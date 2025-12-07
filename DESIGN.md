@@ -240,15 +240,15 @@ The plugin leverages the native Notes feature introduced in WordPress 6.9:
 ```php
 // Creating a note on a block
 wp_insert_comment( array(
-    'comment_type'    => 'block_comment',
+    'comment_type'    => 'note',
     'comment_post_ID' => $post_id,
     'comment_content' => $feedback_text,
     'comment_meta'    => array(
-        'block_id'    => $block_client_id,
         'ai_feedback' => true,
         'review_id'   => $review_id,
     ),
 ) );
+// Note: Link notes to blocks via block attribute metadata (noteId on the block)
 ```
 
 ```javascript
@@ -289,8 +289,8 @@ add_action( 'wp_abilities_api_init', function() {
                 'notes_count' => array( 'type' => 'integer' ),
             ),
         ),
-        'permission_callback' => function() {
-            return current_user_can( 'edit_posts' );
+        'permission_callback' => function( $post_id ) {
+            return current_user_can( 'edit_post', $post_id );
         },
         'execute_callback' => array( 'AI_Feedback\Review_Service', 'execute_review' ),
         'meta' => array(

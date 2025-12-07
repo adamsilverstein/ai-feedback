@@ -189,14 +189,14 @@ X-WP-Nonce: {nonce}
   "default_tone": "professional",
   "available_models": [
     {
-      "id": "claude-sonnet-4",
+      "id": "claude-sonnet-4-20250514",
       "name": "Claude Sonnet 4",
       "provider": "anthropic",
       "capabilities": ["text"],
       "max_tokens": 200000
     },
     {
-      "id": "claude-opus-4",
+      "id": "claude-opus-4-20250514",
       "name": "Claude Opus 4",
       "provider": "anthropic",
       "capabilities": ["text"],
