@@ -34,6 +34,13 @@ class Plugin {
 	private ?Review_Controller $review_controller = null;
 
 	/**
+	 * Notes controller instance.
+	 *
+	 * @var Notes_Controller|null
+	 */
+	private ?Notes_Controller $notes_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -81,6 +88,9 @@ class Plugin {
 
 		$this->review_controller = new Review_Controller();
 		$this->review_controller->register_routes();
+
+		$this->notes_controller = new Notes_Controller();
+		$this->notes_controller->register_routes();
 	}
 
 	/**

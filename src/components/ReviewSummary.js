@@ -83,12 +83,32 @@ export default function ReviewSummary( { review } ) {
 			) }
 
 			{ notes && notes.length > 0 && (
-				<p className="description">
-					{ __(
-						'Feedback notes have been attached to your content blocks. Look for the note indicators in the editor.',
-						'ai-feedback'
+				<div className="notes-info">
+					<p className="description">
+						{ __(
+							'Feedback notes have been attached to your content blocks. Look for the note indicators in the editor.',
+							'ai-feedback'
+						) }
+					</p>
+					{ review.note_ids && review.note_ids.length > 0 && (
+						<p className="success">
+							✓{ ' ' }
+							{ __( 'Created', 'ai-feedback' ) }{ ' ' }
+							{ review.note_ids.length }{ ' ' }
+							{ __( 'WordPress Notes', 'ai-feedback' ) }
+						</p>
 					) }
-				</p>
+					{ review.notes_error && (
+						<p className="error">
+							⚠{ ' ' }
+							{ __(
+								'Note creation warning:',
+								'ai-feedback'
+							) }{ ' ' }
+							{ review.notes_error }
+						</p>
+					) }
+				</div>
 			) }
 		</div>
 	);

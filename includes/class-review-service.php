@@ -31,11 +31,19 @@ class Review_Service {
 	private Response_Parser $response_parser;
 
 	/**
+	 * Notes manager instance.
+	 *
+	 * @var Notes_Manager
+	 */
+	private Notes_Manager $notes_manager;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		$this->prompt_builder  = new Prompt_Builder();
 		$this->response_parser = new Response_Parser();
+		$this->notes_manager   = new Notes_Manager();
 	}
 
 	/**
@@ -114,14 +122,45 @@ class Review_Service {
 		// Generate review ID.
 		$review_id = wp_generate_uuid4();
 
-		// Build response.
+		// Build review data.
+		$review_data = array(
+			'review_id' => $review_id,
+			'post_id'   => $post_id,
+			'model'     => $model,
+			'timestamp' => current_time( 'mysql' ),
+		);
+
+		// Create WordPress Notes from feedback.
+		$note_ids = $this->notes_manager->create_notes_from_feedback(
+			$feedback_items,
+			$post_id,
+			$review_data
+		);
+
+		// Check if note creation failed.
+		if ( is_wp_error( $note_ids ) ) {
+			// Still return the feedback data, but include error.
+			return array(
+				'review_id'       => $review_id,
+				'post_id'         => $post_id,
+				'model'           => $model,
+				'notes'           => $feedback_items,
+				'summary'         => $summary,
+				'timestamp'       => $review_data['timestamp'],
+				'note_ids'        => array(),
+				'notes_error'     => $note_ids->get_error_message(),
+			);
+		}
+
+		// Build response with note IDs.
 		return array(
 			'review_id' => $review_id,
 			'post_id'   => $post_id,
 			'model'     => $model,
 			'notes'     => $feedback_items,
+			'note_ids'  => $note_ids,
 			'summary'   => $summary,
-			'timestamp' => current_time( 'mysql' ),
+			'timestamp' => $review_data['timestamp'],
 		);
 	}
 
