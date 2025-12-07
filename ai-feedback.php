@@ -35,6 +35,36 @@ if ( file_exists( AI_FEEDBACK_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
 	require_once AI_FEEDBACK_PLUGIN_DIR . 'vendor/autoload.php';
 }
 
+// Simple autoloader for plugin classes.
+spl_autoload_register(
+	function ( $class ) {
+		// Check if this is our namespace.
+		if ( strpos( $class, 'AI_Feedback\\' ) !== 0 ) {
+			return;
+		}
+
+		// Remove namespace prefix.
+		$class = str_replace( 'AI_Feedback\\', '', $class );
+
+		// Convert class name to file name.
+		$file = 'class-' . strtolower( str_replace( '_', '-', $class ) ) . '.php';
+
+		// Build full file path.
+		$path = AI_FEEDBACK_PLUGIN_DIR . 'includes/' . $file;
+
+		// Require the file if it exists.
+		if ( file_exists( $path ) ) {
+			require_once $path;
+		}
+	}
+);
+
+// Enable mock mode for testing without AI API calls.
+// Set this to true in wp-config.php: define( 'AI_FEEDBACK_MOCK_MODE', true );
+if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
+	define( 'AI_FEEDBACK_MOCK_MODE', false );
+}
+
 /**
  * Initialize the plugin.
  */

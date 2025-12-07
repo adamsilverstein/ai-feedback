@@ -27,6 +27,13 @@ class Plugin {
 	private ?Settings_Controller $settings_controller = null;
 
 	/**
+	 * Review controller instance.
+	 *
+	 * @var Review_Controller|null
+	 */
+	private ?Review_Controller $review_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -71,6 +78,9 @@ class Plugin {
 	public function register_rest_routes(): void {
 		$this->settings_controller = new Settings_Controller();
 		$this->settings_controller->register_routes();
+
+		$this->review_controller = new Review_Controller();
+		$this->review_controller->register_routes();
 	}
 
 	/**
