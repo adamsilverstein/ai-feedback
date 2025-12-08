@@ -6,8 +6,8 @@
  * Version: 0.1.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
- * Author: Your Name
- * Author URI: https://yourwebsite.com
+ * Author: Adam Silverstein
+ * Author URI: https://wordpress.org/profiles/adamsilverstein/
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: ai-feedback
