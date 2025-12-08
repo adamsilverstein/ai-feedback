@@ -1,0 +1,115 @@
+/**
+ * AI Feedback Plugin Styles
+ */
+
+.ai-feedback-panel {
+	padding: 16px;
+
+	.components-notice {
+		margin: 0 0 16px;
+	}
+}
+
+.ai-feedback-settings {
+	fieldset {
+		margin-bottom: 16px;
+		padding: 0;
+		border: 0;
+
+		legend {
+			font-weight: 600;
+			margin-bottom: 8px;
+		}
+
+		.description {
+			margin: 0 0 12px;
+			color: #757575;
+			font-size: 13px;
+		}
+	}
+
+	.components-base-control {
+		margin-bottom: 12px;
+	}
+}
+
+.ai-feedback-review-button {
+	.components-button {
+		width: 100%;
+		justify-content: center;
+		margin-bottom: 8px;
+	}
+
+	.description {
+		margin: 8px 0 0;
+		color: #757575;
+		font-size: 13px;
+		text-align: center;
+	}
+}
+
+.ai-feedback-review-summary {
+	.summary-stats {
+		display: flex;
+		gap: 16px;
+		margin-bottom: 16px;
+
+		.stat {
+			display: flex;
+			flex-direction: column;
+			padding: 12px;
+			background: #f0f0f0;
+			border-radius: 4px;
+			flex: 1;
+
+			strong {
+				font-size: 24px;
+				color: #1e1e1e;
+				margin-bottom: 4px;
+			}
+
+			span {
+				font-size: 12px;
+				color: #757575;
+			}
+		}
+	}
+
+	.summary-by-severity,
+	.summary-by-category {
+		margin-bottom: 16px;
+
+		h4 {
+			font-size: 13px;
+			font-weight: 600;
+			margin: 0 0 8px;
+		}
+
+		ul {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+
+			li {
+				padding: 4px 0;
+				font-size: 13px;
+				color: #1e1e1e;
+			}
+		}
+	}
+
+	.model-used {
+		margin: 16px 0 0;
+		font-size: 12px;
+		color: #757575;
+	}
+
+	.description {
+		margin: 16px 0 0;
+		padding: 12px;
+		background: #e7f5fe;
+		border-left: 3px solid #0073aa;
+		font-size: 13px;
+		color: #1e1e1e;
+	}
+}
