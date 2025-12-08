@@ -202,7 +202,7 @@ class Review_Service {
 	 */
 	private function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
 		// Check if PHP AI Client is available.
-		if ( ! function_exists( 'Jelix\AI\AiClient' ) ) {
+		if ( ! class_exists( 'Jelix\AI\AiClient' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
 				__( 'PHP AI Client library is not installed. Please run: composer install', 'ai-feedback' )
