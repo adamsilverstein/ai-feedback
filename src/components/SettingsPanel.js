@@ -47,19 +47,16 @@ export default function SettingsPanel() {
 	// Create debounced update function with 500ms delay
 	const debouncedUpdateRef = useRef(null);
 
-	// Initialize debounced function
-	if (!debouncedUpdateRef.current) {
-		debouncedUpdateRef.current = debounce(updateSettings, 500);
-	}
-
-	// Cleanup on unmount
+	// Initialize debounced function and cleanup on unmount
 	useEffect(() => {
+		debouncedUpdateRef.current = debounce(updateSettings, 500);
+
 		return () => {
 			if (debouncedUpdateRef.current) {
 				debouncedUpdateRef.current.cancel();
 			}
 		};
-	}, []);
+	}, [updateSettings]);
 
 	const handleFocusAreaChange = useCallback(
 		(areaId, checked) => {
