@@ -13,21 +13,24 @@ import './index.scss';
 /**
  * Register the AI Feedback plugin.
  */
-registerPlugin( 'ai-feedback', {
+registerPlugin('ai-feedback', {
 	render: () => {
 		return (
 			<>
-				<PluginSidebarMoreMenuItem target="ai-feedback-sidebar" icon={ icon }>
-					{ __( 'AI Feedback', 'ai-feedback' ) }
+				<PluginSidebarMoreMenuItem
+					target="ai-feedback-sidebar"
+					icon={icon}
+				>
+					{__('AI Feedback', 'ai-feedback')}
 				</PluginSidebarMoreMenuItem>
 				<PluginSidebar
 					name="ai-feedback-sidebar"
-					title={ __( 'AI Feedback', 'ai-feedback' ) }
-					icon={ icon }
+					title={__('AI Feedback', 'ai-feedback')}
+					icon={icon}
 				>
 					<AIFeedbackPanel />
 				</PluginSidebar>
 			</>
 		);
 	},
-} );
+});

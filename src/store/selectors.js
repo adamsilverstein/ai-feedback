@@ -8,7 +8,7 @@
  * @param {Object} state Store state.
  * @return {Object} Settings object.
  */
-export function getSettings( state ) {
+export function getSettings(state) {
 	return state.settings;
 }
 
@@ -18,7 +18,7 @@ export function getSettings( state ) {
  * @param {Object} state Store state.
  * @return {Array} Available models.
  */
-export function getAvailableModels( state ) {
+export function getAvailableModels(state) {
 	return state.availableModels;
 }
 
@@ -28,7 +28,7 @@ export function getAvailableModels( state ) {
  * @param {Object} state Store state.
  * @return {string} Selected model ID.
  */
-export function getSelectedModel( state ) {
+export function getSelectedModel(state) {
 	return state.settings.defaultModel;
 }
 
@@ -38,7 +38,7 @@ export function getSelectedModel( state ) {
  * @param {Object} state Store state.
  * @return {Array} Available focus areas.
  */
-export function getAvailableFocusAreas( state ) {
+export function getAvailableFocusAreas(state) {
 	return state.availableFocusAreas;
 }
 
@@ -48,7 +48,7 @@ export function getAvailableFocusAreas( state ) {
  * @param {Object} state Store state.
  * @return {Array} Selected focus areas.
  */
-export function getFocusAreas( state ) {
+export function getFocusAreas(state) {
 	return state.settings.defaultFocusAreas;
 }
 
@@ -58,7 +58,7 @@ export function getFocusAreas( state ) {
  * @param {Object} state Store state.
  * @return {Array} Available tones.
  */
-export function getAvailableTones( state ) {
+export function getAvailableTones(state) {
 	return state.availableTones;
 }
 
@@ -68,7 +68,7 @@ export function getAvailableTones( state ) {
  * @param {Object} state Store state.
  * @return {string} Target tone.
  */
-export function getTargetTone( state ) {
+export function getTargetTone(state) {
 	return state.settings.defaultTone;
 }
 
@@ -78,7 +78,7 @@ export function getTargetTone( state ) {
  * @param {Object} state Store state.
  * @return {boolean} True if reviewing.
  */
-export function isReviewing( state ) {
+export function isReviewing(state) {
 	return state.isReviewing;
 }
 
@@ -88,7 +88,7 @@ export function isReviewing( state ) {
  * @param {Object} state Store state.
  * @return {Object|null} Last review object or null.
  */
-export function getLastReview( state ) {
+export function getLastReview(state) {
 	return state.lastReview;
 }
 
@@ -98,7 +98,7 @@ export function getLastReview( state ) {
  * @param {Object} state Store state.
  * @return {Array} Array of review objects.
  */
-export function getReviewHistory( state ) {
+export function getReviewHistory(state) {
 	return state.reviewHistory;
 }
 
@@ -108,7 +108,7 @@ export function getReviewHistory( state ) {
  * @param {Object} state Store state.
  * @return {Error|null} Error object or null.
  */
-export function getError( state ) {
+export function getError(state) {
 	return state.error;
 }
 
@@ -118,7 +118,7 @@ export function getError( state ) {
  * @param {Object} state Store state.
  * @return {boolean} True if loading.
  */
-export function isLoadingSettings( state ) {
+export function isLoadingSettings(state) {
 	return state.isLoadingSettings;
 }
 
@@ -128,11 +128,11 @@ export function isLoadingSettings( state ) {
  * @param {Object} state Store state.
  * @return {number} Count of unresolved notes.
  */
-export function getUnresolvedNotesCount( state ) {
-	if ( ! state.lastReview || ! state.lastReview.notes ) {
+export function getUnresolvedNotesCount(state) {
+	if (!state.lastReview || !state.lastReview.notes) {
 		return 0;
 	}
-	return state.lastReview.notes.filter( ( note ) => ! note.resolved ).length;
+	return state.lastReview.notes.filter((note) => !note.resolved).length;
 }
 
 /**
@@ -141,6 +141,6 @@ export function getUnresolvedNotesCount( state ) {
  * @param {Object} state Store state.
  * @return {boolean} True if there's an error.
  */
-export function hasError( state ) {
+export function hasError(state) {
 	return state.error !== null;
 }

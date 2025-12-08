@@ -19,7 +19,7 @@ const storeConfig = {
 	resolvers: {
 		*getSettings() {
 			const settings = yield actions.fetchSettings();
-			return actions.receiveSettings( settings );
+			return actions.receiveSettings(settings);
 		},
 	},
 };
@@ -27,8 +27,8 @@ const storeConfig = {
 /**
  * Create and register the store.
  */
-const store = createReduxStore( STORE_NAME, storeConfig );
-register( store );
+const store = createReduxStore(STORE_NAME, storeConfig);
+register(store);
 
 export { STORE_NAME };
 export default store;
