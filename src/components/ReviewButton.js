@@ -15,66 +15,61 @@ import { STORE_NAME } from '../store';
 export default function ReviewButton() {
 	const { postId, isReviewing, selectedModel, focusAreas, targetTone } =
 		useSelect(
-			( select ) => ( {
-				postId: select( editorStore ).getCurrentPostId(),
-				isReviewing: select( STORE_NAME ).isReviewing(),
-				selectedModel: select( STORE_NAME ).getSelectedModel(),
-				focusAreas: select( STORE_NAME ).getFocusAreas(),
-				targetTone: select( STORE_NAME ).getTargetTone(),
-			} ),
+			(select) => ({
+				postId: select(editorStore).getCurrentPostId(),
+				isReviewing: select(STORE_NAME).isReviewing(),
+				selectedModel: select(STORE_NAME).getSelectedModel(),
+				focusAreas: select(STORE_NAME).getFocusAreas(),
+				targetTone: select(STORE_NAME).getTargetTone(),
+			}),
 			[]
 		);
 
-	const { startReview } = useDispatch( STORE_NAME );
+	const { startReview } = useDispatch(STORE_NAME);
 
 	const handleReview = async () => {
-		if ( ! postId ) {
+		if (!postId) {
 			return;
 		}
 
 		try {
-			await startReview( {
+			await startReview({
 				postId,
 				model: selectedModel,
 				focusAreas,
 				targetTone,
-			} );
-		} catch ( error ) {
+			});
+		} catch (error) {
 			// Error is already in the store
-			console.error( 'Review failed:', error );
+			// eslint-disable-next-line no-console
+			console.error('Review failed:', error);
 		}
 	};
 
-	const isDisabled = ! postId || isReviewing;
+	const isDisabled = !postId || isReviewing;
 
 	return (
 		<div className="ai-feedback-review-button">
 			<Button
 				variant="primary"
-				onClick={ handleReview }
-				disabled={ isDisabled }
-				isBusy={ isReviewing }
+				onClick={handleReview}
+				disabled={isDisabled}
+				isBusy={isReviewing}
 			>
-				{ isReviewing
-					? __( 'Reviewing...', 'ai-feedback' )
-					: __( 'Review Document', 'ai-feedback' ) }
+				{isReviewing
+					? __('Reviewing…', 'ai-feedback')
+					: __('Review Document', 'ai-feedback')}
 			</Button>
-			{ ! postId && (
+			{!postId && (
 				<p className="description">
-					{ __(
-						'Save your post first to enable review',
-						'ai-feedback'
-					) }
+					{__('Save your post first to enable review', 'ai-feedback')}
 				</p>
-			) }
-			{ isReviewing && (
+			)}
+			{isReviewing && (
 				<p className="description">
-					{ __(
-						'AI is analyzing your content...',
-						'ai-feedback'
-					) }
+					{__('AI is analyzing your content…', 'ai-feedback')}
 				</p>
-			) }
+			)}
 		</div>
 	);
 }

@@ -11,6 +11,7 @@
 }
 
 .ai-feedback-settings {
+
 	fieldset {
 		margin-bottom: 16px;
 		padding: 0;
@@ -34,12 +35,14 @@
 }
 
 .ai-feedback-review-button {
+
 	.components-button {
 		width: 100%;
 		justify-content: center;
 		margin-bottom: 8px;
 	}
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	.description {
 		margin: 8px 0 0;
 		color: #757575;
@@ -49,6 +52,7 @@
 }
 
 .ai-feedback-review-summary {
+
 	.summary-stats {
 		display: flex;
 		gap: 16px;
@@ -104,6 +108,7 @@
 		color: #757575;
 	}
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	.description {
 		margin: 16px 0 0;
 		padding: 12px;

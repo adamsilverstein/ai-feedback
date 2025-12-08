@@ -1,51 +1,51 @@
 {
-  "name": "ai-feedback",
-  "version": "0.1.0",
-  "description": "AI-powered editorial feedback for WordPress Gutenberg editor",
-  "author": "Your Name",
-  "license": "GPL-2.0-or-later",
-  "main": "build/index.js",
-  "scripts": {
-    "build": "wp-scripts build",
-    "start": "wp-scripts start",
-    "format": "wp-scripts format",
-    "lint:js": "wp-scripts lint-js",
-    "lint:css": "wp-scripts lint-style",
-    "lint:pkg-json": "wp-scripts lint-pkg-json",
-    "test:unit": "wp-scripts test-unit-js",
-    "test:unit:watch": "wp-scripts test-unit-js --watch",
-    "test:e2e": "wp-scripts test-e2e",
-    "test:e2e:watch": "wp-scripts test-e2e --watch",
-    "test:visual": "playwright test --config=tests/visual/playwright.config.js",
-    "test:all": "npm run lint:js && npm run lint:css && npm run test:unit && npm run test:e2e",
-    "env:start": "wp-env start",
-    "env:stop": "wp-env stop",
-    "env:clean": "wp-env clean",
-    "plugin-zip": "wp-scripts plugin-zip"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.40.0",
-    "@testing-library/jest-dom": "^6.1.5",
-    "@testing-library/react": "^14.1.2",
-    "@wordpress/env": "^9.0.0",
-    "@wordpress/scripts": "^31.1.0",
-    "prettier": "^3.1.0"
-  },
-  "dependencies": {
-    "@wordpress/api-fetch": "^7.0.0",
-    "@wordpress/components": "^27.0.0",
-    "@wordpress/compose": "^7.0.0",
-    "@wordpress/data": "^10.0.0",
-    "@wordpress/edit-post": "^8.0.0",
-    "@wordpress/editor": "^14.0.0",
-    "@wordpress/element": "^6.0.0",
-    "@wordpress/i18n": "^5.0.0",
-    "@wordpress/icons": "^10.0.0",
-    "@wordpress/notices": "^5.0.0",
-    "@wordpress/plugins": "^7.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
-  }
+	"name": "ai-feedback",
+	"version": "0.1.0",
+	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
+	"author": "Your Name",
+	"license": "GPL-2.0-or-later",
+	"main": "build/index.js",
+	"scripts": {
+		"build": "wp-scripts build",
+		"start": "wp-scripts start",
+		"format": "wp-scripts format",
+		"lint:js": "wp-scripts lint-js",
+		"lint:css": "wp-scripts lint-style",
+		"lint:pkg-json": "wp-scripts lint-pkg-json",
+		"test:unit": "wp-scripts test-unit-js",
+		"test:unit:watch": "wp-scripts test-unit-js --watch",
+		"test:e2e": "wp-scripts test-e2e",
+		"test:e2e:watch": "wp-scripts test-e2e --watch",
+		"test:visual": "playwright test --config=tests/visual/playwright.config.js",
+		"test:all": "npm run lint:js && npm run lint:css && npm run test:unit && npm run test:e2e",
+		"env:start": "wp-env start",
+		"env:stop": "wp-env stop",
+		"env:clean": "wp-env clean",
+		"plugin-zip": "wp-scripts plugin-zip"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.57.0",
+		"@testing-library/jest-dom": "^6.9.1",
+		"@testing-library/react": "^16.3.0",
+		"@wordpress/env": "^10.36.0",
+		"@wordpress/scripts": "^31.1.0",
+		"prettier": "^3.7.4"
+	},
+	"dependencies": {
+		"@wordpress/api-fetch": "^7.36.0",
+		"@wordpress/components": "^30.9.0",
+		"@wordpress/compose": "^7.36.0",
+		"@wordpress/data": "^10.36.0",
+		"@wordpress/edit-post": "^8.36.0",
+		"@wordpress/editor": "^14.36.0",
+		"@wordpress/element": "^6.36.0",
+		"@wordpress/i18n": "^6.9.0",
+		"@wordpress/icons": "^11.3.0",
+		"@wordpress/notices": "^5.36.0",
+		"@wordpress/plugins": "^7.36.0"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"npm": ">=9.0.0"
+	}
 }

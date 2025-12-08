@@ -8,7 +8,7 @@
 export const initialState = {
 	settings: {
 		defaultModel: 'claude-sonnet-4',
-		defaultFocusAreas: [ 'content', 'tone', 'flow' ],
+		defaultFocusAreas: ['content', 'tone', 'flow'],
 		defaultTone: 'professional',
 	},
 	availableModels: [],
@@ -45,8 +45,8 @@ export const TYPES = {
  * @param {Object} action Action object.
  * @return {Object} New state.
  */
-export default function reducer( state = initialState, action ) {
-	switch ( action.type ) {
+export default function reducer(state = initialState, action) {
+	switch (action.type) {
 		case TYPES.SET_SETTINGS:
 			return {
 				...state,
@@ -56,7 +56,8 @@ export default function reducer( state = initialState, action ) {
 					defaultTone: action.settings.default_tone,
 				},
 				availableModels: action.settings.available_models || [],
-				availableFocusAreas: action.settings.available_focus_areas || [],
+				availableFocusAreas:
+					action.settings.available_focus_areas || [],
 				availableTones: action.settings.available_tones || [],
 				isLoadingSettings: false,
 			};
@@ -100,7 +101,7 @@ export default function reducer( state = initialState, action ) {
 				...state,
 				isReviewing: false,
 				lastReview: action.review,
-				reviewHistory: [ action.review, ...state.reviewHistory ],
+				reviewHistory: [action.review, ...state.reviewHistory],
 			};
 
 		case TYPES.REVIEW_ERROR:
@@ -113,7 +114,7 @@ export default function reducer( state = initialState, action ) {
 		case TYPES.ADD_TO_HISTORY:
 			return {
 				...state,
-				reviewHistory: [ action.review, ...state.reviewHistory ],
+				reviewHistory: [action.review, ...state.reviewHistory],
 			};
 
 		case TYPES.CLEAR_ERROR:
