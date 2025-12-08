@@ -215,7 +215,7 @@ class Review_Service {
 				->usingSystemInstruction( $system_instruction )
 				->usingModel( $model )
 				->usingTemperature( 0.3 ) // Lower temperature for consistent feedback.
-				->withMaxTokens( 2000 ) // Enough for detailed feedback.
+				->withMaxTokens( 8000 ) // Sufficient for large documents with many blocks.
 				->withTimeout( 60 ) // 60 second timeout.
 				->generateText();
 
