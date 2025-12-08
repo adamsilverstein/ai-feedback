@@ -4,7 +4,25 @@
 import { CheckboxControl, SelectControl } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
+import { useRef, useEffect, useCallback } from '@wordpress/element';
 import { STORE_NAME } from '../store';
+
+/**
+ * Custom debounce implementation.
+ *
+ * @param {Function} func  Function to debounce.
+ * @param {number}   delay Delay in milliseconds.
+ * @return {Function} Debounced function with cancel method.
+ */
+function debounce(func, delay) {
+	let timeoutId;
+	const debounced = function (...args) {
+		clearTimeout(timeoutId);
+		timeoutId = setTimeout(() => func.apply(this, args), delay);
+	};
+	debounced.cancel = () => clearTimeout(timeoutId);
+	return debounced;
+}
 
 /**
  * Settings Panel component.
@@ -26,21 +44,41 @@ export default function SettingsPanel() {
 
 	const { updateSettings } = useDispatch(STORE_NAME);
 
-	const handleFocusAreaChange = (areaId, checked) => {
-		const newFocusAreas = checked
-			? [...focusAreas, areaId]
-			: focusAreas.filter((id) => id !== areaId);
+	// Create debounced update function with 500ms delay
+	const debouncedUpdateRef = useRef(null);
 
-		updateSettings({
-			default_focus_areas: newFocusAreas,
-		});
-	};
+	// Initialize debounced function
+	if (!debouncedUpdateRef.current) {
+		debouncedUpdateRef.current = debounce(updateSettings, 500);
+	}
 
-	const handleToneChange = (value) => {
-		updateSettings({
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (debouncedUpdateRef.current) {
+				debouncedUpdateRef.current.cancel();
+			}
+		};
+	}, []);
+
+	const handleFocusAreaChange = useCallback(
+		(areaId, checked) => {
+			const newFocusAreas = checked
+				? [...focusAreas, areaId]
+				: focusAreas.filter((id) => id !== areaId);
+
+			debouncedUpdateRef.current({
+				default_focus_areas: newFocusAreas,
+			});
+		},
+		[focusAreas]
+	);
+
+	const handleToneChange = useCallback((value) => {
+		debouncedUpdateRef.current({
 			default_tone: value,
 		});
-	};
+	}, []);
 
 	return (
 		<div className="ai-feedback-settings">
