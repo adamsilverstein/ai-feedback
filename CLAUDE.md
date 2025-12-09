@@ -104,7 +104,7 @@ add_action( 'wp_abilities_api_init', function() {
 Provider-agnostic AI communication:
 
 ```php
-use function Jelix\AI\AiClient;
+use WordPress\AiClient\AiClient;
 
 $response = AiClient::prompt( $prompt )
     ->usingSystemInstruction( $system_prompt )

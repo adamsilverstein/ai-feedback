@@ -10,6 +10,8 @@
 namespace AI_Feedback;
 
 use WP_Error;
+use WordPress\AiClient\AiClient;
+use WordPress\AiClient\Providers\Http\DTO\RequestOptions;
 
 /**
  * Review Service class.
@@ -202,7 +204,7 @@ class Review_Service {
 	 */
 	private function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
 		// Check if PHP AI Client is available.
-		if ( ! class_exists( 'Jelix\AI\AiClient' ) ) {
+		if ( ! class_exists( 'WordPress\AiClient\AiClient' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
 				__( 'PHP AI Client library is not installed. Please run: composer install', 'ai-feedback' )
@@ -210,13 +212,17 @@ class Review_Service {
 		}
 
 		try {
-			// Call AI using PHP AI Client.
-			$response = \Jelix\AI\AiClient::prompt( $prompt )
+			// Create request options with timeout.
+			$request_options = new RequestOptions();
+			$request_options->setTimeout( 60.0 ); // 60 second timeout.
+
+			// Call AI using WordPress PHP AI Client.
+			$response = AiClient::prompt( $prompt )
 				->usingSystemInstruction( $system_instruction )
-				->usingModel( $model )
+				->usingModelPreference( $model )
 				->usingTemperature( 0.3 ) // Lower temperature for consistent feedback.
-				->withMaxTokens( 8000 ) // Sufficient for large documents; within limits of all supported models.
-				->withTimeout( 60 ) // 60 second timeout.
+				->usingMaxTokens( 8000 ) // Sufficient for large documents; within limits of all supported models.
+				->usingRequestOptions( $request_options )
 				->generateText();
 
 			return $response;
