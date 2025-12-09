@@ -330,7 +330,7 @@ registerPlugin( 'ai-feedback', {
 #### Using PHP AI Client
 
 ```php
-use function Jelix\AI\AiClient;
+use WordPress\AiClient\AiClient;
 
 class Review_Service {
     public function review_document( int $post_id, array $options = array() ): array {
