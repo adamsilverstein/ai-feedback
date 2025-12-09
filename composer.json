@@ -5,7 +5,8 @@
 	"license": "GPL-2.0-or-later",
 	"require": {
 		"php": ">=8.0",
-		"wordpress/php-ai-client": "^0.3.0"
+		"wordpress/php-ai-client": "^0.3.0",
+		"wordpress/wp-ai-client": "^0.2.1"
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^10.5",
