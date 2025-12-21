@@ -71,9 +71,9 @@ class Review_Service {
 		$content = ! empty( $options['content'] ) ? $options['content'] : $post->post_content;
 
 		if ( ! empty( $options['content'] ) ) {
-			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ) ) );
+			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ?? '' ) ) );
 		} else {
-			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ) ) );
+			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ?? '' ) ) );
 		}
 
 		// Parse blocks from content.
