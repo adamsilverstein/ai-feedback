@@ -81,12 +81,21 @@ export function* updateSettings(settings) {
  *
  * @param {Object} options            Review options.
  * @param {number} options.postId     Post ID to review.
+ * @param {string} options.content    Post content from editor.
+ * @param {string} options.title      Post title from editor.
  * @param {string} options.model      AI model to use.
  * @param {Array}  options.focusAreas Focus areas.
  * @param {string} options.targetTone Target tone.
  * @return {Object} Action object.
  */
-export function* startReview({ postId, model, focusAreas, targetTone }) {
+export function* startReview({
+	postId,
+	content,
+	title,
+	model,
+	focusAreas,
+	targetTone,
+}) {
 	yield { type: TYPES.START_REVIEW };
 
 	try {
@@ -95,6 +104,8 @@ export function* startReview({ postId, model, focusAreas, targetTone }) {
 			method: 'POST',
 			data: {
 				post_id: postId,
+				content,
+				title,
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
