@@ -6,6 +6,7 @@
  * Version: 0.1.0
  * Requires at least: 6.9
  * Requires PHP: 8.0
+ * Requires Plugins: ai
  * Author: Adam Silverstein
  * Author URI: https://wordpress.org/profiles/adamsilverstein/
  * License: GPL v2 or later
@@ -65,6 +66,11 @@ if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', false );
 }
 
+// Include plugin.php for is_plugin_active function.
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+}
+
 /**
  * Initialize the plugin.
  */
@@ -78,6 +84,12 @@ function init() {
 	// Check PHP version.
 	if ( version_compare( PHP_VERSION, '8.0', '<' ) ) {
 		add_action( 'admin_notices', __NAMESPACE__ . '\\display_php_version_notice' );
+		return;
+	}
+
+	// Check for AI Experiments plugin dependency.
+	if ( ! is_plugin_active( 'ai/ai.php' ) && ! is_plugin_active( 'ai-experiments/ai.php' ) ) {
+		add_action( 'admin_notices', __NAMESPACE__ . '\\display_ai_plugin_notice' );
 		return;
 	}
 
@@ -117,6 +129,25 @@ function display_php_version_notice() {
 				/* translators: %s: required PHP version */
 				esc_html__( 'AI Feedback requires PHP %s or higher.', 'ai-feedback' ),
 				'8.0'
+			);
+			?>
+		</p>
+	</div>
+	<?php
+}
+
+/**
+ * Display AI Experiments plugin notice.
+ */
+function display_ai_plugin_notice() {
+	?>
+	<div class="notice notice-error">
+		<p>
+			<?php
+			printf(
+				/* translators: %s: link to AI plugin */
+				wp_kses_post( __( 'AI Feedback requires the <a href="%s" target="_blank">WordPress AI Experiments plugin</a> to be installed and activated.', 'ai-feedback' ) ),
+				'https://wordpress.org/plugins/ai/'
 			);
 			?>
 		</p>
