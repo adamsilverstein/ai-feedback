@@ -30,6 +30,7 @@ function getErrorAction(error) {
 	// these keywords in a stable format.
 	if (
 		error.code === 'ai_request_failed' &&
+		typeof error.message === 'string' &&
 		(error.message.toLowerCase().includes('credit') ||
 			error.message.toLowerCase().includes('billing'))
 	) {
@@ -38,6 +39,7 @@ function getErrorAction(error) {
 				variant="link"
 				href={SETTINGS_PAGE_URL}
 				target="_blank"
+				rel="noopener noreferrer"
 				className="ai-feedback-error-action"
 			>
 				{__('Go to Settings', 'ai-feedback')}
