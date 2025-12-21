@@ -147,3 +147,5 @@ function deactivate() {
 	flush_rewrite_rules();
 }
 register_deactivation_hook( __FILE__, __NAMESPACE__ . '\\deactivate' );
+
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-logger.php';
