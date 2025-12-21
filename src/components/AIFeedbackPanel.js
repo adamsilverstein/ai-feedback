@@ -23,7 +23,11 @@ const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
  * @return {JSX.Element|null} Action button or null.
  */
 function getErrorAction(error) {
-	// Check if error is related to API credits or billing
+	// Check if error is related to API credits or billing.
+	// Note: We use string matching on error messages because the PHP AI Client
+	// wraps all AI provider errors under the same 'ai_request_failed' code.
+	// Credit/billing errors from providers (Anthropic, OpenAI) typically include
+	// these keywords in a stable format.
 	if (
 		error.code === 'ai_request_failed' &&
 		(error.message.toLowerCase().includes('credit') ||
