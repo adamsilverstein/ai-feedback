@@ -68,16 +68,16 @@ class Review_Service {
 		}
 
 		// Use content from editor if provided, otherwise fall back to saved content.
-		$content = ! empty( $options['content'] ) ? $options['content'] : $post->post_content;
+		$content = $options['content'] ?? $post->post_content ?? '';
 
 		if ( ! empty( $options['content'] ) ) {
-			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ?? '' ) ) );
+			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ) ) );
 		} else {
-			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ?? '' ) ) );
+			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ) ) );
 		}
 
 		// Parse blocks from content.
-		$blocks = parse_blocks( $content ?? '' );
+		$blocks = parse_blocks( $content );
 
 		// Filter out empty blocks.
 		$blocks = $this->filter_blocks( $blocks );
