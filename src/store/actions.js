@@ -22,7 +22,11 @@ export function* fetchSettings() {
 	} catch (error) {
 		yield {
 			type: TYPES.REVIEW_ERROR,
-			error: new Error(error.message || 'Failed to fetch settings'),
+			error: {
+				code: error.code || 'unknown_error',
+				message: error.message || 'Failed to fetch settings',
+				data: error.data || null,
+			},
 		};
 		throw error;
 	}
@@ -62,7 +66,11 @@ export function* updateSettings(settings) {
 	} catch (error) {
 		yield {
 			type: TYPES.REVIEW_ERROR,
-			error: new Error(error.message || 'Failed to update settings'),
+			error: {
+				code: error.code || 'unknown_error',
+				message: error.message || 'Failed to update settings',
+				data: error.data || null,
+			},
 		};
 		throw error;
 	}
@@ -111,7 +119,11 @@ export function* startReview({
 	} catch (error) {
 		return {
 			type: TYPES.REVIEW_ERROR,
-			error: new Error(error.message || 'Review failed'),
+			error: {
+				code: error.code || 'unknown_error',
+				message: error.message || 'Review failed',
+				data: error.data || null,
+			},
 		};
 	}
 }

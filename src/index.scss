@@ -8,6 +8,45 @@
 	.components-notice {
 		margin: 0 0 16px;
 	}
+
+	.ai-feedback-error-notice {
+
+		.ai-feedback-error-content {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+
+			.ai-feedback-error-message {
+				font-weight: 500;
+				line-height: 1.4;
+			}
+
+			.ai-feedback-error-code {
+				font-size: 12px;
+				color: #757575;
+				font-family: monospace;
+				margin-top: 4px;
+			}
+
+			/* stylelint-disable-next-line no-descending-specificity */
+			.components-button {
+				align-self: flex-start;
+				padding-left: 0;
+				text-decoration: underline;
+			}
+
+			.ai-feedback-error-action {
+				margin-top: 8px;
+			}
+
+			.ai-feedback-error-help {
+				margin-top: 8px;
+				margin-bottom: 0;
+				font-size: 13px;
+				color: #757575;
+			}
+		}
+	}
 }
 
 .ai-feedback-settings {
@@ -36,6 +75,7 @@
 
 .ai-feedback-review-button {
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	.components-button {
 		width: 100%;
 		justify-content: center;

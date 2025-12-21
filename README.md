@@ -19,10 +19,24 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 
 - **WordPress**: 6.9 or higher
 - **PHP**: 8.0 or higher
-- **Node.js**: 18.0 or higher
-- **npm**: 9.0 or higher
+- **Plugins**: [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
+- **Node.js**: 18.0 or higher (for development)
+- **npm**: 9.0 or higher (for development)
 
 ## Installation
+
+### Prerequisites
+
+The AI Feedback plugin requires the [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/) to be installed and activated. The AI Experiments plugin provides:
+- Centralized AI settings screen for configuring API keys
+- Support for multiple AI providers (Anthropic, OpenAI, Google Gemini, etc.)
+- Common interface for AI configuration across WordPress plugins
+
+**Install the AI Experiments plugin first:**
+1. Go to WordPress Admin → Plugins → Add New
+2. Search for "AI Experiments" or "AI"
+3. Click "Install Now" and then "Activate"
+4. Configure your AI provider API keys in Settings → AI
 
 ### 1. Clone the Repository
 
@@ -73,9 +87,19 @@ If using wp-env, the plugin is automatically activated. Otherwise:
 
 ### AI Provider Setup
 
-The plugin uses the [WordPress PHP AI Client](https://github.com/WordPress/php-ai-client) which requires API credentials for your chosen AI provider.
+The plugin uses the [WordPress PHP AI Client](https://github.com/WordPress/php-ai-client) which works in conjunction with the [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/) for managing AI provider credentials.
 
-Configure your AI provider in `wp-config.php`:
+**Option 1: Using the AI Experiments Plugin (Recommended)**
+
+Configure your AI provider through the WordPress admin interface:
+1. Go to Settings → AI in WordPress admin
+2. Select your preferred AI provider (Anthropic, OpenAI, Google Gemini, etc.)
+3. Enter your API key
+4. Save settings
+
+**Option 2: Using wp-config.php**
+
+Alternatively, you can configure your AI provider directly in `wp-config.php`:
 
 ```php
 // For Anthropic Claude (default)
@@ -303,6 +327,7 @@ GPL v2 or later
 
 ## Credits
 
+- Requires [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
 - Built with [WordPress PHP AI Client](https://github.com/WordPress/php-ai-client)
 - Uses WordPress 6.9+ Notes API
 - Powered by AI providers: Anthropic, OpenAI, Google
