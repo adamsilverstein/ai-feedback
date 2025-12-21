@@ -77,7 +77,7 @@ class Review_Service {
 		}
 
 		// Parse blocks from content.
-		$blocks = parse_blocks( $content );
+		$blocks = parse_blocks( $content ?? '' );
 
 		// Filter out empty blocks.
 		$blocks = $this->filter_blocks( $blocks );
