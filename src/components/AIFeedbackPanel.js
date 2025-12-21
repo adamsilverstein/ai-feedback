@@ -12,6 +12,11 @@ import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 
 /**
+ * Settings page URL.
+ */
+const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
+
+/**
  * Get action button for specific error types.
  *
  * @param {Object} error Error object with code, message, and data.
@@ -27,9 +32,9 @@ function getErrorAction(error) {
 		return (
 			<Button
 				variant="link"
-				href="/wp-admin/admin.php?page=ai-feedback-settings"
+				href={SETTINGS_PAGE_URL}
 				target="_blank"
-				style={{ marginTop: '8px' }}
+				className="ai-feedback-error-action"
 			>
 				{__('Go to Settings', 'ai-feedback')}
 			</Button>
@@ -39,7 +44,7 @@ function getErrorAction(error) {
 	// Check for rate limit errors
 	if (error.code === 'rate_limit_exceeded') {
 		return (
-			<p style={{ marginTop: '8px', fontSize: '13px', color: '#757575' }}>
+			<p className="ai-feedback-error-help">
 				{__(
 					'Please wait before making another request.',
 					'ai-feedback'
