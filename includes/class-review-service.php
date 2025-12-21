@@ -53,11 +53,11 @@ class Review_Service {
 	 * Review a document.
 	 *
 	 * @param int   $post_id Post ID to review.
-	 * @param array $options Review options.
+	 * @param array $options Review options including 'blocks' array.
 	 * @return array|WP_Error Review results or error.
 	 */
 	public function review_document( int $post_id, array $options = array() ): array|WP_Error {
-		// Get post.
+		// Get post for fallback title.
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			Logger::debug( sprintf( 'Error: Post %d not found in database', $post_id ) );
@@ -67,30 +67,18 @@ class Review_Service {
 			);
 		}
 
-		// Use content from editor if provided, otherwise fall back to saved content.
-		$content = $options['content'] ?? $post->post_content ?? '';
-
-		if ( ! empty( $options['content'] ) ) {
-			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ) ) );
-		} else {
-			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ) ) );
-		}
-
-		// Parse blocks from content.
-		$blocks = parse_blocks( $content );
-
-		// Filter out empty blocks.
-		$blocks = $this->filter_blocks( $blocks );
-
-		Logger::debug( sprintf( 'Parsed %d blocks from content', count( $blocks ) ) );
+		// Get blocks from options (sent from editor with clientIds).
+		$blocks = $options['blocks'] ?? array();
 
 		if ( empty( $blocks ) ) {
-			Logger::debug( 'Error: No content blocks found to review' );
+			Logger::debug( 'Error: No blocks provided for review' );
 			return new WP_Error(
-				'no_content',
-				__( 'Post has no content to review.', 'ai-feedback' )
+				'no_blocks',
+				__( 'No content blocks provided for review.', 'ai-feedback' )
 			);
 		}
+
+		Logger::debug( sprintf( 'Processing %d blocks for review', count( $blocks ) ) );
 
 		// Validate block count.
 		if ( count( $blocks ) > 100 ) {
@@ -113,30 +101,37 @@ class Review_Service {
 		// Get AI model.
 		$model = $options['model'] ?? 'claude-sonnet-4-20250514';
 
+		Logger::debug( sprintf( 'Calling AI model: %s', $model ) );
+
 		// Check if using mock mode.
 		if ( defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE ) {
 			$ai_response = $this->get_mock_response( $blocks );
+			Logger::debug( 'Using mock response mode' );
 		} else {
 			// Call AI.
 			$ai_response = $this->call_ai( $prompt, $system_instruction, $model );
 
 			if ( is_wp_error( $ai_response ) ) {
+				Logger::debug( sprintf( 'AI request failed: %s', $ai_response->get_error_message() ) );
 				return $ai_response;
 			}
 		}
 
-		// Parse response.
-		$feedback_items = $this->response_parser->parse_feedback( $ai_response, $blocks );
+		Logger::debug( 'AI response received, parsing feedback' );
+
+		// Parse response (now returns summary + feedback).
+		$parsed_response = $this->response_parser->parse_feedback( $ai_response, $blocks );
+
+		$ai_summary     = $parsed_response['summary'] ?? '';
+		$feedback_items = $parsed_response['feedback'] ?? array();
 
 		if ( empty( $feedback_items ) ) {
-			return new WP_Error(
-				'parse_error',
-				__( 'Failed to parse AI response. Please try again.', 'ai-feedback' )
-			);
+			Logger::debug( 'No feedback items parsed from AI response' );
+			// Still allow empty feedback - might be a well-written document!
 		}
 
-		// Get summary.
-		$summary = $this->response_parser->get_feedback_summary( $feedback_items );
+		// Get statistical summary.
+		$stats_summary = $this->response_parser->get_feedback_summary( $feedback_items );
 
 		// Generate review ID.
 		$review_id = wp_generate_uuid4();
@@ -150,65 +145,50 @@ class Review_Service {
 		);
 
 		// Create WordPress Notes from feedback.
-		$note_ids = $this->notes_manager->create_notes_from_feedback(
+		$note_result = $this->notes_manager->create_notes_from_feedback(
 			$feedback_items,
 			$post_id,
 			$review_data
 		);
 
 		// Check if note creation failed.
-		if ( is_wp_error( $note_ids ) ) {
+		if ( is_wp_error( $note_result ) ) {
+			Logger::debug( sprintf( 'Note creation failed: %s', $note_result->get_error_message() ) );
 			// Still return the feedback data, but include error.
 			return array(
-				'review_id'       => $review_id,
-				'post_id'         => $post_id,
-				'model'           => $model,
-				'notes'           => $feedback_items,
-				'summary'         => $summary,
-				'timestamp'       => $review_data['timestamp'],
-				'note_ids'        => array(),
-				'notes_error'     => $note_ids->get_error_message(),
+				'review_id'     => $review_id,
+				'post_id'       => $post_id,
+				'model'         => $model,
+				'notes'         => $feedback_items,
+				'summary'       => $stats_summary,
+				'summary_text'  => $ai_summary,
+				'timestamp'     => $review_data['timestamp'],
+				'note_ids'      => array(),
+				'block_mapping' => array(),
+				'note_count'    => count( $feedback_items ),
+				'notes_error'   => $note_result->get_error_message(),
 			);
 		}
 
-		// Build response with note IDs.
+		// Extract note_ids and block_mapping from result.
+		$note_ids      = $note_result['note_ids'] ?? array();
+		$block_mapping = $note_result['block_mapping'] ?? array();
+
+		Logger::debug( sprintf( 'Created %d notes with %d block mappings', count( $note_ids ), count( $block_mapping ) ) );
+
+		// Build response with note IDs and block mapping.
 		return array(
-			'review_id' => $review_id,
-			'post_id'   => $post_id,
-			'model'     => $model,
-			'notes'     => $feedback_items,
-			'note_ids'  => $note_ids,
-			'summary'   => $summary,
-			'timestamp' => $review_data['timestamp'],
+			'review_id'     => $review_id,
+			'post_id'       => $post_id,
+			'model'         => $model,
+			'notes'         => $feedback_items,
+			'note_ids'      => $note_ids,
+			'block_mapping' => $block_mapping,
+			'summary'       => $stats_summary,
+			'summary_text'  => $ai_summary,
+			'note_count'    => count( $feedback_items ),
+			'timestamp'     => $review_data['timestamp'],
 		);
-	}
-
-	/**
-	 * Filter blocks to remove empty and invalid blocks.
-	 *
-	 * @param array $blocks Parsed blocks.
-	 * @return array Filtered blocks.
-	 */
-	private function filter_blocks( array $blocks ): array {
-		$filtered = array();
-
-		foreach ( $blocks as $block ) {
-			// Skip null blocks.
-			if ( ! $block['blockName'] ) {
-				continue;
-			}
-
-			// Skip empty blocks.
-			$content = $block['innerHTML'] ?? '';
-			if ( empty( trim( wp_strip_all_tags( $content ) ) ) ) {
-				continue;
-			}
-
-			$filtered[] = $block;
-		}
-
-		// Re-index array.
-		return array_values( $filtered );
 	}
 
 	/**
@@ -259,7 +239,7 @@ class Review_Service {
 	/**
 	 * Get mock AI response for testing.
 	 *
-	 * @param array $blocks Document blocks.
+	 * @param array $blocks Document blocks with clientId, name, content.
 	 * @return string Mock JSON response.
 	 */
 	private function get_mock_response( array $blocks ): string {
@@ -269,17 +249,29 @@ class Review_Service {
 		$mock_count = min( 3, count( $blocks ) );
 
 		for ( $i = 0; $i < $mock_count; $i++ ) {
+			$block     = $blocks[ $i ];
+			$client_id = $block['clientId'] ?? 'unknown-' . $i;
+
 			$feedback[] = array(
-				'block_index' => $i,
-				'category'    => array( 'content', 'tone', 'flow' )[ $i % 3 ],
-				'severity'    => array( 'suggestion', 'important' )[ $i % 2 ],
-				'title'       => 'Mock feedback item ' . ( $i + 1 ),
-				'feedback'    => 'This is mock feedback for testing purposes. The AI integration is working correctly.',
-				'suggestion'  => 'Consider this mock suggestion for improvement.',
+				'block_id'   => $client_id,
+				'category'   => array( 'content', 'tone', 'flow' )[ $i % 3 ],
+				'severity'   => array( 'suggestion', 'important' )[ $i % 2 ],
+				'title'      => 'Mock feedback item ' . ( $i + 1 ),
+				'feedback'   => 'This is mock feedback for testing purposes. The AI integration is working correctly.',
+				'suggestion' => 'Consider this mock suggestion for improvement.',
 			);
 		}
 
-		return wp_json_encode( $feedback );
+		// Build response with summary.
+		$response = array(
+			'summary'  => sprintf(
+				'This review generated %d notes of constructive feedback. Overall, the document has a professional tone with clear structure. Key areas for improvement include content clarity and flow between sections.',
+				count( $feedback )
+			),
+			'feedback' => $feedback,
+		);
+
+		return wp_json_encode( $response );
 	}
 
 	/**

@@ -81,8 +81,8 @@ export function* updateSettings(settings) {
  *
  * @param {Object} options            Review options.
  * @param {number} options.postId     Post ID to review.
- * @param {string} options.content    Post content from editor.
  * @param {string} options.title      Post title from editor.
+ * @param {Array}  options.blocks     Blocks with clientIds and content.
  * @param {string} options.model      AI model to use.
  * @param {Array}  options.focusAreas Focus areas.
  * @param {string} options.targetTone Target tone.
@@ -90,8 +90,8 @@ export function* updateSettings(settings) {
  */
 export function* startReview({
 	postId,
-	content,
 	title,
+	blocks,
 	model,
 	focusAreas,
 	targetTone,
@@ -104,13 +104,21 @@ export function* startReview({
 			method: 'POST',
 			data: {
 				post_id: postId,
-				content,
 				title,
+				blocks,
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
 			},
 		});
+
+		// Update block metadata with note IDs if block_mapping is present
+		if (response.block_mapping && Object.keys(response.block_mapping).length > 0) {
+			yield {
+				type: TYPES.UPDATE_BLOCK_NOTES,
+				blockMapping: response.block_mapping,
+			};
+		}
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
@@ -126,6 +134,20 @@ export function* startReview({
 			},
 		};
 	}
+}
+
+/**
+ * Update block metadata with note IDs.
+ * This is a control that dispatches to the block editor store.
+ *
+ * @param {Object} blockMapping Map of clientId to noteId.
+ * @return {Object} Action object.
+ */
+export function updateBlockNotes(blockMapping) {
+	return {
+		type: TYPES.UPDATE_BLOCK_NOTES,
+		blockMapping,
+	};
 }
 
 /**

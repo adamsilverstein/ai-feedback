@@ -74,15 +74,15 @@ class Review_Controller extends WP_REST_Controller {
 	public function create_review( WP_REST_Request $request ) {
 		// Get parameters.
 		$post_id     = $request->get_param( 'post_id' );
-		$content     = $request->get_param( 'content' );
 		$title       = $request->get_param( 'title' );
+		$blocks      = $request->get_param( 'blocks' );
 		$model       = $request->get_param( 'model' );
 		$focus_areas = $request->get_param( 'focus_areas' );
 		$target_tone = $request->get_param( 'target_tone' );
 
 		// Debug logging.
 		Logger::debug( sprintf( 'Review request received for post %d', $post_id ) );
-		Logger::debug( sprintf( 'Content provided: %s (%d characters)', $content ? 'yes' : 'no', strlen( $content ?? '' ) ) );
+		Logger::debug( sprintf( 'Blocks provided: %d', is_array( $blocks ) ? count( $blocks ) : 0 ) );
 
 		// Validate post exists and user can edit it.
 		$post = get_post( $post_id );
@@ -104,6 +104,16 @@ class Review_Controller extends WP_REST_Controller {
 			);
 		}
 
+		// Validate blocks array.
+		if ( empty( $blocks ) || ! is_array( $blocks ) ) {
+			Logger::debug( 'Error: No blocks provided for review' );
+			return new WP_Error(
+				'no_blocks',
+				__( 'No content blocks provided for review.', 'ai-feedback' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		// Check rate limit.
 		$rate_limit_check = $this->review_service->check_rate_limit( get_current_user_id() );
 		if ( is_wp_error( $rate_limit_check ) ) {
@@ -116,7 +126,7 @@ class Review_Controller extends WP_REST_Controller {
 			'model'       => $model,
 			'focus_areas' => $focus_areas,
 			'target_tone' => $target_tone,
-			'content'     => $content,
+			'blocks'      => $blocks,
 			'post_title'  => $title,
 		);
 
@@ -170,19 +180,37 @@ class Review_Controller extends WP_REST_Controller {
 					return is_numeric( $param ) && $param > 0;
 				},
 			),
-			'content'     => array(
-				'required'          => false,
-				'type'              => 'string',
-				'default'           => '',
-				'sanitize_callback' => 'wp_kses_post',
-				'description'       => __( 'Post content from the editor (includes unsaved changes).', 'ai-feedback' ),
-			),
 			'title'       => array(
 				'required'          => false,
 				'type'              => 'string',
 				'default'           => '',
 				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'Post title from the editor (includes unsaved changes).', 'ai-feedback' ),
+				'description'       => __( 'Post title from the editor.', 'ai-feedback' ),
+			),
+			'blocks'      => array(
+				'required'    => true,
+				'type'        => 'array',
+				'description' => __( 'Array of blocks with clientId, name, and content.', 'ai-feedback' ),
+				'items'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'clientId' => array(
+							'type'              => 'string',
+							'required'          => true,
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+						'name'     => array(
+							'type'              => 'string',
+							'required'          => true,
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+						'content'  => array(
+							'type'              => 'string',
+							'required'          => true,
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+					),
+				),
 			),
 			'model'       => array(
 				'required'          => false,

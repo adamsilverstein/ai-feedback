@@ -17,8 +17,8 @@ class Prompt_Builder {
 	/**
 	 * Build a review prompt for the AI.
 	 *
-	 * @param array $blocks      Parsed blocks from post content.
-	 * @param array $options     Review options.
+	 * @param array $blocks  Blocks with clientId, name, and content from the editor.
+	 * @param array $options Review options.
 	 * @return string The constructed prompt.
 	 */
 	public function build_review_prompt( array $blocks, array $options = array() ): string {
@@ -45,7 +45,7 @@ Please review the following document and provide actionable editorial feedback.
 
 DOCUMENT TITLE: {$options['post_title']}
 
-DOCUMENT STRUCTURE:
+DOCUMENT BLOCKS:
 {$document_blocks}
 
 FOCUS AREAS:
@@ -56,26 +56,33 @@ TARGET TONE:
 
 INSTRUCTIONS:
 - Provide specific, actionable feedback for each issue you identify
-- Reference blocks by their index number
+- Reference blocks by their block_id (the unique identifier shown for each block)
 - Prioritize the most impactful suggestions
 - Be encouraging but honest
 - Each feedback item should explain WHY it matters and HOW to improve it
+- Include an overall summary of the document quality
 
 OUTPUT FORMAT:
-Return your response as a JSON array of feedback items. Each item must follow this exact structure:
+Return your response as a JSON object with two properties: "summary" and "feedback".
 
-[
-  {
-    "block_index": 0,
-    "category": "content|tone|flow|design",
-    "severity": "suggestion|important|critical",
-    "title": "Brief title (max 50 chars)",
-    "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",
-    "suggestion": "Specific action to take (max 200 chars, optional)"
-  }
-]
+{
+  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",
+  "feedback": [
+    {
+      "block_id": "abc123-def456",
+      "category": "content|tone|flow|design",
+      "severity": "suggestion|important|critical",
+      "title": "Brief title (max 50 chars)",
+      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",
+      "suggestion": "Specific action to take (max 200 chars, optional)"
+    }
+  ]
+}
 
-Return ONLY valid JSON, no additional text or explanation.
+IMPORTANT:
+- The "block_id" must exactly match one of the block IDs provided in the document
+- Return ONLY valid JSON, no additional text or explanation
+- If no feedback is needed for a block, don't include it in the array
 PROMPT;
 
 		return $prompt;
@@ -105,49 +112,36 @@ INSTRUCTION;
 	/**
 	 * Format blocks for inclusion in prompt.
 	 *
-	 * @param array $blocks Parsed blocks.
+	 * @param array $blocks Blocks with clientId, name, and content.
 	 * @return string Formatted block structure.
 	 */
 	private function format_blocks_for_prompt( array $blocks ): string {
 		$formatted = array();
 
-		foreach ( $blocks as $index => $block ) {
-			$block_type = $block['blockName'] ?? 'unknown';
-			$content    = $this->extract_block_content( $block );
+		foreach ( $blocks as $block ) {
+			$client_id  = $block['clientId'] ?? 'unknown';
+			$block_type = $block['name'] ?? 'unknown';
+			$content    = $block['content'] ?? '';
 
 			// Truncate very long content.
 			if ( strlen( $content ) > 2000 ) {
 				$content = substr( $content, 0, 2000 ) . '... [truncated]';
 			}
 
+			// Skip empty content.
+			if ( empty( trim( $content ) ) ) {
+				continue;
+			}
+
 			$formatted[] = sprintf(
-				"Block %d [%s]:\n%s",
-				$index,
+				"Block ID: %s [%s]\n%s",
+				$client_id,
 				$block_type,
 				$content
 			);
 		}
 
-		return implode( "\n\n", $formatted );
-	}
-
-	/**
-	 * Extract readable content from a block.
-	 *
-	 * @param array $block Block data.
-	 * @return string Extracted content.
-	 */
-	private function extract_block_content( array $block ): string {
-		// Get innerHTML (the actual content).
-		$content = $block['innerHTML'] ?? '';
-
-		// Strip HTML tags for AI analysis.
-		$content = wp_strip_all_tags( $content );
-
-		// Clean up whitespace.
-		$content = trim( preg_replace( '/\s+/', ' ', $content ) );
-
-		return $content ?: '[Empty block]';
+		return implode( "\n\n---\n\n", $formatted );
 	}
 
 	/**

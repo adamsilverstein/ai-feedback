@@ -19,54 +19,88 @@ class Response_Parser {
 	 *
 	 * @param string $response AI response (expected JSON).
 	 * @param array  $blocks   Original blocks for validation.
-	 * @return array Parsed and validated feedback items.
+	 * @return array Parsed result with summary and validated feedback items.
 	 */
 	public function parse_feedback( string $response, array $blocks ): array {
+		// Build a map of valid block IDs for validation.
+		$valid_block_ids = array();
+		foreach ( $blocks as $block ) {
+			if ( ! empty( $block['clientId'] ) ) {
+				$valid_block_ids[ $block['clientId'] ] = true;
+			}
+		}
+
 		// Extract JSON from response (in case AI added text before/after).
 		$json = $this->extract_json( $response );
 
 		if ( empty( $json ) ) {
-			return array();
+			return array(
+				'summary'  => '',
+				'feedback' => array(),
+			);
 		}
 
 		// Decode JSON.
-		$feedback_items = json_decode( $json, true );
+		$data = json_decode( $json, true );
 
-		// Validate it's an array.
-		if ( ! is_array( $feedback_items ) ) {
-			return array();
+		// Handle new format with summary and feedback.
+		if ( is_array( $data ) && isset( $data['feedback'] ) ) {
+			$summary        = $data['summary'] ?? '';
+			$feedback_items = $data['feedback'];
+		} elseif ( is_array( $data ) && isset( $data[0] ) ) {
+			// Legacy format - array of feedback items.
+			$summary        = '';
+			$feedback_items = $data;
+		} else {
+			return array(
+				'summary'  => '',
+				'feedback' => array(),
+			);
 		}
 
 		// Parse and validate each feedback item.
 		$parsed = array();
 		foreach ( $feedback_items as $item ) {
-			$validated = $this->validate_feedback_item( $item, $blocks );
+			$validated = $this->validate_feedback_item( $item, $valid_block_ids );
 			if ( $validated ) {
 				$parsed[] = $validated;
 			}
 		}
 
-		return $parsed;
+		return array(
+			'summary'  => $this->sanitize_summary( $summary ),
+			'feedback' => $parsed,
+		);
 	}
 
 	/**
 	 * Extract JSON from response text.
 	 *
 	 * Sometimes AI adds explanation text before/after JSON.
-	 * This extracts the JSON array.
+	 * This extracts the JSON object or array.
 	 *
 	 * @param string $response Response text.
 	 * @return string JSON string or empty.
 	 */
 	private function extract_json( string $response ): string {
-		// Try to find JSON array in response.
+		$response = trim( $response );
+
+		// Try to find JSON object first (new format with summary).
+		if ( preg_match( '/\{.*\}/s', $response, $matches ) ) {
+			// Verify it contains our expected structure.
+			$test = json_decode( $matches[0], true );
+			if ( is_array( $test ) && ( isset( $test['feedback'] ) || isset( $test['summary'] ) ) ) {
+				return $matches[0];
+			}
+		}
+
+		// Try to find JSON array (legacy format).
 		if ( preg_match( '/\[.*\]/s', $response, $matches ) ) {
 			return $matches[0];
 		}
 
-		// If response is already pure JSON, return it.
-		$response = trim( $response );
-		if ( strpos( $response, '[' ) === 0 ) {
+		// If response starts with { or [, return as is.
+		if ( strpos( $response, '{' ) === 0 || strpos( $response, '[' ) === 0 ) {
 			return $response;
 		}
 
@@ -76,28 +110,35 @@ class Response_Parser {
 	/**
 	 * Validate a single feedback item.
 	 *
-	 * @param mixed $item   Feedback item data.
-	 * @param array $blocks Original blocks.
+	 * @param mixed $item            Feedback item data.
+	 * @param array $valid_block_ids Map of valid block IDs.
 	 * @return array|null Validated item or null if invalid.
 	 */
-	private function validate_feedback_item( $item, array $blocks ): ?array {
+	private function validate_feedback_item( $item, array $valid_block_ids ): ?array {
 		// Must be an array.
 		if ( ! is_array( $item ) ) {
 			return null;
 		}
 
+		// Get block_id (new format) or block_index (legacy).
+		$block_id = $item['block_id'] ?? null;
+
+		// If no block_id, skip this item.
+		if ( empty( $block_id ) ) {
+			return null;
+		}
+
+		// Validate block_id exists in our valid blocks.
+		if ( ! isset( $valid_block_ids[ $block_id ] ) ) {
+			return null;
+		}
+
 		// Required fields.
-		$required = array( 'block_index', 'category', 'severity', 'title', 'feedback' );
+		$required = array( 'category', 'severity', 'title', 'feedback' );
 		foreach ( $required as $field ) {
 			if ( ! isset( $item[ $field ] ) ) {
 				return null;
 			}
-		}
-
-		// Validate block index exists.
-		$block_index = intval( $item['block_index'] );
-		if ( ! isset( $blocks[ $block_index ] ) ) {
-			return null;
 		}
 
 		// Validate category.
@@ -112,17 +153,13 @@ class Response_Parser {
 			return null;
 		}
 
-		// Get block ID (client ID for Notes).
-		$block_id = $blocks[ $block_index ]['attrs']['metadata']['id'] ?? null;
-
 		// Build validated item.
 		$validated = array(
-			'block_index' => $block_index,
-			'block_id'    => $block_id,
-			'category'    => sanitize_text_field( $item['category'] ),
-			'severity'    => sanitize_text_field( $item['severity'] ),
-			'title'       => $this->sanitize_title( $item['title'] ),
-			'feedback'    => $this->sanitize_feedback( $item['feedback'] ),
+			'block_id'  => sanitize_text_field( $block_id ),
+			'category'  => sanitize_text_field( $item['category'] ),
+			'severity'  => sanitize_text_field( $item['severity'] ),
+			'title'     => $this->sanitize_title( $item['title'] ),
+			'feedback'  => $this->sanitize_feedback( $item['feedback'] ),
 		);
 
 		// Optional suggestion field.
@@ -131,6 +168,23 @@ class Response_Parser {
 		}
 
 		return $validated;
+	}
+
+	/**
+	 * Sanitize summary text.
+	 *
+	 * @param string $summary Summary text.
+	 * @return string Sanitized summary.
+	 */
+	private function sanitize_summary( string $summary ): string {
+		$summary = wp_kses_post( $summary );
+
+		// Truncate to 500 characters (generous for summary).
+		if ( strlen( $summary ) > 500 ) {
+			$summary = substr( $summary, 0, 497 ) . '...';
+		}
+
+		return $summary;
 	}
 
 	/**

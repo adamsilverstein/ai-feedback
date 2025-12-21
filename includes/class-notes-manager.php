@@ -22,7 +22,7 @@ class Notes_Manager {
 	 * @param array $feedback_items Parsed feedback items.
 	 * @param int   $post_id        Post ID.
 	 * @param array $review_data    Review metadata.
-	 * @return array|WP_Error Array of created note IDs or error.
+	 * @return array|WP_Error Array with note_ids and block_mapping, or error.
 	 */
 	public function create_notes_from_feedback( array $feedback_items, int $post_id, array $review_data = array() ): array|WP_Error {
 		if ( empty( $feedback_items ) ) {
@@ -32,8 +32,9 @@ class Notes_Manager {
 			);
 		}
 
-		$note_ids = array();
-		$errors   = array();
+		$note_ids      = array();
+		$block_mapping = array();
+		$errors        = array();
 
 		foreach ( $feedback_items as $item ) {
 			$note_id = $this->create_note( $item, $post_id, $review_data );
@@ -44,6 +45,11 @@ class Notes_Manager {
 			}
 
 			$note_ids[] = $note_id;
+
+			// Build block_id to note_id mapping.
+			if ( ! empty( $item['block_id'] ) ) {
+				$block_mapping[ $item['block_id'] ] = $note_id;
+			}
 		}
 
 		// If all notes failed, return error.
@@ -58,7 +64,10 @@ class Notes_Manager {
 			);
 		}
 
-		return $note_ids;
+		return array(
+			'note_ids'      => $note_ids,
+			'block_mapping' => $block_mapping,
+		);
 	}
 
 	/**
