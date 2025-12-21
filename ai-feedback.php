@@ -137,7 +137,7 @@ function display_php_version_notice() {
 }
 
 /**
- * Display AI Experiments plugin notice.
+ * Display AI Experiments plugin dependency notice.
  */
 function display_ai_plugin_notice() {
 	?>
