@@ -12,6 +12,7 @@ namespace AI_Feedback;
 use WP_Error;
 use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Providers\Http\DTO\RequestOptions;
+use AI_Feedback\Logger;
 
 /**
  * Review Service class.
@@ -59,19 +60,32 @@ class Review_Service {
 		// Get post.
 		$post = get_post( $post_id );
 		if ( ! $post ) {
+			Logger::debug( sprintf( 'Error: Post %d not found in database', $post_id ) );
 			return new WP_Error(
 				'invalid_post',
 				__( 'Post not found.', 'ai-feedback' )
 			);
 		}
 
+		// Use content from editor if provided, otherwise fall back to saved content.
+		$content = ! empty( $options['content'] ) ? $options['content'] : $post->post_content;
+
+		if ( ! empty( $options['content'] ) ) {
+			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ) ) );
+		} else {
+			Logger::debug( sprintf( 'Using saved post content (%d characters)', strlen( $content ) ) );
+		}
+
 		// Parse blocks from content.
-		$blocks = parse_blocks( $post->post_content );
+		$blocks = parse_blocks( $content );
 
 		// Filter out empty blocks.
 		$blocks = $this->filter_blocks( $blocks );
 
+		Logger::debug( sprintf( 'Parsed %d blocks from content', count( $blocks ) ) );
+
 		if ( empty( $blocks ) ) {
+			Logger::debug( 'Error: No content blocks found to review' );
 			return new WP_Error(
 				'no_content',
 				__( 'Post has no content to review.', 'ai-feedback' )
@@ -80,14 +94,17 @@ class Review_Service {
 
 		// Validate block count.
 		if ( count( $blocks ) > 100 ) {
+			Logger::debug( sprintf( 'Error: Too many blocks (%d, max 100)', count( $blocks ) ) );
 			return new WP_Error(
 				'too_many_blocks',
 				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'ai-feedback' )
 			);
 		}
 
-		// Add post title to options.
-		$options['post_title'] = $post->post_title;
+		// Use title from editor if provided, otherwise fall back to saved title.
+		if ( empty( $options['post_title'] ) ) {
+			$options['post_title'] = $post->post_title;
+		}
 
 		// Build prompt.
 		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options );

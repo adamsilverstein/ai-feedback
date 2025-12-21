@@ -13,17 +13,26 @@ import { STORE_NAME } from '../store';
  * @return {JSX.Element} Review button component.
  */
 export default function ReviewButton() {
-	const { postId, isReviewing, selectedModel, focusAreas, targetTone } =
-		useSelect(
-			(select) => ({
-				postId: select(editorStore).getCurrentPostId(),
-				isReviewing: select(STORE_NAME).isReviewing(),
-				selectedModel: select(STORE_NAME).getSelectedModel(),
-				focusAreas: select(STORE_NAME).getFocusAreas(),
-				targetTone: select(STORE_NAME).getTargetTone(),
-			}),
-			[]
-		);
+	const {
+		postId,
+		postContent,
+		postTitle,
+		isReviewing,
+		selectedModel,
+		focusAreas,
+		targetTone,
+	} = useSelect(
+		(select) => ({
+			postId: select(editorStore).getCurrentPostId(),
+			postContent: select(editorStore).getEditedPostContent(),
+			postTitle: select(editorStore).getEditedPostAttribute('title'),
+			isReviewing: select(STORE_NAME).isReviewing(),
+			selectedModel: select(STORE_NAME).getSelectedModel(),
+			focusAreas: select(STORE_NAME).getFocusAreas(),
+			targetTone: select(STORE_NAME).getTargetTone(),
+		}),
+		[]
+	);
 
 	const { startReview } = useDispatch(STORE_NAME);
 
@@ -35,6 +44,8 @@ export default function ReviewButton() {
 		try {
 			await startReview({
 				postId,
+				content: postContent,
+				title: postTitle,
 				model: selectedModel,
 				focusAreas,
 				targetTone,

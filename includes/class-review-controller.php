@@ -12,6 +12,7 @@ use WP_REST_Server;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_Error;
+use AI_Feedback\Logger;
 
 /**
  * Review REST API controller.
@@ -73,13 +74,20 @@ class Review_Controller extends WP_REST_Controller {
 	public function create_review( WP_REST_Request $request ) {
 		// Get parameters.
 		$post_id     = $request->get_param( 'post_id' );
+		$content     = $request->get_param( 'content' );
+		$title       = $request->get_param( 'title' );
 		$model       = $request->get_param( 'model' );
 		$focus_areas = $request->get_param( 'focus_areas' );
 		$target_tone = $request->get_param( 'target_tone' );
 
+		// Debug logging.
+		Logger::debug( sprintf( 'Review request received for post %d', $post_id ) );
+		Logger::debug( sprintf( 'Content provided: %s (%d characters)', $content ? 'yes' : 'no', strlen( $content ?? '' ) ) );
+
 		// Validate post exists and user can edit it.
 		$post = get_post( $post_id );
 		if ( ! $post ) {
+			Logger::debug( sprintf( 'Error: Post %d not found', $post_id ) );
 			return new WP_Error(
 				'invalid_post',
 				__( 'Post not found.', 'ai-feedback' ),
@@ -88,6 +96,7 @@ class Review_Controller extends WP_REST_Controller {
 		}
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			Logger::debug( sprintf( 'Error: User lacks permission to edit post %d', $post_id ) );
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to review this post.', 'ai-feedback' ),
@@ -98,6 +107,7 @@ class Review_Controller extends WP_REST_Controller {
 		// Check rate limit.
 		$rate_limit_check = $this->review_service->check_rate_limit( get_current_user_id() );
 		if ( is_wp_error( $rate_limit_check ) ) {
+			Logger::debug( sprintf( 'Error: Rate limit exceeded for user %d', get_current_user_id() ) );
 			return $rate_limit_check;
 		}
 
@@ -106,14 +116,21 @@ class Review_Controller extends WP_REST_Controller {
 			'model'       => $model,
 			'focus_areas' => $focus_areas,
 			'target_tone' => $target_tone,
+			'content'     => $content,
+			'post_title'  => $title,
 		);
 
 		// Perform review.
 		$result = $this->review_service->review_document( $post_id, $options );
 
 		if ( is_wp_error( $result ) ) {
+			Logger::debug( sprintf( 'Error: Review failed - %s', $result->get_error_message() ) );
 			return $result;
 		}
+
+		// Debug logging for successful response.
+		$note_count = isset( $result['notes'] ) ? count( $result['notes'] ) : 0;
+		Logger::debug( sprintf( 'Review completed successfully, returning %d feedback items', $note_count ) );
 
 		// Return response.
 		return rest_ensure_response( $result );
@@ -145,7 +162,7 @@ class Review_Controller extends WP_REST_Controller {
 	 */
 	private function get_create_review_args(): array {
 		return array(
-			'post_id' => array(
+			'post_id'     => array(
 				'required'          => true,
 				'type'              => 'integer',
 				'sanitize_callback' => 'absint',
@@ -153,7 +170,21 @@ class Review_Controller extends WP_REST_Controller {
 					return is_numeric( $param ) && $param > 0;
 				},
 			),
-			'model' => array(
+			'content'     => array(
+				'required'          => false,
+				'type'              => 'string',
+				'default'           => '',
+				'sanitize_callback' => 'wp_kses_post',
+				'description'       => __( 'Post content from the editor (includes unsaved changes).', 'ai-feedback' ),
+			),
+			'title'       => array(
+				'required'          => false,
+				'type'              => 'string',
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_text_field',
+				'description'       => __( 'Post title from the editor (includes unsaved changes).', 'ai-feedback' ),
+			),
+			'model'       => array(
 				'required'          => false,
 				'type'              => 'string',
 				'default'           => 'claude-sonnet-4-20250514',
