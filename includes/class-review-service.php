@@ -68,7 +68,7 @@ class Review_Service {
 		}
 
 		// Use content from editor if provided, otherwise fall back to saved content.
-		$content = ! empty( $options['content'] ) ? $options['content'] : $post->post_content;
+		$content = $options['content'] ?? $post->post_content ?? '';
 
 		if ( ! empty( $options['content'] ) ) {
 			Logger::debug( sprintf( 'Using editor content (%d characters)', strlen( $content ) ) );
