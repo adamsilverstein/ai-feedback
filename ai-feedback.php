@@ -66,11 +66,6 @@ if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', false );
 }
 
-// Include plugin.php for is_plugin_active function.
-if ( ! function_exists( 'is_plugin_active' ) ) {
-	require_once ABSPATH . 'wp-admin/includes/plugin.php';
-}
-
 /**
  * Initialize the plugin.
  */
@@ -88,6 +83,11 @@ function init() {
 	}
 
 	// Check for AI Experiments plugin dependency.
+	// Include plugin.php for is_plugin_active function.
+	if ( ! function_exists( 'is_plugin_active' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+
 	if ( ! is_plugin_active( 'ai/ai.php' ) && ! is_plugin_active( 'ai-experiments/ai.php' ) ) {
 		add_action( 'admin_notices', __NAMESPACE__ . '\\display_ai_plugin_notice' );
 		return;
