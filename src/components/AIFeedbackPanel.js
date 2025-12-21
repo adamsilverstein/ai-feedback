@@ -1,8 +1,8 @@
 /**
  * AI Feedback Panel Component
  */
-import { PanelBody, Notice } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
+import { PanelBody, Notice, Button } from '@wordpress/components';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
@@ -10,6 +10,46 @@ import ModelSelector from './ModelSelector';
 import SettingsPanel from './SettingsPanel';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+
+/**
+ * Get action button for specific error types.
+ *
+ * @param {Object} error Error object with code, message, and data.
+ * @return {JSX.Element|null} Action button or null.
+ */
+function getErrorAction(error) {
+	// Check if error is related to API credits or billing
+	if (
+		error.code === 'ai_request_failed' &&
+		(error.message.toLowerCase().includes('credit') ||
+			error.message.toLowerCase().includes('billing'))
+	) {
+		return (
+			<Button
+				variant="link"
+				href="/wp-admin/admin.php?page=ai-feedback-settings"
+				target="_blank"
+				style={{ marginTop: '8px' }}
+			>
+				{__('Go to Settings', 'ai-feedback')}
+			</Button>
+		);
+	}
+
+	// Check for rate limit errors
+	if (error.code === 'rate_limit_exceeded') {
+		return (
+			<p style={{ marginTop: '8px', fontSize: '13px', color: '#757575' }}>
+				{__(
+					'Please wait before making another request.',
+					'ai-feedback'
+				)}
+			</p>
+		);
+	}
+
+	return null;
+}
 
 /**
  * AI Feedback Panel component.
@@ -26,6 +66,8 @@ export default function AIFeedbackPanel() {
 		[]
 	);
 
+	const { clearError } = useDispatch(STORE_NAME);
+
 	if (isLoadingSettings) {
 		return (
 			<div className="ai-feedback-panel">
@@ -39,8 +81,23 @@ export default function AIFeedbackPanel() {
 	return (
 		<div className="ai-feedback-panel">
 			{error && (
-				<Notice status="error" isDismissible={false}>
-					{error.message}
+				<Notice
+					status="error"
+					isDismissible={true}
+					onRemove={clearError}
+					className="ai-feedback-error-notice"
+				>
+					<div className="ai-feedback-error-content">
+						<div className="ai-feedback-error-message">
+							{error.message}
+						</div>
+						{error.code && (
+							<div className="ai-feedback-error-code">
+								{__('Error code:', 'ai-feedback')} {error.code}
+							</div>
+						)}
+						{getErrorAction(error)}
+					</div>
 				</Notice>
 			)}
 
