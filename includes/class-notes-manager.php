@@ -83,9 +83,10 @@ class Notes_Manager {
 		$content = $this->build_note_content( $feedback_item );
 
 		// Prepare comment data.
+		// WordPress 6.9+ uses 'note' for block-level notes/comments.
 		$comment_data = array(
 			'comment_post_ID'  => $post_id,
-			'comment_type'     => 'note', // WordPress 6.9 Notes type.
+			'comment_type'     => 'note', // WordPress block comment type for notes.
 			'comment_content'  => $content,
 			'comment_approved' => '1',
 			'user_id'          => 0, // System-generated (AI).
