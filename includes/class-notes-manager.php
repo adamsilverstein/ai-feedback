@@ -85,7 +85,7 @@ class Notes_Manager {
 		// Prepare comment data.
 		$comment_data = array(
 			'comment_post_ID'  => $post_id,
-			'comment_type'     => 'block_comment', // WordPress 6.9 Notes type.
+			'comment_type'     => 'note', // WordPress 6.9 Notes type.
 			'comment_content'  => $content,
 			'comment_approved' => '1',
 			'user_id'          => 0, // System-generated (AI).
