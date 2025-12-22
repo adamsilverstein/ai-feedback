@@ -29,16 +29,13 @@ const controls = {
 		// Update each block's metadata with its noteId
 		Object.entries(blockMapping).forEach(([clientId, noteId]) => {
 			try {
-				dispatch(blockEditorStore).updateBlockAttributes(clientId, {
+				console.log( `[AI-Feedback] Updating block ${clientId} with noteId ${noteId}` );
+				dispatch(blockEditorStore).updateBlockAttributes( clientId, {
 					metadata: {
-						bindings: {
-							noteId: {
-								source: 'ai-feedback/note',
-								args: { id: noteId },
-							},
-						},
+						...metadata,
+						noteId: noteId,
 					},
-				});
+				} );
 			} catch (error) {
 				// Block might not exist or be editable
 				// eslint-disable-next-line no-console
