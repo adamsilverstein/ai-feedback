@@ -82,6 +82,16 @@ class Notes_Manager {
 		// Build note content.
 		$content = $this->build_note_content( $feedback_item );
 
+		// Build metadata first so we can log it.
+		$note_meta = $this->build_note_meta( $feedback_item, $review_data );
+
+		// Debug logging.
+		Logger::debug( sprintf(
+			'Creating note for post %d, block_id: %s',
+			$post_id,
+			$feedback_item['block_id'] ?? 'none'
+		) );
+
 		// Prepare comment data.
 		// WordPress 6.9+ uses 'note' for block-level notes/comments.
 		$comment_data = array(
@@ -91,18 +101,21 @@ class Notes_Manager {
 			'comment_approved' => '1',
 			'user_id'          => 0, // System-generated (AI).
 			'comment_author'   => __( 'AI Feedback', 'ai-feedback' ),
-			'comment_meta'     => $this->build_note_meta( $feedback_item, $review_data ),
+			'comment_meta'     => $note_meta,
 		);
 
 		// Insert comment as note.
 		$note_id = wp_insert_comment( $comment_data );
 
 		if ( ! $note_id ) {
+			Logger::debug( 'Note creation failed - wp_insert_comment returned false' );
 			return new WP_Error(
 				'note_creation_failed',
 				__( 'Failed to create note.', 'ai-feedback' )
 			);
 		}
+
+		Logger::debug( sprintf( 'Note created successfully with ID: %d', $note_id ) );
 
 		return $note_id;
 	}
@@ -192,15 +205,21 @@ class Notes_Manager {
 	 */
 	private function build_note_meta( array $feedback_item, array $review_data ): array {
 		$meta = array(
-			'ai_feedback'        => true,
+			'ai_feedback'        => '1', // Store as string for meta_query compatibility.
 			'feedback_category'  => $feedback_item['category'] ?? '',
 			'feedback_severity'  => $feedback_item['severity'] ?? '',
 			'block_index'        => $feedback_item['block_index'] ?? null,
 		);
 
-		// Add block ID if available.
+		// Add block ID (clientId) if available.
+		// Note: clientId is ephemeral and changes on each editor load.
 		if ( ! empty( $feedback_item['block_id'] ) ) {
 			$meta['block_id'] = $feedback_item['block_id'];
+		}
+
+		// Add block name for more stable identification.
+		if ( ! empty( $feedback_item['block_name'] ) ) {
+			$meta['block_name'] = $feedback_item['block_name'];
 		}
 
 		// Add review metadata.
@@ -215,6 +234,14 @@ class Notes_Manager {
 		if ( ! empty( $review_data['timestamp'] ) ) {
 			$meta['created_at'] = $review_data['timestamp'];
 		}
+
+		Logger::debug( sprintf(
+			'Built note meta: block_id=%s, block_name=%s, category=%s, severity=%s',
+			$meta['block_id'] ?? 'none',
+			$meta['block_name'] ?? 'none',
+			$meta['feedback_category'],
+			$meta['feedback_severity']
+		) );
 
 		return $meta;
 	}

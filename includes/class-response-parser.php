@@ -22,11 +22,26 @@ class Response_Parser {
 	 * @return array Parsed result with summary and validated feedback items.
 	 */
 	public function parse_feedback( string $response, array $blocks ): array {
-		// Build a map of valid block IDs for validation.
+		// Build a map of valid block IDs for validation, including block name.
 		$valid_block_ids = array();
-		foreach ( $blocks as $block ) {
+		$block_info      = array();
+
+		Logger::debug( sprintf( 'Parsing feedback, received %d blocks', count( $blocks ) ) );
+
+		foreach ( $blocks as $index => $block ) {
 			if ( ! empty( $block['clientId'] ) ) {
 				$valid_block_ids[ $block['clientId'] ] = true;
+				// Store block info for enriching feedback items.
+				$block_info[ $block['clientId'] ] = array(
+					'name'  => $block['name'] ?? '',
+					'index' => $index,
+				);
+				Logger::debug( sprintf(
+					'Block %d: clientId=%s, name=%s',
+					$index,
+					$block['clientId'],
+					$block['name'] ?? 'unknown'
+				) );
 			}
 		}
 
@@ -61,11 +76,13 @@ class Response_Parser {
 		// Parse and validate each feedback item.
 		$parsed = array();
 		foreach ( $feedback_items as $item ) {
-			$validated = $this->validate_feedback_item( $item, $valid_block_ids );
+			$validated = $this->validate_feedback_item( $item, $valid_block_ids, $block_info );
 			if ( $validated ) {
 				$parsed[] = $validated;
 			}
 		}
+
+		Logger::debug( sprintf( 'Parsed %d valid feedback items', count( $parsed ) ) );
 
 		return array(
 			'summary'  => $this->sanitize_summary( $summary ),
@@ -112,11 +129,13 @@ class Response_Parser {
 	 *
 	 * @param mixed $item            Feedback item data.
 	 * @param array $valid_block_ids Map of valid block IDs.
+	 * @param array $block_info      Map of block IDs to their info (name, index).
 	 * @return array|null Validated item or null if invalid.
 	 */
-	private function validate_feedback_item( $item, array $valid_block_ids ): ?array {
+	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
 		// Must be an array.
 		if ( ! is_array( $item ) ) {
+			Logger::debug( 'Feedback item is not an array, skipping' );
 			return null;
 		}
 
@@ -125,11 +144,13 @@ class Response_Parser {
 
 		// If no block_id, skip this item.
 		if ( empty( $block_id ) ) {
+			Logger::debug( 'Feedback item has no block_id, skipping' );
 			return null;
 		}
 
 		// Validate block_id exists in our valid blocks.
 		if ( ! isset( $valid_block_ids[ $block_id ] ) ) {
+			Logger::debug( sprintf( 'Block ID %s not found in valid blocks, skipping', $block_id ) );
 			return null;
 		}
 
@@ -137,6 +158,7 @@ class Response_Parser {
 		$required = array( 'category', 'severity', 'title', 'feedback' );
 		foreach ( $required as $field ) {
 			if ( ! isset( $item[ $field ] ) ) {
+				Logger::debug( sprintf( 'Feedback item missing required field: %s', $field ) );
 				return null;
 			}
 		}
@@ -144,12 +166,14 @@ class Response_Parser {
 		// Validate category.
 		$valid_categories = array( 'content', 'tone', 'flow', 'design' );
 		if ( ! in_array( $item['category'], $valid_categories, true ) ) {
+			Logger::debug( sprintf( 'Invalid category: %s', $item['category'] ) );
 			return null;
 		}
 
 		// Validate severity.
 		$valid_severities = array( 'suggestion', 'important', 'critical' );
 		if ( ! in_array( $item['severity'], $valid_severities, true ) ) {
+			Logger::debug( sprintf( 'Invalid severity: %s', $item['severity'] ) );
 			return null;
 		}
 
@@ -161,6 +185,17 @@ class Response_Parser {
 			'title'     => $this->sanitize_title( $item['title'] ),
 			'feedback'  => $this->sanitize_feedback( $item['feedback'] ),
 		);
+
+		// Add block name and index from block_info if available.
+		if ( isset( $block_info[ $block_id ] ) ) {
+			$validated['block_name']  = $block_info[ $block_id ]['name'] ?? '';
+			$validated['block_index'] = $block_info[ $block_id ]['index'] ?? 0;
+			Logger::debug( sprintf(
+				'Enriched feedback item with block_name=%s, block_index=%d',
+				$validated['block_name'],
+				$validated['block_index']
+			) );
+		}
 
 		// Optional suggestion field.
 		if ( isset( $item['suggestion'] ) && ! empty( $item['suggestion'] ) ) {

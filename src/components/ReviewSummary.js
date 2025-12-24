@@ -2,6 +2,7 @@
  * Review Summary Component
  */
 import { __ } from '@wordpress/i18n';
+import { useEffect } from '@wordpress/element';
 
 /**
  * Review Summary component.
@@ -11,7 +12,28 @@ import { __ } from '@wordpress/i18n';
  * @return {JSX.Element} Review summary component.
  */
 export default function ReviewSummary({ review }) {
+	// Debug logging when review changes
+	useEffect(() => {
+		if (review) {
+			// eslint-disable-next-line no-console
+			console.log('[AI-Feedback] ReviewSummary received review:', {
+				reviewId: review.review_id,
+				hasSummary: !!review.summary,
+				hasSummaryText: !!review.summary_text,
+				summaryTextLength: review.summary_text?.length || 0,
+				notesCount: review.notes?.length || 0,
+				noteCount: review.note_count,
+				model: review.model,
+				blockMappingKeys: review.block_mapping
+					? Object.keys(review.block_mapping)
+					: [],
+			});
+		}
+	}, [review]);
+
 	if (!review) {
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] ReviewSummary: No review data');
 		return null;
 	}
 

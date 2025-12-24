@@ -91,7 +91,74 @@
 	}
 }
 
+/* Indeterminate Progress Bar */
+.ai-feedback-progress-container {
+	margin: 12px 0;
+	padding: 0;
+}
+
+.ai-feedback-progress-bar {
+	width: 100%;
+	height: 4px;
+	background-color: #e0e0e0;
+	border-radius: 2px;
+	overflow: hidden;
+	position: relative;
+}
+
+.ai-feedback-progress-indicator {
+	position: absolute;
+	width: 40%;
+	height: 100%;
+	background: linear-gradient(90deg, #0073aa, #005a87, #0073aa);
+	border-radius: 2px;
+	animation: ai-feedback-progress-animation 1.5s ease-in-out infinite;
+}
+
+@keyframes ai-feedback-progress-animation {
+	0% {
+		left: -40%;
+	}
+
+	50% {
+		left: 100%;
+	}
+
+	100% {
+		left: -40%;
+	}
+}
+
 .ai-feedback-review-summary {
+
+	/* AI-generated summary text */
+	.ai-summary-text {
+		margin: 0 0 16px;
+		padding: 12px;
+		background: linear-gradient(135deg, #f0f7fc 0%, #e8f4f8 100%);
+		border-radius: 6px;
+		border-left: 4px solid #0073aa;
+
+		p {
+			margin: 0;
+			font-size: 14px;
+			line-height: 1.6;
+			color: #1e1e1e;
+		}
+	}
+
+	/* Note count headline */
+	.summary-headline {
+		margin: 0 0 12px;
+		padding: 8px 12px;
+		background: #f0f0f0;
+		border-radius: 4px;
+
+		strong {
+			font-size: 15px;
+			color: #1e1e1e;
+		}
+	}
 
 	.summary-stats {
 		display: flex;
@@ -148,13 +215,36 @@
 		color: #757575;
 	}
 
-	/* stylelint-disable-next-line no-descending-specificity */
-	.description {
-		margin: 16px 0 0;
-		padding: 12px;
-		background: #e7f5fe;
-		border-left: 3px solid #0073aa;
-		font-size: 13px;
-		color: #1e1e1e;
+	.notes-info {
+
+		/* stylelint-disable-next-line no-descending-specificity */
+		.description {
+			margin: 16px 0 0;
+			padding: 12px;
+			background: #e7f5fe;
+			border-left: 3px solid #0073aa;
+			font-size: 13px;
+			color: #1e1e1e;
+		}
+
+		.success {
+			margin: 8px 0 0;
+			padding: 8px 12px;
+			background: #d4edda;
+			border-left: 3px solid #28a745;
+			border-radius: 4px;
+			font-size: 13px;
+			color: #155724;
+		}
+
+		.error {
+			margin: 8px 0 0;
+			padding: 8px 12px;
+			background: #fff3cd;
+			border-left: 3px solid #ffc107;
+			border-radius: 4px;
+			font-size: 13px;
+			color: #856404;
+		}
 	}
 }

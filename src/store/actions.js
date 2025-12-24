@@ -2,6 +2,8 @@
  * Store actions.
  */
 import apiFetch from '@wordpress/api-fetch';
+import { dispatch as registryDispatch, select as registrySelect } from '@wordpress/data';
+import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
 
 /**
@@ -96,6 +98,23 @@ export function* startReview({
 	focusAreas,
 	targetTone,
 }) {
+	// eslint-disable-next-line no-console
+	console.log('[AI-Feedback] Starting review', {
+		postId,
+		title,
+		blocksCount: blocks.length,
+		model,
+		focusAreas,
+		targetTone,
+	});
+
+	// eslint-disable-next-line no-console
+	console.log('[AI-Feedback] Blocks being sent:', blocks.map((b) => ({
+		clientId: b.clientId,
+		name: b.name,
+		contentLength: b.content?.length || 0,
+	})));
+
 	yield { type: TYPES.START_REVIEW };
 
 	try {
@@ -112,19 +131,96 @@ export function* startReview({
 			},
 		});
 
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Review API response received:', {
+			reviewId: response.review_id,
+			postId: response.post_id,
+			model: response.model,
+			noteCount: response.note_count,
+			notesCount: response.notes?.length || 0,
+			noteIdsCount: response.note_ids?.length || 0,
+			blockMappingKeys: response.block_mapping ? Object.keys(response.block_mapping) : [],
+			summaryText: response.summary_text?.substring(0, 100) + '...',
+			hasSummary: !!response.summary,
+		});
+
+		// Debug: Log full response for inspection
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Full response:', response);
+
 		// Update block metadata with note IDs if block_mapping is present
 		if (response.block_mapping && Object.keys(response.block_mapping).length > 0) {
+			// eslint-disable-next-line no-console
+			console.log('[AI-Feedback] Processing block_mapping:', response.block_mapping);
+
+			// Directly update block metadata using registry dispatch
+			// This stores the noteId in each block's metadata so WordPress can link blocks to notes
+			let updatedCount = 0;
+			let errorCount = 0;
+
+			Object.entries(response.block_mapping).forEach(([clientId, noteId]) => {
+				try {
+					// Get the current block to access existing metadata
+					const block = registrySelect(blockEditorStore).getBlock(clientId);
+
+					if (!block) {
+						// eslint-disable-next-line no-console
+						console.warn(`[AI-Feedback] Block ${clientId} not found in editor`);
+						errorCount++;
+						return;
+					}
+
+					// Get existing metadata or empty object
+					const existingMetadata = block.attributes?.metadata || {};
+
+					// eslint-disable-next-line no-console
+					console.log(`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`, {
+						existingMetadata,
+						blockName: block.name,
+					});
+
+					// Update block attributes with the noteId in metadata
+					registryDispatch(blockEditorStore).updateBlockAttributes(clientId, {
+						metadata: {
+							...existingMetadata,
+							noteId: noteId,
+						},
+					});
+
+					// eslint-disable-next-line no-console
+					console.log(`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`);
+					updatedCount++;
+				} catch (error) {
+					// eslint-disable-next-line no-console
+					console.error(`[AI-Feedback] Could not update block ${clientId}:`, error.message, error);
+					errorCount++;
+				}
+			});
+
+			// eslint-disable-next-line no-console
+			console.log(`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`);
+
+			// Also dispatch to our store for tracking
 			yield {
 				type: TYPES.UPDATE_BLOCK_NOTES,
 				blockMapping: response.block_mapping,
 			};
+		} else {
+			// eslint-disable-next-line no-console
+			console.log('[AI-Feedback] No block_mapping in response or empty');
 		}
+
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Dispatching REVIEW_SUCCESS with review data');
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
 			review: response,
 		};
 	} catch (error) {
+		// eslint-disable-next-line no-console
+		console.error('[AI-Feedback] Review failed:', error);
+
 		return {
 			type: TYPES.REVIEW_ERROR,
 			error: {

@@ -9,6 +9,22 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
 /**
+ * Indeterminate Progress Bar component.
+ * Shows an animated progress bar that moves back and forth.
+ *
+ * @return {JSX.Element} Progress bar component.
+ */
+function IndeterminateProgressBar() {
+	return (
+		<div className="ai-feedback-progress-container">
+			<div className="ai-feedback-progress-bar">
+				<div className="ai-feedback-progress-indicator" />
+			</div>
+		</div>
+	);
+}
+
+/**
  * Extract text content from a block's innerHTML.
  *
  * @param {string} innerHTML The block's innerHTML.
@@ -134,9 +150,12 @@ export default function ReviewButton() {
 				</p>
 			)}
 			{isReviewing && (
-				<p className="description">
-					{__('AI is analyzing your content…', 'ai-feedback')}
-				</p>
+				<>
+					<IndeterminateProgressBar />
+					<p className="description">
+						{__('AI is analyzing your content…', 'ai-feedback')}
+					</p>
+				</>
 			)}
 		</div>
 	);
