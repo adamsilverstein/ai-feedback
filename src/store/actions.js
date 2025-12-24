@@ -1,7 +1,7 @@
 /**
  * Store actions.
  */
-import apiFetch from '@wordpress/api-fetch';
+import { apiFetch } from '@wordpress/data-controls';
 import { dispatch as registryDispatch, select as registrySelect } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
