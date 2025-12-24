@@ -200,6 +200,49 @@ export function* startReview({
 			// eslint-disable-next-line no-console
 			console.log(`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`);
 
+			// Invalidate core notes/comments resolution to force a refresh in the UI.
+			// This ensures the toolbar icon appears immediately without a page refresh.
+			try {
+				// Inject the notes directly into the core data store.
+				// We use 'root' kind and exact query params used by Gutenberg's useBlockComments.
+				if (response.notes && response.notes.length > 0) {
+					const queryArgs = {
+						post: postId,
+						type: 'note',
+						status: 'all',
+						per_page: -1,
+					};
+
+					registryDispatch('core').receiveEntityRecords(
+						'root',
+						'comment',
+						response.notes,
+						queryArgs,
+						true // invalidateCaches
+					);
+
+					// Also explicitly invalidate to be sure.
+					registryDispatch('core').invalidateResolution('getEntityRecords', ['root', 'comment', queryArgs]);
+				}
+
+				// Also try to invalidate core/notes if it exists.
+				registryDispatch('core/notes')?.invalidateResolution('getNotes', [postId]);
+			} catch (e) {
+				// Fallback to core comments invalidation if specific store isn't available.
+				try {
+					const queryArgs = {
+						post: postId,
+						type: 'note',
+						status: 'all',
+						per_page: -1,
+					};
+					registryDispatch('core')?.invalidateResolution('getComments', { post: postId });
+					registryDispatch('core')?.invalidateResolution('getEntityRecords', ['root', 'comment', queryArgs]);
+				} catch (e2) {
+					// Ignore errors if stores aren't initialized yet.
+				}
+			}
+
 			// Also dispatch to our store for tracking
 			yield {
 				type: TYPES.UPDATE_BLOCK_NOTES,

@@ -5,6 +5,7 @@ import { Button } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { serialize } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
@@ -50,8 +51,11 @@ function extractBlockData(blocks) {
 	const result = [];
 
 	for (const block of blocks) {
-		// Get the serialized content for this block
-		const content = extractTextContent(block.originalContent || '');
+		// Get the serialized content for this block.
+		// Use originalContent if available (parsed from existing HTML),
+		// otherwise serialize the current block state.
+		const rawContent = block.originalContent || serialize(block);
+		const content = extractTextContent(rawContent);
 
 		// Only include blocks with actual content
 		if (content.trim()) {
