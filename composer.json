@@ -38,6 +38,7 @@
 			"php-http/discovery": true
 		},
 		"optimize-autoloader": true,
-		"sort-packages": true
+		"sort-packages": true,
+		"preferred-install": "dist"
 	}
 }
