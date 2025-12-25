@@ -232,7 +232,7 @@ All pull requests automatically run through GitHub Actions CI/CD:
 - ✅ JavaScript linting (ESLint, Stylelint, Prettier)
 - ✅ PHP linting (PHPCS, PHPStan)
 - ✅ JavaScript unit tests (Jest)
-- ✅ PHP unit tests (PHPUnit) across PHP 8.0-8.3
+- ✅ PHP unit tests (PHPUnit) across PHP 8.1-8.3
 
 See [docs/CI.md](docs/CI.md) for details on running checks locally and setting up branch protection.
 

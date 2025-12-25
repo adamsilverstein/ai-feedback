@@ -40,7 +40,7 @@ Runs JavaScript unit tests using Jest.
 ### PHP Testing
 **File**: `.github/workflows/test-php.yml`
 
-Runs PHP unit tests using PHPUnit across multiple PHP versions (8.0, 8.1, 8.2, 8.3).
+Runs PHP unit tests using PHPUnit across multiple PHP versions (8.1, 8.2, 8.3).
 
 **Triggered on**: Pull requests and pushes when PHP or test files change
 
@@ -56,8 +56,8 @@ To require all checks to pass before merging:
    - `JavaScript Linting`
    - `PHP Linting`
    - `JavaScript Unit Tests`
-   - `PHP Unit Tests (8.0)` (minimum PHP version)
-   - Optionally add `PHP Unit Tests (8.1)`, `PHP Unit Tests (8.2)`, `PHP Unit Tests (8.3)` for all PHP versions
+   - `PHP Unit Tests (8.1)` (minimum PHP version)
+   - Optionally add `PHP Unit Tests (8.2)`, `PHP Unit Tests (8.3)` for all PHP versions
 6. Optionally enable **Require branches to be up to date before merging**
 7. Click **Create** or **Save changes**
 

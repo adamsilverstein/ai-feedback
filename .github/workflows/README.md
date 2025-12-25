@@ -48,7 +48,7 @@ Runs JavaScript unit tests using Jest.
 Runs PHP unit tests using PHPUnit across multiple PHP versions.
 
 **Tests run**:
-- PHPUnit tests across PHP 8.0, 8.1, 8.2, and 8.3
+- PHPUnit tests across PHP 8.1, 8.2, and 8.3
 
 **Triggered on**: Pull requests and pushes when PHP or test files change
 
@@ -64,7 +64,7 @@ To enforce these checks before merging pull requests:
    - `JavaScript Linting`
    - `PHP Linting`
    - `JavaScript Unit Tests`
-   - `PHP Unit Tests (8.0)` - Select at minimum `PHP Unit Tests (8.0)`, or optionally all PHP versions (8.0, 8.1, 8.2, 8.3)
+   - `PHP Unit Tests (8.1)` - Select at minimum `PHP Unit Tests (8.1)`, or optionally all PHP versions (8.1, 8.2, 8.3)
 6. Enable **Require branches to be up to date before merging** (recommended)
 7. Save the branch protection rule
 

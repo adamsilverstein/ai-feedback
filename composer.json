@@ -4,7 +4,7 @@
 	"type": "wordpress-plugin",
 	"license": "GPL-2.0-or-later",
 	"require": {
-		"php": ">=8.0",
+		"php": ">=8.1",
 		"wordpress/php-ai-client": "^0.3.0"
 	},
 	"require-dev": {
@@ -39,6 +39,9 @@
 		},
 		"optimize-autoloader": true,
 		"sort-packages": true,
-		"preferred-install": "dist"
+		"preferred-install": "dist",
+		"platform": {
+			"php": "8.1.0"
+		}
 	}
 }

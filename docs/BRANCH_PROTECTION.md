@@ -48,7 +48,7 @@ This is the key setting for CI enforcement.
 - `JavaScript Linting`
 - `PHP Linting`
 - `JavaScript Unit Tests`
-- `PHP Unit Tests (8.0)` - At minimum, require the lowest PHP version
+- `PHP Unit Tests (8.1)` - At minimum, require the lowest PHP version
 - Optionally, require all PHP version tests: `PHP Unit Tests (8.1)`, `PHP Unit Tests (8.2)`, `PHP Unit Tests (8.3)`
 
 **Additional options**:
@@ -97,7 +97,7 @@ Required settings:
     - JavaScript Linting
     - PHP Linting
     - JavaScript Unit Tests
-    - PHP Unit Tests (8.0)
+    - PHP Unit Tests (8.1)
     - PHP Unit Tests (8.1)
     - PHP Unit Tests (8.2)
     - PHP Unit Tests (8.3)
@@ -119,7 +119,7 @@ Required settings:
     - JavaScript Linting
     - PHP Linting
     - JavaScript Unit Tests
-    - PHP Unit Tests (8.0)
+    - PHP Unit Tests (8.1)
 ```
 
 ## Verifying the Setup
