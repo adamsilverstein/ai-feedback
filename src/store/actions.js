@@ -2,7 +2,10 @@
  * Store actions.
  */
 import { apiFetch } from '@wordpress/data-controls';
-import { dispatch as registryDispatch, select as registrySelect } from '@wordpress/data';
+import {
+	dispatch as registryDispatch,
+	select as registrySelect,
+} from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
 
@@ -109,11 +112,14 @@ export function* startReview({
 	});
 
 	// eslint-disable-next-line no-console
-	console.log('[AI-Feedback] Blocks being sent:', blocks.map((b) => ({
-		clientId: b.clientId,
-		name: b.name,
-		contentLength: b.content?.length || 0,
-	})));
+	console.log(
+		'[AI-Feedback] Blocks being sent:',
+		blocks.map((b) => ({
+			clientId: b.clientId,
+			name: b.name,
+			contentLength: b.content?.length || 0,
+		}))
+	);
 
 	yield { type: TYPES.START_REVIEW };
 
@@ -139,7 +145,9 @@ export function* startReview({
 			noteCount: response.note_count,
 			notesCount: response.notes?.length || 0,
 			noteIdsCount: response.note_ids?.length || 0,
-			blockMappingKeys: response.block_mapping ? Object.keys(response.block_mapping) : [],
+			blockMappingKeys: response.block_mapping
+				? Object.keys(response.block_mapping)
+				: [],
 			summaryText: response.summary_text?.substring(0, 100) + '...',
 			hasSummary: !!response.summary,
 		});
@@ -149,56 +157,81 @@ export function* startReview({
 		console.log('[AI-Feedback] Full response:', response);
 
 		// Update block metadata with note IDs if block_mapping is present
-		if (response.block_mapping && Object.keys(response.block_mapping).length > 0) {
+		if (
+			response.block_mapping &&
+			Object.keys(response.block_mapping).length > 0
+		) {
 			// eslint-disable-next-line no-console
-			console.log('[AI-Feedback] Processing block_mapping:', response.block_mapping);
+			console.log(
+				'[AI-Feedback] Processing block_mapping:',
+				response.block_mapping
+			);
 
 			// Directly update block metadata using registry dispatch
 			// This stores the noteId in each block's metadata so WordPress can link blocks to notes
 			let updatedCount = 0;
 			let errorCount = 0;
 
-			Object.entries(response.block_mapping).forEach(([clientId, noteId]) => {
-				try {
-					// Get the current block to access existing metadata
-					const block = registrySelect(blockEditorStore).getBlock(clientId);
+			Object.entries(response.block_mapping).forEach(
+				([clientId, noteId]) => {
+					try {
+						// Get the current block to access existing metadata
+						const block =
+							registrySelect(blockEditorStore).getBlock(clientId);
 
-					if (!block) {
+						if (!block) {
+							// eslint-disable-next-line no-console
+							console.warn(
+								`[AI-Feedback] Block ${clientId} not found in editor`
+							);
+							errorCount++;
+							return;
+						}
+
+						// Get existing metadata or empty object
+						const existingMetadata =
+							block.attributes?.metadata || {};
+
 						// eslint-disable-next-line no-console
-						console.warn(`[AI-Feedback] Block ${clientId} not found in editor`);
+						console.log(
+							`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`,
+							{
+								existingMetadata,
+								blockName: block.name,
+							}
+						);
+
+						// Update block attributes with the noteId in metadata
+						registryDispatch(
+							blockEditorStore
+						).updateBlockAttributes(clientId, {
+							metadata: {
+								...existingMetadata,
+								noteId,
+							},
+						});
+
+						// eslint-disable-next-line no-console
+						console.log(
+							`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`
+						);
+						updatedCount++;
+					} catch (error) {
+						// eslint-disable-next-line no-console
+						console.error(
+							`[AI-Feedback] Could not update block ${clientId}:`,
+							error.message,
+							error
+						);
 						errorCount++;
-						return;
 					}
-
-					// Get existing metadata or empty object
-					const existingMetadata = block.attributes?.metadata || {};
-
-					// eslint-disable-next-line no-console
-					console.log(`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`, {
-						existingMetadata,
-						blockName: block.name,
-					});
-
-					// Update block attributes with the noteId in metadata
-					registryDispatch(blockEditorStore).updateBlockAttributes(clientId, {
-						metadata: {
-							...existingMetadata,
-							noteId: noteId,
-						},
-					});
-
-					// eslint-disable-next-line no-console
-					console.log(`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`);
-					updatedCount++;
-				} catch (error) {
-					// eslint-disable-next-line no-console
-					console.error(`[AI-Feedback] Could not update block ${clientId}:`, error.message, error);
-					errorCount++;
 				}
-			});
+			);
 
 			// eslint-disable-next-line no-console
-			console.log(`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`);
+			console.log(
+				`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`
+			);
 
 			// Invalidate core notes/comments resolution to force a refresh in the UI.
 			// This ensures the toolbar icon appears immediately without a page refresh.
@@ -222,11 +255,17 @@ export function* startReview({
 					);
 
 					// Also explicitly invalidate to be sure.
-					registryDispatch('core').invalidateResolution('getEntityRecords', ['root', 'comment', queryArgs]);
+					registryDispatch('core').invalidateResolution(
+						'getEntityRecords',
+						['root', 'comment', queryArgs]
+					);
 				}
 
 				// Also try to invalidate core/notes if it exists.
-				registryDispatch('core/notes')?.invalidateResolution('getNotes', [postId]);
+				registryDispatch('core/notes')?.invalidateResolution(
+					'getNotes',
+					[postId]
+				);
 			} catch (e) {
 				// Fallback to core comments invalidation if specific store isn't available.
 				try {
@@ -236,8 +275,14 @@ export function* startReview({
 						status: 'all',
 						per_page: -1,
 					};
-					registryDispatch('core')?.invalidateResolution('getComments', { post: postId });
-					registryDispatch('core')?.invalidateResolution('getEntityRecords', ['root', 'comment', queryArgs]);
+					registryDispatch('core')?.invalidateResolution(
+						'getComments',
+						{ post: postId }
+					);
+					registryDispatch('core')?.invalidateResolution(
+						'getEntityRecords',
+						['root', 'comment', queryArgs]
+					);
 				} catch (e2) {
 					// Ignore errors if stores aren't initialized yet.
 				}
@@ -254,7 +299,9 @@ export function* startReview({
 		}
 
 		// eslint-disable-next-line no-console
-		console.log('[AI-Feedback] Dispatching REVIEW_SUCCESS with review data');
+		console.log(
+			'[AI-Feedback] Dispatching REVIEW_SUCCESS with review data'
+		);
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
