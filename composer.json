@@ -26,11 +26,11 @@
 		}
 	},
 	"scripts": {
-		"test": "phpunit",
-		"test:coverage": "phpunit --coverage-html coverage/php",
-		"phpcs": "phpcs --standard=WordPress includes/",
-		"phpcbf": "phpcbf --standard=WordPress includes/",
-		"phpstan": "phpstan analyze includes/ --level=5"
+		"test": "vendor/bin/phpunit",
+		"test:coverage": "vendor/bin/phpunit --coverage-html coverage/php",
+		"phpcs": "vendor/bin/phpcs --standard=WordPress includes/",
+		"phpcbf": "vendor/bin/phpcbf --standard=WordPress includes/",
+		"phpstan": "vendor/bin/phpstan analyze includes/ --level=5"
 	},
 	"config": {
 		"allow-plugins": {
