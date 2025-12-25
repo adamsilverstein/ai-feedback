@@ -195,19 +195,19 @@ class Review_Controller extends WP_REST_Controller {
 					'type'       => 'object',
 					'properties' => array(
 						'clientId' => array(
-							'type'              => 'string',
-							'required'          => true,
-							'sanitize_callback' => 'sanitize_text_field',
+							'type'     => 'string',
+							'required' => true,
+							'format'   => 'text-field',
 						),
 						'name'     => array(
-							'type'              => 'string',
-							'required'          => true,
-							'sanitize_callback' => 'sanitize_text_field',
+							'type'     => 'string',
+							'required' => true,
+							'format'   => 'text-field',
 						),
 						'content'  => array(
-							'type'              => 'string',
-							'required'          => true,
-							'sanitize_callback' => 'sanitize_text_field',
+							'type'     => 'string',
+							'required' => true,
+							'format'   => 'text-field',
 						),
 					),
 				),

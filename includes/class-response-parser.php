@@ -215,8 +215,8 @@ class Response_Parser {
 		$summary = wp_kses_post( $summary );
 
 		// Truncate to 500 characters (generous for summary).
-		if ( strlen( $summary ) > 500 ) {
-			$summary = substr( $summary, 0, 497 ) . '...';
+		if ( mb_strlen( $summary, 'UTF-8' ) > 500 ) {
+			$summary = mb_substr( $summary, 0, 497, 'UTF-8' ) . '...';
 		}
 
 		return $summary;
@@ -232,8 +232,8 @@ class Response_Parser {
 		$title = sanitize_text_field( $title );
 
 		// Truncate to 50 characters.
-		if ( strlen( $title ) > 50 ) {
-			$title = substr( $title, 0, 47 ) . '...';
+		if ( mb_strlen( $title, 'UTF-8' ) > 50 ) {
+			$title = mb_substr( $title, 0, 47, 'UTF-8' ) . '...';
 		}
 
 		return $title;
@@ -259,8 +259,8 @@ class Response_Parser {
 		$feedback = wp_kses( $feedback, $allowed_tags );
 
 		// Truncate to 300 characters (increased from 200 to be more flexible).
-		if ( strlen( $feedback ) > 300 ) {
-			$feedback = substr( $feedback, 0, 297 ) . '...';
+		if ( mb_strlen( $feedback, 'UTF-8' ) > 300 ) {
+			$feedback = mb_substr( $feedback, 0, 297, 'UTF-8' ) . '...';
 		}
 
 		return $feedback;

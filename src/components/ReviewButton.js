@@ -5,6 +5,7 @@ import { Button } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as noticesStore } from '@wordpress/notices';
 import { serialize } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
@@ -103,6 +104,7 @@ export default function ReviewButton() {
 	);
 
 	const { startReview } = useDispatch(STORE_NAME);
+	const { createWarningNotice } = useDispatch(noticesStore);
 
 	const handleReview = async () => {
 		if (!postId) {
@@ -115,6 +117,10 @@ export default function ReviewButton() {
 		if (blocks.length === 0) {
 			// eslint-disable-next-line no-console
 			console.warn('No content blocks found to review');
+			createWarningNotice(
+				__('No content blocks found to review.', 'ai-feedback'),
+				{ type: 'snackbar' }
+			);
 			return;
 		}
 

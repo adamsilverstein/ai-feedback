@@ -1,7 +1,7 @@
 /**
  * Review Summary Component
  */
-import { __ } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
 
 /**
@@ -47,7 +47,9 @@ export default function ReviewSummary({ review }) {
 	} = review;
 
 	const hasNotes = notes && notes.length > 0;
-	const mappedBlockCount = blockMapping ? Object.keys(blockMapping).length : 0;
+	const mappedBlockCount = blockMapping
+		? Object.keys(blockMapping).length
+		: 0;
 
 	return (
 		<div className="ai-feedback-review-summary">
@@ -64,9 +66,16 @@ export default function ReviewSummary({ review }) {
 					<strong>
 						{noteCount === 0
 							? __('No feedback items', 'ai-feedback')
-							: noteCount === 1
-								? __('1 feedback item', 'ai-feedback')
-								: `${noteCount} ${__('feedback items', 'ai-feedback')}`}
+							: sprintf(
+									/* translators: %d: number of feedback items */
+									_n(
+										'%d feedback item',
+										'%d feedback items',
+										noteCount,
+										'ai-feedback'
+									),
+									noteCount
+								)}
 					</strong>
 				</div>
 			)}
@@ -133,11 +142,17 @@ export default function ReviewSummary({ review }) {
 					</p>
 					{mappedBlockCount > 0 && (
 						<p className="success">
-							✓ {__('Created notes for', 'ai-feedback')}{' '}
-							{mappedBlockCount}{' '}
-							{mappedBlockCount === 1
-								? __('block', 'ai-feedback')
-								: __('blocks', 'ai-feedback')}
+							✓{' '}
+							{sprintf(
+								/* translators: %d: number of blocks */
+								_n(
+									'Created notes for %d block',
+									'Created notes for %d blocks',
+									mappedBlockCount,
+									'ai-feedback'
+								),
+								mappedBlockCount
+							)}
 						</p>
 					)}
 					{review.notes_error && (
