@@ -10,27 +10,39 @@ All checks run automatically when you create or update a pull request. You can s
 
 The CI system includes the following workflows:
 
-### 1. CI (Main Workflow)
-**File**: `.github/workflows/ci.yml`
+### JavaScript Linting
+**File**: `.github/workflows/lint-js.yml`
 
-This is the main workflow that runs all checks. It includes:
-- JavaScript linting (ESLint, Stylelint, Prettier)
-- PHP linting (PHPCS, PHPStan)
-- JavaScript unit tests
-- PHP unit tests across multiple PHP versions (8.0, 8.1, 8.2, 8.3)
+Checks JavaScript/CSS code quality and formatting:
+- ESLint for JavaScript code quality
+- Stylelint for CSS/SCSS quality
+- Prettier code formatting check
+- Package.json validation
 
-**This is the workflow that should be set as a required status check.**
+**Triggered on**: Pull requests and pushes when JavaScript, CSS, or package files change
 
-### 2. Individual Workflows
+### PHP Linting
+**File**: `.github/workflows/lint-php.yml`
 
-The following workflows can also be run independently:
+Checks PHP code quality and standards compliance:
+- PHPCS (PHP_CodeSniffer) with WordPress Coding Standards
+- PHPStan static analysis (level 5)
 
-- `lint-js.yml` - JavaScript/CSS linting only
-- `lint-php.yml` - PHP linting only
-- `test-js.yml` - JavaScript unit tests only
-- `test-php.yml` - PHP unit tests only
+**Triggered on**: Pull requests and pushes when PHP or composer files change
 
-These workflows are included in the main CI workflow but can also run independently when only their relevant files change.
+### JavaScript Testing
+**File**: `.github/workflows/test-js.yml`
+
+Runs JavaScript unit tests using Jest.
+
+**Triggered on**: Pull requests and pushes when JavaScript or test files change
+
+### PHP Testing
+**File**: `.github/workflows/test-php.yml`
+
+Runs PHP unit tests using PHPUnit across multiple PHP versions (8.0, 8.1, 8.2, 8.3).
+
+**Triggered on**: Pull requests and pushes when PHP or test files change
 
 ## Setting Up Branch Protection
 
@@ -45,6 +57,7 @@ To require all checks to pass before merging:
    - `PHP Linting`
    - `JavaScript Unit Tests`
    - `PHP Unit Tests (8.0)` (minimum PHP version)
+   - Optionally add `PHP Unit Tests (8.1)`, `PHP Unit Tests (8.2)`, `PHP Unit Tests (8.3)` for all PHP versions
 6. Optionally enable **Require branches to be up to date before merging**
 7. Click **Create** or **Save changes**
 

@@ -4,19 +4,6 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ## Workflows
 
-### Main CI Workflow
-
-**File**: `ci.yml`
-
-The main CI workflow that orchestrates all linting and testing jobs. This workflow should be set as a required status check for pull requests.
-
-**Triggered on**: Pull requests and pushes to `main` and `develop` branches
-
-**Jobs**:
-- Runs all linting workflows
-- Runs all testing workflows
-- Provides a single "CI Success" status check
-
 ### JavaScript Linting
 
 **File**: `lint-js.yml`
@@ -73,8 +60,11 @@ To enforce these checks before merging pull requests:
 2. Navigate to **Branches** → **Branch protection rules**
 3. Add a rule for your main branch (e.g., `main`)
 4. Enable **Require status checks to pass before merging**
-5. Add the following required status check:
-   - `CI Success`
+5. Add the following required status checks:
+   - `JavaScript Linting`
+   - `PHP Linting`
+   - `JavaScript Unit Tests`
+   - `PHP Unit Tests (8.0)` - Select at minimum `PHP Unit Tests (8.0)`, or optionally all PHP versions (8.0, 8.1, 8.2, 8.3)
 6. Enable **Require branches to be up to date before merging** (recommended)
 7. Save the branch protection rule
 
