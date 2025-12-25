@@ -46,7 +46,9 @@ jobs:
                   restore-keys: ${{ runner.os }}-php-${{ matrix.php-version }}-composer-
 
             - name: Install Composer dependencies
-              run: composer install --prefer-dist --no-progress
+              env:
+                  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+              run: composer install --prefer-dist --no-progress --no-interaction
 
             - name: Run PHPUnit tests
               run: composer run test

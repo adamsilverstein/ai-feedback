@@ -4,7 +4,51 @@
 	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
 	"author": "Your Name",
 	"license": "GPL-2.0-or-later",
+	"keywords": [
+		"wordpress",
+		"gutenberg",
+		"ai",
+		"feedback",
+		"editorial",
+		"block-editor"
+	],
+	"homepage": "https://github.com/adamsilverstein/ai-feedback#readme",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/adamsilverstein/ai-feedback.git"
+	},
+	"bugs": {
+		"url": "https://github.com/adamsilverstein/ai-feedback/issues"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"npm": ">=9.0.0"
+	},
 	"main": "build/index.js",
+	"dependencies": {
+		"@wordpress/api-fetch": "^7.36.0",
+		"@wordpress/block-editor": "^15.10.0",
+		"@wordpress/components": "^30.9.0",
+		"@wordpress/compose": "^7.36.0",
+		"@wordpress/data": "^10.36.0",
+		"@wordpress/data-controls": "^4.37.0",
+		"@wordpress/edit-post": "^8.36.0",
+		"@wordpress/editor": "^14.36.0",
+		"@wordpress/element": "^6.36.0",
+		"@wordpress/i18n": "^6.9.0",
+		"@wordpress/icons": "^11.3.0",
+		"@wordpress/notices": "^5.36.0",
+		"@wordpress/plugins": "^7.36.0"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.57.0",
+		"@testing-library/jest-dom": "^6.9.1",
+		"@testing-library/react": "^16.3.0",
+		"@wordpress/blocks": "^15.10.0",
+		"@wordpress/env": "^10.36.0",
+		"@wordpress/scripts": "^31.1.0",
+		"prettier": "^3.7.4"
+	},
 	"scripts": {
 		"build": "wp-scripts build",
 		"start": "wp-scripts start",
@@ -24,33 +68,5 @@
 		"env:stop": "wp-env stop",
 		"env:clean": "wp-env clean",
 		"plugin-zip": "wp-scripts plugin-zip"
-	},
-	"devDependencies": {
-		"@playwright/test": "^1.57.0",
-		"@testing-library/jest-dom": "^6.9.1",
-		"@testing-library/react": "^16.3.0",
-		"@wordpress/blocks": "^15.10.0",
-		"@wordpress/env": "^10.36.0",
-		"@wordpress/scripts": "^31.1.0",
-		"prettier": "^3.7.4"
-	},
-	"dependencies": {
-		"@wordpress/api-fetch": "^7.36.0",
-		"@wordpress/block-editor": "^15.10.0",
-		"@wordpress/components": "^30.9.0",
-		"@wordpress/compose": "^7.36.0",
-		"@wordpress/data": "^10.36.0",
-		"@wordpress/data-controls": "^4.37.0",
-		"@wordpress/edit-post": "^8.36.0",
-		"@wordpress/editor": "^14.36.0",
-		"@wordpress/element": "^6.36.0",
-		"@wordpress/i18n": "^6.9.0",
-		"@wordpress/icons": "^11.3.0",
-		"@wordpress/notices": "^5.36.0",
-		"@wordpress/plugins": "^7.36.0"
-	},
-	"engines": {
-		"node": ">=18.0.0",
-		"npm": ">=9.0.0"
 	}
 }

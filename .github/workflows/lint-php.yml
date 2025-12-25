@@ -42,7 +42,9 @@ jobs:
                   restore-keys: ${{ runner.os }}-composer-
 
             - name: Install Composer dependencies
-              run: composer install --prefer-dist --no-progress
+              env:
+                  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+              run: composer install --prefer-dist --no-progress --no-interaction
 
             - name: Run PHPCS (WordPress Coding Standards)
               run: composer run phpcs
