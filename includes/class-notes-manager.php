@@ -124,7 +124,7 @@ class Notes_Manager {
 			'comment_approved' => '0', // 'hold' status in Gutenberg (unresolved)
 			'comment_parent'   => $parent_id,
 			'user_id'          => 0, // System-generated (AI).
-			'comment_author'   => __( 'AI Feedback', 'ai-feedback' ),
+			'comment_author'   => __( Plugin::get_ai_feedback_author(), 'ai-feedback' ),
 			'comment_meta'     => $note_meta,
 		);
 

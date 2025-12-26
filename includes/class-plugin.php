@@ -12,6 +12,12 @@ namespace AI_Feedback;
  */
 class Plugin {
 
+	/**
+	 * AI Feedback comment author name.
+	 *
+	 * @var string
+	 */
+	private const AI_FEEDBACK_AUTHOR = 'AI Feedback';
 
 	/**
 	 * Plugin instance.
@@ -51,6 +57,15 @@ class Plugin {
 			self::$instance = new self();
 		}
 		return self::$instance;
+	}
+
+	/**
+	 * Get AI Feedback author name.
+	 *
+	 * @return string The AI Feedback comment author name.
+	 */
+	public static function get_ai_feedback_author(): string {
+		return self::AI_FEEDBACK_AUTHOR;
 	}
 
 	/**
@@ -187,20 +202,23 @@ class Plugin {
 
 		// Check if this is an AI Feedback comment.
 		// Method 1: Check the comment author name.
-		$is_ai_feedback = ( 'AI Feedback' === $comment->comment_author );
+		$is_ai_feedback = ( self::AI_FEEDBACK_AUTHOR === $comment->comment_author );
 
 		// Method 2: Check comment meta for ai_feedback flag.
 		if ( ! $is_ai_feedback && $comment->comment_ID ) {
-			$ai_feedback_meta = get_comment_meta( $comment->comment_ID, 'ai_feedback', true );
+			$ai_feedback_meta = get_comment_meta( (int) $comment->comment_ID, 'ai_feedback', true );
 			$is_ai_feedback   = ( '1' === $ai_feedback_meta );
 		}
 
 		// If this is an AI Feedback comment, use our custom avatar.
 		if ( $is_ai_feedback ) {
-			$avatar_url = AI_FEEDBACK_PLUGIN_URL . 'assets/ai-feedback-avatar.svg';
+			$avatar_path = AI_FEEDBACK_PLUGIN_DIR . 'assets/ai-feedback-avatar.svg';
+			if ( file_exists( $avatar_path ) ) {
+				$avatar_url = AI_FEEDBACK_PLUGIN_URL . 'assets/ai-feedback-avatar.svg';
 
-			$args['url']          = $avatar_url;
-			$args['found_avatar'] = true;
+				$args['url']          = $avatar_url;
+				$args['found_avatar'] = true;
+			}
 		}
 
 		return $args;
