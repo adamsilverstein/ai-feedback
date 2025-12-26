@@ -28,8 +28,6 @@
 		}
 	},
 	"scripts": {
-		"test": "vendor/bin/phpunit",
-		"test:coverage": "vendor/bin/phpunit --coverage-html coverage/php",
 		"phpcs": "vendor/bin/phpcs --standard=WordPress includes/",
 		"phpcbf": "vendor/bin/phpcbf --standard=WordPress includes/",
 		"phpstan": "vendor/bin/phpstan analyze --memory-limit 1G"

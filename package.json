@@ -62,7 +62,6 @@
 		"test:e2e": "wp-scripts test-e2e",
 		"test:e2e:watch": "wp-scripts test-e2e --watch",
 		"test:visual": "playwright test --config=tests/visual/playwright.config.js",
-		"test:php": "composer run test",
 		"test:all": "npm run lint:js && npm run lint:css && npm run test:unit && npm run test:e2e",
 		"env:start": "wp-env start",
 		"env:stop": "wp-env stop",
