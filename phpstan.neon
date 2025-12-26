@@ -6,8 +6,8 @@ parameters:
     scanFiles:
         - ai-feedback.php
     excludePaths:
-        - vendor/
-        - node_modules/
+        - vendor/ (?)
+        - node_modules/ (?)
     ignoreErrors:
         - '#Constant [A-Z_]+ not found\.#'
         -
