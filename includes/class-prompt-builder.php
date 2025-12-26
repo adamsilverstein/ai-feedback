@@ -14,11 +14,12 @@ namespace AI_Feedback;
  */
 class Prompt_Builder {
 
+
 	/**
 	 * Build a review prompt for the AI.
 	 *
-	 * @param array $blocks  Blocks with clientId, name, and content from the editor.
-	 * @param array $options Review options.
+	 * @param  array $blocks  Blocks with clientId, name, and content from the editor.
+	 * @param  array $options Review options.
 	 * @return string The constructed prompt.
 	 */
 	public function build_review_prompt( array $blocks, array $options = array() ): string {
@@ -94,7 +95,7 @@ PROMPT;
 	 * @return string System instruction.
 	 */
 	public function get_system_instruction(): string {
-		return <<<INSTRUCTION
+		return <<<'INSTRUCTION'
 You are an expert editorial assistant reviewing content in WordPress. Your role is to provide concise, actionable feedback on content quality, tone, flow, and design.
 
 Key principles:
@@ -112,7 +113,7 @@ INSTRUCTION;
 	/**
 	 * Format blocks for inclusion in prompt.
 	 *
-	 * @param array $blocks Blocks with clientId, name, and content.
+	 * @param  array $blocks Blocks with clientId, name, and content.
 	 * @return string Formatted block structure.
 	 */
 	private function format_blocks_for_prompt( array $blocks ): string {
@@ -147,7 +148,7 @@ INSTRUCTION;
 	/**
 	 * Build focus area instructions.
 	 *
-	 * @param array $focus_areas Selected focus areas.
+	 * @param  array $focus_areas Selected focus areas.
 	 * @return string Focus instructions.
 	 */
 	private function build_focus_instructions( array $focus_areas ): string {
@@ -172,7 +173,7 @@ INSTRUCTION;
 	/**
 	 * Build tone guidance.
 	 *
-	 * @param string $target_tone Target tone.
+	 * @param  string $target_tone Target tone.
 	 * @return string Tone guidance.
 	 */
 	private function build_tone_guidance( string $target_tone ): string {

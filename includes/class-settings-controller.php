@@ -18,6 +18,7 @@ use WP_Error;
  */
 class Settings_Controller extends WP_REST_Controller {
 
+
 	/**
 	 * Namespace.
 	 *
@@ -72,17 +73,17 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Get settings.
 	 *
-	 * @param WP_REST_Request $request Request object.
+	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_settings( WP_REST_Request $request ) {
 		$settings = array(
-			'default_model'       => get_option( 'ai_feedback_default_model', 'claude-sonnet-4' ),
-			'default_focus_areas' => get_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
-			'default_tone'        => get_option( 'ai_feedback_default_tone', 'professional' ),
-			'available_models'    => $this->get_available_models(),
+			'default_model'         => get_option( 'ai_feedback_default_model', 'claude-sonnet-4' ),
+			'default_focus_areas'   => get_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
+			'default_tone'          => get_option( 'ai_feedback_default_tone', 'professional' ),
+			'available_models'      => $this->get_available_models(),
 			'available_focus_areas' => $this->get_available_focus_areas(),
-			'available_tones'     => $this->get_available_tones(),
+			'available_tones'       => $this->get_available_tones(),
 		);
 
 		return rest_ensure_response( $settings );
@@ -91,7 +92,7 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Update settings.
 	 *
-	 * @param WP_REST_Request $request Request object.
+	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function update_settings( WP_REST_Request $request ) {
@@ -124,7 +125,7 @@ class Settings_Controller extends WP_REST_Controller {
 					return new WP_Error(
 						'invalid_focus_area',
 						sprintf(
-							/* translators: %s: invalid focus area */
+						/* translators: %s: invalid focus area */
 							__( 'Invalid focus area: %s', 'ai-feedback' ),
 							$area
 						),
@@ -183,7 +184,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 */
 	private function get_update_settings_args(): array {
 		return array(
-			'default_model' => array(
+			'default_model'       => array(
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 				'validate_callback' => array( $this, 'is_valid_model' ),
@@ -194,7 +195,7 @@ class Settings_Controller extends WP_REST_Controller {
 					'type' => 'string',
 				),
 			),
-			'default_tone' => array(
+			'default_tone'        => array(
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 				'validate_callback' => array( $this, 'is_valid_tone' ),
@@ -314,11 +315,11 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Check if model is valid.
 	 *
-	 * @param string $model Model ID.
+	 * @param  string $model Model ID.
 	 * @return bool
 	 */
 	public function is_valid_model( string $model ): bool {
-		$models = $this->get_available_models();
+		$models    = $this->get_available_models();
 		$model_ids = array_column( $models, 'id' );
 		return in_array( $model, $model_ids, true );
 	}
@@ -326,11 +327,11 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Check if focus area is valid.
 	 *
-	 * @param string $area Focus area ID.
+	 * @param  string $area Focus area ID.
 	 * @return bool
 	 */
 	private function is_valid_focus_area( string $area ): bool {
-		$areas = $this->get_available_focus_areas();
+		$areas    = $this->get_available_focus_areas();
 		$area_ids = array_column( $areas, 'id' );
 		return in_array( $area, $area_ids, true );
 	}
@@ -338,11 +339,11 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Check if tone is valid.
 	 *
-	 * @param string $tone Tone ID.
+	 * @param  string $tone Tone ID.
 	 * @return bool
 	 */
 	public function is_valid_tone( string $tone ): bool {
-		$tones = $this->get_available_tones();
+		$tones    = $this->get_available_tones();
 		$tone_ids = array_column( $tones, 'id' );
 		return in_array( $tone, $tone_ids, true );
 	}
