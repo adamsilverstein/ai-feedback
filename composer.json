@@ -8,12 +8,14 @@
 		"wordpress/php-ai-client": "^0.3.0"
 	},
 	"require-dev": {
-		"phpunit/phpunit": "^10.5",
 		"mockery/mockery": "^1.6",
-		"wp-phpunit/wp-phpunit": "^6.9",
+		"phpstan/extension-installer": "^1.4",
+		"phpstan/phpstan": "^2.1",
+		"phpunit/phpunit": "^10.5",
 		"squizlabs/php_codesniffer": "^3.13",
+		"szepeviktor/phpstan-wordpress": "^2.0",
 		"wp-coding-standards/wpcs": "^3.3",
-		"phpstan/phpstan": "^2.1"
+		"wp-phpunit/wp-phpunit": "^6.9"
 	},
 	"autoload": {
 		"psr-4": {
@@ -30,11 +32,12 @@
 		"test:coverage": "vendor/bin/phpunit --coverage-html coverage/php",
 		"phpcs": "vendor/bin/phpcs --standard=WordPress includes/",
 		"phpcbf": "vendor/bin/phpcbf --standard=WordPress includes/",
-		"phpstan": "vendor/bin/phpstan analyze includes/ --level=5"
+		"phpstan": "vendor/bin/phpstan analyze --memory-limit 1G"
 	},
 	"config": {
 		"allow-plugins": {
 			"dealerdirect/phpcodesniffer-composer-installer": true,
+			"phpstan/extension-installer": true,
 			"php-http/discovery": true
 		},
 		"optimize-autoloader": true,
