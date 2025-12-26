@@ -14,11 +14,13 @@ namespace AI_Feedback;
  */
 class Response_Parser {
 
+
+
 	/**
 	 * Parse feedback response from AI.
 	 *
-	 * @param string $response AI response (expected JSON).
-	 * @param array  $blocks   Original blocks for validation.
+	 * @param  string $response AI response (expected JSON).
+	 * @param  array  $blocks   Original blocks for validation.
 	 * @return array Parsed result with summary and validated feedback items.
 	 */
 	public function parse_feedback( string $response, array $blocks ): array {
@@ -36,12 +38,14 @@ class Response_Parser {
 					'name'  => $block['name'] ?? '',
 					'index' => $index,
 				);
-				Logger::debug( sprintf(
-					'Block %d: clientId=%s, name=%s',
-					$index,
-					$block['clientId'],
-					$block['name'] ?? 'unknown'
-				) );
+				Logger::debug(
+					sprintf(
+						'Block %d: clientId=%s, name=%s',
+						$index,
+						$block['clientId'],
+						$block['name'] ?? 'unknown'
+					)
+				);
 			}
 		}
 
@@ -96,7 +100,7 @@ class Response_Parser {
 	 * Sometimes AI adds explanation text before/after JSON.
 	 * This extracts the JSON object or array.
 	 *
-	 * @param string $response Response text.
+	 * @param  string $response Response text.
 	 * @return string JSON string or empty.
 	 */
 	private function extract_json( string $response ): string {
@@ -127,9 +131,9 @@ class Response_Parser {
 	/**
 	 * Validate a single feedback item.
 	 *
-	 * @param mixed $item            Feedback item data.
-	 * @param array $valid_block_ids Map of valid block IDs.
-	 * @param array $block_info      Map of block IDs to their info (name, index).
+	 * @param  mixed $item            Feedback item data.
+	 * @param  array $valid_block_ids Map of valid block IDs.
+	 * @param  array $block_info      Map of block IDs to their info (name, index).
 	 * @return array|null Validated item or null if invalid.
 	 */
 	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
@@ -179,22 +183,24 @@ class Response_Parser {
 
 		// Build validated item.
 		$validated = array(
-			'block_id'  => sanitize_text_field( $block_id ),
-			'category'  => sanitize_text_field( $item['category'] ),
-			'severity'  => sanitize_text_field( $item['severity'] ),
-			'title'     => $this->sanitize_title( $item['title'] ),
-			'feedback'  => $this->sanitize_feedback( $item['feedback'] ),
+			'block_id' => sanitize_text_field( $block_id ),
+			'category' => sanitize_text_field( $item['category'] ),
+			'severity' => sanitize_text_field( $item['severity'] ),
+			'title'    => $this->sanitize_title( $item['title'] ),
+			'feedback' => $this->sanitize_feedback( $item['feedback'] ),
 		);
 
 		// Add block name and index from block_info if available.
 		if ( isset( $block_info[ $block_id ] ) ) {
 			$validated['block_name']  = $block_info[ $block_id ]['name'] ?? '';
 			$validated['block_index'] = $block_info[ $block_id ]['index'] ?? 0;
-			Logger::debug( sprintf(
-				'Enriched feedback item with block_name=%s, block_index=%d',
-				$validated['block_name'],
-				$validated['block_index']
-			) );
+			Logger::debug(
+				sprintf(
+					'Enriched feedback item with block_name=%s, block_index=%d',
+					$validated['block_name'],
+					$validated['block_index']
+				)
+			);
 		}
 
 		// Optional suggestion field.
@@ -208,7 +214,7 @@ class Response_Parser {
 	/**
 	 * Sanitize summary text.
 	 *
-	 * @param string $summary Summary text.
+	 * @param  string $summary Summary text.
 	 * @return string Sanitized summary.
 	 */
 	private function sanitize_summary( string $summary ): string {
@@ -225,7 +231,7 @@ class Response_Parser {
 	/**
 	 * Sanitize title text.
 	 *
-	 * @param string $title Title text.
+	 * @param  string $title Title text.
 	 * @return string Sanitized title.
 	 */
 	private function sanitize_title( string $title ): string {
@@ -244,7 +250,7 @@ class Response_Parser {
 	 *
 	 * Allows basic formatting tags.
 	 *
-	 * @param string $feedback Feedback text.
+	 * @param  string $feedback Feedback text.
 	 * @return string Sanitized feedback.
 	 */
 	private function sanitize_feedback( string $feedback ): string {
@@ -269,7 +275,7 @@ class Response_Parser {
 	/**
 	 * Get summary of feedback items.
 	 *
-	 * @param array $feedback_items Parsed feedback items.
+	 * @param  array $feedback_items Parsed feedback items.
 	 * @return array Summary data.
 	 */
 	public function get_feedback_summary( array $feedback_items ): array {
@@ -292,16 +298,16 @@ class Response_Parser {
 		foreach ( $feedback_items as $item ) {
 			// Count by category.
 			if ( isset( $summary['by_category'][ $item['category'] ] ) ) {
-				$summary['by_category'][ $item['category'] ]++;
+				++$summary['by_category'][ $item['category'] ];
 			}
 
 			// Count by severity.
 			if ( isset( $summary['by_severity'][ $item['severity'] ] ) ) {
-				$summary['by_severity'][ $item['severity'] ]++;
+				++$summary['by_severity'][ $item['severity'] ];
 			}
 
 			// Track if any critical items exist.
-			if ( $item['severity'] === 'critical' ) {
+			if ( 'critical' === $item['severity'] ) {
 				$summary['has_critical'] = true;
 			}
 		}

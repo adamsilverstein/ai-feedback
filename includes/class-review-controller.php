@@ -19,6 +19,7 @@ use AI_Feedback\Logger;
  */
 class Review_Controller extends WP_REST_Controller {
 
+
 	/**
 	 * Namespace.
 	 *
@@ -68,7 +69,7 @@ class Review_Controller extends WP_REST_Controller {
 	/**
 	 * Create a review.
 	 *
-	 * @param WP_REST_Request $request Request object.
+	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function create_review( WP_REST_Request $request ) {
@@ -149,7 +150,7 @@ class Review_Controller extends WP_REST_Controller {
 	/**
 	 * Check permissions for creating a review.
 	 *
-	 * @param WP_REST_Request $request Request object.
+	 * @param  WP_REST_Request $request Request object.
 	 * @return bool|WP_Error
 	 */
 	public function create_review_permissions_check( WP_REST_Request $request ) {

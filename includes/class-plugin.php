@@ -12,6 +12,7 @@ namespace AI_Feedback;
  */
 class Plugin {
 
+
 	/**
 	 * Plugin instance.
 	 *
@@ -109,7 +110,7 @@ class Plugin {
 			return;
 		}
 
-		$asset = require $asset_file;
+		$asset = include $asset_file;
 
 		// Enqueue the main script.
 		wp_enqueue_script(

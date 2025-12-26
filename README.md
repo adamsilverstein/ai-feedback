@@ -184,13 +184,15 @@ npm run format             # Format code with Prettier
 # Linting
 npm run lint:js            # ESLint
 npm run lint:css           # Stylelint
-npm run lint:php           # PHPCS (requires Composer)
+npm run lint:pkg-json      # Package.json validation
+npm run lint:php           # PHPCS + PHPStan
 
 # Testing
 npm run test:unit          # JavaScript unit tests
-composer test              # PHP unit tests
+npm run test:php           # PHP unit tests
+composer test              # PHP unit tests (alternative)
 npm run test:e2e           # End-to-end tests
-npm run test:all           # Run all tests
+npm run test:all           # Run JS linting and tests
 
 # WordPress Environment
 npm run env:start          # Start wp-env
@@ -223,6 +225,16 @@ The plugin follows:
 - **PHP**: WordPress Coding Standards
 - **JavaScript**: WordPress ESLint configuration
 - **CSS**: WordPress Stylelint configuration
+
+### Continuous Integration
+
+All pull requests automatically run through GitHub Actions CI/CD:
+- ✅ JavaScript linting (ESLint, Stylelint, Prettier)
+- ✅ PHP linting (PHPCS, PHPStan)
+- ✅ JavaScript unit tests (Jest)
+- ✅ PHP unit tests (PHPUnit) across PHP 8.1-8.3
+
+See [docs/CI.md](docs/CI.md) for details on running checks locally and setting up branch protection.
 
 ## Architecture
 

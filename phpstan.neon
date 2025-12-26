@@ -1,0 +1,18 @@
+parameters:
+    level: 5
+    paths:
+        - includes/
+        - ai-feedback.php
+    scanFiles:
+        - ai-feedback.php
+    excludePaths:
+        - vendor/ (?)
+        - node_modules/ (?)
+    ignoreErrors:
+        - '#Constant [A-Z_]+ not found\.#'
+        -
+            message: '#If condition is always false\.#'
+            path: ai-feedback.php
+        -
+            message: '#Right side of && is always false\.#'
+            path: includes/class-review-service.php

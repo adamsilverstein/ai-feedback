@@ -202,7 +202,7 @@ test( 'sidebar default state', async ( { page } ) => {
 ### Required at Runtime
 
 - WordPress 6.9+
-- PHP 8.0+
+- PHP 8.1+
 - [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
 - `wordpress/php-ai-client` (Composer)
 

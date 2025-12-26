@@ -1,0 +1,49 @@
+name: Lint JavaScript
+
+on:
+    pull_request:
+        branches:
+            - main
+            - develop
+        paths:
+            - '**.js'
+            - '**.jsx'
+            - '**.json'
+            - '**.css'
+            - '**.scss'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.github/workflows/lint-js.yml'
+    push:
+        branches:
+            - main
+            - develop
+
+jobs:
+    lint-js:
+        name: JavaScript Linting
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Lint JavaScript (ESLint)
+              run: npm run lint:js
+
+            - name: Lint CSS (Stylelint)
+              run: npm run lint:css
+
+            - name: Check package.json format
+              run: npm run lint:pkg-json
+
+            - name: Check code formatting (Prettier)
+              run: npm run format -- --check
