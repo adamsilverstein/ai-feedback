@@ -1,19 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
-  <defs>
-    <linearGradient id="bubbleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-    </linearGradient>
-    <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <circle cx="48" cy="48" r="46" fill="url(#bubbleGrad)" />
-  <path d="M24 28 h44 a8 8 0 0 1 8 8 v24 a8 8 0 0 1 -8 8 h-28 l-12 12 v-12 h-4 a8 8 0 0 1 -8 -8 v-24 a8 8 0 0 1 8 -8 z" fill="white" opacity="0.95"/>
-  <path d="M48 38 L50.5 45.5 L58 48 L50.5 50.5 L48 58 L45.5 50.5 L38 48 L45.5 45.5 Z" fill="url(#sparkleGrad)"/>
-  <circle cx="36" cy="40" r="2" fill="#fbbf24" opacity="0.8"/>
-  <circle cx="60" cy="40" r="1.5" fill="#fbbf24" opacity="0.7"/>
-  <circle cx="58" cy="56" r="1.5" fill="#fbbf24" opacity="0.6"/>
-  <circle cx="38" cy="54" r="1" fill="#fbbf24" opacity="0.5"/>
+  <!-- Solid Indigo Background Circle -->
+  <circle cx="48" cy="48" r="46" fill="#4f46e5" />
+  
+  <!-- Simplified White Speech Bubble -->
+  <path d="M24 30 h48 a6 6 0 0 1 6 6 v24 a6 6 0 0 1 -6 6 h-24 l-14 14 v-14 h-10 a6 6 0 0 1 -6 -6 v-24 a6 6 0 0 1 6 -6 z" fill="white" />
+  
+  <!-- Bold 4-Pointed AI Sparkle (Amber) -->
+  <path d="M48 36 C50 44 52 46 60 48 C52 50 50 52 48 60 C46 52 44 50 36 48 C44 46 46 44 48 36 Z" fill="#f59e0b" />
 </svg>
