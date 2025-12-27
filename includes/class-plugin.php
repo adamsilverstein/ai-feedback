@@ -13,13 +13,6 @@ namespace AI_Feedback;
 class Plugin {
 
 	/**
-	 * AI Feedback comment author name.
-	 *
-	 * @var string
-	 */
-	private const AI_FEEDBACK_AUTHOR = 'AI Feedback';
-
-	/**
 	 * Plugin instance.
 	 *
 	 * @var Plugin|null
