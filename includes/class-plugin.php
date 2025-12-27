@@ -65,7 +65,7 @@ class Plugin {
 	 * @return string The AI Feedback comment author name.
 	 */
 	public static function get_ai_feedback_author(): string {
-		return self::AI_FEEDBACK_AUTHOR;
+		return __( 'AI Feedback', 'ai-feedback' );
 	}
 
 	/**
@@ -202,7 +202,7 @@ class Plugin {
 
 		// Check if this is an AI Feedback comment.
 		// Method 1: Check the comment author name.
-		$is_ai_feedback = ( self::AI_FEEDBACK_AUTHOR === $comment->comment_author );
+		$is_ai_feedback = ( self::get_ai_feedback_author() === $comment->comment_author );
 
 		// Method 2: Check comment meta for ai_feedback flag.
 		if ( ! $is_ai_feedback && $comment->comment_ID ) {
