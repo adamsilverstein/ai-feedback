@@ -12,6 +12,12 @@ namespace AI_Feedback;
  */
 class Plugin {
 
+	/**
+	 * AI Feedback comment author name.
+	 *
+	 * @var string
+	 */
+	private const AI_FEEDBACK_AUTHOR = 'AI Feedback';
 
 	/**
 	 * Plugin instance.
@@ -54,6 +60,15 @@ class Plugin {
 	}
 
 	/**
+	 * Get AI Feedback author name.
+	 *
+	 * @return string The AI Feedback comment author name.
+	 */
+	public static function get_ai_feedback_author(): string {
+		return self::AI_FEEDBACK_AUTHOR;
+	}
+
+	/**
 	 * Constructor.
 	 */
 	private function __construct() {
@@ -67,6 +82,9 @@ class Plugin {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
+
+		// Add custom avatar for AI Feedback comments/notes.
+		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
 	}
 
 	/**
@@ -164,5 +182,45 @@ class Plugin {
 
 		// Check if the block editor is being used.
 		return $current_screen->is_block_editor();
+	}
+
+	/**
+	 * Filter avatar data to show custom avatar for AI Feedback comments/notes.
+	 *
+	 * @param array $args        Arguments for getting avatar data.
+	 * @param mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
+	 *                           user email, WP_User object, WP_Post object, or WP_Comment object.
+	 * @return array Modified avatar args with custom URL for AI Feedback.
+	 */
+	public function filter_ai_feedback_avatar( array $args, $id_or_email ): array {
+		// Check if this is a comment object.
+		if ( ! $id_or_email instanceof \WP_Comment ) {
+			return $args;
+		}
+
+		$comment = $id_or_email;
+
+		// Check if this is an AI Feedback comment.
+		// Method 1: Check the comment author name.
+		$is_ai_feedback = ( self::AI_FEEDBACK_AUTHOR === $comment->comment_author );
+
+		// Method 2: Check comment meta for ai_feedback flag.
+		if ( ! $is_ai_feedback && $comment->comment_ID ) {
+			$ai_feedback_meta = get_comment_meta( (int) $comment->comment_ID, 'ai_feedback', true );
+			$is_ai_feedback   = ( '1' === $ai_feedback_meta );
+		}
+
+		// If this is an AI Feedback comment, use our custom avatar.
+		if ( $is_ai_feedback ) {
+			$avatar_path = AI_FEEDBACK_PLUGIN_DIR . 'assets/ai-feedback-avatar.svg';
+			if ( file_exists( $avatar_path ) ) {
+				$avatar_url = AI_FEEDBACK_PLUGIN_URL . 'assets/ai-feedback-avatar.svg';
+
+				$args['url']          = $avatar_url;
+				$args['found_avatar'] = true;
+			}
+		}
+
+		return $args;
 	}
 }

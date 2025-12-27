@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Solid Indigo Background Circle -->
+  <circle cx="48" cy="48" r="46" fill="#4f46e5" />
+  
+  <!-- Simplified White Speech Bubble -->
+  <path d="M24 30 h48 a6 6 0 0 1 6 6 v24 a6 6 0 0 1 -6 6 h-24 l-14 14 v-14 h-10 a6 6 0 0 1 -6 -6 v-24 a6 6 0 0 1 6 -6 z" fill="white" />
+  
+  <!-- Bold 4-Pointed AI Sparkle (Amber) -->
+  <path d="M48 36 C50 44 52 46 60 48 C52 50 50 52 48 60 C46 52 44 50 36 48 C44 46 46 44 48 36 Z" fill="#f59e0b" />
+</svg>
