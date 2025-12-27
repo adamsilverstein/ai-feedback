@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
-  <!-- Solid Indigo Background Circle -->
-  <circle cx="48" cy="48" r="46" fill="#4f46e5" />
+  <!-- Very Dark Purple Background Circle with white border -->
+  <circle cx="48" cy="48" r="45" fill="#1e1b4b" stroke="white" stroke-width="2" />
   
   <!-- Simplified White Speech Bubble -->
   <path d="M24 30 h48 a6 6 0 0 1 6 6 v24 a6 6 0 0 1 -6 6 h-24 l-14 14 v-14 h-10 a6 6 0 0 1 -6 -6 v-24 a6 6 0 0 1 6 -6 z" fill="white" />
   
-  <!-- Bold 4-Pointed AI Sparkle (Amber) -->
-  <path d="M48 36 C50 44 52 46 60 48 C52 50 50 52 48 60 C46 52 44 50 36 48 C44 46 46 44 48 36 Z" fill="#f59e0b" />
+  <!-- Larger sparkle offset to upper-right corner -->
+  <path d="M62 14 C66 24 70 28 80 32 C70 36 66 40 62 50 C58 40 54 36 44 32 C54 28 58 24 62 14 Z" fill="#fb923c" stroke="#1e1b4b" stroke-width="1.5" />
 </svg>
