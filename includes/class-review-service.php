@@ -19,6 +19,16 @@ use AI_Feedback\Logger;
  */
 class Review_Service {
 
+	/**
+	 * Non-retryable error codes that should fail immediately without retry.
+	 *
+	 * @var array
+	 */
+	const NON_RETRYABLE_ERRORS = array(
+		'rate_limit_exceeded',
+		'invalid_api_key',
+		'billing_error',
+	);
 
 	/**
 	 * Prompt builder instance.
@@ -109,8 +119,8 @@ class Review_Service {
 			$ai_response = $this->get_mock_response( $blocks );
 			Logger::debug( 'Using mock response mode' );
 		} else {
-			// Call AI.
-			$ai_response = $this->call_ai( $prompt, $system_instruction, $model );
+			// Call AI with retry logic.
+			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model );
 
 			if ( is_wp_error( $ai_response ) ) {
 				Logger::debug( sprintf( 'AI request failed: %s', $ai_response->get_error_message() ) );
@@ -204,7 +214,7 @@ class Review_Service {
 	 * @param  string $model              Model to use.
 	 * @return string|WP_Error AI response or error.
 	 */
-	private function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
+	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
 		// Check if PHP AI Client is available.
 		if ( ! class_exists( 'WordPress\AiClient\AiClient' ) ) {
 			return new WP_Error(
@@ -230,8 +240,9 @@ class Review_Service {
 			return $response;
 
 		} catch ( \Exception $e ) {
+			$error_code = $this->extract_error_code_from_exception( $e );
 			return new WP_Error(
-				'ai_request_failed',
+				$error_code,
 				sprintf(
 				/* translators: %s: error message */
 					__( 'AI request failed: %s', 'ai-feedback' ),
@@ -239,6 +250,134 @@ class Review_Service {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Call AI service with retry logic and exponential backoff.
+	 *
+	 * @param string $prompt             User prompt.
+	 * @param string $system_instruction System instruction.
+	 * @param string $model              Model to use.
+	 * @param int    $max_retries        Maximum number of retry attempts.
+	 * @return string|WP_Error AI response or error.
+	 */
+	protected function call_ai_with_retry(
+		string $prompt,
+		string $system_instruction,
+		string $model,
+		int $max_retries = 3
+	): string|WP_Error {
+		$delay_ms   = 1000; // Start at 1 second (1000ms).
+		$last_error = null;
+
+		for ( $attempt = 0; $attempt <= $max_retries; $attempt++ ) {
+			// Sleep before retry attempts (not before first attempt).
+			if ( $attempt > 0 ) {
+				Logger::debug(
+					sprintf(
+						'Retry attempt %d/%d for AI call, waiting %dms',
+						$attempt,
+						$max_retries,
+						$delay_ms
+					)
+				);
+				usleep( $delay_ms * 1000 ); // Convert ms to microseconds.
+				$delay_ms *= 2; // Exponential backoff for next attempt.
+			}
+
+			$response = $this->call_ai( $prompt, $system_instruction, $model );
+
+			// Success - return immediately.
+			if ( ! is_wp_error( $response ) ) {
+				if ( $attempt > 0 ) {
+					Logger::debug( sprintf( 'AI call succeeded on retry attempt %d', $attempt ) );
+				}
+				return $response;
+			}
+
+			$last_error = $response;
+			$error_code = $response->get_error_code();
+
+			// Check if error is non-retryable - fail immediately.
+			if ( in_array( $error_code, self::NON_RETRYABLE_ERRORS, true ) ) {
+				Logger::debug(
+					sprintf(
+						'Non-retryable error encountered: %s - %s',
+						$error_code,
+						$response->get_error_message()
+					)
+				);
+				return $response;
+			}
+
+			// Log the failure for retryable errors.
+			Logger::debug(
+				sprintf(
+					'AI call failed (attempt %d/%d): %s - %s',
+					$attempt + 1,
+					$max_retries + 1,
+					$error_code,
+					$response->get_error_message()
+				)
+			);
+		}
+
+		Logger::debug(
+			sprintf(
+				'All %d attempts exhausted, returning final error',
+				$max_retries + 1
+			)
+		);
+		return $last_error;
+	}
+
+	/**
+	 * Extract error code from exception.
+	 *
+	 * Attempts to identify specific error types from exception messages
+	 * or exception class names for better retry handling.
+	 *
+	 * @param \Exception $e The exception to analyze.
+	 * @return string Error code for WP_Error.
+	 */
+	protected function extract_error_code_from_exception( \Exception $e ): string {
+		$message    = strtolower( $e->getMessage() );
+		$class_name = strtolower( get_class( $e ) );
+
+		// Check for rate limiting errors.
+		if (
+			str_contains( $message, 'rate limit' ) ||
+			str_contains( $message, 'rate_limit' ) ||
+			str_contains( $message, 'too many requests' ) ||
+			str_contains( $class_name, 'ratelimit' )
+		) {
+			return 'rate_limit_exceeded';
+		}
+
+		// Check for authentication errors.
+		if (
+			str_contains( $message, 'invalid api key' ) ||
+			str_contains( $message, 'invalid_api_key' ) ||
+			str_contains( $message, 'unauthorized' ) ||
+			str_contains( $message, 'authentication' ) ||
+			str_contains( $class_name, 'authentication' ) ||
+			str_contains( $class_name, 'unauthorized' )
+		) {
+			return 'invalid_api_key';
+		}
+
+		// Check for billing errors.
+		if (
+			str_contains( $message, 'billing' ) ||
+			str_contains( $message, 'payment' ) ||
+			str_contains( $message, 'quota exceeded' ) ||
+			str_contains( $message, 'insufficient' )
+		) {
+			return 'billing_error';
+		}
+
+		// Default to generic error code.
+		return 'ai_request_failed';
 	}
 
 	/**
