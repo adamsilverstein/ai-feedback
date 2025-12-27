@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Deep Purple Background -->
+  <rect width="256" height="256" rx="32" fill="#1e1b4b"/>
+  
+  <!-- White Speech Bubble -->
+  <path d="M48 72 h160 a16 16 0 0 1 16 16 v80 a16 16 0 0 1 -16 16 h-80 l-40 40 v-40 h-40 a16 16 0 0 1 -16 -16 v-80 a16 16 0 0 1 16 -16 z" fill="white"/>
+  
+  <!-- Orange AI Sparkle in upper-right -->
+  <path d="M176 16 C184 40 196 52 220 60 C196 68 184 80 176 104 C168 80 156 68 132 60 C156 52 168 40 176 16 Z" fill="#fb923c" stroke="#1e1b4b" stroke-width="3"/>
+</svg>
