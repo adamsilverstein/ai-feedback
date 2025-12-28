@@ -21,7 +21,6 @@ function IndeterminateProgressBar() {
 		<div
 			className="ai-feedback-progress-container"
 			role="progressbar"
-			aria-valuenow={undefined}
 			aria-valuemin={0}
 			aria-valuemax={100}
 			aria-label={__('Review progress', 'ai-feedback')}
