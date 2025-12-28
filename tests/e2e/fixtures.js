@@ -172,8 +172,8 @@ class AIFeedbackUtils {
 	 * Start a review and wait for completion.
 	 * Assumes API is already mocked if needed.
 	 *
-	 * @param {number} timeout          - Maximum time to wait for the review to complete and button to return to ready state (default 10000ms).
-	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear (default 1000ms).
+	 * @param {number} timeout          - Maximum time to wait for the review to complete and button to return to ready state. Default: 10000ms.
+	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear. Default: 1000ms.
 	 */
 	async startReviewAndWait(timeout = 10000, reviewingTimeout = 1000) {
 		await this.page
@@ -191,7 +191,10 @@ class AIFeedbackUtils {
 		} catch (error) {
 			// Reviewing state might not appear if review completes very quickly
 			// Only ignore timeout errors, re-throw other errors
-			if (error.name !== 'TimeoutError') {
+			if (
+				error.name !== 'TimeoutError' &&
+				!error.message?.includes('Timeout')
+			) {
 				throw error;
 			}
 		}
