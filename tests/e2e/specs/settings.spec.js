@@ -1,142 +1,182 @@
 /**
  * E2E tests for settings persistence.
  */
-const { test, expect } = require( '../fixtures' );
+const { test, expect } = require('../fixtures');
 
-test.describe( 'Settings Persistence', () => {
-	test.beforeEach( async ( { admin } ) => {
+test.describe('Settings Persistence', () => {
+	test.beforeEach(async ({ admin }) => {
 		await admin.createNewPost();
-	} );
+	});
 
-	test( 'persists model selection across sessions', async ( { admin, page, aiFeedback } ) => {
+	test('persists model selection across sessions', async ({
+		admin,
+		page,
+		aiFeedback,
+	}) => {
 		await aiFeedback.openSidebar();
-		
+
 		// Change model
-		await aiFeedback.selectModel( 'gpt-4o' );
-		
+		await aiFeedback.selectModel('gpt-4o');
+
 		// Wait for save (debounced)
 		await aiFeedback.waitForSettingsSave();
-		
+
 		// Navigate away and back
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
-		
-		// Verify persistence
-		const modelSelect = page.getByLabel( 'AI Model' );
-		await expect( modelSelect ).toHaveValue( 'gpt-4o' );
-	} );
 
-	test( 'persists focus area selections', async ( { admin, page, aiFeedback } ) => {
+		// Verify persistence
+		const modelSelect = page.getByLabel('AI Model');
+		await expect(modelSelect).toHaveValue('gpt-4o');
+	});
+
+	test('persists focus area selections', async ({
+		admin,
+		page,
+		aiFeedback,
+	}) => {
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
+
 		// Toggle focus areas
-		await aiFeedback.toggleFocusArea( 'Content Quality', false );
-		await aiFeedback.toggleFocusArea( 'Design & Formatting', true );
-		
+		await aiFeedback.toggleFocusArea('Content Quality', false);
+		await aiFeedback.toggleFocusArea('Design & Formatting', true);
+
 		// Wait for save
 		await aiFeedback.waitForSettingsSave();
-		
+
 		// Navigate away and back
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
-		// Verify persistence
-		await expect( page.getByLabel( 'Content Quality', { exact: true } ) ).not.toBeChecked();
-		await expect( page.getByLabel( 'Design & Formatting', { exact: true } ) ).toBeChecked();
-	} );
 
-	test( 'persists target tone selection', async ( { admin, page, aiFeedback } ) => {
+		// Verify persistence
+		await expect(
+			page.getByLabel('Content Quality', { exact: true })
+		).not.toBeChecked();
+		await expect(
+			page.getByLabel('Design & Formatting', { exact: true })
+		).toBeChecked();
+	});
+
+	test('persists target tone selection', async ({
+		admin,
+		page,
+		aiFeedback,
+	}) => {
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
+
 		// Change tone
-		await aiFeedback.selectTone( 'academic' );
-		
+		await aiFeedback.selectTone('academic');
+
 		// Wait and verify
 		await aiFeedback.waitForSettingsSave();
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
-		await expect( page.getByLabel( 'Target Tone' ) ).toHaveValue( 'academic' );
-	} );
 
-	test( 'handles concurrent settings updates', async ( { page, aiFeedback, admin } ) => {
+		await expect(page.getByLabel('Target Tone')).toHaveValue('academic');
+	});
+
+	test('handles concurrent settings updates', async ({
+		page,
+		aiFeedback,
+		admin,
+	}) => {
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
+
 		// Get initial state of focus areas
-		const contentQuality = page.getByLabel( 'Content Quality', { exact: true } );
-		const toneVoice = page.getByLabel( 'Tone & Voice', { exact: true } );
-		const flowStructure = page.getByLabel( 'Flow & Structure', { exact: true } );
-		
+		const contentQuality = page.getByLabel('Content Quality', {
+			exact: true,
+		});
+		const toneVoice = page.getByLabel('Tone & Voice', { exact: true });
+		const flowStructure = page.getByLabel('Flow & Structure', {
+			exact: true,
+		});
+
 		const initialContentState = await contentQuality.isChecked();
 		const initialToneState = await toneVoice.isChecked();
 		const initialFlowState = await flowStructure.isChecked();
-		
+
 		// Rapid changes (should debounce)
 		await contentQuality.click();
 		await toneVoice.click();
 		await flowStructure.click();
-		
+
 		// Wait for debounced save
 		await aiFeedback.waitForSettingsSave();
-		
+
 		// All changes should be saved
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
-		// Verify all toggles persisted correctly (opposite of initial state)
-		await expect( page.getByLabel( 'Content Quality', { exact: true } ) ).toHaveProperty( 'checked', ! initialContentState );
-		await expect( page.getByLabel( 'Tone & Voice', { exact: true } ) ).toHaveProperty( 'checked', ! initialToneState );
-		await expect( page.getByLabel( 'Flow & Structure', { exact: true } ) ).toHaveProperty( 'checked', ! initialFlowState );
-	} );
 
-	test( 'settings load on sidebar open', async ( { page, aiFeedback } ) => {
+		// Verify all toggles persisted correctly (opposite of initial state)
+		await expect(
+			page.getByLabel('Content Quality', { exact: true })
+		).toHaveProperty('checked', !initialContentState);
+		await expect(
+			page.getByLabel('Tone & Voice', { exact: true })
+		).toHaveProperty('checked', !initialToneState);
+		await expect(
+			page.getByLabel('Flow & Structure', { exact: true })
+		).toHaveProperty('checked', !initialFlowState);
+	});
+
+	test('settings load on sidebar open', async ({ page, aiFeedback }) => {
 		await aiFeedback.openSidebar();
-		
+
 		// Verify that settings are loaded (no "Loading..." state)
-		const loadingText = page.getByText( 'Loading…' );
-		
+		const loadingText = page.getByText('Loading…');
+
 		// Either loading is not visible or it quickly disappears
-		await expect( loadingText ).not.toBeVisible( { timeout: 5000 } ).catch( () => {
-			// Loading might have already disappeared, which is fine
-		} );
-		
+		await expect(loadingText)
+			.not.toBeVisible({ timeout: 5000 })
+			.catch(() => {
+				// Loading might have already disappeared, which is fine
+			});
+
 		// Verify settings UI is present
-		await expect( page.getByLabel( 'AI Model' ) ).toBeVisible();
-		
+		await expect(page.getByLabel('AI Model')).toBeVisible();
+
 		// Expand settings panel
 		await aiFeedback.expandReviewSettings();
-		
-		// Verify settings content is present
-		await expect( page.getByLabel( 'Content Quality', { exact: true } ) ).toBeVisible();
-		await expect( page.getByLabel( 'Target Tone' ) ).toBeVisible();
-	} );
 
-	test( 'preserves multiple settings changes in single session', async ( { admin, page, aiFeedback } ) => {
+		// Verify settings content is present
+		await expect(
+			page.getByLabel('Content Quality', { exact: true })
+		).toBeVisible();
+		await expect(page.getByLabel('Target Tone')).toBeVisible();
+	});
+
+	test('preserves multiple settings changes in single session', async ({
+		admin,
+		page,
+		aiFeedback,
+	}) => {
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
+
 		// Make multiple changes
-		await aiFeedback.selectModel( 'claude-opus-4' );
-		await aiFeedback.toggleFocusArea( 'Content Quality', false );
-		await aiFeedback.selectTone( 'friendly' );
-		
+		await aiFeedback.selectModel('claude-opus-4');
+		await aiFeedback.toggleFocusArea('Content Quality', false);
+		await aiFeedback.selectTone('friendly');
+
 		// Wait for all changes to save
 		await aiFeedback.waitForSettingsSave();
-		
+
 		// Navigate to new post
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-		
+
 		// Verify all settings persisted
-		await expect( page.getByLabel( 'AI Model' ) ).toHaveValue( 'claude-opus-4' );
-		await expect( page.getByLabel( 'Content Quality', { exact: true } ) ).not.toBeChecked();
-		await expect( page.getByLabel( 'Target Tone' ) ).toHaveValue( 'friendly' );
-	} );
-} );
+		await expect(page.getByLabel('AI Model')).toHaveValue('claude-opus-4');
+		await expect(
+			page.getByLabel('Content Quality', { exact: true })
+		).not.toBeChecked();
+		await expect(page.getByLabel('Target Tone')).toHaveValue('friendly');
+	});
+});
