@@ -109,11 +109,24 @@ class AIFeedbackUtils {
 
 	/**
 	 * Wait for settings to be saved (accounting for debounce).
+	 * Waits for the settings API request to complete.
 	 *
-	 * @param {number} ms - Milliseconds to wait (default 600ms for 500ms debounce + buffer).
+	 * @param {number} timeout - Maximum time to wait in milliseconds (default 3000ms).
 	 */
-	async waitForSettingsSave(ms = 600) {
-		await this.page.waitForTimeout(ms);
+	async waitForSettingsSave(timeout = 3000) {
+		try {
+			// Wait for the settings POST request to complete
+			await this.page.waitForResponse(
+				(response) =>
+					response.url().includes('/ai-feedback/v1/settings') &&
+					response.request().method() === 'POST' &&
+					response.status() === 200,
+				{ timeout }
+			);
+		} catch (error) {
+			// If no request was made (settings unchanged), just wait for debounce time
+			await this.page.waitForTimeout(600);
+		}
 	}
 }
 

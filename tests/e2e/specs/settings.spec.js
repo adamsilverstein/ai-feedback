@@ -114,31 +114,41 @@ test.describe('Settings Persistence', () => {
 		await aiFeedback.expandReviewSettings();
 
 		// Verify all toggles persisted correctly (opposite of initial state)
-		await expect(
-			page.getByLabel('Content Quality', { exact: true })
-		).toHaveProperty('checked', !initialContentState);
-		await expect(
-			page.getByLabel('Tone & Voice', { exact: true })
-		).toHaveProperty('checked', !initialToneState);
-		await expect(
-			page.getByLabel('Flow & Structure', { exact: true })
-		).toHaveProperty('checked', !initialFlowState);
+		if (initialContentState) {
+			await expect(
+				page.getByLabel('Content Quality', { exact: true })
+			).not.toBeChecked();
+		} else {
+			await expect(
+				page.getByLabel('Content Quality', { exact: true })
+			).toBeChecked();
+		}
+
+		if (initialToneState) {
+			await expect(
+				page.getByLabel('Tone & Voice', { exact: true })
+			).not.toBeChecked();
+		} else {
+			await expect(
+				page.getByLabel('Tone & Voice', { exact: true })
+			).toBeChecked();
+		}
+
+		if (initialFlowState) {
+			await expect(
+				page.getByLabel('Flow & Structure', { exact: true })
+			).not.toBeChecked();
+		} else {
+			await expect(
+				page.getByLabel('Flow & Structure', { exact: true })
+			).toBeChecked();
+		}
 	});
 
 	test('settings load on sidebar open', async ({ page, aiFeedback }) => {
 		await aiFeedback.openSidebar();
 
-		// Verify that settings are loaded (no "Loading..." state)
-		const loadingText = page.getByText('Loading…');
-
-		// Either loading is not visible or it quickly disappears
-		await expect(loadingText)
-			.not.toBeVisible({ timeout: 5000 })
-			.catch(() => {
-				// Loading might have already disappeared, which is fine
-			});
-
-		// Verify settings UI is present
+		// Verify settings UI is present (settings should be loaded)
 		await expect(page.getByLabel('AI Model')).toBeVisible();
 
 		// Expand settings panel
