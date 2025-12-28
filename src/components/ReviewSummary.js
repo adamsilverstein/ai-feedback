@@ -124,7 +124,7 @@ export default function ReviewSummary({ review }) {
 							<li className="severity-critical">
 								<span
 									className="severity-badge severity-critical"
-									role="status"
+									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
 										__('Severity level: %s', 'ai-feedback'),
@@ -141,7 +141,7 @@ export default function ReviewSummary({ review }) {
 							<li className="severity-important">
 								<span
 									className="severity-badge severity-important"
-									role="status"
+									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
 										__('Severity level: %s', 'ai-feedback'),
@@ -158,7 +158,7 @@ export default function ReviewSummary({ review }) {
 							<li className="severity-suggestion">
 								<span
 									className="severity-badge severity-suggestion"
-									role="status"
+									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
 										__('Severity level: %s', 'ai-feedback'),
@@ -191,17 +191,7 @@ export default function ReviewSummary({ review }) {
 										aria-setsize={array.length}
 										aria-posinset={index + 1}
 									>
-										<span
-											className="category-badge"
-											aria-label={sprintf(
-												/* translators: %s: feedback category */
-												__(
-													'Feedback category: %s',
-													'ai-feedback'
-												),
-												categoryLabel
-											)}
-										>
+										<span className="category-badge">
 											{categoryLabel}
 										</span>
 										: {count}
