@@ -342,4 +342,203 @@ class Response_Parser {
 
 		return $summary;
 	}
+
+	/**
+	 * Validate response structure against JSON schema.
+	 *
+	 * This validates the structure and types of the response without
+	 * checking semantic validity (e.g., whether block_ids exist).
+	 *
+	 * @param  mixed $data Decoded JSON data to validate.
+	 * @return true|\WP_Error True if valid, WP_Error with validation errors if invalid.
+	 */
+	public function validate_schema( $data ) {
+		$errors = new \WP_Error();
+
+		// Must be an array/object.
+		if ( ! is_array( $data ) ) {
+			$errors->add(
+				'invalid_type',
+				__( 'Response must be a JSON object.', 'ai-feedback' ),
+				array( 'path' => '$' )
+			);
+			return $errors;
+		}
+
+		// Check for required 'feedback' field.
+		if ( ! isset( $data['feedback'] ) ) {
+			$errors->add(
+				'missing_field',
+				__( 'Response must contain a "feedback" array.', 'ai-feedback' ),
+				array( 'path' => '$.feedback' )
+			);
+		} elseif ( ! is_array( $data['feedback'] ) ) {
+			$errors->add(
+				'invalid_type',
+				__( 'The "feedback" field must be an array.', 'ai-feedback' ),
+				array( 'path' => '$.feedback' )
+			);
+		} else {
+			// Validate each feedback item.
+			foreach ( $data['feedback'] as $index => $item ) {
+				$item_errors = $this->validate_feedback_item_schema( $item, $index );
+				if ( is_wp_error( $item_errors ) ) {
+					foreach ( $item_errors->get_error_codes() as $code ) {
+						$error_data = $item_errors->get_error_data( $code );
+						foreach ( $item_errors->get_error_messages( $code ) as $message ) {
+							$errors->add( $code, $message, $error_data );
+						}
+					}
+				}
+			}
+		}
+
+		// Validate optional summary field.
+		if ( isset( $data['summary'] ) && ! is_string( $data['summary'] ) ) {
+			$errors->add(
+				'invalid_type',
+				__( 'The "summary" field must be a string.', 'ai-feedback' ),
+				array( 'path' => '$.summary' )
+			);
+		}
+
+		// Return true if no errors, otherwise return WP_Error.
+		if ( ! $errors->has_errors() ) {
+			return true;
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Validate a single feedback item against schema.
+	 *
+	 * @param  mixed $item  Feedback item to validate.
+	 * @param  int   $index Index of item in feedback array.
+	 * @return true|\WP_Error True if valid, WP_Error with validation errors if invalid.
+	 */
+	private function validate_feedback_item_schema( $item, int $index ) {
+		$errors = new \WP_Error();
+		$path   = '$.feedback[' . $index . ']';
+
+		// Must be an array/object.
+		if ( ! is_array( $item ) ) {
+			$errors->add(
+				'invalid_type',
+				sprintf(
+					/* translators: %d: item index */
+					__( 'Feedback item %d must be an object.', 'ai-feedback' ),
+					$index
+				),
+				array( 'path' => $path )
+			);
+			return $errors;
+		}
+
+		// Check required fields.
+		foreach ( self::REQUIRED_FEEDBACK_FIELDS as $field ) {
+			if ( ! isset( $item[ $field ] ) ) {
+				$errors->add(
+					'missing_field',
+					sprintf(
+						/* translators: 1: field name, 2: item index */
+						__( 'Feedback item %2$d is missing required field "%1$s".', 'ai-feedback' ),
+						$field,
+						$index
+					),
+					array( 'path' => $path . '.' . $field )
+				);
+			} elseif ( ! is_string( $item[ $field ] ) ) {
+				$errors->add(
+					'invalid_type',
+					sprintf(
+						/* translators: 1: field name, 2: item index */
+						__( 'Field "%1$s" in feedback item %2$d must be a string.', 'ai-feedback' ),
+						$field,
+						$index
+					),
+					array( 'path' => $path . '.' . $field )
+				);
+			}
+		}
+
+		// Validate category enum.
+		if ( isset( $item['category'] ) && is_string( $item['category'] ) ) {
+			if ( ! in_array( $item['category'], self::VALID_CATEGORIES, true ) ) {
+				$errors->add(
+					'invalid_enum',
+					sprintf(
+						/* translators: 1: invalid value, 2: valid values, 3: item index */
+						__( 'Invalid category "%1$s" in item %3$d. Must be one of: %2$s.', 'ai-feedback' ),
+						$item['category'],
+						implode( ', ', self::VALID_CATEGORIES ),
+						$index
+					),
+					array( 'path' => $path . '.category' )
+				);
+			}
+		}
+
+		// Validate severity enum.
+		if ( isset( $item['severity'] ) && is_string( $item['severity'] ) ) {
+			if ( ! in_array( $item['severity'], self::VALID_SEVERITIES, true ) ) {
+				$errors->add(
+					'invalid_enum',
+					sprintf(
+						/* translators: 1: invalid value, 2: valid values, 3: item index */
+						__( 'Invalid severity "%1$s" in item %3$d. Must be one of: %2$s.', 'ai-feedback' ),
+						$item['severity'],
+						implode( ', ', self::VALID_SEVERITIES ),
+						$index
+					),
+					array( 'path' => $path . '.severity' )
+				);
+			}
+		}
+
+		// Validate optional suggestion field type.
+		if ( isset( $item['suggestion'] ) && ! is_string( $item['suggestion'] ) ) {
+			$errors->add(
+				'invalid_type',
+				sprintf(
+					/* translators: %d: item index */
+					__( 'Field "suggestion" in feedback item %d must be a string.', 'ai-feedback' ),
+					$index
+				),
+				array( 'path' => $path . '.suggestion' )
+			);
+		}
+
+		if ( ! $errors->has_errors() ) {
+			return true;
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Format validation errors for debugging output.
+	 *
+	 * @param  \WP_Error $errors Validation errors.
+	 * @return string Formatted error report.
+	 */
+	public function format_validation_errors( \WP_Error $errors ): string {
+		$output = array();
+
+		foreach ( $errors->get_error_codes() as $code ) {
+			$messages = $errors->get_error_messages( $code );
+			foreach ( $messages as $message ) {
+				$data     = $errors->get_error_data( $code );
+				$path     = is_array( $data ) && isset( $data['path'] ) ? $data['path'] : '';
+				$output[] = sprintf(
+					'[%s] %s%s',
+					$code,
+					$message,
+					$path ? ' (at ' . $path . ')' : ''
+				);
+			}
+		}
+
+		return implode( "\n", $output );
+	}
 }
