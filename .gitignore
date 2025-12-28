@@ -3,3 +3,6 @@ node_modules/
 build/
 /ai-feedback.zip
 .phpunit.cache/
+artifacts/
+test-results/
+playwright-report/
