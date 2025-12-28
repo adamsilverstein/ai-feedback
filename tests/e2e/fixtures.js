@@ -34,9 +34,10 @@ class AIFeedbackUtils {
 			.catch(() => false);
 
 		if (!isOpen) {
-			// Open the options menu if not already open
+			// Open the options menu if not already open - use exact match
 			const optionsButton = this.page.getByRole('button', {
 				name: 'Options',
+				exact: true,
 			});
 			const menuVisible = await this.page
 				.getByRole('menu', { name: 'Options' })
@@ -204,14 +205,14 @@ class AIFeedbackUtils {
  * Extend the base test with custom fixtures.
  */
 const test = base.extend({
-	admin: async ({ page, pageUtils }, use) => {
-		await use(new Admin({ page, pageUtils }));
+	pageUtils: async ({ page }, use) => {
+		await use(new PageUtils({ page }));
 	},
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	pageUtils: async ({ page }, use) => {
-		await use(new PageUtils({ page }));
+	admin: async ({ page, pageUtils, editor }, use) => {
+		await use(new Admin({ page, pageUtils, editor }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
