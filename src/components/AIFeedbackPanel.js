@@ -7,6 +7,7 @@ import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
+import { hasTextContent, extractBlockData } from '../utils/block-utils';
 
 import ModelSelector from './ModelSelector';
 import SettingsPanel from './SettingsPanel';
@@ -101,17 +102,7 @@ export default function AIFeedbackPanel() {
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
 	// Check if post has content (any text blocks)
-	const hasContent = editorBlocks.some((block) => {
-		if (!block.name) {
-			return false;
-		}
-		// Get text content from the block
-		const content = block.originalContent || '';
-		const temp = document.createElement('div');
-		temp.innerHTML = content;
-		const text = (temp.textContent || temp.innerText || '').trim();
-		return text.length > 0;
-	});
+	const hasContent = hasTextContent(editorBlocks);
 
 	const isSaved = !!postId;
 	const canReview = isSaved && hasContent;
@@ -123,35 +114,6 @@ export default function AIFeedbackPanel() {
 		if (!canReview) {
 			return;
 		}
-
-		// Extract block data with clientIds (reused logic from ReviewButton)
-		const extractTextContent = (innerHTML) => {
-			if (!innerHTML) {
-				return '';
-			}
-			const temp = document.createElement('div');
-			temp.innerHTML = innerHTML;
-			return temp.textContent || temp.innerText || '';
-		};
-
-		const extractBlockData = (blocks) => {
-			const result = [];
-			for (const block of blocks) {
-				const rawContent = block.originalContent || '';
-				const content = extractTextContent(rawContent);
-				if (content.trim()) {
-					result.push({
-						clientId: block.clientId,
-						name: block.name,
-						content: content.trim(),
-					});
-				}
-				if (block.innerBlocks && block.innerBlocks.length > 0) {
-					result.push(...extractBlockData(block.innerBlocks));
-				}
-			}
-			return result;
-		};
 
 		const blocks = extractBlockData(editorBlocks);
 
