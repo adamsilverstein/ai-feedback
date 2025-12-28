@@ -128,6 +128,76 @@ class AIFeedbackUtils {
 			await this.page.waitForTimeout(600);
 		}
 	}
+
+	/**
+	 * Mock the review API with a custom response.
+	 *
+	 * @param {Object} response - Custom response object.
+	 */
+	async mockReviewAPI(response) {
+		await this.page.route(
+			'**/wp-json/ai-feedback/v1/review',
+			async (route) => {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(response),
+				});
+			}
+		);
+	}
+
+	/**
+	 * Mock the review API to return an error.
+	 *
+	 * @param {number} status  - HTTP status code.
+	 * @param {string} code    - Error code.
+	 * @param {string} message - Error message.
+	 */
+	async mockReviewAPIError(status, code, message) {
+		await this.page.route(
+			'**/wp-json/ai-feedback/v1/review',
+			async (route) => {
+				await route.fulfill({
+					status,
+					contentType: 'application/json',
+					body: JSON.stringify({ code, message }),
+				});
+			}
+		);
+	}
+
+	/**
+	 * Start a review and wait for completion.
+	 * Assumes API is already mocked if needed.
+	 *
+	 * @param {number} timeout - Timeout in milliseconds.
+	 */
+	async startReviewAndWait(timeout = 10000) {
+		await this.page
+			.getByRole('button', { name: 'Review Document' })
+			.click();
+
+		// Wait for reviewing state to appear and then disappear
+		try {
+			await this.page
+				.getByRole('button', { name: /Reviewing/i })
+				.waitFor({
+					state: 'visible',
+					timeout: 1000,
+				});
+		} catch {
+			// Might complete too fast
+		}
+
+		// Wait for review to complete
+		await this.page
+			.getByRole('button', { name: 'Review Document' })
+			.waitFor({
+				state: 'visible',
+				timeout,
+			});
+	}
 }
 
 /**
