@@ -299,3 +299,13 @@ __( 'Review Document', 'ai-feedback' );
 - [API Reference](./docs/API.md) - REST API documentation
 - [WordPress Block Editor Handbook](https://developer.wordpress.org/block-editor/)
 - [PHP AI Client Documentation](https://github.com/WordPress/php-ai-client)
+
+## Git process
+- As you work, commit each group of related changes together with a clear commit message.
+- Keep commits concise and focused on a single change.
+- Commit messages should be brief, high level overview of the changes made.
+- A detailed commit description is not desired - if it seems required, consider breaking the commit down into several smaller commits
+- Before each commit, ensure that current linting and tests pass.
+- Use feature branches for new features and bugfix branches for fixes.
+- Regularly rebase your branch onto the main branch to keep history clean.
+- Open a pull request for code review before merging into the main branch.
