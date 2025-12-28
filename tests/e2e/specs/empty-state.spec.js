@@ -13,9 +13,7 @@ test.describe('Empty State', () => {
 		await aiFeedback.openSidebar();
 
 		// Verify empty state is visible
-		await expect(
-			page.getByText('No reviews yet')
-		).toBeVisible();
+		await expect(page.getByText('No reviews yet')).toBeVisible();
 		await expect(
 			page.getByText(
 				'Get AI-powered feedback on your writing to improve clarity, tone, and structure.'
@@ -36,9 +34,7 @@ test.describe('Empty State', () => {
 		await expect(
 			page.getByText('Add some content to your post')
 		).toBeVisible();
-		await expect(
-			page.getByText('Save your post as a draft')
-		).toBeVisible();
+		await expect(page.getByText('Save your post as a draft')).toBeVisible();
 
 		// Review button should not be visible
 		await expect(
@@ -69,9 +65,7 @@ test.describe('Empty State', () => {
 		await expect(
 			page.getByText('Add some content to your post')
 		).not.toBeVisible();
-		await expect(
-			page.getByText('Save your post as a draft')
-		).toBeVisible();
+		await expect(page.getByText('Save your post as a draft')).toBeVisible();
 	});
 
 	test('shows Review Document button when post is saved with content', async ({
@@ -91,15 +85,12 @@ test.describe('Empty State', () => {
 			.fill('This is test content for the post.');
 
 		// Save the post
-		await page
-			.getByRole('button', { name: 'Save draft' })
-			.click();
+		await page.getByRole('button', { name: 'Save draft' }).click();
 
 		// Wait for save to complete
-		await page.waitForSelector(
-			'button:has-text("Saved")',
-			{ timeout: 10000 }
-		);
+		await page.waitForSelector('button:has-text("Saved")', {
+			timeout: 10000,
+		});
 
 		await aiFeedback.openSidebar();
 
@@ -118,7 +109,6 @@ test.describe('Empty State', () => {
 		page,
 		editor,
 		aiFeedback,
-		requestUtils,
 	}) => {
 		// Mock the review endpoint to return a successful response
 		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
@@ -147,13 +137,10 @@ test.describe('Empty State', () => {
 			.getByRole('textbox', { name: 'Type / to choose a block' })
 			.fill('This is test content for the post.');
 
-		await page
-			.getByRole('button', { name: 'Save draft' })
-			.click();
-		await page.waitForSelector(
-			'button:has-text("Saved")',
-			{ timeout: 10000 }
-		);
+		await page.getByRole('button', { name: 'Save draft' }).click();
+		await page.waitForSelector('button:has-text("Saved")', {
+			timeout: 10000,
+		});
 
 		await aiFeedback.openSidebar();
 
@@ -167,9 +154,7 @@ test.describe('Empty State', () => {
 		await page.waitForTimeout(1000);
 
 		// Empty state should no longer be visible
-		await expect(
-			page.getByText('No reviews yet')
-		).not.toBeVisible();
+		await expect(page.getByText('No reviews yet')).not.toBeVisible();
 
 		// Review settings panel should now be visible
 		await expect(
@@ -177,11 +162,7 @@ test.describe('Empty State', () => {
 		).toBeVisible();
 	});
 
-	test('empty state icon is visible', async ({
-		admin,
-		page,
-		aiFeedback,
-	}) => {
+	test('empty state icon is visible', async ({ admin, page, aiFeedback }) => {
 		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 
