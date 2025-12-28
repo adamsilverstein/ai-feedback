@@ -51,12 +51,27 @@ export default function ModelSelector() {
 	};
 
 	return (
-		<SelectControl
-			label={__('AI Model', 'ai-feedback')}
-			value={selectedModel}
-			options={options}
-			onChange={handleChange}
-			help={__('Select the AI model to use for reviews', 'ai-feedback')}
-		/>
+		<>
+			<SelectControl
+				label={__('AI Model', 'ai-feedback')}
+				value={selectedModel}
+				options={options}
+				onChange={handleChange}
+				help={__(
+					'Select the AI model to use for reviews',
+					'ai-feedback'
+				)}
+				aria-describedby="model-description"
+			/>
+			<p
+				id="model-description"
+				className="description screen-reader-text"
+			>
+				{__(
+					'Select the AI model to analyze your content',
+					'ai-feedback'
+				)}
+			</p>
+		</>
 	);
 }
