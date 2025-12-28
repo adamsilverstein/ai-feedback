@@ -47,11 +47,12 @@ class Response_Parser {
 	/**
 	 * Parse feedback response from AI.
 	 *
-	 * @param  string $response AI response (expected JSON).
-	 * @param  array  $blocks   Original blocks for validation.
-	 * @return array Parsed result with summary and validated feedback items.
+	 * @param  string $response        AI response (expected JSON).
+	 * @param  array  $blocks          Original blocks for validation.
+	 * @param  bool   $validate_schema Whether to perform strict schema validation.
+	 * @return array|\WP_Error Parsed result with summary and validated feedback items, or WP_Error if schema invalid.
 	 */
-	public function parse_feedback( string $response, array $blocks ): array {
+	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false ) {
 		// Build a map of valid block IDs for validation, including block name.
 		$valid_block_ids = array();
 		$block_info      = array();
@@ -81,6 +82,12 @@ class Response_Parser {
 		$json = $this->extract_json( $response );
 
 		if ( empty( $json ) ) {
+			if ( $validate_schema ) {
+				return new \WP_Error(
+					'invalid_json',
+					__( 'Could not extract valid JSON from AI response.', 'ai-feedback' )
+				);
+			}
 			return array(
 				'summary'  => '',
 				'feedback' => array(),
@@ -89,6 +96,31 @@ class Response_Parser {
 
 		// Decode JSON.
 		$data = json_decode( $json, true );
+
+		if ( json_last_error() !== JSON_ERROR_NONE ) {
+			if ( $validate_schema ) {
+				return new \WP_Error(
+					'json_parse_error',
+					sprintf(
+						/* translators: %s: JSON error message */
+						__( 'JSON parse error: %s', 'ai-feedback' ),
+						json_last_error_msg()
+					)
+				);
+			}
+			return array(
+				'summary'  => '',
+				'feedback' => array(),
+			);
+		}
+
+		// Perform schema validation if requested.
+		if ( $validate_schema ) {
+			$schema_result = $this->validate_schema( $data );
+			if ( is_wp_error( $schema_result ) ) {
+				return $schema_result;
+			}
+		}
 
 		// Handle new format with summary and feedback.
 		if ( is_array( $data ) && isset( $data['feedback'] ) ) {
@@ -99,6 +131,12 @@ class Response_Parser {
 			$summary        = '';
 			$feedback_items = $data;
 		} else {
+			if ( $validate_schema ) {
+				return new \WP_Error(
+					'invalid_format',
+					__( 'Response does not contain expected feedback format.', 'ai-feedback' )
+				);
+			}
 			return array(
 				'summary'  => '',
 				'feedback' => array(),
