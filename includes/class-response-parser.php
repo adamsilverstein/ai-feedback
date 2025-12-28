@@ -59,7 +59,7 @@ class Response_Parser {
 	 * @return array|\WP_Error On success, an array with keys:
 	 *                         - `summary` (string): sanitized summary text.
 	 *                         - `feedback` (array): list of validated, sanitized, and enriched feedback items.
-	 *                         On schema validation failure (when $validate_schema is true), returns a WP_Error. 
+	 *                         On schema validation failure (when $validate_schema is true), returns a WP_Error.
 	 */
 	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false ) {
 		// Build a map of valid block IDs for validation, including block name.
