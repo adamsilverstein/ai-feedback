@@ -45,12 +45,21 @@ class Response_Parser {
 	);
 
 	/**
-	 * Parse feedback response from AI.
+	 * Parse an AI response and extract validated feedback items with an optional summary.
 	 *
-	 * @param  string $response        AI response (expected JSON).
-	 * @param  array  $blocks          Original blocks for validation.
-	 * @param  bool   $validate_schema Whether to perform strict schema validation.
-	 * @return array|\WP_Error Parsed result with summary and validated feedback items, or WP_Error if schema invalid.
+	 * Given the raw AI response text, attempts to extract and decode JSON, validates and
+	 * sanitizes feedback items, and enriches them with block metadata drawn from $blocks.
+	 *
+	 * @param string $response AI response text (may contain surrounding text; JSON is extracted).
+	 * @param array  $blocks   Original blocks used to validate `block_id` values and provide
+	 *                         enrichment (`name` and `index`) for validated items.
+	 * @param bool   $validate_schema If true, perform strict JSON schema validation and return
+	 *                                a WP_Error on schema or parse failures; if false, parsing
+	 *                                errors yield an empty result structure.
+	 * @return array|\WP_Error On success, an array with keys:
+	 *                         - `summary` (string): sanitized summary text.
+	 *                         - `feedback` (array): list of validated, sanitized, and enriched feedback items.
+	 *                         On schema validation failure (when $validate_schema is true), returns a WP_Error. 
 	 */
 	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false ) {
 		// Build a map of valid block IDs for validation, including block name.
@@ -195,12 +204,18 @@ class Response_Parser {
 	}
 
 	/**
-	 * Validate a single feedback item.
+	 * Validate and sanitize a single feedback item, enriching it with block metadata when available.
 	 *
-	 * @param  mixed $item            Feedback item data.
-	 * @param  array $valid_block_ids Map of valid block IDs.
-	 * @param  array $block_info      Map of block IDs to their info (name, index).
-	 * @return array|null Validated item or null if invalid.
+	 * Ensures the item contains a valid `block_id` present in `$valid_block_ids`, includes the required
+	 * fields (`category`, `severity`, `title`, `feedback`), and that `category` and `severity` are
+	 * allowed values. When valid, returns a sanitized array containing `block_id`, `category`, `severity`,
+	 * `title`, and `feedback`; includes `block_name` and `block_index` from `$block_info` when available,
+	 * and includes a sanitized `suggestion` if provided.
+	 *
+	 * @param mixed $item Feedback item data.
+	 * @param array $valid_block_ids Map of valid block IDs.
+	 * @param array $block_info      Map of block IDs to their info (name, index).
+	 * @return array|null Array of validated and sanitized fields on success, `null` if the item is invalid.
 	 */
 	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
 		// Must be an array.
@@ -337,10 +352,15 @@ class Response_Parser {
 	}
 
 	/**
-	 * Get summary of feedback items.
+	 * Produce aggregated counts and flags for a set of parsed feedback items.
 	 *
-	 * @param  array $feedback_items Parsed feedback items.
-	 * @return array Summary data.
+	 * @param array $feedback_items Parsed feedback items. Each item is expected to include at least the `category` and `severity` keys.
+	 * @return array{
+	 *     total_notes: int,
+	 *     by_category: array{content:int, tone:int, flow:int, design:int},
+	 *     by_severity: array{suggestion:int, important:int, critical:int},
+	 *     has_critical: bool
+	 * } Summary data with total counts by category and severity, and a boolean indicating presence of any critical items.
 	 */
 	public function get_feedback_summary( array $feedback_items ): array {
 		$summary = array(
@@ -380,13 +400,14 @@ class Response_Parser {
 	}
 
 	/**
-	 * Validate response structure against JSON schema.
+	 * Validates the decoded JSON response structure against the expected schema.
 	 *
-	 * This validates the structure and types of the response without
-	 * checking semantic validity (e.g., whether block_ids exist).
+	 * Performs structural and type checks only; does not perform semantic validations
+	 * (for example, it does not verify that referenced block IDs exist).
 	 *
-	 * @param  mixed $data Decoded JSON data to validate.
-	 * @return true|\WP_Error True if valid, WP_Error with validation errors if invalid.
+	 * @param mixed $data Decoded JSON data to validate.
+	 * @return true|\WP_Error `true` if the data conforms to the schema, a `WP_Error`
+	 *                      containing one or more validation errors otherwise.
 	 */
 	public function validate_schema( $data ) {
 		$errors = new \WP_Error();
@@ -447,11 +468,15 @@ class Response_Parser {
 	}
 
 	/**
-	 * Validate a single feedback item against schema.
+	 * Validates a single feedback item against the parser's JSON schema rules.
 	 *
-	 * @param  mixed $item  Feedback item to validate.
-	 * @param  int   $index Index of item in feedback array.
-	 * @return true|\WP_Error True if valid, WP_Error with validation errors if invalid.
+	 * Ensures the item is an object/array, contains all required string fields, enforces allowed
+	 * values for `category` and `severity`, and checks the optional `suggestion` is a string.
+	 *
+	 * @param mixed $item  Feedback item to validate.
+	 * @param int   $index Index of the item in the feedback array (used to build error paths).
+	 * @return true|\WP_Error `true` if the item is valid, or a `\WP_Error` containing one or more
+	 *                        validation errors with `path` metadata indicating the failing field.
 	 */
 	private function validate_feedback_item_schema( $item, int $index ) {
 		$errors = new \WP_Error();
@@ -553,10 +578,12 @@ class Response_Parser {
 	}
 
 	/**
-	 * Format validation errors for debugging output.
+	 * Convert a WP_Error of validation failures into a human-readable multi-line string.
 	 *
-	 * @param  \WP_Error $errors Validation errors.
-	 * @return string Formatted error report.
+	 * Each line is formatted as "[code] message (at path)" when path information is present.
+	 *
+	 * @param \WP_Error $errors Validation errors; individual error data may include a 'path' key.
+	 * @return string Multi-line formatted error report.
 	 */
 	public function format_validation_errors( \WP_Error $errors ): string {
 		$output = array();
