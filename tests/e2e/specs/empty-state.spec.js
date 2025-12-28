@@ -150,8 +150,10 @@ test.describe('Empty State', () => {
 			.first()
 			.click();
 
-		// Wait for review to complete
-		await page.waitForTimeout(1000);
+		// Wait for the review to complete by watching for the Last Review panel
+		await expect(
+			page.getByRole('button', { name: 'Last Review' })
+		).toBeVisible({ timeout: 5000 });
 
 		// Empty state should no longer be visible
 		await expect(page.getByText('No reviews yet')).not.toBeVisible();

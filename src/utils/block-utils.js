@@ -67,6 +67,6 @@ export function hasTextContent(blocks) {
 		// Get text content from the block
 		const content = block.originalContent || serialize(block);
 		const text = extractTextContent(content);
-		return text.length > 0;
+		return text.trim().length > 0;
 	});
 }

@@ -127,9 +127,7 @@ export default function AIFeedbackPanel() {
 				targetTone,
 			});
 		} catch (reviewError) {
-			// Error is already in the store
-			// eslint-disable-next-line no-console
-			console.error('Review failed:', reviewError);
+			// Error is already in the store, no additional action needed
 		}
 	};
 
