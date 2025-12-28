@@ -99,3 +99,22 @@ if ( ! function_exists( 'is_wp_error' ) ) {
 		return ( $thing instanceof WP_Error );
 	}
 }
+
+// Mock WordPress sanitization functions.
+if ( ! function_exists( 'wp_kses_post' ) ) {
+	function wp_kses_post( $data ) {
+		return $data;
+	}
+}
+
+if ( ! function_exists( 'wp_kses' ) ) {
+	function wp_kses( $data, $allowed_html, $allowed_protocols = array() ) {
+		return $data;
+	}
+}
+
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $str ) {
+		return $str;
+	}
+}
