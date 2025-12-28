@@ -14,7 +14,35 @@ namespace AI_Feedback;
  */
 class Response_Parser {
 
+	/**
+	 * Valid category values for feedback items.
+	 */
+	public const VALID_CATEGORIES = array( 'content', 'tone', 'flow', 'design' );
 
+	/**
+	 * Valid severity values for feedback items.
+	 */
+	public const VALID_SEVERITIES = array( 'suggestion', 'important', 'critical' );
+
+	/**
+	 * Required fields for each feedback item.
+	 */
+	public const REQUIRED_FEEDBACK_FIELDS = array( 'block_id', 'category', 'severity', 'title', 'feedback' );
+
+	/**
+	 * Optional fields for each feedback item.
+	 */
+	public const OPTIONAL_FEEDBACK_FIELDS = array( 'suggestion' );
+
+	/**
+	 * Maximum character lengths for feedback fields.
+	 */
+	public const FIELD_MAX_LENGTHS = array(
+		'summary'    => 500,
+		'title'      => 50,
+		'feedback'   => 300,
+		'suggestion' => 200,
+	);
 
 	/**
 	 * Parse feedback response from AI.
