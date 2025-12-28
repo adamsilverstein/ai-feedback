@@ -234,15 +234,13 @@ class Response_Parser {
 		}
 
 		// Validate category.
-		$valid_categories = array( 'content', 'tone', 'flow', 'design' );
-		if ( ! in_array( $item['category'], $valid_categories, true ) ) {
+		if ( ! in_array( $item['category'], self::VALID_CATEGORIES, true ) ) {
 			Logger::debug( sprintf( 'Invalid category: %s', $item['category'] ) );
 			return null;
 		}
 
 		// Validate severity.
-		$valid_severities = array( 'suggestion', 'important', 'critical' );
-		if ( ! in_array( $item['severity'], $valid_severities, true ) ) {
+		if ( ! in_array( $item['severity'], self::VALID_SEVERITIES, true ) ) {
 			Logger::debug( sprintf( 'Invalid severity: %s', $item['severity'] ) );
 			return null;
 		}
