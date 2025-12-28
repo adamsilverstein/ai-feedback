@@ -1,0 +1,64 @@
+name: E2E Tests
+
+on:
+    pull_request:
+        branches:
+            - main
+            - develop
+        paths:
+            - 'src/**'
+            - 'includes/**'
+            - 'tests/e2e/**'
+            - 'playwright.config.js'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.wp-env.json'
+            - '.github/workflows/test-e2e.yml'
+    push:
+        branches:
+            - main
+            - develop
+
+jobs:
+    e2e-tests:
+        name: E2E Tests
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install Playwright browsers
+              run: npx playwright install chromium --with-deps
+
+            - name: Build plugin assets
+              run: npm run build
+
+            - name: Start WordPress environment
+              run: npm run env:start
+
+            - name: Wait for WordPress to be ready
+              run: npx wait-on http://localhost:8889 --timeout 60000
+
+            - name: Run E2E tests
+              run: npm run test:e2e
+
+            - name: Upload test artifacts
+              uses: actions/upload-artifact@v4
+              if: failure()
+              with:
+                  name: e2e-test-results
+                  path: artifacts/
+                  retention-days: 7
+
+            - name: Stop WordPress environment
+              if: always()
+              run: npm run env:stop
