@@ -6,9 +6,9 @@ import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as noticesStore } from '@wordpress/notices';
-import { serialize } from '@wordpress/blocks';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
+import { extractBlockData } from '../utils/block-utils';
 
 /**
  * Indeterminate Progress Bar component.
@@ -24,56 +24,6 @@ function IndeterminateProgressBar() {
 			</div>
 		</div>
 	);
-}
-
-/**
- * Extract text content from a block's innerHTML.
- *
- * @param {string} innerHTML The block's innerHTML.
- * @return {string} Plain text content.
- */
-function extractTextContent(innerHTML) {
-	if (!innerHTML) {
-		return '';
-	}
-	// Create a temporary element to strip HTML tags
-	const temp = document.createElement('div');
-	temp.innerHTML = innerHTML;
-	return temp.textContent || temp.innerText || '';
-}
-
-/**
- * Recursively extract blocks with their clientIds and content.
- *
- * @param {Array} blocks Array of blocks from the editor.
- * @return {Array} Simplified block data for API.
- */
-function extractBlockData(blocks) {
-	const result = [];
-
-	for (const block of blocks) {
-		// Get the serialized content for this block.
-		// Use originalContent if available (parsed from existing HTML),
-		// otherwise serialize the current block state.
-		const rawContent = block.originalContent || serialize(block);
-		const content = extractTextContent(rawContent);
-
-		// Only include blocks with actual content
-		if (content.trim()) {
-			result.push({
-				clientId: block.clientId,
-				name: block.name,
-				content: content.trim(),
-			});
-		}
-
-		// Recursively process inner blocks
-		if (block.innerBlocks && block.innerBlocks.length > 0) {
-			result.push(...extractBlockData(block.innerBlocks));
-		}
-	}
-
-	return result;
 }
 
 /**

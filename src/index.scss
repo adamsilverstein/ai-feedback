@@ -249,3 +249,50 @@
 		}
 	}
 }
+
+.ai-feedback-empty-state {
+	text-align: center;
+	padding: 24px 16px;
+
+	.ai-feedback-empty-icon {
+		margin-bottom: 16px;
+		color: #757575;
+	}
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	h4 {
+		margin: 0 0 8px;
+		font-size: 1.1em;
+	}
+
+	.ai-feedback-empty-description {
+		color: #666;
+		margin-bottom: 20px;
+	}
+
+	.ai-feedback-empty-prereq {
+		text-align: left;
+		background: #f0f0f0;
+		padding: 16px;
+		border-radius: 4px;
+		margin-bottom: 16px;
+
+		/* stylelint-disable-next-line no-descending-specificity */
+		h5 {
+			margin: 0 0 12px;
+		}
+
+		ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+
+			li {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 8px 0;
+			}
+		}
+	}
+}
