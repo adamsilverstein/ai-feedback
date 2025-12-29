@@ -162,6 +162,9 @@ test.describe('Accessibility', () => {
 		// Error notice should be visible
 		const notice = page.locator('.components-notice.is-error');
 		await expect(notice).toBeVisible({ timeout: 10000 });
+
+		// Verify the notice has proper role for screen readers
+		await expect(notice).toHaveAttribute('role', 'alert');
 	});
 
 	test('panels can be expanded with keyboard', async ({

@@ -219,8 +219,8 @@ const test = base.extend({
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	admin: async ({ page, pageUtils, editor }, use) => {
-		await use(new Admin({ page, pageUtils, editor }));
+	admin: async ({ page, pageUtils }, use) => {
+		await use(new Admin({ page, pageUtils }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
