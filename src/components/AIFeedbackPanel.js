@@ -14,6 +14,7 @@ import SettingsPanel from './SettingsPanel';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
+import StatusAnnouncer from './StatusAnnouncer';
 
 /**
  * Settings page URL.
@@ -143,6 +144,11 @@ export default function AIFeedbackPanel() {
 
 	return (
 		<div className="ai-feedback-panel">
+			<StatusAnnouncer
+				isReviewing={isReviewing}
+				lastReview={lastReview}
+				error={error}
+			/>
 			{error && (
 				<Notice
 					status="error"
