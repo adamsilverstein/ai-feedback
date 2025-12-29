@@ -1,107 +1,92 @@
-# AI Feedback Plugin - Development Guide
+# AI Feedback Plugin
 
-This document provides context for AI assistants (like Claude) working on this codebase.
+AI-powered editorial feedback for WordPress Gutenberg using the Notes feature (WP 6.9+).
 
-## Project Overview
+## Workflow
 
-AI Feedback is a WordPress plugin that provides AI-powered editorial feedback in the Gutenberg editor using WordPress 6.9's Notes feature. The plugin integrates with the PHP AI Client for provider-agnostic AI communication.
+- Prefer WordPress core features/APIs and Gutenberg packages over third-party tools
+- Commit related changes together with brief, single-line messages
+- Commit regularly as you work
+- Run linting and tests after completing a batch of work
 
 ## Quick Reference
 
 ```bash
-# Install dependencies
-composer install
-npm install
-
-# Start development environment
+# Setup
+composer install && npm install
 npm run env:start
 
-# Build assets
-npm run build        # Production build
-npm run start        # Development with watch
+# Development
+npm run start       # Watch mode
+npm run build       # Production
 
-# Run tests
-npm run test:unit    # JavaScript unit tests
-npm run test:php     # PHP unit tests
-npm run test:e2e     # End-to-end tests
-npm run test:visual  # Visual regression tests
-
-# Linting
-npm run lint:js      # ESLint
-npm run lint:php     # PHPCS
-npm run lint:css     # Stylelint
+# Testing
+npm run test:unit   # JS unit tests
+npm run test:e2e    # Playwright e2e
+npm run lint:js     # ESLint
+npm run lint:php    # PHPCS + PHPStan
 ```
 
-## Architecture Overview
+## Architecture
 
 ```
 ai-feedback/
-├── ai-feedback.php           # Main plugin file
-├── includes/                  # PHP classes
-│   ├── class-plugin.php      # Bootstrap
-│   ├── class-review-service.php
-│   ├── class-reply-service.php
-│   ├── class-prompt-builder.php
-│   ├── class-notes-manager.php
-│   ├── class-settings-controller.php
-│   ├── class-review-controller.php
-│   └── class-abilities-provider.php
-├── src/                       # JavaScript/React source
-│   ├── index.js              # Entry point
-│   ├── store/                # WordPress data store
-│   ├── components/           # React components
-│   └── hooks/                # Custom React hooks
-├── build/                     # Compiled assets (gitignored)
+├── ai-feedback.php              # Plugin bootstrap
+├── includes/
+│   ├── class-plugin.php         # Initialization, hooks registration
+│   ├── class-review-service.php # Core review logic, AI integration
+│   ├── class-review-controller.php  # REST endpoint for reviews
+│   ├── class-notes-manager.php      # Creates WP Notes from feedback
+│   ├── class-notes-controller.php   # REST endpoint for notes
+│   ├── class-prompt-builder.php     # Builds prompts for AI
+│   ├── class-response-parser.php    # Parses AI responses
+│   ├── class-settings-controller.php # Settings REST endpoint
+│   └── class-logger.php             # Debug logging utility
+├── src/
+│   ├── index.js                 # Editor script entry
+│   ├── index.scss               # Styles
+│   ├── components/
+│   │   ├── AIFeedbackPanel.js   # Main sidebar panel
+│   │   ├── ReviewButton.js      # Trigger review action
+│   │   ├── ReviewSummary.js     # Display review results
+│   │   ├── SettingsPanel.js     # Model/focus area settings
+│   │   ├── ModelSelector.js     # AI model dropdown
+│   │   └── EmptyState.js        # No-content placeholder
+│   ├── store/                   # Redux-style data store
+│   │   ├── index.js
+│   │   ├── actions.js
+│   │   ├── reducer.js
+│   │   └── selectors.js
+│   └── utils/
+│       └── block-utils.js       # Block content extraction
 ├── tests/
-│   ├── php/                  # PHPUnit tests
-│   ├── js/                   # Jest tests
-│   ├── e2e/                  # Playwright tests
-│   └── visual/               # Visual regression tests
-└── docs/                      # Documentation
+│   ├── php/                     # PHPUnit tests
+│   └── e2e/                     # Playwright tests
+└── docs/
+    ├── API.md                   # REST API reference
+    ├── TESTING.md               # Testing guide
+    └── CI.md                    # CI/CD documentation
 ```
 
 ## Key Concepts
 
-### Notes API (WordPress 6.9+)
+### Notes (WordPress 6.9+)
 
-Notes are block-level comments stored in the `wp_comments` table with `comment_type = 'block_comment'`. The plugin creates notes programmatically when AI feedback is generated.
+Notes are block-level comments stored in `wp_comments` with `comment_type = 'block_comment'`. The plugin creates notes when AI generates feedback:
 
 ```php
-// Creating a note
-wp_insert_comment( array(
+// Creating a note (simplified)
+wp_insert_comment( [
     'comment_type'    => 'block_comment',
     'comment_post_ID' => $post_id,
     'comment_content' => $feedback,
-    'comment_meta'    => array(
-        'block_id'    => $block_client_id,
-        'ai_feedback' => true,
-    ),
-) );
-```
-
-```javascript
-// JavaScript: Working with notes
-import { useBlockComments } from '@wordpress/editor';
-const { comments, addComment } = useBlockComments( blockId );
-```
-
-### Abilities API (WordPress 6.9+)
-
-The plugin registers abilities for discoverability by other tools and AI agents:
-
-```php
-add_action( 'wp_abilities_api_init', function() {
-    wp_register_ability( 'ai-feedback/review-document', array(
-        'label'             => __( 'Review Document with AI', 'ai-feedback' ),
-        'permission_callback' => fn() => current_user_can( 'edit_posts' ),
-        'execute_callback'  => array( Review_Service::class, 'execute_review' ),
-    ) );
-} );
+    'comment_meta'    => [ 'block_id' => $client_id, 'ai_feedback' => true ],
+] );
 ```
 
 ### PHP AI Client
 
-Provider-agnostic AI communication:
+Uses `wordpress/php-ai-client` for provider-agnostic AI communication:
 
 ```php
 use WordPress\AiClient\AiClient;
@@ -112,200 +97,70 @@ $response = AiClient::prompt( $prompt )
     ->generateText();
 ```
 
+### Data Flow
+
+1. User clicks "Review Document" in sidebar
+2. `ReviewButton` dispatches `startReview` action
+3. REST API calls `Review_Controller` → `Review_Service`
+4. `Prompt_Builder` constructs prompt, AI generates response
+5. `Response_Parser` extracts feedback items
+6. `Notes_Manager` creates WP Notes for each item
+7. Response returns note IDs mapped to block clientIds
+8. Store updates block metadata with noteIds
+
 ## Common Tasks
 
-### Adding a New Focus Area
+### Adding a Focus Area
 
-1. Add constant to `includes/class-review-service.php`:
-   ```php
-   const FOCUS_ACCESSIBILITY = 'accessibility';
-   ```
+1. Add constant to `class-review-service.php`
+2. Update `get_focus_area_prompt()` with instructions
+3. Add UI option in `SettingsPanel.js`
 
-2. Update `get_focus_area_prompt()` method with instructions for this area
+### Adding a REST Endpoint
 
-3. Add UI option in `src/components/SettingsPanel.js`
-
-4. Add tests in `tests/php/test-review-service.php` and `tests/js/SettingsPanel.test.js`
-
-### Adding a New REST Endpoint
-
-1. Create controller class in `includes/` following `class-review-controller.php` pattern
-
+1. Create controller in `includes/` following existing patterns
 2. Register routes in `rest_api_init` hook
+3. Add tests in `tests/php/`
 
-3. Add integration tests in `tests/php/integration/`
+### Modifying Prompts
 
-4. Document in `docs/API.md`
-
-### Modifying the Prompt
-
-The prompt is built in `class-prompt-builder.php`. Key methods:
-
-- `build_review_prompt()` - Main document review prompt
-- `build_reply_prompt()` - Context-aware reply prompt
-- `get_system_instruction()` - System prompt defining AI behavior
-
-When modifying prompts, update the corresponding tests and consider:
+Edit `class-prompt-builder.php`. Consider:
 - Token limits for different models
-- Response format consistency (JSON schema)
-- Localization of user-facing parts
-
-## Testing Guidelines
-
-### Unit Tests
-
-- PHP: Use `WP_Mock` for WordPress function mocking
-- JavaScript: Use `@testing-library/react` for component tests
-- Mock AI responses, don't make real API calls
-
-### E2E Tests
-
-Located in `tests/e2e/`. Use Playwright with WordPress test utils:
-
-```javascript
-test( 'can initiate review from sidebar', async ( { page, admin } ) => {
-    await admin.createNewPost();
-    await page.getByRole( 'button', { name: 'AI Feedback' } ).click();
-    await page.getByRole( 'button', { name: 'Review Document' } ).click();
-    await expect( page.getByText( 'Reviewing...' ) ).toBeVisible();
-} );
-```
-
-### Visual Regression
-
-Tests in `tests/visual/` capture and compare UI states:
-
-```javascript
-test( 'sidebar default state', async ( { page } ) => {
-    await page.goto( '/wp-admin/post-new.php' );
-    await openAIFeedbackSidebar( page );
-    await expect( page ).toHaveScreenshot( 'sidebar-default.png' );
-} );
-```
-
-## Code Style
-
-### PHP
-
-- WordPress Coding Standards
-- PSR-4 autoloading with `AI_Feedback\` namespace
-- Type hints on all function parameters and returns
-
-### JavaScript
-
-- WordPress ESLint configuration
-- Functional components with hooks
-- TypeScript JSDoc annotations for type safety
+- Consistent JSON response format
+- Localization of user-facing content
 
 ## Dependencies
 
-### Required at Runtime
+**Runtime:** WordPress 6.9+, PHP 8.1+, [AI Experiments plugin](https://wordpress.org/plugins/ai/)
 
-- WordPress 6.9+
-- PHP 8.1+
-- [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
-- `wordpress/php-ai-client` (Composer)
+**Development:** Node 18+, Composer 2+, Docker (for wp-env)
 
-### Development
+## Code Style
 
-- Node.js 18+
-- npm 9+
-- Composer 2+
-- Docker (for wp-env)
+- **PHP:** WordPress Coding Standards, PSR-4 autoloading (`AI_Feedback\` namespace), full type hints
+- **JS:** WordPress ESLint config, functional components with hooks
 
-## Environment Variables
+## Security
 
-For local development, create `.env`:
-
-```env
-# AI Provider credentials (for testing with real APIs)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Test configuration
-WP_TESTS_DOMAIN=localhost
-WP_TESTS_EMAIL=admin@example.com
-```
+- Sanitize all input (`sanitize_text_field`, `wp_kses`)
+- Escape all output (`esc_html`, `esc_attr`)
+- Capability checks on endpoints (`current_user_can`)
+- Validate AI responses against expected schema
 
 ## Debugging
 
-### PHP
-
 ```php
-// Enable WordPress debug mode in wp-config.php
-define( 'WP_DEBUG', true );
-define( 'WP_DEBUG_LOG', true );
-
-// Plugin-specific logging
-AI_Feedback\Logger::debug( 'Review started', array( 'post_id' => $post_id ) );
+// PHP: Enable WP_DEBUG in wp-config.php
+AI_Feedback\Logger::debug( 'Message', [ 'context' => $data ] );
 ```
 
-### JavaScript
-
 ```javascript
-// Enable debug mode
+// JS: Check browser console
 localStorage.setItem( 'AI_FEEDBACK_DEBUG', 'true' );
-
-// Console logging in development
-import { debug } from './utils/logger';
-debug( 'Review response', response );
 ```
 
-## Security Checklist
+## Resources
 
-When reviewing code changes, verify:
-
-- [ ] All user input is sanitized (`sanitize_text_field`, `wp_kses`, etc.)
-- [ ] All output is escaped (`esc_html`, `esc_attr`, `wp_json_encode`)
-- [ ] Capability checks on all endpoints (`current_user_can`)
-- [ ] Nonce verification for form submissions
-- [ ] AI responses validated against expected schema
-- [ ] No sensitive data logged or exposed
-
-## Performance Considerations
-
-- Lazy load review history (don't fetch on sidebar open)
-- Use streaming for reviews of documents > 20 blocks
-- Cache available models list (1 hour TTL)
-- Debounce settings updates (500ms)
-
-## Localization
-
-All user-facing strings must be translatable:
-
-```php
-__( 'Review Document', 'ai-feedback' )
-_n( '%d note', '%d notes', $count, 'ai-feedback' )
-```
-
-```javascript
-import { __ } from '@wordpress/i18n';
-__( 'Review Document', 'ai-feedback' );
-```
-
-## Release Process
-
-1. Update version in `ai-feedback.php` and `package.json`
-2. Run full test suite: `npm run test:all`
-3. Build production assets: `npm run build`
-4. Generate POT file: `npm run i18n:pot`
-5. Create git tag: `git tag v1.0.0`
-6. Build release ZIP: `npm run plugin-zip`
-
-## Getting Help
-
-- [Design Document](./DESIGN.md) - Architecture and technical decisions
-- [Testing Guide](./docs/TESTING.md) - Comprehensive testing documentation
-- [API Reference](./docs/API.md) - REST API documentation
-- [WordPress Block Editor Handbook](https://developer.wordpress.org/block-editor/)
-- [PHP AI Client Documentation](https://github.com/WordPress/php-ai-client)
-
-## Git process
-- As you work, commit each group of related changes together with a clear commit message.
-- Keep commits concise and focused on a single change.
-- Commit messages should be brief, high level overview of the changes made.
-- A detailed commit description is not desired - if it seems required, consider breaking the commit down into several smaller commits
-- Before each commit, ensure that current linting and tests pass.
-- Use feature branches for new features and bugfix branches for fixes.
-- Regularly rebase your branch onto the main branch to keep history clean.
-- Open a pull request for code review before merging into the main branch.
+- [DESIGN.md](./DESIGN.md) - Architecture decisions
+- [docs/TESTING.md](./docs/TESTING.md) - Testing guide
+- [docs/API.md](./docs/API.md) - REST API docs
