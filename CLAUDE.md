@@ -6,9 +6,8 @@ AI-powered editorial feedback for WordPress Gutenberg using the Notes feature (W
 
 - Prefer WordPress core features/APIs and Gutenberg packages over third-party tools
 - Commit related changes together with brief, single-line messages
-- Run linting and tests before each commit
-- Use feature/bugfix branches; rebase onto main regularly
-- Open PRs for review before merging
+- Commit regularly as you work
+- Run linting and tests after completing a batch of work
 
 ## Quick Reference
 
