@@ -18,7 +18,14 @@ import { extractBlockData } from '../utils/block-utils';
  */
 function IndeterminateProgressBar() {
 	return (
-		<div className="ai-feedback-progress-container">
+		<div
+			className="ai-feedback-progress-container"
+			role="progressbar"
+			aria-valuemin={0}
+			aria-valuemax={100}
+			aria-label={__('Review progress', 'ai-feedback')}
+			aria-valuetext={__('Processing review', 'ai-feedback')}
+		>
 			<div className="ai-feedback-progress-bar">
 				<div className="ai-feedback-progress-indicator" />
 			</div>
