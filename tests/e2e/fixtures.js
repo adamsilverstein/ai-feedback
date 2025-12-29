@@ -22,16 +22,13 @@ class AIFeedbackUtils {
 	 * Open the AI Feedback sidebar.
 	 */
 	async openSidebar() {
-		// Click the "AI Feedback" menu item in the editor's more menu
-		const sidebarButton = this.page.getByRole('button', {
-			name: 'AI Feedback',
-		});
+		// The sidebar panel - WordPress uses complementary role for plugin sidebars
+		const sidebarPanel = this.page.locator(
+			'.ai-feedback-sidebar, [class*="ai-feedback"]'
+		).first();
 
-		// Check if sidebar is already open by looking for the panel
-		const isOpen = await this.page
-			.getByRole('region', { name: 'AI Feedback' })
-			.isVisible()
-			.catch(() => false);
+		// Check if sidebar is already open by looking for the panel heading
+		const isOpen = await sidebarPanel.isVisible().catch(() => false);
 
 		if (!isOpen) {
 			// Open the options menu if not already open - use exact match
@@ -49,13 +46,16 @@ class AIFeedbackUtils {
 			}
 
 			// Click AI Feedback menu item
+			const sidebarButton = this.page.getByRole('menuitemcheckbox', {
+				name: 'AI Feedback',
+			});
 			await sidebarButton.click();
 		}
 
-		// Wait for the sidebar to be visible
+		// Wait for the sidebar content to be visible - look for the primary Review Document button
 		await this.page
-			.getByRole('region', { name: 'AI Feedback' })
-			.waitFor({ state: 'visible' });
+			.locator('button.is-primary:has-text("Review Document")')
+			.waitFor({ state: 'visible', timeout: 10000 });
 	}
 
 	/**
@@ -219,8 +219,8 @@ const test = base.extend({
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	admin: async ({ page, pageUtils }, use) => {
-		await use(new Admin({ page, pageUtils }));
+	admin: async ({ page, pageUtils, editor }, use) => {
+		await use(new Admin({ page, pageUtils, editor }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({

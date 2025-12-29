@@ -4,14 +4,12 @@
 const { test, expect } = require('../fixtures');
 
 test.describe('Review Workflow', () => {
-	test.beforeEach(async ({ admin }) => {
-		await admin.createNewPost();
-	});
-
 	test('review button shows save message without post ID', async ({
+		admin,
 		page,
 		aiFeedback,
 	}) => {
+		await admin.createNewPost();
 		await aiFeedback.openSidebar();
 
 		// New unsaved post - button should show helper text
@@ -21,16 +19,13 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('review button enables after saving post with content', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Add title
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Test Post');
-
-		// Add paragraph content
+		// Add title and paragraph content
+		await admin.createNewPost({ title: 'Test Post' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('This is test content for the AI review.');
 
@@ -45,21 +40,18 @@ test.describe('Review Workflow', () => {
 			page.getByText('Save your post first to enable review')
 		).not.toBeVisible();
 
-		const reviewButton = page.getByRole('button', {
-			name: 'Review Document',
-		});
+		const reviewButton = page.locator('button.is-primary:has-text("Review Document")');
 		await expect(reviewButton).toBeEnabled();
 	});
 
 	test('shows reviewing state when review is initiated', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup: Add content and save
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Test Post');
+		await admin.createNewPost({ title: 'Test Post' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Test content for review.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -89,7 +81,7 @@ test.describe('Review Workflow', () => {
 		});
 
 		// Click review button
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Verify reviewing state
 		await expect(
@@ -101,14 +93,13 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('displays review summary after completion', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup: Add content and save
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Test Post');
+		await admin.createNewPost({ title: 'Test Post' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Test content for review.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -145,7 +136,7 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Wait for and verify summary
 		await expect(page.getByText('1 feedback item')).toBeVisible({
@@ -157,14 +148,13 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('shows success message when no issues found', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Perfect Post');
+		await admin.createNewPost({ title: 'Perfect Post' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Well-written content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -192,7 +182,7 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		await expect(
 			page.getByText('Great job! The AI found no issues')

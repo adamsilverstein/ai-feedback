@@ -4,19 +4,14 @@
 const { test, expect } = require('../fixtures');
 
 test.describe('Notes Creation', () => {
-	test.beforeEach(async ({ admin }) => {
-		await admin.createNewPost();
-	});
-
 	test('review creates notes that appear in summary', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Post with Notes');
+		await admin.createNewPost({ title: 'Post with Notes' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content that will receive feedback.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -51,14 +46,13 @@ test.describe('Notes Creation', () => {
 	});
 
 	test('displays severity breakdown in summary', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Severity Test');
+		await admin.createNewPost({ title: 'Severity Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Test content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -91,14 +85,13 @@ test.describe('Notes Creation', () => {
 	});
 
 	test('displays category breakdown in summary', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Category Test');
+		await admin.createNewPost({ title: 'Category Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Test content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -134,14 +127,13 @@ test.describe('Notes Creation', () => {
 	});
 
 	test('displays model used in review summary', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Model Display Test');
+		await admin.createNewPost({ title: 'Model Display Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Test content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();

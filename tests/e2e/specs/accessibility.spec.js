@@ -93,14 +93,13 @@ test.describe('Accessibility', () => {
 	});
 
 	test('review button has proper aria attributes when busy', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Loading State A11y');
+		await admin.createNewPost({ title: 'Loading State A11y' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -122,7 +121,7 @@ test.describe('Accessibility', () => {
 			});
 		});
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Button should indicate busy state
 		const reviewButton = page.getByRole('button', { name: /Reviewing/i });
@@ -133,14 +132,13 @@ test.describe('Accessibility', () => {
 	});
 
 	test('error notices have proper role for screen readers', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup for error
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('A11y Error Test');
+		await admin.createNewPost({ title: 'A11y Error Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -155,7 +153,7 @@ test.describe('Accessibility', () => {
 			'Test error for accessibility'
 		);
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Error notice should be visible
 		const notice = page.locator('.components-notice.is-error');

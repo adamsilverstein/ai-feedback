@@ -4,19 +4,14 @@
 const { test, expect } = require('../fixtures');
 
 test.describe('Error Handling', () => {
-	test.beforeEach(async ({ admin }) => {
-		await admin.createNewPost();
-	});
-
 	test('displays error notice when API request fails', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Error Test Post');
+		// Setup - create post with title and content
+		await admin.createNewPost({ title: 'Error Test Post' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content for error test.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -31,7 +26,7 @@ test.describe('Error Handling', () => {
 			'AI request failed: Internal server error'
 		);
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Verify error notice appears
 		await expect(page.getByText('AI request failed')).toBeVisible({
@@ -41,14 +36,13 @@ test.describe('Error Handling', () => {
 	});
 
 	test('error notice can be dismissed', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup with error
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Dismissable Error');
+		await admin.createNewPost({ title: 'Dismissable Error' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -62,7 +56,7 @@ test.describe('Error Handling', () => {
 			'Something went wrong'
 		);
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Wait for error
 		await expect(page.getByText('Something went wrong')).toBeVisible({
@@ -78,14 +72,13 @@ test.describe('Error Handling', () => {
 	});
 
 	test('displays rate limit error with appropriate message', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Rate Limit Test');
+		await admin.createNewPost({ title: 'Rate Limit Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -99,7 +92,7 @@ test.describe('Error Handling', () => {
 			'You have reached the maximum number of reviews per hour.'
 		);
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		await expect(page.getByText('rate_limit_exceeded')).toBeVisible({
 			timeout: 10000,
@@ -110,14 +103,13 @@ test.describe('Error Handling', () => {
 	});
 
 	test('displays billing/credit error with settings link', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Billing Error Test');
+		await admin.createNewPost({ title: 'Billing Error Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -131,7 +123,7 @@ test.describe('Error Handling', () => {
 			'AI request failed: Insufficient credit balance'
 		);
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		await expect(page.getByText('Insufficient credit')).toBeVisible({
 			timeout: 10000,
@@ -142,14 +134,13 @@ test.describe('Error Handling', () => {
 	});
 
 	test('handles network timeout gracefully', async ({
+		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
 		// Setup
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Timeout Test');
+		await admin.createNewPost({ title: 'Timeout Test' });
 		await editor.insertBlock({ name: 'core/paragraph' });
 		await page.keyboard.type('Content.');
 		await page.getByRole('button', { name: 'Save draft' }).click();
@@ -162,29 +153,28 @@ test.describe('Error Handling', () => {
 			await route.abort('timedout');
 		});
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Should show some error state - button should return to normal
 		await expect(
-			page.getByRole('button', { name: 'Review Document' })
+			page.locator('button.is-primary:has-text("Review Document")')
 		).toBeVisible({ timeout: 10000 });
 	});
 
 	test('shows warning when reviewing empty content', async ({
+		admin,
 		page,
 		aiFeedback,
 	}) => {
 		// Don't add any content, just try to review
 		// Save as draft to get post ID
-		await page
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Empty Post');
+		await admin.createNewPost({ title: 'Empty Post' });
 		await page.getByRole('button', { name: 'Save draft' }).click();
 		await page.waitForSelector('.editor-post-saved-state.is-saved');
 
 		await aiFeedback.openSidebar();
 
-		await page.getByRole('button', { name: 'Review Document' }).click();
+		await page.locator('button.is-primary:has-text("Review Document")').click();
 
 		// Should show warning notice about no content (snackbar)
 		await expect(
