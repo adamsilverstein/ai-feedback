@@ -172,9 +172,10 @@ class AIFeedbackUtils {
 	 * Start a review and wait for completion.
 	 * Assumes API is already mocked if needed.
 	 *
-	 * @param {number} timeout - Timeout in milliseconds.
+	 * @param {number} timeout          - Maximum time to wait for the review to complete and button to return to ready state. Default: 10000ms.
+	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear. Default: 1000ms.
 	 */
-	async startReviewAndWait(timeout = 10000) {
+	async startReviewAndWait(timeout = 10000, reviewingTimeout = 1000) {
 		await this.page
 			.getByRole('button', { name: 'Review Document' })
 			.click();
@@ -185,10 +186,17 @@ class AIFeedbackUtils {
 				.getByRole('button', { name: /Reviewing/i })
 				.waitFor({
 					state: 'visible',
-					timeout: 1000,
+					timeout: reviewingTimeout,
 				});
-		} catch {
-			// Might complete too fast
+		} catch (error) {
+			// Reviewing state might not appear if review completes very quickly
+			// Only ignore timeout errors, re-throw other errors
+			if (
+				error.name !== 'TimeoutError' &&
+				!error.message?.includes('Timeout')
+			) {
+				throw error;
+			}
 		}
 
 		// Wait for review to complete
@@ -211,8 +219,8 @@ const test = base.extend({
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	admin: async ({ page, pageUtils, editor }, use) => {
-		await use(new Admin({ page, pageUtils, editor }));
+	admin: async ({ page, pageUtils }, use) => {
+		await use(new Admin({ page, pageUtils }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
