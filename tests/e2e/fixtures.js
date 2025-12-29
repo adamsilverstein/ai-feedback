@@ -176,18 +176,18 @@ class AIFeedbackUtils {
 	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear. Default: 1000ms.
 	 */
 	async startReviewAndWait(timeout = 10000, reviewingTimeout = 1000) {
-		await this.page
-			.getByRole('button', { name: 'Review Document' })
-			.click();
+		// Use the primary button specifically (not the panel toggle)
+		const reviewButton = this.page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
+		await reviewButton.click();
 
 		// Wait for reviewing state to appear and then disappear
 		try {
-			await this.page
-				.getByRole('button', { name: /Reviewing/i })
-				.waitFor({
-					state: 'visible',
-					timeout: reviewingTimeout,
-				});
+			await this.page.locator('button.is-primary.is-busy').waitFor({
+				state: 'visible',
+				timeout: reviewingTimeout,
+			});
 		} catch (error) {
 			// Reviewing state might not appear if review completes very quickly
 			// Only ignore timeout errors, re-throw other errors
@@ -199,13 +199,11 @@ class AIFeedbackUtils {
 			}
 		}
 
-		// Wait for review to complete
-		await this.page
-			.getByRole('button', { name: 'Review Document' })
-			.waitFor({
-				state: 'visible',
-				timeout,
-			});
+		// Wait for review to complete (button no longer busy)
+		await reviewButton.waitFor({
+			state: 'visible',
+			timeout,
+		});
 	}
 }
 
@@ -219,8 +217,8 @@ const test = base.extend({
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	admin: async ({ page, pageUtils }, use) => {
-		await use(new Admin({ page, pageUtils }));
+	admin: async ({ page, pageUtils, editor }, use) => {
+		await use(new Admin({ page, pageUtils, editor }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
