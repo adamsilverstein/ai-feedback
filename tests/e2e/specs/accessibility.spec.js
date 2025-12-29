@@ -121,7 +121,9 @@ test.describe('Accessibility', () => {
 			});
 		});
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Button should indicate busy state
 		const reviewButton = page.getByRole('button', { name: /Reviewing/i });
@@ -153,7 +155,9 @@ test.describe('Accessibility', () => {
 			'Test error for accessibility'
 		);
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Error notice should be visible
 		const notice = page.locator('.components-notice.is-error');

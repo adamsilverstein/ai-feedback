@@ -15,7 +15,9 @@ test.describe('Sidebar', () => {
 		await aiFeedback.openSidebar();
 
 		// Verify sidebar is visible by checking for the primary Review Document button
-		const reviewButton = page.locator('button.is-primary:has-text("Review Document")');
+		const reviewButton = page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
 		await expect(reviewButton).toBeVisible();
 	});
 
@@ -35,7 +37,9 @@ test.describe('Sidebar', () => {
 			await expect(modelSelect).toBeVisible();
 		} else {
 			// If models aren't configured in test environment, check for Focus Areas section instead
-			const focusAreasLegend = page.locator('legend:has-text("Focus Areas")');
+			const focusAreasLegend = page.locator(
+				'legend:has-text("Focus Areas")'
+			);
 			await expect(focusAreasLegend).toBeVisible();
 		}
 	});
@@ -53,7 +57,9 @@ test.describe('Sidebar', () => {
 		await aiFeedback.openSidebar();
 
 		// Check for the primary Review Document button (action button, not panel toggle)
-		const reviewDocumentButton = page.locator('button.is-primary:has-text("Review Document")');
+		const reviewDocumentButton = page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
 		await expect(reviewDocumentButton).toBeVisible();
 	});
 
@@ -65,7 +71,9 @@ test.describe('Sidebar', () => {
 		await closeButton.click();
 
 		// Verify sidebar is hidden by checking primary Review Document button is not visible
-		const reviewButton = page.locator('button.is-primary:has-text("Review Document")');
+		const reviewButton = page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
 		await expect(reviewButton).not.toBeVisible();
 
 		// Reopen
@@ -89,7 +97,9 @@ test.describe('Sidebar', () => {
 
 		// Checkboxes are dynamically loaded from the API
 		// If focus areas are configured, check that at least one checkbox exists
-		const checkboxes = page.locator('.ai-feedback-settings input[type="checkbox"]');
+		const checkboxes = page.locator(
+			'.ai-feedback-settings input[type="checkbox"]'
+		);
 		const checkboxCount = await checkboxes.count();
 
 		if (checkboxCount > 0) {

@@ -23,9 +23,9 @@ class AIFeedbackUtils {
 	 */
 	async openSidebar() {
 		// The sidebar panel - WordPress uses complementary role for plugin sidebars
-		const sidebarPanel = this.page.locator(
-			'.ai-feedback-sidebar, [class*="ai-feedback"]'
-		).first();
+		const sidebarPanel = this.page
+			.locator('.ai-feedback-sidebar, [class*="ai-feedback"]')
+			.first();
 
 		// Check if sidebar is already open by looking for the panel heading
 		const isOpen = await sidebarPanel.isVisible().catch(() => false);

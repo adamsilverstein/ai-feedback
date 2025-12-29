@@ -40,7 +40,9 @@ test.describe('Review Workflow', () => {
 			page.getByText('Save your post first to enable review')
 		).not.toBeVisible();
 
-		const reviewButton = page.locator('button.is-primary:has-text("Review Document")');
+		const reviewButton = page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
 		await expect(reviewButton).toBeEnabled();
 	});
 
@@ -81,7 +83,9 @@ test.describe('Review Workflow', () => {
 		});
 
 		// Click review button
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Verify reviewing state
 		await expect(
@@ -136,7 +140,9 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Wait for and verify summary
 		await expect(page.getByText('1 feedback item')).toBeVisible({
@@ -182,7 +188,9 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		await expect(
 			page.getByText('Great job! The AI found no issues')

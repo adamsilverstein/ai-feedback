@@ -26,7 +26,9 @@ test.describe('Error Handling', () => {
 			'AI request failed: Internal server error'
 		);
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Verify error notice appears
 		await expect(page.getByText('AI request failed')).toBeVisible({
@@ -56,7 +58,9 @@ test.describe('Error Handling', () => {
 			'Something went wrong'
 		);
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Wait for error
 		await expect(page.getByText('Something went wrong')).toBeVisible({
@@ -92,7 +96,9 @@ test.describe('Error Handling', () => {
 			'You have reached the maximum number of reviews per hour.'
 		);
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		await expect(page.getByText('rate_limit_exceeded')).toBeVisible({
 			timeout: 10000,
@@ -123,7 +129,9 @@ test.describe('Error Handling', () => {
 			'AI request failed: Insufficient credit balance'
 		);
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		await expect(page.getByText('Insufficient credit')).toBeVisible({
 			timeout: 10000,
@@ -153,7 +161,9 @@ test.describe('Error Handling', () => {
 			await route.abort('timedout');
 		});
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Should show some error state - button should return to normal
 		await expect(
@@ -174,7 +184,9 @@ test.describe('Error Handling', () => {
 
 		await aiFeedback.openSidebar();
 
-		await page.locator('button.is-primary:has-text("Review Document")').click();
+		await page
+			.locator('button.is-primary:has-text("Review Document")')
+			.click();
 
 		// Should show warning notice about no content (snackbar)
 		await expect(
