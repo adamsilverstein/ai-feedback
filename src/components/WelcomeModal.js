@@ -27,7 +27,13 @@ export default function WelcomeModal() {
 	}, []);
 
 	const dismiss = () => {
-		window.localStorage.setItem(STORAGE_KEY, 'true');
+		try {
+			window.localStorage.setItem(STORAGE_KEY, 'true');
+		} catch (error) {
+			// Storage may be unavailable (e.g., private browsing, quota exceeded)
+			// eslint-disable-next-line no-console
+			console.warn('AI Feedback: Could not save welcome state', error);
+		}
 		setIsOpen(false);
 	};
 
