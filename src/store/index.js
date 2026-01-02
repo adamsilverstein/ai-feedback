@@ -1,8 +1,9 @@
 /**
  * WordPress data store for AI Feedback.
  */
-import { createReduxStore, register } from '@wordpress/data';
+import { createReduxStore, register, select } from '@wordpress/data';
 import { controls } from '@wordpress/data-controls';
+import { store as editorStore } from '@wordpress/editor';
 import * as selectors from './selectors';
 import * as actions from './actions';
 import reducer from './reducer';
@@ -27,6 +28,36 @@ const storeConfig = {
 		*getSettings() {
 			const settings = yield actions.fetchSettings();
 			return actions.receiveSettings(settings);
+		},
+
+		/**
+		 * Resolver for getLastReview - fetches previous review from database on first access.
+		 *
+		 * This resolver is called automatically when getLastReview selector is accessed
+		 * and the data hasn't been fetched yet.
+		 */
+		*getLastReview() {
+			// Get the current post ID from the editor store.
+			const postId = select(editorStore).getCurrentPostId();
+
+			if (!postId) {
+				// eslint-disable-next-line no-console
+				console.log(
+					'[AI-Feedback] No post ID available, skipping previous review fetch'
+				);
+				return actions.receivePreviousReview(null);
+			}
+
+			// Fetch the previous review.
+			// eslint-disable-next-line no-console
+			console.log(
+				'[AI-Feedback] Fetching previous review for post:',
+				postId
+			);
+
+			// Use the generator action to fetch.
+			const result = yield* actions.fetchPreviousReview(postId);
+			return result;
 		},
 	},
 };
