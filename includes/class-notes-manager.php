@@ -409,4 +409,301 @@ class Notes_Manager {
 
 		return $count;
 	}
+
+	/**
+	 * Get notes with their reply threads.
+	 *
+	 * @param  int  $post_id          Post ID.
+	 * @param  bool $exclude_resolved Whether to exclude resolved notes.
+	 * @return array Array of notes with replies.
+	 */
+	public function get_notes_with_replies( int $post_id, bool $exclude_resolved = true ): array {
+		// Get top-level AI feedback notes (parent = 0).
+		$args = array(
+			'post_id'    => $post_id,
+			'type'       => 'note',
+			'status'     => 'all',
+			'parent'     => 0,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+			'meta_query' => array(
+				array(
+					'key'   => 'ai_feedback',
+					'value' => '1',
+				),
+			),
+		);
+
+		$top_level_notes    = get_comments( $args );
+		$notes_with_replies = array();
+
+		foreach ( $top_level_notes as $note ) {
+			// Skip resolved notes if requested.
+			if ( $exclude_resolved && $this->is_note_resolved( $note->comment_ID ) ) {
+				continue;
+			}
+
+			// Get all replies for this note.
+			$replies = get_comments(
+				array(
+					'post_id' => $post_id,
+					'type'    => 'note',
+					'status'  => 'all',
+					'parent'  => $note->comment_ID,
+					'orderby' => 'comment_date',
+					'order'   => 'ASC',
+				)
+			);
+
+			$formatted_note            = $this->format_single_note( $note );
+			$formatted_note['replies'] = array();
+
+			foreach ( $replies as $reply ) {
+				$formatted_note['replies'][] = $this->format_single_note( $reply );
+			}
+
+			$notes_with_replies[] = $formatted_note;
+		}
+
+		return $notes_with_replies;
+	}
+
+	/**
+	 * Format a single note/comment for API response.
+	 *
+	 * @param  object $comment Comment object.
+	 * @return array Formatted note.
+	 */
+	private function format_single_note( object $comment ): array {
+		$is_ai = (bool) get_comment_meta( $comment->comment_ID, 'ai_feedback', true );
+
+		return array(
+			'id'          => (int) $comment->comment_ID,
+			'post'        => (int) $comment->comment_post_ID,
+			'parent'      => (int) $comment->comment_parent,
+			'author_name' => $comment->comment_author,
+			'content'     => array(
+				'raw'      => $comment->comment_content,
+				'rendered' => apply_filters( 'comment_text', $comment->comment_content, $comment ),
+			),
+			'date'        => $comment->comment_date,
+			'type'        => $comment->comment_type,
+			'status'      => ( '1' === $comment->comment_approved ) ? 'approved' : 'hold',
+			'block_id'    => get_comment_meta( $comment->comment_ID, 'block_id', true ),
+			'block_name'  => get_comment_meta( $comment->comment_ID, 'block_name', true ),
+			'block_index' => get_comment_meta( $comment->comment_ID, 'block_index', true ),
+			'category'    => get_comment_meta( $comment->comment_ID, 'feedback_category', true ),
+			'severity'    => get_comment_meta( $comment->comment_ID, 'feedback_severity', true ),
+			'review_id'   => get_comment_meta( $comment->comment_ID, 'review_id', true ),
+			'ai_model'    => get_comment_meta( $comment->comment_ID, 'ai_model', true ),
+			'created_at'  => $comment->comment_date,
+			'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
+			'is_ai'       => $is_ai,
+		);
+	}
+
+	/**
+	 * Find existing note thread for a block.
+	 *
+	 * Attempts to match by block_id first, then falls back to block_name + block_index.
+	 *
+	 * @param  int         $post_id     Post ID.
+	 * @param  string      $block_id    Block client ID.
+	 * @param  string|null $block_name  Block name (e.g., 'core/paragraph').
+	 * @param  int|null    $block_index Block index in the document.
+	 * @return int|null Note ID if found, null otherwise.
+	 */
+	public function get_existing_note_for_block( int $post_id, string $block_id, ?string $block_name = null, ?int $block_index = null ): ?int {
+		// First, try to find by exact block_id match.
+		$args = array(
+			'post_id'    => $post_id,
+			'type'       => 'note',
+			'status'     => 'all',
+			'parent'     => 0,
+			'number'     => 1,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+			'meta_query' => array(
+				'relation' => 'AND',
+				array(
+					'key'   => 'ai_feedback',
+					'value' => '1',
+				),
+				array(
+					'key'   => 'block_id',
+					'value' => $block_id,
+				),
+			),
+		);
+
+		$notes = get_comments( $args );
+		if ( ! empty( $notes ) ) {
+			return (int) $notes[0]->comment_ID;
+		}
+
+		// Fall back to block_name + block_index if provided.
+		if ( null !== $block_name && null !== $block_index ) {
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+			$args['meta_query'] = array(
+				'relation' => 'AND',
+				array(
+					'key'   => 'ai_feedback',
+					'value' => '1',
+				),
+				array(
+					'key'   => 'block_name',
+					'value' => $block_name,
+				),
+				array(
+					'key'   => 'block_index',
+					'value' => $block_index,
+				),
+			);
+
+			$notes = get_comments( $args );
+			if ( ! empty( $notes ) ) {
+				return (int) $notes[0]->comment_ID;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get the latest review data for a post.
+	 *
+	 * Reconstructs a review-like structure from persisted notes.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return array|null Review data or null if no reviews exist.
+	 */
+	public function get_latest_review_for_post( int $post_id ): ?array {
+		// Get all AI feedback notes for this post.
+		$notes = $this->get_notes_with_replies( $post_id, false );
+
+		if ( empty( $notes ) ) {
+			return null;
+		}
+
+		// Find the most recent review_id.
+		$review_ids       = array();
+		$latest_date      = null;
+		$latest_review_id = null;
+
+		foreach ( $notes as $note ) {
+			$review_id = $note['review_id'] ?? '';
+			if ( empty( $review_id ) ) {
+				continue;
+			}
+
+			if ( ! isset( $review_ids[ $review_id ] ) ) {
+				$review_ids[ $review_id ] = array(
+					'date'  => $note['date'],
+					'notes' => array(),
+				);
+			}
+			$review_ids[ $review_id ]['notes'][] = $note;
+
+			// Track the latest review.
+			if ( null === $latest_date || $note['date'] > $latest_date ) {
+				$latest_date      = $note['date'];
+				$latest_review_id = $review_id;
+			}
+		}
+
+		if ( null === $latest_review_id ) {
+			return null;
+		}
+
+		$review_notes = $review_ids[ $latest_review_id ]['notes'];
+
+		// Build block mapping from notes.
+		$block_mapping = array();
+		foreach ( $review_notes as $note ) {
+			$block_id = $note['block_id'] ?? '';
+			if ( ! empty( $block_id ) && 0 === $note['parent'] ) {
+				$block_mapping[ $block_id ] = $note['id'];
+			}
+		}
+
+		// Calculate summary statistics.
+		$summary = $this->calculate_summary( $review_notes );
+
+		// Get model from first note.
+		$model = '';
+		foreach ( $review_notes as $note ) {
+			if ( ! empty( $note['ai_model'] ) ) {
+				$model = $note['ai_model'];
+				break;
+			}
+		}
+
+		return array(
+			'review_id'     => $latest_review_id,
+			'post_id'       => $post_id,
+			'model'         => $model,
+			'notes'         => $review_notes,
+			'note_ids'      => array_column( $review_notes, 'id' ),
+			'block_mapping' => $block_mapping,
+			'summary'       => $summary,
+			'note_count'    => count( $review_notes ),
+			'timestamp'     => $latest_date,
+			'is_persisted'  => true,
+		);
+	}
+
+	/**
+	 * Calculate summary statistics from notes.
+	 *
+	 * @param  array $notes Array of notes.
+	 * @return array Summary statistics.
+	 */
+	private function calculate_summary( array $notes ): array {
+		$by_severity = array(
+			'critical'   => 0,
+			'important'  => 0,
+			'suggestion' => 0,
+		);
+
+		$by_category = array(
+			'content' => 0,
+			'tone'    => 0,
+			'flow'    => 0,
+			'design'  => 0,
+		);
+
+		foreach ( $notes as $note ) {
+			// Only count top-level notes (not replies).
+			if ( $note['parent'] > 0 ) {
+				continue;
+			}
+
+			$severity = $note['severity'] ?? '';
+			$category = $note['category'] ?? '';
+
+			if ( isset( $by_severity[ $severity ] ) ) {
+				++$by_severity[ $severity ];
+			}
+
+			if ( isset( $by_category[ $category ] ) ) {
+				++$by_category[ $category ];
+			}
+		}
+
+		return array(
+			'by_severity' => $by_severity,
+			'by_category' => $by_category,
+		);
+	}
+
+	/**
+	 * Add feedback as a reply to an existing note thread.
+	 *
+	 * @param  array $feedback_item Feedback item data.
+	 * @param  int   $post_id       Post ID.
+	 * @param  int   $parent_id     Parent note ID.
+	 * @param  array $review_data   Review metadata.
+	 * @return int|WP_Error Note ID or error.
+	 */
+	public function add_reply_to_thread( array $feedback_item, int $post_id, int $parent_id, array $review_data = array() ): int|WP_Error {
+		return $this->create_note( $feedback_item, $post_id, $review_data, $parent_id );
+	}
 }
