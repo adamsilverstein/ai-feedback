@@ -12,6 +12,7 @@ namespace AI_Feedback;
  */
 class Plugin {
 
+
 	/**
 	 * Plugin instance.
 	 *
@@ -180,9 +181,9 @@ class Plugin {
 	/**
 	 * Filter avatar data to show custom avatar for AI Feedback comments/notes.
 	 *
-	 * @param array $args        Arguments for getting avatar data.
-	 * @param mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
-	 *                           user email, WP_User object, WP_Post object, or WP_Comment object.
+	 * @param  array $args        Arguments for getting avatar data.
+	 * @param  mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
+	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
 	 * @return array Modified avatar args with custom URL for AI Feedback.
 	 */
 	public function filter_ai_feedback_avatar( array $args, $id_or_email ): array {
@@ -196,7 +197,7 @@ class Plugin {
 		// Check if this is an AI Feedback comment.
 		// Method 1: Check the comment author name (current translated or legacy untranslated).
 		$is_ai_feedback = ( self::get_ai_feedback_author() === $comment->comment_author )
-			|| ( 'AI Feedback' === $comment->comment_author ); // Backward compatibility with untranslated strings.
+		|| ( 'AI Feedback' === $comment->comment_author ); // Backward compatibility with untranslated strings.
 
 		// Method 2: Check comment meta for ai_feedback flag.
 		if ( ! $is_ai_feedback && $comment->comment_ID ) {

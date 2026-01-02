@@ -438,7 +438,7 @@ class Notes_Manager {
 
 		foreach ( $top_level_notes as $note ) {
 			// Skip resolved notes if requested.
-			if ( $exclude_resolved && $this->is_note_resolved( $note->comment_ID ) ) {
+			if ( $exclude_resolved && $this->is_note_resolved( (int) $note->comment_ID ) ) {
 				continue;
 			}
 
@@ -448,7 +448,7 @@ class Notes_Manager {
 					'post_id' => $post_id,
 					'type'    => 'note',
 					'status'  => 'all',
-					'parent'  => $note->comment_ID,
+					'parent'  => (int) $note->comment_ID,
 					'orderby' => 'comment_date',
 					'order'   => 'ASC',
 				)

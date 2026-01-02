@@ -19,6 +19,7 @@ use WP_Error;
 class Settings_Controller extends WP_REST_Controller {
 
 
+
 	/**
 	 * Namespace.
 	 *

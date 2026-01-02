@@ -19,6 +19,7 @@ use AI_Feedback\Logger;
  */
 class Review_Service {
 
+
 	/**
 	 * Non-retryable error codes that should fail immediately without retry.
 	 *
@@ -265,10 +266,10 @@ class Review_Service {
 	/**
 	 * Call AI service with retry logic and exponential backoff.
 	 *
-	 * @param string $prompt             User prompt.
-	 * @param string $system_instruction System instruction.
-	 * @param string $model              Model to use.
-	 * @param int    $max_retries        Maximum number of retry attempts.
+	 * @param  string $prompt             User prompt.
+	 * @param  string $system_instruction System instruction.
+	 * @param  string $model              Model to use.
+	 * @param  int    $max_retries        Maximum number of retry attempts.
 	 * @return string|WP_Error AI response or error.
 	 */
 	protected function call_ai_with_retry(
@@ -347,7 +348,7 @@ class Review_Service {
 	 * Attempts to identify specific error types from exception messages
 	 * or exception class names for better retry handling.
 	 *
-	 * @param \Exception $e The exception to analyze.
+	 * @param  \Exception $e The exception to analyze.
 	 * @return string Error code for WP_Error.
 	 */
 	protected function extract_error_code_from_exception( \Exception $e ): string {
@@ -355,33 +356,30 @@ class Review_Service {
 		$class_name = strtolower( get_class( $e ) );
 
 		// Check for rate limiting errors.
-		if (
-			str_contains( $message, 'rate limit' ) ||
-			str_contains( $message, 'rate_limit' ) ||
-			str_contains( $message, 'too many requests' ) ||
-			str_contains( $class_name, 'ratelimit' )
+		if ( str_contains( $message, 'rate limit' )
+			|| str_contains( $message, 'rate_limit' )
+			|| str_contains( $message, 'too many requests' )
+			|| str_contains( $class_name, 'ratelimit' )
 		) {
 			return 'rate_limit_exceeded';
 		}
 
 		// Check for authentication errors.
-		if (
-			str_contains( $message, 'invalid api key' ) ||
-			str_contains( $message, 'invalid_api_key' ) ||
-			str_contains( $message, 'unauthorized' ) ||
-			str_contains( $message, 'authentication' ) ||
-			str_contains( $class_name, 'authentication' ) ||
-			str_contains( $class_name, 'unauthorized' )
+		if ( str_contains( $message, 'invalid api key' )
+			|| str_contains( $message, 'invalid_api_key' )
+			|| str_contains( $message, 'unauthorized' )
+			|| str_contains( $message, 'authentication' )
+			|| str_contains( $class_name, 'authentication' )
+			|| str_contains( $class_name, 'unauthorized' )
 		) {
 			return 'invalid_api_key';
 		}
 
 		// Check for billing errors.
-		if (
-			str_contains( $message, 'billing' ) ||
-			str_contains( $message, 'payment' ) ||
-			str_contains( $message, 'quota exceeded' ) ||
-			str_contains( $message, 'insufficient' )
+		if ( str_contains( $message, 'billing' )
+			|| str_contains( $message, 'payment' )
+			|| str_contains( $message, 'quota exceeded' )
+			|| str_contains( $message, 'insufficient' )
 		) {
 			return 'billing_error';
 		}
@@ -506,11 +504,11 @@ class Review_Service {
 					);
 
 					if ( is_wp_error( $note_id ) ) {
-						$errors[] = $note_id->get_error_message();
-						continue;
+								$errors[] = $note_id->get_error_message();
+								continue;
 					}
 
-					$note_ids[] = $note_id;
+						$note_ids[] = $note_id;
 				}
 
 				// Map block to the existing parent note.
@@ -527,8 +525,8 @@ class Review_Service {
 					);
 
 					if ( is_wp_error( $note_id ) ) {
-						$errors[] = $note_id->get_error_message();
-						continue;
+								$errors[] = $note_id->get_error_message();
+								continue;
 					}
 
 					$note_ids[] = $note_id;
@@ -549,7 +547,7 @@ class Review_Service {
 			return new WP_Error(
 				'note_creation_failed',
 				sprintf(
-					/* translators: %s: error messages */
+				/* translators: %s: error messages */
 					__( 'Failed to create notes: %s', 'ai-feedback' ),
 					implode( ', ', $errors )
 				)
