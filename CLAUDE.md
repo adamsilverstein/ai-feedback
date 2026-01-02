@@ -49,8 +49,7 @@ ai-feedback/
 │   │   ├── AIFeedbackPanel.js   # Main sidebar panel
 │   │   ├── ReviewButton.js      # Trigger review action
 │   │   ├── ReviewSummary.js     # Display review results
-│   │   ├── SettingsPanel.js     # Model/focus area settings
-│   │   ├── ModelSelector.js     # AI model dropdown
+│   │   ├── ModelSelector.js     # AI model dropdown (shown when multiple models available)
 │   │   └── EmptyState.js        # No-content placeholder
 │   ├── store/                   # Redux-style data store
 │   │   ├── index.js
@@ -109,12 +108,6 @@ $response = AiClient::prompt( $prompt )
 8. Store updates block metadata with noteIds
 
 ## Common Tasks
-
-### Adding a Focus Area
-
-1. Add constant to `class-review-service.php`
-2. Update `get_focus_area_prompt()` with instructions
-3. Add UI option in `SettingsPanel.js`
 
 ### Adding a REST Endpoint
 
