@@ -144,3 +144,33 @@ export function getUnresolvedNotesCount(state) {
 export function hasError(state) {
 	return state.error !== null;
 }
+
+/**
+ * Check if previous review is loading.
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True if loading previous review.
+ */
+export function isLoadingPreviousReview(state) {
+	return state.isLoadingPreviousReview;
+}
+
+/**
+ * Check if previous review has been fetched.
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True if previous review fetch has completed.
+ */
+export function hasFetchedPreviousReview(state) {
+	return state.hasFetchedPreviousReview;
+}
+
+/**
+ * Check if there's a previous review available.
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True if a previous review exists.
+ */
+export function hasPreviousReview(state) {
+	return state.lastReview !== null;
+}
