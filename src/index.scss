@@ -320,6 +320,16 @@
 		margin-bottom: 1.5em;
 	}
 
+	.ai-feedback-welcome-prereq {
+		margin-top: 16px;
+
+		h3 {
+			margin: 0 0 12px;
+			font-size: 14px;
+			font-weight: 600;
+		}
+	}
+
 	.ai-feedback-welcome-steps {
 		list-style: none;
 		padding: 0;
@@ -344,5 +354,9 @@
 		gap: 12px;
 		margin-top: 24px;
 		justify-content: flex-end;
+	}
+
+	.components-notice {
+		margin: 0 0 16px;
 	}
 }

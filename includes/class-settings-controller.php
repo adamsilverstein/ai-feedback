@@ -68,6 +68,33 @@ class Settings_Controller extends WP_REST_Controller {
 				),
 			)
 		);
+
+		// Register status endpoint to check AI client availability.
+		register_rest_route(
+			$this->namespace,
+			'/status',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_status' ),
+				'permission_callback' => array( $this, 'get_settings_permissions_check' ),
+			)
+		);
+	}
+
+	/**
+	 * Get AI client status.
+	 *
+	 * @return WP_REST_Response Status response.
+	 */
+	public function get_status(): \WP_REST_Response {
+		$ai_client_available = class_exists( 'WordPress\AiClient\AiClient' );
+
+		$status = array(
+			'ai_client_available' => $ai_client_available,
+			'settings_url'        => admin_url( 'options-general.php?page=wp-ai-client' ),
+		);
+
+		return rest_ensure_response( $status );
 	}
 
 	/**
