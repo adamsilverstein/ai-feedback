@@ -30,7 +30,6 @@
 		"includes/",
 		"build/",
 		"assets/",
-		"languages/",
 		"readme.txt",
 		".wordpress-org/"
 	],
