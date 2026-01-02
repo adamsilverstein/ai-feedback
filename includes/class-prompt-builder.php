@@ -18,11 +18,12 @@ class Prompt_Builder {
 	/**
 	 * Build a review prompt for the AI.
 	 *
-	 * @param  array $blocks  Blocks with clientId, name, and content from the editor.
-	 * @param  array $options Review options.
+	 * @param  array $blocks            Blocks with clientId, name, and content from the editor.
+	 * @param  array $options           Review options.
+	 * @param  array $existing_feedback Optional existing feedback for continuation reviews.
 	 * @return string The constructed prompt.
 	 */
-	public function build_review_prompt( array $blocks, array $options = array() ): string {
+	public function build_review_prompt( array $blocks, array $options = array(), array $existing_feedback = array() ): string {
 		$defaults = array(
 			'focus_areas' => array( 'content', 'tone', 'flow' ),
 			'target_tone' => 'professional',
@@ -40,6 +41,25 @@ class Prompt_Builder {
 		// Build tone guidance.
 		$tone_guidance = $this->build_tone_guidance( $options['target_tone'] );
 
+		// Build existing feedback section for continuation reviews.
+		$existing_feedback_section = '';
+		$continuation_instructions = '';
+		if ( ! empty( $existing_feedback ) ) {
+			$existing_feedback_section = $this->format_existing_feedback( $existing_feedback );
+			$continuation_instructions = <<<CONT
+
+CONTINUATION REVIEW INSTRUCTIONS:
+- This is a follow-up review. Previous feedback and user responses are provided below.
+- Do NOT repeat feedback that has already been given unless the issue persists after user addressed it.
+- Focus on NEW issues or issues that weren't fully addressed in previous feedback.
+- Consider user responses when determining if issues have been resolved.
+- If a user has responded to feedback, check if their changes adequately address the concern.
+
+PREVIOUS FEEDBACK AND RESPONSES:
+{$existing_feedback_section}
+CONT;
+		}
+
 		// Construct the full prompt.
 		$prompt = <<<PROMPT
 Please review the following document and provide actionable editorial feedback.
@@ -54,6 +74,7 @@ FOCUS AREAS:
 
 TARGET TONE:
 {$tone_guidance}
+{$continuation_instructions}
 
 INSTRUCTIONS:
 - Provide specific, actionable feedback for each issue you identify
@@ -92,10 +113,11 @@ PROMPT;
 	/**
 	 * Get system instruction for the AI.
 	 *
+	 * @param  bool $is_continuation Whether this is a continuation review.
 	 * @return string System instruction.
 	 */
-	public function get_system_instruction(): string {
-		return <<<'INSTRUCTION'
+	public function get_system_instruction( bool $is_continuation = false ): string {
+		$base_instruction = <<<'INSTRUCTION'
 You are a concise editorial assistant. Follow these rules strictly:
 
 BREVITY:
@@ -117,6 +139,77 @@ BAD: {"title":"Improve writing","feedback":"Could be better.","suggestion":"Cons
 
 Output valid JSON only.
 INSTRUCTION;
+
+		if ( $is_continuation ) {
+			$base_instruction .= "\n\nCONTINUATION REVIEW RULES:\n";
+			$base_instruction .= "- You have access to previous feedback and user responses.\n";
+			$base_instruction .= "- Skip issues that were already addressed based on user responses.\n";
+			$base_instruction .= "- Only flag new issues or issues that persist despite user changes.\n";
+			$base_instruction .= "- Be aware that content may have changed since the last review.\n";
+			$base_instruction .= '- Reference the same block_ids when following up on existing issues.';
+		}
+
+		return $base_instruction;
+	}
+
+	/**
+	 * Format existing feedback for inclusion in continuation prompts.
+	 *
+	 * @param  array $existing_feedback Array of feedback notes with replies.
+	 * @return string Formatted feedback for prompt.
+	 */
+	private function format_existing_feedback( array $existing_feedback ): string {
+		if ( empty( $existing_feedback ) ) {
+			return '';
+		}
+
+		$formatted = array();
+
+		foreach ( $existing_feedback as $note ) {
+			$block_id = $note['block_id'] ?? 'unknown';
+			$category = $note['category'] ?? 'general';
+			$severity = $note['severity'] ?? 'suggestion';
+			$content  = $note['content']['raw'] ?? '';
+
+			// Truncate very long content.
+			if ( strlen( $content ) > 500 ) {
+				$content = substr( $content, 0, 500 ) . '... [truncated]';
+			}
+
+			$feedback_entry = sprintf(
+				"[Block: %s] [%s/%s]\nAI Feedback: %s",
+				$block_id,
+				$category,
+				$severity,
+				wp_strip_all_tags( $content )
+			);
+
+			// Add user replies if present.
+			if ( ! empty( $note['replies'] ) ) {
+				$feedback_entry .= "\nUser Responses:";
+				foreach ( $note['replies'] as $reply ) {
+					$reply_content = $reply['content']['raw'] ?? '';
+					$reply_author  = $reply['author_name'] ?? 'User';
+					$is_ai_reply   = $reply['is_ai'] ?? false;
+
+					// Truncate reply content.
+					if ( strlen( $reply_content ) > 300 ) {
+						$reply_content = substr( $reply_content, 0, 300 ) . '...';
+					}
+
+					$author_label    = $is_ai_reply ? 'AI' : $reply_author;
+					$feedback_entry .= sprintf(
+						"\n  - %s: %s",
+						$author_label,
+						wp_strip_all_tags( $reply_content )
+					);
+				}
+			}
+
+			$formatted[] = $feedback_entry;
+		}
+
+		return implode( "\n\n---\n\n", $formatted );
 	}
 
 	/**
