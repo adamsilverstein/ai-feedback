@@ -310,3 +310,39 @@
 		}
 	}
 }
+
+/* Welcome Modal Styles */
+.ai-feedback-welcome-modal {
+	max-width: 500px;
+
+	.ai-feedback-welcome-intro {
+		font-size: 1.1em;
+		margin-bottom: 1.5em;
+	}
+
+	.ai-feedback-welcome-steps {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+
+		/* stylelint-disable-next-line no-descending-specificity */
+		li {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 12px 0;
+			border-bottom: 1px solid #ddd;
+
+			svg {
+				fill: var(--wp-admin-theme-color, #007cba);
+			}
+		}
+	}
+
+	.ai-feedback-welcome-actions {
+		display: flex;
+		gap: 12px;
+		margin-top: 24px;
+		justify-content: flex-end;
+	}
+}

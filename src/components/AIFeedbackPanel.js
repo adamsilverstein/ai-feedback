@@ -15,6 +15,7 @@ import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
+import WelcomeModal from './WelcomeModal';
 
 /**
  * Settings page URL.
@@ -144,6 +145,7 @@ export default function AIFeedbackPanel() {
 
 	return (
 		<div className="ai-feedback-panel">
+			<WelcomeModal />
 			<StatusAnnouncer
 				isReviewing={isReviewing}
 				lastReview={lastReview}
