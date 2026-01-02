@@ -86,6 +86,7 @@ export default function WelcomeModal() {
 						variant="link"
 						href="https://github.com/adamsilverstein/ai-feedback#readme"
 						target="_blank"
+						rel="noopener noreferrer"
 					>
 						{__('Learn More', 'ai-feedback')}
 					</Button>

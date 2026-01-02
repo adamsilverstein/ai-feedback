@@ -162,8 +162,12 @@ test.describe('Welcome Modal', () => {
 		const learnMoreLink = page.getByRole('link', { name: 'Learn More' });
 		await expect(learnMoreLink).toBeVisible();
 
-		// Verify it has target="_blank"
+		// Verify it has target="_blank" and security attributes
 		await expect(learnMoreLink).toHaveAttribute('target', '_blank');
+		await expect(learnMoreLink).toHaveAttribute(
+			'rel',
+			'noopener noreferrer'
+		);
 	});
 
 	test('does not show welcome modal when localStorage flag is set', async ({
