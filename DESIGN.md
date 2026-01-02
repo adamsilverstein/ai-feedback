@@ -135,8 +135,7 @@ By leveraging the native Notes system, feedback becomes a first-class collaborat
 |-----------|-------------|
 | `PluginSidebar` | Main settings panel in editor toolbar |
 | `ReviewButton` | Triggers document review |
-| `ModelSelector` | Dropdown for AI model selection |
-| `SettingsPanel` | Configuration options |
+| `ModelSelector` | Dropdown for AI model selection (shown when multiple models available) |
 | `ReviewHistory` | List of past reviews with timestamps |
 | `NotesIntegration` | Bridge to WordPress Notes API |
 

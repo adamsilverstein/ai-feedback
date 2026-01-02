@@ -10,7 +10,6 @@ import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 
 import ModelSelector from './ModelSelector';
-import SettingsPanel from './SettingsPanel';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
@@ -84,6 +83,7 @@ export default function AIFeedbackPanel() {
 		focusAreas,
 		targetTone,
 		postTitle,
+		availableModels,
 	} = useSelect(
 		(select) => ({
 			error: select(STORE_NAME).getError(),
@@ -96,6 +96,7 @@ export default function AIFeedbackPanel() {
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
+			availableModels: select(STORE_NAME).getAvailableModels(),
 		}),
 		[]
 	);
@@ -179,13 +180,14 @@ export default function AIFeedbackPanel() {
 				/>
 			) : (
 				<>
-					<PanelBody
-						title={__('Review Settings', 'ai-feedback')}
-						initialOpen={true}
-					>
-						<ModelSelector />
-						<SettingsPanel />
-					</PanelBody>
+					{availableModels.length > 1 && (
+						<PanelBody
+							title={__('Review Settings', 'ai-feedback')}
+							initialOpen={true}
+						>
+							<ModelSelector />
+						</PanelBody>
+					)}
 
 					<PanelBody
 						title={__('Review Document', 'ai-feedback')}
