@@ -64,7 +64,7 @@ class Review_Service {
 	 * Review a document.
 	 *
 	 * @param  int   $post_id Post ID to review.
-	 * @param  array $options Review options including 'blocks' array.
+	 * @param  array $options Review options including 'blocks' array and optional 'existing_feedback'.
 	 * @return array|WP_Error Review results or error.
 	 */
 	public function review_document( int $post_id, array $options = array() ): array|WP_Error {
@@ -105,9 +105,17 @@ class Review_Service {
 			$options['post_title'] = $post->post_title;
 		}
 
-		// Build prompt.
-		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options );
-		$system_instruction = $this->prompt_builder->get_system_instruction();
+		// Get existing feedback for continuation reviews if not already provided.
+		$existing_feedback = $options['existing_feedback'] ?? array();
+		$is_continuation   = ! empty( $existing_feedback );
+
+		if ( $is_continuation ) {
+			Logger::debug( sprintf( 'Continuation review with %d existing feedback items', count( $existing_feedback ) ) );
+		}
+
+		// Build prompt with existing feedback context if available.
+		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
+		$system_instruction = $this->prompt_builder->get_system_instruction( $is_continuation );
 
 		// Get AI model.
 		$model = $options['model'] ?? 'claude-sonnet-4-20250514';
@@ -156,10 +164,12 @@ class Review_Service {
 		);
 
 		// Create WordPress Notes from feedback.
-		$note_result = $this->notes_manager->create_notes_from_feedback(
+		// For continuation reviews, append to existing threads where possible.
+		$note_result = $this->create_notes_with_threading(
 			$feedback_items,
 			$post_id,
-			$review_data
+			$review_data,
+			$is_continuation
 		);
 
 		// Check if note creation failed.
@@ -416,6 +426,140 @@ class Review_Service {
 		);
 
 		return wp_json_encode( $response );
+	}
+
+	/**
+	 * Create notes with threading support for continuation reviews.
+	 *
+	 * For continuation reviews, this method checks if blocks already have note threads
+	 * and appends new feedback as replies to existing threads.
+	 *
+	 * @param  array $feedback_items  Parsed feedback items from AI.
+	 * @param  int   $post_id         Post ID.
+	 * @param  array $review_data     Review metadata.
+	 * @param  bool  $is_continuation Whether this is a continuation review.
+	 * @return array|WP_Error Array with note_ids and block_mapping, or error.
+	 */
+	private function create_notes_with_threading(
+		array $feedback_items,
+		int $post_id,
+		array $review_data,
+		bool $is_continuation
+	): array|WP_Error {
+		// For non-continuation reviews, use the standard method.
+		if ( ! $is_continuation ) {
+			return $this->notes_manager->create_notes_from_feedback(
+				$feedback_items,
+				$post_id,
+				$review_data
+			);
+		}
+
+		// For continuation reviews, check for existing threads and append.
+		$note_ids      = array();
+		$block_mapping = array();
+		$errors        = array();
+
+		// Group feedback by block_id.
+		$grouped_feedback = array();
+		foreach ( $feedback_items as $item ) {
+			$block_id = ! empty( $item['block_id'] ) ? $item['block_id'] : 'document';
+			if ( ! isset( $grouped_feedback[ $block_id ] ) ) {
+				$grouped_feedback[ $block_id ] = array();
+			}
+			$grouped_feedback[ $block_id ][] = $item;
+		}
+
+		foreach ( $grouped_feedback as $block_id => $items ) {
+			// Check if this block already has a note thread.
+			$existing_note_id = null;
+			if ( 'document' !== $block_id ) {
+				// Try to find existing note by block_id, block_name, or block_index.
+				$block_name  = $items[0]['block_name'] ?? null;
+				$block_index = $items[0]['block_index'] ?? null;
+
+				$existing_note_id = $this->notes_manager->get_existing_note_for_block(
+					$post_id,
+					$block_id,
+					$block_name,
+					$block_index
+				);
+			}
+
+			if ( null !== $existing_note_id ) {
+				// Append to existing thread.
+				Logger::debug(
+					sprintf(
+						'Appending %d feedback items to existing thread %d for block %s',
+						count( $items ),
+						$existing_note_id,
+						$block_id
+					)
+				);
+
+				foreach ( $items as $item ) {
+					$note_id = $this->notes_manager->add_reply_to_thread(
+						$item,
+						$post_id,
+						$existing_note_id,
+						$review_data
+					);
+
+					if ( is_wp_error( $note_id ) ) {
+						$errors[] = $note_id->get_error_message();
+						continue;
+					}
+
+					$note_ids[] = $note_id;
+				}
+
+				// Map block to the existing parent note.
+				$block_mapping[ $block_id ] = $existing_note_id;
+			} else {
+				// Create new thread for this block.
+				$parent_id = 0;
+				foreach ( $items as $index => $item ) {
+					$note_id = $this->notes_manager->add_reply_to_thread(
+						$item,
+						$post_id,
+						$parent_id,
+						$review_data
+					);
+
+					if ( is_wp_error( $note_id ) ) {
+						$errors[] = $note_id->get_error_message();
+						continue;
+					}
+
+					$note_ids[] = $note_id;
+
+					// First note becomes parent for subsequent notes.
+					if ( 0 === $index ) {
+						$parent_id = $note_id;
+						if ( 'document' !== $block_id ) {
+							$block_mapping[ $block_id ] = $note_id;
+						}
+					}
+				}
+			}
+		}
+
+		// If all notes failed, return error.
+		if ( empty( $note_ids ) && ! empty( $errors ) ) {
+			return new WP_Error(
+				'note_creation_failed',
+				sprintf(
+					/* translators: %s: error messages */
+					__( 'Failed to create notes: %s', 'ai-feedback' ),
+					implode( ', ', $errors )
+				)
+			);
+		}
+
+		return array(
+			'note_ids'      => $note_ids,
+			'block_mapping' => $block_mapping,
+		);
 	}
 
 	/**
