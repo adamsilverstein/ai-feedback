@@ -324,18 +324,18 @@
 		list-style: none;
 		padding: 0;
 		margin: 0;
+	}
 
-		/* stylelint-disable-next-line no-descending-specificity */
-		li {
-			display: flex;
-			align-items: center;
-			gap: 12px;
-			padding: 12px 0;
-			border-bottom: 1px solid #ddd;
+	/* stylelint-disable-next-line no-descending-specificity */
+	.ai-feedback-welcome-steps li {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 0;
+		border-bottom: 1px solid #ddd;
 
-			svg {
-				fill: var(--wp-admin-theme-color, #007cba);
-			}
+		svg {
+			fill: var(--wp-admin-theme-color, #007cba);
 		}
 	}
 

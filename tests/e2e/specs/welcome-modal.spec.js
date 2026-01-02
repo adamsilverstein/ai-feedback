@@ -39,9 +39,7 @@ test.describe('Welcome Modal', () => {
 		await aiFeedback.openSidebar();
 
 		// Verify steps are visible
-		await expect(
-			page.getByText('Get started in 3 steps:')
-		).toBeVisible();
+		await expect(page.getByText('Get started in 3 steps:')).toBeVisible();
 		await expect(
 			page.getByText('Write your content in the editor')
 		).toBeVisible();
@@ -63,7 +61,9 @@ test.describe('Welcome Modal', () => {
 		await expect(
 			page.getByRole('button', { name: 'Get Started' })
 		).toBeVisible();
-		await expect(page.getByRole('link', { name: 'Learn More' })).toBeVisible();
+		await expect(
+			page.getByRole('link', { name: 'Learn More' })
+		).toBeVisible();
 	});
 
 	test('dismisses modal when Get Started button is clicked', async ({

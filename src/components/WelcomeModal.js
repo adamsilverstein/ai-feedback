@@ -51,7 +51,7 @@ export default function WelcomeModal() {
 
 				<h3>{__('Get started in 3 steps:', 'ai-feedback')}</h3>
 
-				<ol className="ai-feedback-welcome-steps">
+				<ul className="ai-feedback-welcome-steps">
 					<li>
 						<Icon icon={pencil} />
 						<span>
@@ -76,7 +76,7 @@ export default function WelcomeModal() {
 							)}
 						</span>
 					</li>
-				</ol>
+				</ul>
 
 				<div className="ai-feedback-welcome-actions">
 					<Button variant="primary" onClick={dismiss}>
