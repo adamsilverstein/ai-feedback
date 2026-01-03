@@ -58,7 +58,12 @@ The WordPress site will be available at:
 tests/e2e/
 ├── fixtures.js              # Custom test fixtures and utilities
 └── specs/
-    └── settings.spec.js     # Settings persistence tests
+    ├── settings.spec.js     # Settings persistence tests
+    ├── sidebar.spec.js      # Sidebar functionality tests
+    ├── review-workflow.spec.js  # Review workflow tests
+    ├── notes-creation.spec.js   # Notes creation tests
+    ├── error-handling.spec.js   # Error handling tests
+    └── accessibility.spec.js    # Accessibility tests
 ```
 
 ### Fixtures
@@ -80,6 +85,9 @@ The `aiFeedback` fixture provides:
 - `selectTone(toneId)`: Selects a target tone
 - `expandReviewSettings()`: Expands the Review Settings panel
 - `waitForSettingsSave(ms)`: Waits for debounced settings to save (default 600ms)
+- `mockReviewAPI(response)`: Mocks the review API with a custom response
+- `mockReviewAPIError(status, code, message)`: Mocks the review API to return an error
+- `startReviewAndWait(timeout)`: Starts a review and waits for completion
 
 ## Writing Tests
 
@@ -165,11 +173,13 @@ test('my test', async ({ page }) => {
 
 ## Continuous Integration
 
-The tests are designed to run in CI environments:
+The tests are designed to run in CI environments via GitHub Actions (`.github/workflows/test-e2e.yml`):
 
 - Tests run in headless mode by default
 - Failed tests are retried 2 times in CI
-- Test artifacts are uploaded for debugging
+- Test artifacts are uploaded for debugging on failure
+- Runs on PRs and pushes to main/develop branches
+- Only triggers when relevant files change (src/, includes/, tests/e2e/, etc.)
 
 ## Troubleshooting
 

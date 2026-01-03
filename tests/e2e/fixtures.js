@@ -22,21 +22,19 @@ class AIFeedbackUtils {
 	 * Open the AI Feedback sidebar.
 	 */
 	async openSidebar() {
-		// Click the "AI Feedback" menu item in the editor's more menu
-		const sidebarButton = this.page.getByRole('button', {
-			name: 'AI Feedback',
-		});
+		// The sidebar panel - WordPress uses complementary role for plugin sidebars
+		const sidebarPanel = this.page
+			.locator('.ai-feedback-sidebar, [class*="ai-feedback"]')
+			.first();
 
-		// Check if sidebar is already open by looking for the panel
-		const isOpen = await this.page
-			.getByRole('region', { name: 'AI Feedback' })
-			.isVisible()
-			.catch(() => false);
+		// Check if sidebar is already open by looking for the panel heading
+		const isOpen = await sidebarPanel.isVisible().catch(() => false);
 
 		if (!isOpen) {
-			// Open the options menu if not already open
+			// Open the options menu if not already open - use exact match
 			const optionsButton = this.page.getByRole('button', {
 				name: 'Options',
+				exact: true,
 			});
 			const menuVisible = await this.page
 				.getByRole('menu', { name: 'Options' })
@@ -48,13 +46,16 @@ class AIFeedbackUtils {
 			}
 
 			// Click AI Feedback menu item
+			const sidebarButton = this.page.getByRole('menuitemcheckbox', {
+				name: 'AI Feedback',
+			});
 			await sidebarButton.click();
 		}
 
-		// Wait for the sidebar to be visible
+		// Wait for the sidebar content to be visible - look for the primary Review Document button
 		await this.page
-			.getByRole('region', { name: 'AI Feedback' })
-			.waitFor({ state: 'visible' });
+			.locator('button.is-primary:has-text("Review Document")')
+			.waitFor({ state: 'visible', timeout: 10000 });
 	}
 
 	/**
@@ -128,20 +129,96 @@ class AIFeedbackUtils {
 			await this.page.waitForTimeout(600);
 		}
 	}
+
+	/**
+	 * Mock the review API with a custom response.
+	 *
+	 * @param {Object} response - Custom response object.
+	 */
+	async mockReviewAPI(response) {
+		await this.page.route(
+			'**/wp-json/ai-feedback/v1/review',
+			async (route) => {
+				await route.fulfill({
+					status: 200,
+					contentType: 'application/json',
+					body: JSON.stringify(response),
+				});
+			}
+		);
+	}
+
+	/**
+	 * Mock the review API to return an error.
+	 *
+	 * @param {number} status  - HTTP status code.
+	 * @param {string} code    - Error code.
+	 * @param {string} message - Error message.
+	 */
+	async mockReviewAPIError(status, code, message) {
+		await this.page.route(
+			'**/wp-json/ai-feedback/v1/review',
+			async (route) => {
+				await route.fulfill({
+					status,
+					contentType: 'application/json',
+					body: JSON.stringify({ code, message }),
+				});
+			}
+		);
+	}
+
+	/**
+	 * Start a review and wait for completion.
+	 * Assumes API is already mocked if needed.
+	 *
+	 * @param {number} timeout          - Maximum time to wait for the review to complete and button to return to ready state. Default: 10000ms.
+	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear. Default: 1000ms.
+	 */
+	async startReviewAndWait(timeout = 10000, reviewingTimeout = 1000) {
+		// Use the primary button specifically (not the panel toggle)
+		const reviewButton = this.page.locator(
+			'button.is-primary:has-text("Review Document")'
+		);
+		await reviewButton.click();
+
+		// Wait for reviewing state to appear and then disappear
+		try {
+			await this.page.locator('button.is-primary.is-busy').waitFor({
+				state: 'visible',
+				timeout: reviewingTimeout,
+			});
+		} catch (error) {
+			// Reviewing state might not appear if review completes very quickly
+			// Only ignore timeout errors, re-throw other errors
+			if (
+				error.name !== 'TimeoutError' &&
+				!error.message?.includes('Timeout')
+			) {
+				throw error;
+			}
+		}
+
+		// Wait for review to complete (button no longer busy)
+		await reviewButton.waitFor({
+			state: 'visible',
+			timeout,
+		});
+	}
 }
 
 /**
  * Extend the base test with custom fixtures.
  */
 const test = base.extend({
-	admin: async ({ page, pageUtils }, use) => {
-		await use(new Admin({ page, pageUtils }));
+	pageUtils: async ({ page }, use) => {
+		await use(new PageUtils({ page }));
 	},
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	pageUtils: async ({ page }, use) => {
-		await use(new PageUtils({ page }));
+	admin: async ({ page, pageUtils, editor }, use) => {
+		await use(new Admin({ page, pageUtils, editor }));
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({

@@ -1,7 +1,10 @@
 {
 	"core": "WordPress/WordPress#6.9",
 	"phpVersion": "8.2",
-	"plugins": ["."],
+	"plugins": [
+		"https://downloads.wordpress.org/plugin/ai.zip",
+		"."
+	],
 	"themes": ["WordPress/twentytwentyfour"],
 	"port": 8889,
 	"testsPort": 8890,
