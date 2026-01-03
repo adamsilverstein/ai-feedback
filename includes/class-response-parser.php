@@ -14,6 +14,7 @@ namespace AI_Feedback;
  */
 class Response_Parser {
 
+
 	/**
 	 * Valid category values for feedback items.
 	 */
@@ -50,12 +51,12 @@ class Response_Parser {
 	 * Given the raw AI response text, attempts to extract and decode JSON, validates and
 	 * sanitizes feedback items, and enriches them with block metadata drawn from $blocks.
 	 *
-	 * @param string $response AI response text (may contain surrounding text; JSON is extracted).
-	 * @param array  $blocks   Original blocks used to validate `block_id` values and provide
-	 *                         enrichment (`name` and `index`) for validated items.
-	 * @param bool   $validate_schema If true, perform strict JSON schema validation and return
-	 *                                a WP_Error on schema or parse failures; if false, parsing
-	 *                                errors yield an empty result structure.
+	 * @param  string $response        AI response text (may contain surrounding text; JSON is extracted).
+	 * @param  array  $blocks          Original blocks used to validate `block_id` values and provide
+	 *                                 enrichment (`name` and `index`) for validated items.
+	 * @param  bool   $validate_schema If true, perform strict JSON schema validation and return
+	 *                                 a WP_Error on schema or parse failures; if false, parsing
+	 *                                 errors yield an empty result structure.
 	 * @return array|\WP_Error On success, an array with keys:
 	 *                         - `summary` (string): sanitized summary text.
 	 *                         - `feedback` (array): list of validated, sanitized, and enriched feedback items.
@@ -111,7 +112,7 @@ class Response_Parser {
 				return new \WP_Error(
 					'json_parse_error',
 					sprintf(
-						/* translators: %s: JSON error message */
+					/* translators: %s: JSON error message */
 						__( 'JSON parse error: %s', 'ai-feedback' ),
 						json_last_error_msg()
 					)
@@ -212,9 +213,9 @@ class Response_Parser {
 	 * `title`, and `feedback`; includes `block_name` and `block_index` from `$block_info` when available,
 	 * and includes a sanitized `suggestion` if provided.
 	 *
-	 * @param mixed $item Feedback item data.
-	 * @param array $valid_block_ids Map of valid block IDs.
-	 * @param array $block_info      Map of block IDs to their info (name, index).
+	 * @param  mixed $item            Feedback item data.
+	 * @param  array $valid_block_ids Map of valid block IDs.
+	 * @param  array $block_info      Map of block IDs to their info (name, index).
 	 * @return array|null Array of validated and sanitized fields on success, `null` if the item is invalid.
 	 */
 	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
@@ -354,7 +355,7 @@ class Response_Parser {
 	/**
 	 * Produce aggregated counts and flags for a set of parsed feedback items.
 	 *
-	 * @param array $feedback_items Parsed feedback items. Each item is expected to include at least the `category` and `severity` keys.
+	 * @param  array $feedback_items Parsed feedback items. Each item is expected to include at least the `category` and `severity` keys.
 	 * @return array{
 	 *     total_notes: int,
 	 *     by_category: array{content:int, tone:int, flow:int, design:int},
@@ -405,7 +406,7 @@ class Response_Parser {
 	 * Performs structural and type checks only; does not perform semantic validations
 	 * (for example, it does not verify that referenced block IDs exist).
 	 *
-	 * @param mixed $data Decoded JSON data to validate.
+	 * @param  mixed $data Decoded JSON data to validate.
 	 * @return true|\WP_Error `true` if the data conforms to the schema, a `WP_Error`
 	 *                      containing one or more validation errors otherwise.
 	 */
@@ -443,7 +444,7 @@ class Response_Parser {
 					foreach ( $item_errors->get_error_codes() as $code ) {
 						$error_data = $item_errors->get_error_data( $code );
 						foreach ( $item_errors->get_error_messages( $code ) as $message ) {
-							$errors->add( $code, $message, $error_data );
+								$errors->add( $code, $message, $error_data );
 						}
 					}
 				}
@@ -473,8 +474,8 @@ class Response_Parser {
 	 * Ensures the item is an object/array, contains all required string fields, enforces allowed
 	 * values for `category` and `severity`, and checks the optional `suggestion` is a string.
 	 *
-	 * @param mixed $item  Feedback item to validate.
-	 * @param int   $index Index of the item in the feedback array (used to build error paths).
+	 * @param  mixed $item  Feedback item to validate.
+	 * @param  int   $index Index of the item in the feedback array (used to build error paths).
 	 * @return true|\WP_Error `true` if the item is valid, or a `\WP_Error` containing one or more
 	 *                        validation errors with `path` metadata indicating the failing field.
 	 */
@@ -487,7 +488,7 @@ class Response_Parser {
 			$errors->add(
 				'invalid_type',
 				sprintf(
-					/* translators: %d: item index */
+				/* translators: %d: item index */
 					__( 'Feedback item %d must be an object.', 'ai-feedback' ),
 					$index
 				),
@@ -502,7 +503,7 @@ class Response_Parser {
 				$errors->add(
 					'missing_field',
 					sprintf(
-						/* translators: 1: field name, 2: item index */
+					/* translators: 1: field name, 2: item index */
 						__( 'Feedback item %2$d is missing required field "%1$s".', 'ai-feedback' ),
 						$field,
 						$index
@@ -513,7 +514,7 @@ class Response_Parser {
 				$errors->add(
 					'invalid_type',
 					sprintf(
-						/* translators: 1: field name, 2: item index */
+					/* translators: 1: field name, 2: item index */
 						__( 'Field "%1$s" in feedback item %2$d must be a string.', 'ai-feedback' ),
 						$field,
 						$index
@@ -529,7 +530,7 @@ class Response_Parser {
 				$errors->add(
 					'invalid_enum',
 					sprintf(
-						/* translators: 1: invalid value, 2: valid values, 3: item index */
+					/* translators: 1: invalid value, 2: valid values, 3: item index */
 						__( 'Invalid category "%1$s" in item %3$d. Must be one of: %2$s.', 'ai-feedback' ),
 						$item['category'],
 						implode( ', ', self::VALID_CATEGORIES ),
@@ -546,7 +547,7 @@ class Response_Parser {
 				$errors->add(
 					'invalid_enum',
 					sprintf(
-						/* translators: 1: invalid value, 2: valid values, 3: item index */
+					/* translators: 1: invalid value, 2: valid values, 3: item index */
 						__( 'Invalid severity "%1$s" in item %3$d. Must be one of: %2$s.', 'ai-feedback' ),
 						$item['severity'],
 						implode( ', ', self::VALID_SEVERITIES ),
@@ -562,7 +563,7 @@ class Response_Parser {
 			$errors->add(
 				'invalid_type',
 				sprintf(
-					/* translators: %d: item index */
+				/* translators: %d: item index */
 					__( 'Field "suggestion" in feedback item %d must be a string.', 'ai-feedback' ),
 					$index
 				),
@@ -582,7 +583,7 @@ class Response_Parser {
 	 *
 	 * Each line is formatted as "[code] message (at path)" when path information is present.
 	 *
-	 * @param \WP_Error $errors Validation errors; individual error data may include a 'path' key.
+	 * @param  \WP_Error $errors Validation errors; individual error data may include a 'path' key.
 	 * @return string Multi-line formatted error report.
 	 */
 	public function format_validation_errors( \WP_Error $errors ): string {

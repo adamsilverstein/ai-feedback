@@ -20,6 +20,7 @@ use AI_Feedback\Logger;
 class Review_Controller extends WP_REST_Controller {
 
 
+
 	/**
 	 * Namespace.
 	 *
@@ -74,12 +75,13 @@ class Review_Controller extends WP_REST_Controller {
 	 */
 	public function create_review( WP_REST_Request $request ) {
 		// Get parameters.
-		$post_id     = $request->get_param( 'post_id' );
-		$title       = $request->get_param( 'title' );
-		$blocks      = $request->get_param( 'blocks' );
-		$model       = $request->get_param( 'model' );
-		$focus_areas = $request->get_param( 'focus_areas' );
-		$target_tone = $request->get_param( 'target_tone' );
+		$post_id           = $request->get_param( 'post_id' );
+		$title             = $request->get_param( 'title' );
+		$blocks            = $request->get_param( 'blocks' );
+		$model             = $request->get_param( 'model' );
+		$focus_areas       = $request->get_param( 'focus_areas' );
+		$target_tone       = $request->get_param( 'target_tone' );
+		$existing_feedback = $request->get_param( 'existing_feedback' );
 
 		// Debug logging.
 		Logger::debug( sprintf( 'Review request received for post %d', $post_id ) );
@@ -124,12 +126,18 @@ class Review_Controller extends WP_REST_Controller {
 
 		// Prepare options.
 		$options = array(
-			'model'       => $model,
-			'focus_areas' => $focus_areas,
-			'target_tone' => $target_tone,
-			'blocks'      => $blocks,
-			'post_title'  => $title,
+			'model'             => $model,
+			'focus_areas'       => $focus_areas,
+			'target_tone'       => $target_tone,
+			'blocks'            => $blocks,
+			'post_title'        => $title,
+			'existing_feedback' => is_array( $existing_feedback ) ? $existing_feedback : array(),
 		);
+
+		// Log continuation review status.
+		if ( ! empty( $options['existing_feedback'] ) ) {
+			Logger::debug( sprintf( 'Continuation review with %d existing feedback items', count( $options['existing_feedback'] ) ) );
+		}
 
 		// Perform review.
 		$result = $this->review_service->review_document( $post_id, $options );
@@ -173,7 +181,7 @@ class Review_Controller extends WP_REST_Controller {
 	 */
 	private function get_create_review_args(): array {
 		return array(
-			'post_id'     => array(
+			'post_id'           => array(
 				'required'          => true,
 				'type'              => 'integer',
 				'sanitize_callback' => 'absint',
@@ -181,14 +189,14 @@ class Review_Controller extends WP_REST_Controller {
 					return is_numeric( $param ) && $param > 0;
 				},
 			),
-			'title'       => array(
+			'title'             => array(
 				'required'          => false,
 				'type'              => 'string',
 				'default'           => '',
 				'sanitize_callback' => 'sanitize_text_field',
 				'description'       => __( 'Post title from the editor.', 'ai-feedback' ),
 			),
-			'blocks'      => array(
+			'blocks'            => array(
 				'required'    => true,
 				'type'        => 'array',
 				'description' => __( 'Array of blocks with clientId, name, and content.', 'ai-feedback' ),
@@ -213,13 +221,13 @@ class Review_Controller extends WP_REST_Controller {
 					),
 				),
 			),
-			'model'       => array(
+			'model'             => array(
 				'required'          => false,
 				'type'              => 'string',
 				'default'           => 'claude-sonnet-4-20250514',
 				'sanitize_callback' => 'sanitize_text_field',
 			),
-			'focus_areas' => array(
+			'focus_areas'       => array(
 				'required' => false,
 				'type'     => 'array',
 				'default'  => array( 'content', 'tone', 'flow' ),
@@ -228,12 +236,18 @@ class Review_Controller extends WP_REST_Controller {
 					'enum' => array( 'content', 'tone', 'flow', 'design' ),
 				),
 			),
-			'target_tone' => array(
+			'target_tone'       => array(
 				'required'          => false,
 				'type'              => 'string',
 				'default'           => 'professional',
 				'sanitize_callback' => 'sanitize_text_field',
 				'enum'              => array( 'professional', 'casual', 'academic', 'friendly' ),
+			),
+			'existing_feedback' => array(
+				'required'    => false,
+				'type'        => 'array',
+				'default'     => array(),
+				'description' => __( 'Existing feedback from previous reviews for continuation.', 'ai-feedback' ),
 			),
 		);
 	}
