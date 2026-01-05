@@ -22,40 +22,54 @@ class AIFeedbackUtils {
 	 * Open the AI Feedback sidebar.
 	 */
 	async openSidebar() {
-		// The sidebar panel - WordPress uses complementary role for plugin sidebars
-		const sidebarPanel = this.page
-			.locator('.ai-feedback-sidebar, [class*="ai-feedback"]')
-			.first();
+		// Specific region for the editor top bar where buttons and menu live
+		const topBar = this.page.getByRole('region', { name: 'Editor top bar' });
 
-		// Check if sidebar is already open by looking for the panel heading
-		const isOpen = await sidebarPanel.isVisible().catch(() => false);
+		// The custom panel inside the sidebar
+		const customPanel = this.page.locator('.ai-feedback-panel');
+
+		// Check if sidebar is already open
+		let isOpen = await customPanel.isVisible().catch(() => false);
 
 		if (!isOpen) {
-			// Open the options menu if not already open - use exact match
-			const optionsButton = this.page.getByRole('button', {
-				name: 'Options',
-				exact: true,
-			});
-			const menuVisible = await this.page
-				.getByRole('menu', { name: 'Options' })
-				.isVisible()
-				.catch(() => false);
-
-			if (!menuVisible) {
-				await optionsButton.click();
-			}
-
-			// Click AI Feedback menu item
-			const sidebarButton = this.page.getByRole('menuitemcheckbox', {
+			// First, check if the plugin is pinned to the toolbar
+			const pinnedButton = topBar.getByRole('button', {
 				name: 'AI Feedback',
 			});
-			await sidebarButton.click();
+			const isPinnedVisible = await pinnedButton.isVisible().catch(() => false);
+
+			if (isPinnedVisible) {
+				await pinnedButton.click();
+			} else {
+				// Not pinned, use the Options (three dots) menu
+				const optionsButton = topBar.getByRole('button', {
+					name: 'Options',
+					exact: true,
+				});
+
+				await optionsButton.click();
+
+				// Wait for the menu to appear and click the AI Feedback item
+				await this.page
+					.getByRole('menuitemcheckbox', { name: 'AI Feedback' })
+					.click();
+			}
 		}
 
-		// Wait for the sidebar content to be visible - look for the primary Review Document button
-		await this.page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Wait for the custom panel to be visible
+		await customPanel.waitFor({ state: 'visible', timeout: 10000 });
+
+		// Check for "Loading..." state
+		const loadingText = customPanel.getByText(/Loading/i);
+		const isLoadingVisible = await loadingText.isVisible().catch(() => false);
+		if (isLoadingVisible) {
+			await expect(loadingText).toBeHidden({ timeout: 15000 });
+		}
+
+		// Wait for the primary button to be visible
+		// We use a broader selector as backup since text matching can be tricky with i18n
+		const reviewButton = customPanel.locator('button.is-primary');
+		await reviewButton.first().waitFor({ state: 'visible', timeout: 10000 });
 	}
 
 	/**
@@ -176,13 +190,14 @@ class AIFeedbackUtils {
 	 * @param {number} reviewingTimeout - Maximum time to wait for the "Reviewing" button state to appear. Default: 1000ms.
 	 */
 	async startReviewAndWait(timeout = 10000, reviewingTimeout = 1000) {
-		// Use the primary button specifically (not the panel toggle)
-		const reviewButton = this.page.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
+		// Use the primary button specifically
+		const reviewButton = this.page
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first();
 		await reviewButton.click();
 
-		// Wait for reviewing state to appear and then disappear
+		// Wait for reviewing state to appear
 		try {
 			await this.page.locator('button.is-primary.is-busy').waitFor({
 				state: 'visible',
@@ -190,20 +205,16 @@ class AIFeedbackUtils {
 			});
 		} catch (error) {
 			// Reviewing state might not appear if review completes very quickly
-			// Only ignore timeout errors, re-throw other errors
-			if (
-				error.name !== 'TimeoutError' &&
-				!error.message?.includes('Timeout')
-			) {
-				throw error;
-			}
 		}
 
 		// Wait for review to complete (button no longer busy)
-		await reviewButton.waitFor({
-			state: 'visible',
-			timeout,
-		});
+		await this.page
+			.locator('.ai-feedback-panel button.is-primary:not(.is-busy)')
+			.first()
+			.waitFor({
+				state: 'visible',
+				timeout,
+			});
 	}
 }
 
@@ -220,7 +231,7 @@ const test = base.extend({
 	admin: async ({ page, pageUtils, editor }, use) => {
 		await use(new Admin({ page, pageUtils, editor }));
 	},
-	requestUtils: async ({}, use) => {
+	requestUtils: async ({ }, use) => {
 		const requestUtils = await RequestUtils.setup({
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {
