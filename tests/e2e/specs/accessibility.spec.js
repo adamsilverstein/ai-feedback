@@ -149,7 +149,9 @@ test.describe('Accessibility', () => {
 		});
 
 		await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.click();
 
 		// Button should indicate busy state
@@ -187,7 +189,9 @@ test.describe('Accessibility', () => {
 		);
 
 		await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.click();
 
 		// Error notice should be visible
