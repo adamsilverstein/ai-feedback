@@ -179,11 +179,16 @@ test.describe('Review Workflow', () => {
 
 		// Verify summary appears - look for the summary text from our mock
 		const panel = page.locator('.ai-feedback-panel');
-		await expect(panel).toContainText(/Found 1 suggestion for improvement/i, {
-			timeout: 10000,
-		});
+		await expect(panel).toContainText(
+			/Found 1 suggestion for improvement/i,
+			{
+				timeout: 10000,
+			}
+		);
 		await expect(panel).toContainText(/1 feedback item/i);
-		await expect(panel.locator('.ai-feedback-review-summary')).toBeVisible();
+		await expect(
+			panel.locator('.ai-feedback-review-summary')
+		).toBeVisible();
 	});
 
 	test('shows success message when no issues found', async ({
