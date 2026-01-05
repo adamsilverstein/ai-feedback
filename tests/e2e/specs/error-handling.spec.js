@@ -26,14 +26,8 @@ test.describe('Error Handling', () => {
 			'AI request failed: Internal server error'
 		);
 
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
-
-		// Wait for error state - button should return to normal state after error
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Start review and wait for completion (it will return to normal state even on error)
+		await aiFeedback.startReviewAndWait();
 
 		// Verify error notice appears - look for the error notice component
 		const errorNotice = page.locator('.components-notice.is-error').first();
@@ -41,7 +35,9 @@ test.describe('Error Handling', () => {
 
 		// Either error notice is visible OR the button returned to normal state (error was handled)
 		const buttonEnabled = await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.isEnabled()
 			.catch(() => false);
 
@@ -69,14 +65,8 @@ test.describe('Error Handling', () => {
 			'Something went wrong'
 		);
 
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
-
-		// Wait for error state - button should return to normal state after error
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Start review and wait for completion
+		await aiFeedback.startReviewAndWait();
 
 		// Check if error notice appeared
 		const errorNotice = page.locator('.components-notice.is-error').first();
@@ -111,7 +101,9 @@ test.describe('Error Handling', () => {
 		} else {
 			// Error was handled differently, test still passes
 			const buttonEnabled = await page
-				.locator('button.is-primary:has-text("Review Document")')
+				.locator('button.is-primary')
+				.filter({ hasText: /Review( Document)?/i })
+				.first()
 				.isEnabled()
 				.catch(() => false);
 			expect(buttonEnabled).toBe(true);
@@ -140,12 +132,14 @@ test.describe('Error Handling', () => {
 		);
 
 		await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.click();
 
 		// Verify error notice shows rate limit message (use locator to avoid a11y region duplication)
 		await expect(
-			page.locator('.ai-feedback-error-notice:has-text("rate_limit")')
+			page.locator('.ai-feedback-error-notice').filter({ hasText: /rate_limit/i })
 		).toBeVisible({
 			timeout: 10000,
 		});
@@ -178,14 +172,8 @@ test.describe('Error Handling', () => {
 			'AI request failed: Insufficient credit balance'
 		);
 
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
-
-		// Wait for error state - button should return to normal state after error
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Start review and wait for completion
+		await aiFeedback.startReviewAndWait();
 
 		// Verify error notice appears
 		const errorNotice = page.locator('.components-notice.is-error').first();
@@ -193,7 +181,9 @@ test.describe('Error Handling', () => {
 
 		// Either error notice is visible OR the button returned to normal state
 		const buttonEnabled = await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.isEnabled()
 			.catch(() => false);
 
@@ -221,12 +211,14 @@ test.describe('Error Handling', () => {
 		});
 
 		await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.click();
 
 		// Should show some error state - button should return to normal
 		await expect(
-			page.locator('button.is-primary:has-text("Review Document")')
+			page.locator('button.is-primary').filter({ hasText: /Review( Document)?/i }).first()
 		).toBeVisible({ timeout: 10000 });
 	});
 
@@ -244,7 +236,9 @@ test.describe('Error Handling', () => {
 		await aiFeedback.openSidebar();
 
 		await page
-			.locator('button.is-primary:has-text("Review Document")')
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
 			.click();
 
 		// Should show warning notice about no content (snackbar - use locator to avoid a11y region duplication)
