@@ -139,7 +139,9 @@ test.describe('Error Handling', () => {
 
 		// Verify error notice shows rate limit message (use locator to avoid a11y region duplication)
 		await expect(
-			page.locator('.ai-feedback-error-notice').filter({ hasText: /rate_limit/i })
+			page
+				.locator('.ai-feedback-error-notice')
+				.filter({ hasText: /rate_limit/i })
 		).toBeVisible({
 			timeout: 10000,
 		});
@@ -218,7 +220,10 @@ test.describe('Error Handling', () => {
 
 		// Should show some error state - button should return to normal
 		await expect(
-			page.locator('button.is-primary').filter({ hasText: /Review( Document)?/i }).first()
+			page
+				.locator('button.is-primary')
+				.filter({ hasText: /Review( Document)?/i })
+				.first()
 		).toBeVisible({ timeout: 10000 });
 	});
 

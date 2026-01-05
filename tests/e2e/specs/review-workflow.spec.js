@@ -105,7 +105,9 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		const reviewButton = page.locator('.ai-feedback-panel button.is-primary').first();
+		const reviewButton = page
+			.locator('.ai-feedback-panel button.is-primary')
+			.first();
 		await reviewButton.click();
 
 		// Verify reviewing state

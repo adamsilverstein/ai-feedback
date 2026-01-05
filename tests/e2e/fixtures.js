@@ -23,20 +23,24 @@ class AIFeedbackUtils {
 	 */
 	async openSidebar() {
 		// Specific region for the editor top bar where buttons and menu live
-		const topBar = this.page.getByRole('region', { name: 'Editor top bar' });
+		const topBar = this.page.getByRole('region', {
+			name: 'Editor top bar',
+		});
 
 		// The custom panel inside the sidebar
 		const customPanel = this.page.locator('.ai-feedback-panel');
 
 		// Check if sidebar is already open
-		let isOpen = await customPanel.isVisible().catch(() => false);
+		const isOpen = await customPanel.isVisible().catch(() => false);
 
 		if (!isOpen) {
 			// First, check if the plugin is pinned to the toolbar
 			const pinnedButton = topBar.getByRole('button', {
 				name: 'AI Feedback',
 			});
-			const isPinnedVisible = await pinnedButton.isVisible().catch(() => false);
+			const isPinnedVisible = await pinnedButton
+				.isVisible()
+				.catch(() => false);
 
 			if (isPinnedVisible) {
 				await pinnedButton.click();
@@ -61,7 +65,9 @@ class AIFeedbackUtils {
 
 		// Check for "Loading..." state
 		const loadingText = customPanel.getByText(/Loading/i);
-		const isLoadingVisible = await loadingText.isVisible().catch(() => false);
+		const isLoadingVisible = await loadingText
+			.isVisible()
+			.catch(() => false);
 		if (isLoadingVisible) {
 			await expect(loadingText).toBeHidden({ timeout: 15000 });
 		}
@@ -69,7 +75,9 @@ class AIFeedbackUtils {
 		// Wait for the primary button to be visible
 		// We use a broader selector as backup since text matching can be tricky with i18n
 		const reviewButton = customPanel.locator('button.is-primary');
-		await reviewButton.first().waitFor({ state: 'visible', timeout: 10000 });
+		await reviewButton
+			.first()
+			.waitFor({ state: 'visible', timeout: 10000 });
 	}
 
 	/**
@@ -231,7 +239,7 @@ const test = base.extend({
 	admin: async ({ page, pageUtils, editor }, use) => {
 		await use(new Admin({ page, pageUtils, editor }));
 	},
-	requestUtils: async ({ }, use) => {
+	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {
