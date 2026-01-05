@@ -13,7 +13,7 @@ test.describe('Review Workflow', () => {
 		await aiFeedback.openSidebar();
 
 		// Wait for sidebar to fully load
-		await page.waitForTimeout(500);
+		await page.locator('.ai-feedback-panel').waitFor({ state: 'visible' });
 
 		const panel = page.locator('.ai-feedback-panel');
 		const reviewButton = panel
@@ -135,6 +135,7 @@ test.describe('Review Workflow', () => {
 
 		// Mock the API with feedback
 		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 500));
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -163,22 +164,14 @@ test.describe('Review Workflow', () => {
 		});
 
 		// Start review and wait for completion
-		await aiFeedback.startReviewAndWait();
+		const [response] = await Promise.all([
+			page.waitForResponse('**/wp-json/ai-feedback/v1/review'),
+			aiFeedback.startReviewAndWait(),
+		]);
 
 		// Verify summary appears - look for the summary text from our mock
-		// or any indication that the review completed with feedback
-		const summaryText = page.locator('.ai-feedback-panel').getByText(/1/);
-		const hasSummary = await summaryText.isVisible().catch(() => false);
-
-		// The mock returns summary_text with "Found 1 suggestion for improvement."
-		const suggestionText = page
-			.locator('.ai-feedback-panel')
-			.getByText(/suggestion/i);
-		const hasSuggestion = await suggestionText
-			.isVisible()
-			.catch(() => false);
-
-		expect(hasSummary || hasSuggestion).toBe(true);
+		await expect(page.getByText(/Found 1 suggestion for improvement/i)).toBeVisible({ timeout: 10000 });
+		await expect(page.getByText(/1 feedback item/i)).toBeVisible();
 	});
 
 	test('shows success message when no issues found', async ({
@@ -198,6 +191,7 @@ test.describe('Review Workflow', () => {
 
 		// Mock API with no issues
 		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 500));
 			await route.fulfill({
 				status: 200,
 				contentType: 'application/json',
@@ -217,32 +211,13 @@ test.describe('Review Workflow', () => {
 		});
 
 		// Start review and wait for completion
-		await aiFeedback.startReviewAndWait();
+		const [response] = await Promise.all([
+			page.waitForResponse('**/wp-json/ai-feedback/v1/review'),
+			aiFeedback.startReviewAndWait(),
+		]);
 
-		// Look for success indicator - could be "no issues", "great job", "0 items", etc.
-		const successPatterns = [
-			page.locator('.ai-feedback-panel').getByText(/no issues/i),
-			page.locator('.ai-feedback-panel').getByText(/great job/i),
-			page.locator('.ai-feedback-panel').getByText(/0 feedback/i),
-			page.locator('.ai-feedback-panel').getByText(/no feedback/i),
-		];
-
-		let foundSuccess = false;
-		for (const pattern of successPatterns) {
-			if (await pattern.isVisible().catch(() => false)) {
-				foundSuccess = true;
-				break;
-			}
-		}
-
-		// If no specific success message, check that the review completed
-		// by verifying button is back to normal state
-		if (!foundSuccess) {
-			const reviewButton = page
-				.locator('button.is-primary')
-				.filter({ hasText: /Review( Document)?/i })
-				.first();
-			await expect(reviewButton).toBeEnabled();
-		}
+		// Ensure a success indicator is visible, which also implies the review is complete
+		await expect(page.getByText(/Great job/i)).toBeVisible({ timeout: 10000 });
+		await expect(page.getByText(/no feedback items/i)).toBeVisible();
 	});
 });
