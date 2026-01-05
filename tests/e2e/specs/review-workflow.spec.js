@@ -16,9 +16,10 @@ test.describe('Review Workflow', () => {
 		await page.waitForTimeout(500);
 
 		const panel = page.locator('.ai-feedback-panel');
-		const reviewButton = panel.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
+		const reviewButton = panel
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first();
 
 		// For unsaved posts, the review functionality might:
 		// 1. Show helper text about saving first
@@ -61,9 +62,10 @@ test.describe('Review Workflow', () => {
 			page.getByText('Save your post first to enable review')
 		).not.toBeVisible();
 
-		const reviewButton = page.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
+		const reviewButton = page
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first();
 		await expect(reviewButton).toBeEnabled();
 	});
 
@@ -103,10 +105,8 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		// Click review button
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
+		const reviewButton = page.locator('.ai-feedback-panel button.is-primary').first();
+		await reviewButton.click();
 
 		// Verify reviewing state
 		await expect(
@@ -161,14 +161,8 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
-
-		// Wait for review to complete (button no longer busy)
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Start review and wait for completion
+		await aiFeedback.startReviewAndWait();
 
 		// Verify summary appears - look for the summary text from our mock
 		// or any indication that the review completed with feedback
@@ -221,14 +215,8 @@ test.describe('Review Workflow', () => {
 			});
 		});
 
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.click();
-
-		// Wait for review to complete (button no longer busy)
-		await page
-			.locator('button.is-primary:has-text("Review Document")')
-			.waitFor({ state: 'visible', timeout: 10000 });
+		// Start review and wait for completion
+		await aiFeedback.startReviewAndWait();
 
 		// Look for success indicator - could be "no issues", "great job", "0 items", etc.
 		const successPatterns = [
@@ -249,9 +237,10 @@ test.describe('Review Workflow', () => {
 		// If no specific success message, check that the review completed
 		// by verifying button is back to normal state
 		if (!foundSuccess) {
-			const reviewButton = page.locator(
-				'button.is-primary:has-text("Review Document")'
-			);
+			const reviewButton = page
+				.locator('button.is-primary')
+				.filter({ hasText: /Review( Document)?/i })
+				.first();
 			await expect(reviewButton).toBeEnabled();
 		}
 	});
