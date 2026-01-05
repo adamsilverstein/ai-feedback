@@ -84,6 +84,7 @@ function extractBlockData(blocks) {
 export default function ReviewButton() {
 	const {
 		postId,
+		postStatus,
 		postTitle,
 		editorBlocks,
 		isReviewing,
@@ -93,6 +94,7 @@ export default function ReviewButton() {
 	} = useSelect(
 		(select) => ({
 			postId: select(editorStore).getCurrentPostId(),
+			postStatus: select(editorStore).getEditedPostAttribute('status'),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			editorBlocks: select(blockEditorStore).getBlocks(),
 			isReviewing: select(STORE_NAME).isReviewing(),
@@ -107,7 +109,7 @@ export default function ReviewButton() {
 	const { createWarningNotice } = useDispatch(noticesStore);
 
 	const handleReview = async () => {
-		if (!postId) {
+		if (!postId || postStatus === 'auto-draft') {
 			return;
 		}
 
@@ -140,7 +142,8 @@ export default function ReviewButton() {
 		}
 	};
 
-	const isDisabled = !postId || isReviewing;
+	const isUnsaved = !postId || postStatus === 'auto-draft';
+	const isDisabled = isUnsaved || isReviewing;
 
 	return (
 		<div className="ai-feedback-review-button">
@@ -154,7 +157,7 @@ export default function ReviewButton() {
 					? __('Reviewing…', 'ai-feedback')
 					: __('Review Document', 'ai-feedback')}
 			</Button>
-			{!postId && (
+			{!isReviewing && isUnsaved && (
 				<p className="description">
 					{__('Save your post first to enable review', 'ai-feedback')}
 				</p>

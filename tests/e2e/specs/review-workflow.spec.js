@@ -33,11 +33,10 @@ test.describe('Review Workflow', () => {
 		// Button should exist in the panel
 		expect(buttonExists).toBe(true);
 
-		// The test passes if any of these conditions are met:
+		// The test passes if either of these conditions are met for an unsaved post:
 		// - Helper text is shown
 		// - Button is disabled
-		// - Button exists (the actual review would handle missing post ID)
-		expect(hasHelperText || isDisabled || buttonExists).toBe(true);
+		expect(hasHelperText || isDisabled).toBe(true);
 	});
 
 	test('review button enables after saving post with content', async ({
