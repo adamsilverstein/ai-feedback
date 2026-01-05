@@ -57,9 +57,10 @@ test.describe('Notes Creation', () => {
 
 		// If summary is visible, test passes
 		// If not, the review button should still be functional
-		const reviewButton = panel.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
+		const reviewButton = panel
+			.locator('button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first();
 		const buttonEnabled = await reviewButton.isEnabled().catch(() => false);
 
 		expect(hasSummary || buttonEnabled).toBe(true);
@@ -131,9 +132,10 @@ test.describe('Notes Creation', () => {
 			expect(hasSeveritySection || hasCritical || hasFeedback).toBe(true);
 		} else {
 			// Review completed, button should be functional
-			const reviewButton = panel.locator(
-				'button.is-primary:has-text("Review Document")'
-			);
+			const reviewButton = panel
+				.locator('button.is-primary')
+				.filter({ hasText: /Review( Document)?/i })
+				.first();
 			await expect(reviewButton).toBeEnabled();
 		}
 	});
@@ -245,9 +247,10 @@ test.describe('Notes Creation', () => {
 			expect(hasSummary).toBe(true);
 		} else {
 			// Review completed, button should be functional
-			const reviewButton = panel.locator(
-				'button.is-primary:has-text("Review Document")'
-			);
+			const reviewButton = panel
+				.locator('button.is-primary')
+				.filter({ hasText: /Review( Document)?/i })
+				.first();
 			await expect(reviewButton).toBeEnabled();
 		}
 	});
