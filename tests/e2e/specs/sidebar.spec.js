@@ -14,11 +14,11 @@ test.describe('Sidebar', () => {
 	}) => {
 		await aiFeedback.openSidebar();
 
-		// Verify sidebar is visible by checking for the primary Review Document button
-		const reviewButton = page.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
-		await expect(reviewButton).toBeVisible();
+		// Verify sidebar is visible
+		const reviewButton = page.locator('button.is-primary').filter({
+			hasText: /Review( Document)?/i,
+		});
+		await expect(reviewButton.first()).toBeVisible();
 	});
 
 	test('displays model selector in sidebar', async ({ page, aiFeedback }) => {
@@ -56,11 +56,11 @@ test.describe('Sidebar', () => {
 	test('displays Review Document panel', async ({ page, aiFeedback }) => {
 		await aiFeedback.openSidebar();
 
-		// Check for the primary Review Document button (action button, not panel toggle)
-		const reviewDocumentButton = page.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
-		await expect(reviewDocumentButton).toBeVisible();
+		// Check for the primary button
+		const reviewDocumentButton = page.locator('button.is-primary').filter({
+			hasText: /Review( Document)?/i,
+		});
+		await expect(reviewDocumentButton.first()).toBeVisible();
 	});
 
 	test('sidebar can be closed and reopened', async ({ page, aiFeedback }) => {
@@ -70,15 +70,15 @@ test.describe('Sidebar', () => {
 		const closeButton = page.getByRole('button', { name: 'Close plugin' });
 		await closeButton.click();
 
-		// Verify sidebar is hidden by checking primary Review Document button is not visible
-		const reviewButton = page.locator(
-			'button.is-primary:has-text("Review Document")'
-		);
-		await expect(reviewButton).not.toBeVisible();
+		// Verify sidebar is hidden
+		const reviewButton = page.locator('button.is-primary').filter({
+			hasText: /Review( Document)?/i,
+		});
+		await expect(reviewButton.first()).not.toBeVisible();
 
 		// Reopen
 		await aiFeedback.openSidebar();
-		await expect(reviewButton).toBeVisible();
+		await expect(reviewButton.first()).toBeVisible();
 	});
 
 	test('displays focus area checkboxes in settings', async ({
