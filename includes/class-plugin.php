@@ -7,10 +7,16 @@
 
 namespace AI_Feedback;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+
 /**
  * Main plugin bootstrap class.
  */
 class Plugin {
+
 
 
 	/**
@@ -73,23 +79,11 @@ class Plugin {
 	 * Initialize hooks.
 	 */
 	private function init_hooks(): void {
-		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
 		// Add custom avatar for AI Feedback comments/notes.
 		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
-	}
-
-	/**
-	 * Load plugin textdomain.
-	 */
-	public function load_textdomain(): void {
-		load_plugin_textdomain(
-			'ai-feedback',
-			false,
-			dirname( AI_FEEDBACK_PLUGIN_BASENAME ) . '/languages'
-		);
 	}
 
 	/**

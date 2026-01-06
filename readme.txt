@@ -1,6 +1,6 @@
 === AI Feedback ===
 Contributors: adamsilverstein
-Tags: ai, gutenberg, feedback, editorial, block-editor, notes
+Tags: ai, gutenberg, feedback, block-editor, notes
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 8.0
