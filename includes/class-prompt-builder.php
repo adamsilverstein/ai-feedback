@@ -279,13 +279,12 @@ INSTRUCTION;
 	}
 
 	/**
-	 * Get language instruction for the AI based on locale.
+	 * Get default language configurations.
 	 *
-	 * @param  string $locale WordPress locale code.
-	 * @return string Language instruction for the prompt.
+	 * @return array Language configurations.
 	 */
-	private function get_language_instruction( string $locale ): string {
-		$language_configs = array(
+	private function get_default_language_configs(): array {
+		return array(
 			'es_ES' => array(
 				'name'        => 'Spanish',
 				'instruction' => 'Provide all feedback in Spanish. Apply Spanish grammar and style conventions. Consider RAE (Real Academia Española) guidelines.',
@@ -319,6 +318,16 @@ INSTRUCTION;
 				'instruction' => 'Provide all feedback in Simplified Chinese.',
 			),
 		);
+	}
+
+	/**
+	 * Get language instruction for the AI based on locale.
+	 *
+	 * @param  string $locale WordPress locale code.
+	 * @return string Language instruction for the prompt.
+	 */
+	private function get_language_instruction( string $locale ): string {
+		$language_configs = $this->get_default_language_configs();
 
 		// Allow filtering of language configurations.
 		$language_configs = apply_filters( 'ai_feedback_language_configs', $language_configs );

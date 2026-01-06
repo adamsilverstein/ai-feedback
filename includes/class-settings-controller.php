@@ -370,7 +370,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return array
 	 */
 	private function get_available_locales(): array {
-		return array(
+		$locales = array(
 			array(
 				'id'    => 'auto',
 				'label' => __( 'Match WordPress locale', 'ai-feedback' ),
@@ -379,38 +379,51 @@ class Settings_Controller extends WP_REST_Controller {
 				'id'    => 'en_US',
 				'label' => 'English',
 			),
-			array(
-				'id'    => 'es_ES',
-				'label' => 'Español',
-			),
-			array(
-				'id'    => 'fr_FR',
-				'label' => 'Français',
-			),
-			array(
-				'id'    => 'de_DE',
-				'label' => 'Deutsch',
-			),
-			array(
-				'id'    => 'it_IT',
-				'label' => 'Italiano',
-			),
-			array(
-				'id'    => 'pt_BR',
-				'label' => 'Português (Brasil)',
-			),
-			array(
-				'id'    => 'nl_NL',
-				'label' => 'Nederlands',
-			),
-			array(
-				'id'    => 'ja',
-				'label' => '日本語',
-			),
-			array(
-				'id'    => 'zh_CN',
-				'label' => '简体中文',
-			),
+		);
+
+		// Get language configs from prompt builder to ensure consistency.
+		$language_configs = apply_filters( 'ai_feedback_language_configs', $this->get_default_language_configs() );
+
+		// Map language configs to locale options.
+		$locale_labels = array(
+			'es_ES' => 'Español',
+			'fr_FR' => 'Français',
+			'de_DE' => 'Deutsch',
+			'it_IT' => 'Italiano',
+			'pt_BR' => 'Português (Brasil)',
+			'nl_NL' => 'Nederlands',
+			'ja'    => '日本語',
+			'zh_CN' => '简体中文',
+		);
+
+		foreach ( array_keys( $language_configs ) as $locale_id ) {
+			if ( isset( $locale_labels[ $locale_id ] ) ) {
+				$locales[] = array(
+					'id'    => $locale_id,
+					'label' => $locale_labels[ $locale_id ],
+				);
+			}
+		}
+
+		return $locales;
+	}
+
+	/**
+	 * Get default language configurations.
+	 * This mirrors the configurations in Prompt_Builder to ensure consistency.
+	 *
+	 * @return array Language configurations.
+	 */
+	private function get_default_language_configs(): array {
+		return array(
+			'es_ES' => array( 'name' => 'Spanish' ),
+			'fr_FR' => array( 'name' => 'French' ),
+			'de_DE' => array( 'name' => 'German' ),
+			'it_IT' => array( 'name' => 'Italian' ),
+			'pt_BR' => array( 'name' => 'Brazilian Portuguese' ),
+			'nl_NL' => array( 'name' => 'Dutch' ),
+			'ja'    => array( 'name' => 'Japanese' ),
+			'zh_CN' => array( 'name' => 'Simplified Chinese' ),
 		);
 	}
 
