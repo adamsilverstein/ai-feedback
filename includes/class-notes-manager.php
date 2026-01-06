@@ -342,7 +342,7 @@ class Notes_Manager {
 				'author_name' => $comment->comment_author,
 				'content'     => array(
 					'raw'      => $comment->comment_content,
-					'rendered' => apply_filters( 'comment_text', $comment->comment_content, $comment ),
+					'rendered' => wp_kses_post( $comment->comment_content ),
 				),
 				'date'        => $comment->comment_date,
 				'type'        => $comment->comment_type,
@@ -483,7 +483,7 @@ class Notes_Manager {
 			'author_name' => $comment->comment_author,
 			'content'     => array(
 				'raw'      => $comment->comment_content,
-				'rendered' => apply_filters( 'comment_text', $comment->comment_content, $comment ),
+				'rendered' => wp_kses_post( $comment->comment_content ),
 			),
 			'date'        => $comment->comment_date,
 			'type'        => $comment->comment_type,
