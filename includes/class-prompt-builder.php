@@ -47,66 +47,49 @@ class Prompt_Builder {
 		$continuation_instructions = '';
 		if ( ! empty( $existing_feedback ) ) {
 			$existing_feedback_section = $this->format_existing_feedback( $existing_feedback );
-			$continuation_instructions = <<<CONT
-
-CONTINUATION REVIEW INSTRUCTIONS:
-- This is a follow-up review. Previous feedback and user responses are provided below.
-- Do NOT repeat feedback that has already been given unless the issue persists after user addressed it.
-- Focus on NEW issues or issues that weren't fully addressed in previous feedback.
-- Consider user responses when determining if issues have been resolved.
-- If a user has responded to feedback, check if their changes adequately address the concern.
-
-PREVIOUS FEEDBACK AND RESPONSES:
-{$existing_feedback_section}
-CONT;
+			$continuation_instructions = "\n\nCONTINUATION REVIEW INSTRUCTIONS:\n";
+			$continuation_instructions .= "- This is a follow-up review. Previous feedback and user responses are provided below.\n";
+			$continuation_instructions .= "- Do NOT repeat feedback that has already been given unless the issue persists after user addressed it.\n";
+			$continuation_instructions .= "- Focus on NEW issues or issues that weren't fully addressed in previous feedback.\n";
+			$continuation_instructions .= "- Consider user responses when determining if issues have been resolved.\n";
+			$continuation_instructions .= "- If a user has responded to feedback, check if their changes adequately address the concern.\n\n";
+			$continuation_instructions .= "PREVIOUS FEEDBACK AND RESPONSES:\n";
+			$continuation_instructions .= $existing_feedback_section;
 		}
 
 		// Construct the full prompt.
-		$prompt = <<<PROMPT
-Please review the following document and provide actionable editorial feedback.
-
-DOCUMENT TITLE: {$options['post_title']}
-
-DOCUMENT BLOCKS:
-{$document_blocks}
-
-FOCUS AREAS:
-{$focus_instructions}
-
-TARGET TONE:
-{$tone_guidance}
-{$continuation_instructions}
-
-INSTRUCTIONS:
-- Provide specific, actionable feedback for each issue you identify
-- Reference blocks by their block_id (the unique identifier shown for each block)
-- Prioritize the most impactful suggestions
-- Be encouraging but honest
-- Each feedback item should explain WHY it matters and HOW to improve it
-- Include an overall summary of the document quality
-
-OUTPUT FORMAT:
-Return your response as a JSON object with two properties: "summary" and "feedback".
-
-{
-  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",
-  "feedback": [
-    {
-      "block_id": "abc123-def456",
-      "category": "content|tone|flow|design",
-      "severity": "suggestion|important|critical",
-      "title": "Brief title (max 50 chars)",
-      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",
-      "suggestion": "Specific action to take (max 200 chars, optional)"
-    }
-  ]
-}
-
-IMPORTANT:
-- The "block_id" must exactly match one of the block IDs provided in the document
-- Return ONLY valid JSON, no additional text or explanation
-- If no feedback is needed for a block, don't include it in the array
-PROMPT;
+		$prompt = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
+		$prompt .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
+		$prompt .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
+		$prompt .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
+		$prompt .= "TARGET TONE:\n" . $tone_guidance;
+		$prompt .= $continuation_instructions . "\n\n";
+		$prompt .= "INSTRUCTIONS:\n";
+		$prompt .= "- Provide specific, actionable feedback for each issue you identify\n";
+		$prompt .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
+		$prompt .= "- Prioritize the most impactful suggestions\n";
+		$prompt .= "- Be encouraging but honest\n";
+		$prompt .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
+		$prompt .= "- Include an overall summary of the document quality\n\n";
+		$prompt .= "OUTPUT FORMAT:\n";
+		$prompt .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
+		$prompt .= "{\n";
+		$prompt .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
+		$prompt .= '  "feedback": [' . "\n";
+		$prompt .= "    {\n";
+		$prompt .= '      "block_id": "abc123-def456",' . "\n";
+		$prompt .= '      "category": "content|tone|flow|design",' . "\n";
+		$prompt .= '      "severity": "suggestion|important|critical",' . "\n";
+		$prompt .= '      "title": "Brief title (max 50 chars)",' . "\n";
+		$prompt .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
+		$prompt .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
+		$prompt .= "    }\n";
+		$prompt .= "  ]\n";
+		$prompt .= "}\n\n";
+		$prompt .= "IMPORTANT:\n";
+		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
+		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
+		$prompt .= "- If no feedback is needed for a block, don't include it in the array";
 
 		return $prompt;
 	}
@@ -118,28 +101,21 @@ PROMPT;
 	 * @return string System instruction.
 	 */
 	public function get_system_instruction( bool $is_continuation = false ): string {
-		$base_instruction = <<<'INSTRUCTION'
-You are a concise editorial assistant. Follow these rules strictly:
-
-BREVITY:
-- Title: Max 5 words, start with action verb (e.g., "Add supporting evidence")
-- Feedback: Max 2 sentences explaining the issue
-- Suggestion: One specific, actionable step with example text
-
-ACTIONABILITY:
-- Provide specific replacement text when possible
-- Never use vague phrases like "improve clarity" or "consider revising"
-
-SEVERITY:
-- critical: Factual errors, confusing content
-- important: Weak arguments, tone issues
-- suggestion: Style polish, formatting
-
-GOOD: {"title":"Add data source","feedback":"Claim lacks evidence.","suggestion":"Add: 'Users grew 40% (Source: Analytics)'"}
-BAD: {"title":"Improve writing","feedback":"Could be better.","suggestion":"Consider revising."}
-
-Output valid JSON only.
-INSTRUCTION;
+		$base_instruction = "You are a concise editorial assistant. Follow these rules strictly:\n\n";
+		$base_instruction .= "BREVITY:\n";
+		$base_instruction .= '- Title: Max 5 words, start with action verb (e.g., "Add supporting evidence")' . "\n";
+		$base_instruction .= "- Feedback: Max 2 sentences explaining the issue\n";
+		$base_instruction .= "- Suggestion: One specific, actionable step with example text\n\n";
+		$base_instruction .= "ACTIONABILITY:\n";
+		$base_instruction .= "- Provide specific replacement text when possible\n";
+		$base_instruction .= '- Never use vague phrases like "improve clarity" or "consider revising"' . "\n\n";
+		$base_instruction .= "SEVERITY:\n";
+		$base_instruction .= "- critical: Factual errors, confusing content\n";
+		$base_instruction .= "- important: Weak arguments, tone issues\n";
+		$base_instruction .= "- suggestion: Style polish, formatting\n\n";
+		$base_instruction .= 'GOOD: {"title":"Add data source","feedback":"Claim lacks evidence.","suggestion":"Add: \'Users grew 40% (Source: Analytics)\'"}' . "\n";
+		$base_instruction .= 'BAD: {"title":"Improve writing","feedback":"Could be better.","suggestion":"Consider revising."}' . "\n\n";
+		$base_instruction .= 'Output valid JSON only.';
 
 		if ( $is_continuation ) {
 			$base_instruction .= "\n\nCONTINUATION REVIEW RULES:\n";
