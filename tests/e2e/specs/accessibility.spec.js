@@ -198,12 +198,8 @@ test.describe('Accessibility', () => {
 		const notice = page.locator('.components-notice.is-error');
 		await expect(notice).toBeVisible({ timeout: 10000 });
 
-		// Verify the notice has proper styling for error state
-		// WordPress notice component uses is-error class for visual indication
-		const hasErrorClass = await notice.evaluate((el) =>
-			el.classList.contains('is-error')
-		);
-		expect(hasErrorClass).toBe(true);
+		// Verify the notice has proper role for screen readers
+		await expect(notice).toHaveAttribute('role', 'alert');
 	});
 
 	test('panels can be expanded with keyboard', async ({
