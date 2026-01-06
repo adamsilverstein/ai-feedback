@@ -72,6 +72,21 @@ class AIFeedbackUtils {
 			await expect(loadingText).toBeHidden({ timeout: 15000 });
 		}
 
+		// Dismiss the welcome modal if it appears (shown on first use)
+		const welcomeModal = this.page.getByRole('dialog', {
+			name: 'Welcome to AI Feedback',
+		});
+		const isWelcomeModalVisible = await welcomeModal
+			.isVisible()
+			.catch(() => false);
+		if (isWelcomeModalVisible) {
+			await this.page
+				.getByRole('button', { name: 'Get Started' })
+				.click();
+			// Wait for modal to close
+			await welcomeModal.waitFor({ state: 'hidden', timeout: 5000 });
+		}
+
 		// Wait for the primary button to be visible
 		// We use a broader selector as backup since text matching can be tricky with i18n
 		const reviewButton = customPanel.locator('button.is-primary');
