@@ -10,10 +10,12 @@ export const initialState = {
 		defaultModel: 'claude-sonnet-4',
 		defaultFocusAreas: ['content', 'tone', 'flow'],
 		defaultTone: 'professional',
+		feedbackLocale: 'auto',
 	},
 	availableModels: [],
 	availableFocusAreas: [],
 	availableTones: [],
+	availableLocales: [],
 	isReviewing: false,
 	lastReview: null,
 	reviewHistory: [],
@@ -32,6 +34,7 @@ export const TYPES = {
 	SET_AVAILABLE_MODELS: 'SET_AVAILABLE_MODELS',
 	SET_AVAILABLE_FOCUS_AREAS: 'SET_AVAILABLE_FOCUS_AREAS',
 	SET_AVAILABLE_TONES: 'SET_AVAILABLE_TONES',
+	SET_AVAILABLE_LOCALES: 'SET_AVAILABLE_LOCALES',
 	START_REVIEW: 'START_REVIEW',
 	REVIEW_SUCCESS: 'REVIEW_SUCCESS',
 	REVIEW_ERROR: 'REVIEW_ERROR',
@@ -59,11 +62,14 @@ export default function reducer(state = initialState, action) {
 					defaultModel: action.settings.default_model,
 					defaultFocusAreas: action.settings.default_focus_areas,
 					defaultTone: action.settings.default_tone,
+					feedbackLocale:
+						action.settings.feedback_locale || 'auto',
 				},
 				availableModels: action.settings.available_models || [],
 				availableFocusAreas:
 					action.settings.available_focus_areas || [],
 				availableTones: action.settings.available_tones || [],
+				availableLocales: action.settings.available_locales || [],
 				isLoadingSettings: false,
 			};
 
@@ -92,6 +98,12 @@ export default function reducer(state = initialState, action) {
 			return {
 				...state,
 				availableTones: action.tones,
+			};
+
+		case TYPES.SET_AVAILABLE_LOCALES:
+			return {
+				...state,
+				availableLocales: action.locales,
 			};
 
 		case TYPES.START_REVIEW:

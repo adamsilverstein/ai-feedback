@@ -109,9 +109,11 @@ class Settings_Controller extends WP_REST_Controller {
 			'default_model'         => get_option( 'ai_feedback_default_model', 'claude-sonnet-4' ),
 			'default_focus_areas'   => get_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
 			'default_tone'          => get_option( 'ai_feedback_default_tone', 'professional' ),
+			'feedback_locale'       => get_option( 'ai_feedback_feedback_locale', 'auto' ),
 			'available_models'      => $this->get_available_models(),
 			'available_focus_areas' => $this->get_available_focus_areas(),
 			'available_tones'       => $this->get_available_tones(),
+			'available_locales'     => $this->get_available_locales(),
 		);
 
 		return rest_ensure_response( $settings );
@@ -183,6 +185,23 @@ class Settings_Controller extends WP_REST_Controller {
 			$updated['default_tone'] = $tone;
 		}
 
+		// Update feedback locale if provided.
+		if ( $request->has_param( 'feedback_locale' ) ) {
+			$locale = sanitize_text_field( $request->get_param( 'feedback_locale' ) );
+
+			// Validate locale.
+			if ( ! $this->is_valid_locale( $locale ) ) {
+				return new WP_Error(
+					'invalid_locale',
+					__( 'The specified locale is not available.', 'ai-feedback' ),
+					array( 'status' => 400 )
+				);
+			}
+
+			update_option( 'ai_feedback_feedback_locale', $locale );
+			$updated['feedback_locale'] = $locale;
+		}
+
 		// Return updated settings.
 		return $this->get_settings( $request );
 	}
@@ -227,6 +246,11 @@ class Settings_Controller extends WP_REST_Controller {
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 				'validate_callback' => array( $this, 'is_valid_tone' ),
+			),
+			'feedback_locale'     => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+				'validate_callback' => array( $this, 'is_valid_locale' ),
 			),
 		);
 	}
@@ -341,6 +365,56 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
+	 * Get available locales for feedback.
+	 *
+	 * @return array
+	 */
+	private function get_available_locales(): array {
+		return array(
+			array(
+				'id'    => 'auto',
+				'label' => __( 'Match WordPress locale', 'ai-feedback' ),
+			),
+			array(
+				'id'    => 'en_US',
+				'label' => 'English',
+			),
+			array(
+				'id'    => 'es_ES',
+				'label' => 'Español',
+			),
+			array(
+				'id'    => 'fr_FR',
+				'label' => 'Français',
+			),
+			array(
+				'id'    => 'de_DE',
+				'label' => 'Deutsch',
+			),
+			array(
+				'id'    => 'it_IT',
+				'label' => 'Italiano',
+			),
+			array(
+				'id'    => 'pt_BR',
+				'label' => 'Português (Brasil)',
+			),
+			array(
+				'id'    => 'nl_NL',
+				'label' => 'Nederlands',
+			),
+			array(
+				'id'    => 'ja',
+				'label' => '日本語',
+			),
+			array(
+				'id'    => 'zh_CN',
+				'label' => '简体中文',
+			),
+		);
+	}
+
+	/**
 	 * Check if model is valid.
 	 *
 	 * @param  string $model Model ID.
@@ -374,5 +448,17 @@ class Settings_Controller extends WP_REST_Controller {
 		$tones    = $this->get_available_tones();
 		$tone_ids = array_column( $tones, 'id' );
 		return in_array( $tone, $tone_ids, true );
+	}
+
+	/**
+	 * Check if locale is valid.
+	 *
+	 * @param  string $locale Locale code.
+	 * @return bool
+	 */
+	public function is_valid_locale( string $locale ): bool {
+		$locales    = $this->get_available_locales();
+		$locale_ids = array_column( $locales, 'id' );
+		return in_array( $locale, $locale_ids, true );
 	}
 }
