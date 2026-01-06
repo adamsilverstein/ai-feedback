@@ -62,8 +62,7 @@ export default function reducer(state = initialState, action) {
 					defaultModel: action.settings.default_model,
 					defaultFocusAreas: action.settings.default_focus_areas,
 					defaultTone: action.settings.default_tone,
-					feedbackLocale:
-						action.settings.feedback_locale || 'auto',
+					feedbackLocale: action.settings.feedback_locale || 'auto',
 				},
 				availableModels: action.settings.available_models || [],
 				availableFocusAreas:

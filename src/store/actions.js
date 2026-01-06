@@ -84,14 +84,14 @@ export function* updateSettings(settings) {
 /**
  * Start a document review.
  *
- * @param {Object} options              Review options.
- * @param {number} options.postId       Post ID to review.
- * @param {string} options.title        Post title from editor.
- * @param {Array}  options.blocks       Blocks with clientIds and content.
- * @param {string} options.model        AI model to use.
- * @param {Array}  options.focusAreas   Focus areas.
- * @param {string} options.targetTone   Target tone.
- * @param {string} options.locale       Feedback locale.
+ * @param {Object} options            Review options.
+ * @param {number} options.postId     Post ID to review.
+ * @param {string} options.title      Post title from editor.
+ * @param {Array}  options.blocks     Blocks with clientIds and content.
+ * @param {string} options.model      AI model to use.
+ * @param {Array}  options.focusAreas Focus areas.
+ * @param {string} options.targetTone Target tone.
+ * @param {string} options.locale     Feedback locale.
  * @return {Object} Action object.
  */
 export function* startReview({
