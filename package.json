@@ -24,8 +24,17 @@
 		"node": ">=18.0.0",
 		"npm": ">=9.0.0"
 	},
+	"files": [
+		"ai-feedback.php",
+		"includes/",
+		"build/",
+		"assets/",
+		"readme.txt",
+		".wordpress-org/"
+	],
 	"main": "build/index.js",
 	"dependencies": {
+		"@wordpress/a11y": "^4.37.0",
 		"@wordpress/api-fetch": "^7.36.0",
 		"@wordpress/block-editor": "^15.10.0",
 		"@wordpress/components": "^30.9.0",

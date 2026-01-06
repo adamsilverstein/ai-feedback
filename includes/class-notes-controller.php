@@ -20,6 +20,7 @@ class Notes_Controller extends WP_REST_Controller {
 
 
 
+
 	/**
 	 * Namespace.
 	 *
@@ -150,6 +151,46 @@ class Notes_Controller extends WP_REST_Controller {
 							'required'          => true,
 							'type'              => 'string',
 							'sanitize_callback' => 'sanitize_text_field',
+						),
+					),
+				),
+			)
+		);
+
+		// Get latest review for a post.
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/post/(?P<post_id>\d+)/latest-review',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_latest_review' ),
+					'permission_callback' => array( $this, 'get_notes_permissions_check' ),
+					'args'                => array(
+						'post_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+			)
+		);
+
+		// Get feedback history for continuation reviews.
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/post/(?P<post_id>\d+)/feedback-history',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_feedback_history' ),
+					'permission_callback' => array( $this, 'get_notes_permissions_check' ),
+					'args'                => array(
+						'post_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
 						),
 					),
 				),
@@ -299,6 +340,80 @@ class Notes_Controller extends WP_REST_Controller {
 				'success'   => true,
 				'review_id' => $review_id,
 				'deleted'   => $deleted_count,
+			)
+		);
+	}
+
+	/**
+	 * Get the latest review for a post.
+	 *
+	 * Returns the most recent review data reconstructed from persisted notes.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_latest_review( WP_REST_Request $request ) {
+		$post_id = $request->get_param( 'post_id' );
+
+		// Verify post exists.
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return new WP_Error(
+				'invalid_post',
+				__( 'Post not found.', 'ai-feedback' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$review = $this->notes_manager->get_latest_review_for_post( $post_id );
+
+		if ( null === $review ) {
+			return rest_ensure_response(
+				array(
+					'has_review' => false,
+					'review'     => null,
+				)
+			);
+		}
+
+		return rest_ensure_response(
+			array(
+				'has_review' => true,
+				'review'     => $review,
+			)
+		);
+	}
+
+	/**
+	 * Get feedback history for continuation reviews.
+	 *
+	 * Returns all unresolved AI feedback notes with their user replies
+	 * for inclusion in continuation review prompts.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_feedback_history( WP_REST_Request $request ) {
+		$post_id = $request->get_param( 'post_id' );
+
+		// Verify post exists.
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return new WP_Error(
+				'invalid_post',
+				__( 'Post not found.', 'ai-feedback' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		// Get unresolved notes with their replies.
+		$notes = $this->notes_manager->get_notes_with_replies( $post_id, true );
+
+		return rest_ensure_response(
+			array(
+				'notes'       => $notes,
+				'total'       => count( $notes ),
+				'has_history' => count( $notes ) > 0,
 			)
 		);
 	}

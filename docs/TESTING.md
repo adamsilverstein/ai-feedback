@@ -35,7 +35,6 @@ tests/
 │   │   ├── AIFeedbackPanel.test.js
 │   │   ├── ModelSelector.test.js
 │   │   ├── ReviewButton.test.js
-│   │   ├── SettingsPanel.test.js
 │   │   └── ReviewHistory.test.js
 │   ├── hooks/
 │   │   ├── useReview.test.js

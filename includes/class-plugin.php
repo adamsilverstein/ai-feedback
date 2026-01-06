@@ -7,10 +7,17 @@
 
 namespace AI_Feedback;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+
 /**
  * Main plugin bootstrap class.
  */
 class Plugin {
+
+
 
 	/**
 	 * Plugin instance.
@@ -72,23 +79,11 @@ class Plugin {
 	 * Initialize hooks.
 	 */
 	private function init_hooks(): void {
-		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
 		// Add custom avatar for AI Feedback comments/notes.
 		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
-	}
-
-	/**
-	 * Load plugin textdomain.
-	 */
-	public function load_textdomain(): void {
-		load_plugin_textdomain(
-			'ai-feedback',
-			false,
-			dirname( AI_FEEDBACK_PLUGIN_BASENAME ) . '/languages'
-		);
 	}
 
 	/**
@@ -180,9 +175,9 @@ class Plugin {
 	/**
 	 * Filter avatar data to show custom avatar for AI Feedback comments/notes.
 	 *
-	 * @param array $args        Arguments for getting avatar data.
-	 * @param mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
-	 *                           user email, WP_User object, WP_Post object, or WP_Comment object.
+	 * @param  array $args        Arguments for getting avatar data.
+	 * @param  mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
+	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
 	 * @return array Modified avatar args with custom URL for AI Feedback.
 	 */
 	public function filter_ai_feedback_avatar( array $args, $id_or_email ): array {
@@ -196,7 +191,7 @@ class Plugin {
 		// Check if this is an AI Feedback comment.
 		// Method 1: Check the comment author name (current translated or legacy untranslated).
 		$is_ai_feedback = ( self::get_ai_feedback_author() === $comment->comment_author )
-			|| ( 'AI Feedback' === $comment->comment_author ); // Backward compatibility with untranslated strings.
+		|| ( 'AI Feedback' === $comment->comment_author ); // Backward compatibility with untranslated strings.
 
 		// Method 2: Check comment meta for ai_feedback flag.
 		if ( ! $is_ai_feedback && $comment->comment_ID ) {

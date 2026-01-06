@@ -2,6 +2,20 @@
  * AI Feedback Plugin Styles
  */
 
+/* Screen reader only text - visually hidden but available to assistive technologies */
+.screen-reader-text {
+	border: 0;
+	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	width: 1px;
+	word-wrap: normal;
+}
+
 .ai-feedback-panel {
 	padding: 16px;
 
@@ -247,5 +261,102 @@
 			font-size: 13px;
 			color: #856404;
 		}
+	}
+}
+
+.ai-feedback-empty-state {
+	text-align: center;
+	padding: 24px 16px;
+
+	.ai-feedback-empty-icon {
+		margin-bottom: 16px;
+		color: #757575;
+	}
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	h4 {
+		margin: 0 0 8px;
+		font-size: 1.1em;
+	}
+
+	.ai-feedback-empty-description {
+		color: #666;
+		margin-bottom: 20px;
+	}
+
+	.ai-feedback-empty-prereq {
+		text-align: left;
+		background: #f0f0f0;
+		padding: 16px;
+		border-radius: 4px;
+		margin-bottom: 16px;
+
+		/* stylelint-disable-next-line no-descending-specificity */
+		h5 {
+			margin: 0 0 12px;
+		}
+
+		ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+
+			li {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 8px 0;
+			}
+		}
+	}
+}
+
+/* Welcome Modal Styles */
+.ai-feedback-welcome-modal {
+	max-width: 500px;
+
+	.ai-feedback-welcome-intro {
+		font-size: 1.1em;
+		margin-bottom: 1.5em;
+	}
+
+	.ai-feedback-welcome-prereq {
+		margin-top: 16px;
+
+		h3 {
+			margin: 0 0 12px;
+			font-size: 14px;
+			font-weight: 600;
+		}
+	}
+
+	.ai-feedback-welcome-steps {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	.ai-feedback-welcome-steps li {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 0;
+		border-bottom: 1px solid #ddd;
+
+		svg {
+			fill: var(--wp-admin-theme-color, #007cba);
+		}
+	}
+
+	.ai-feedback-welcome-actions {
+		display: flex;
+		gap: 12px;
+		margin-top: 24px;
+		justify-content: flex-end;
+	}
+
+	.components-notice {
+		margin: 0 0 16px;
 	}
 }

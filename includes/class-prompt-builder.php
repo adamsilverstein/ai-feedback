@@ -15,14 +15,17 @@ namespace AI_Feedback;
 class Prompt_Builder {
 
 
+
+
 	/**
 	 * Build a review prompt for the AI.
 	 *
-	 * @param  array $blocks  Blocks with clientId, name, and content from the editor.
-	 * @param  array $options Review options.
+	 * @param  array $blocks            Blocks with clientId, name, and content from the editor.
+	 * @param  array $options           Review options.
+	 * @param  array $existing_feedback Optional existing feedback for continuation reviews.
 	 * @return string The constructed prompt.
 	 */
-	public function build_review_prompt( array $blocks, array $options = array() ): string {
+	public function build_review_prompt( array $blocks, array $options = array(), array $existing_feedback = array() ): string {
 		$defaults = array(
 			'focus_areas' => array( 'content', 'tone', 'flow' ),
 			'target_tone' => 'professional',
@@ -40,51 +43,54 @@ class Prompt_Builder {
 		// Build tone guidance.
 		$tone_guidance = $this->build_tone_guidance( $options['target_tone'] );
 
+		// Build existing feedback section for continuation reviews.
+		$existing_feedback_section = '';
+		$continuation_instructions = '';
+		if ( ! empty( $existing_feedback ) ) {
+			$existing_feedback_section  = $this->format_existing_feedback( $existing_feedback );
+			$continuation_instructions  = "\n\nCONTINUATION REVIEW INSTRUCTIONS:\n";
+			$continuation_instructions .= "- This is a follow-up review. Previous feedback and user responses are provided below.\n";
+			$continuation_instructions .= "- Do NOT repeat feedback that has already been given unless the issue persists after user addressed it.\n";
+			$continuation_instructions .= "- Focus on NEW issues or issues that weren't fully addressed in previous feedback.\n";
+			$continuation_instructions .= "- Consider user responses when determining if issues have been resolved.\n";
+			$continuation_instructions .= "- If a user has responded to feedback, check if their changes adequately address the concern.\n\n";
+			$continuation_instructions .= "PREVIOUS FEEDBACK AND RESPONSES:\n";
+			$continuation_instructions .= $existing_feedback_section;
+		}
+
 		// Construct the full prompt.
-		$prompt = <<<PROMPT
-Please review the following document and provide actionable editorial feedback.
-
-DOCUMENT TITLE: {$options['post_title']}
-
-DOCUMENT BLOCKS:
-{$document_blocks}
-
-FOCUS AREAS:
-{$focus_instructions}
-
-TARGET TONE:
-{$tone_guidance}
-
-INSTRUCTIONS:
-- Provide specific, actionable feedback for each issue you identify
-- Reference blocks by their block_id (the unique identifier shown for each block)
-- Prioritize the most impactful suggestions
-- Be encouraging but honest
-- Each feedback item should explain WHY it matters and HOW to improve it
-- Include an overall summary of the document quality
-
-OUTPUT FORMAT:
-Return your response as a JSON object with two properties: "summary" and "feedback".
-
-{
-  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",
-  "feedback": [
-    {
-      "block_id": "abc123-def456",
-      "category": "content|tone|flow|design",
-      "severity": "suggestion|important|critical",
-      "title": "Brief title (max 50 chars)",
-      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",
-      "suggestion": "Specific action to take (max 200 chars, optional)"
-    }
-  ]
-}
-
-IMPORTANT:
-- The "block_id" must exactly match one of the block IDs provided in the document
-- Return ONLY valid JSON, no additional text or explanation
-- If no feedback is needed for a block, don't include it in the array
-PROMPT;
+		$prompt  = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
+		$prompt .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
+		$prompt .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
+		$prompt .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
+		$prompt .= "TARGET TONE:\n" . $tone_guidance;
+		$prompt .= $continuation_instructions . "\n\n";
+		$prompt .= "INSTRUCTIONS:\n";
+		$prompt .= "- Provide specific, actionable feedback for each issue you identify\n";
+		$prompt .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
+		$prompt .= "- Prioritize the most impactful suggestions\n";
+		$prompt .= "- Be encouraging but honest\n";
+		$prompt .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
+		$prompt .= "- Include an overall summary of the document quality\n\n";
+		$prompt .= "OUTPUT FORMAT:\n";
+		$prompt .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
+		$prompt .= "{\n";
+		$prompt .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
+		$prompt .= '  "feedback": [' . "\n";
+		$prompt .= "    {\n";
+		$prompt .= '      "block_id": "abc123-def456",' . "\n";
+		$prompt .= '      "category": "content|tone|flow|design",' . "\n";
+		$prompt .= '      "severity": "suggestion|important|critical",' . "\n";
+		$prompt .= '      "title": "Brief title (max 50 chars)",' . "\n";
+		$prompt .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
+		$prompt .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
+		$prompt .= "    }\n";
+		$prompt .= "  ]\n";
+		$prompt .= "}\n\n";
+		$prompt .= "IMPORTANT:\n";
+		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
+		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
+		$prompt .= "- If no feedback is needed for a block, don't include it in the array";
 
 		return $prompt;
 	}
@@ -92,22 +98,96 @@ PROMPT;
 	/**
 	 * Get system instruction for the AI.
 	 *
+	 * @param  bool $is_continuation Whether this is a continuation review.
 	 * @return string System instruction.
 	 */
-	public function get_system_instruction(): string {
-		return <<<'INSTRUCTION'
-You are an expert editorial assistant reviewing content in WordPress. Your role is to provide concise, actionable feedback on content quality, tone, flow, and design.
+	public function get_system_instruction( bool $is_continuation = false ): string {
+		$base_instruction  = "You are a concise editorial assistant. Follow these rules strictly:\n\n";
+		$base_instruction .= "BREVITY:\n";
+		$base_instruction .= '- Title: Max 5 words, start with action verb (e.g., "Add supporting evidence")' . "\n";
+		$base_instruction .= "- Feedback: Max 2 sentences explaining the issue\n";
+		$base_instruction .= "- Suggestion: One specific, actionable step with example text\n\n";
+		$base_instruction .= "ACTIONABILITY:\n";
+		$base_instruction .= "- Provide specific replacement text when possible\n";
+		$base_instruction .= '- Never use vague phrases like "improve clarity" or "consider revising"' . "\n\n";
+		$base_instruction .= "SEVERITY:\n";
+		$base_instruction .= "- critical: Factual errors, confusing content\n";
+		$base_instruction .= "- important: Weak arguments, tone issues\n";
+		$base_instruction .= "- suggestion: Style polish, formatting\n\n";
+		$base_instruction .= 'GOOD: {"title":"Add data source","feedback":"Claim lacks evidence.","suggestion":"Add: \'Users grew 40% (Source: Analytics)\'"}' . "\n";
+		$base_instruction .= 'BAD: {"title":"Improve writing","feedback":"Could be better.","suggestion":"Consider revising."}' . "\n\n";
+		$base_instruction .= 'Output valid JSON only.';
 
-Key principles:
-1. Every piece of feedback should be specific and actionable
-2. Explain WHY something matters, not just WHAT is wrong
-3. Suggest concrete improvements
-4. Be encouraging while maintaining high editorial standards
-5. Focus on the most impactful changes first
-6. Consider the target audience and tone requirements
+		if ( $is_continuation ) {
+			$base_instruction .= "\n\nCONTINUATION REVIEW RULES:\n";
+			$base_instruction .= "- You have access to previous feedback and user responses.\n";
+			$base_instruction .= "- Skip issues that were already addressed based on user responses.\n";
+			$base_instruction .= "- Only flag new issues or issues that persist despite user changes.\n";
+			$base_instruction .= "- Be aware that content may have changed since the last review.\n";
+			$base_instruction .= '- Reference the same block_ids when following up on existing issues.';
+		}
 
-You must respond ONLY with valid JSON in the specified format. Do not include any explanatory text outside the JSON structure.
-INSTRUCTION;
+		return $base_instruction;
+	}
+
+	/**
+	 * Format existing feedback for inclusion in continuation prompts.
+	 *
+	 * @param  array $existing_feedback Array of feedback notes with replies.
+	 * @return string Formatted feedback for prompt.
+	 */
+	private function format_existing_feedback( array $existing_feedback ): string {
+		if ( empty( $existing_feedback ) ) {
+			return '';
+		}
+
+		$formatted = array();
+
+		foreach ( $existing_feedback as $note ) {
+			$block_id = $note['block_id'] ?? 'unknown';
+			$category = $note['category'] ?? 'general';
+			$severity = $note['severity'] ?? 'suggestion';
+			$content  = $note['content']['raw'] ?? '';
+
+			// Truncate very long content.
+			if ( strlen( $content ) > 500 ) {
+				$content = substr( $content, 0, 500 ) . '... [truncated]';
+			}
+
+			$feedback_entry = sprintf(
+				"[Block: %s] [%s/%s]\nAI Feedback: %s",
+				$block_id,
+				$category,
+				$severity,
+				wp_strip_all_tags( $content )
+			);
+
+			// Add user replies if present.
+			if ( ! empty( $note['replies'] ) ) {
+				$feedback_entry .= "\nUser Responses:";
+				foreach ( $note['replies'] as $reply ) {
+					$reply_content = $reply['content']['raw'] ?? '';
+					$reply_author  = $reply['author_name'] ?? 'User';
+					$is_ai_reply   = $reply['is_ai'] ?? false;
+
+					// Truncate reply content.
+					if ( strlen( $reply_content ) > 300 ) {
+						$reply_content = substr( $reply_content, 0, 300 ) . '...';
+					}
+
+					$author_label    = $is_ai_reply ? 'AI' : $reply_author;
+					$feedback_entry .= sprintf(
+						"\n  - %s: %s",
+						$author_label,
+						wp_strip_all_tags( $reply_content )
+					);
+				}
+			}
+
+			$formatted[] = $feedback_entry;
+		}
+
+		return implode( "\n\n---\n\n", $formatted );
 	}
 
 	/**

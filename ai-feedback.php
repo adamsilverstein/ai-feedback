@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: AI Feedback
- * Plugin URI: https://github.com/yourusername/ai-feedback
+ * Plugin URI: https://github.com/adamsilverstein/ai-feedback
  * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 6.9's Notes feature.
  * Version: 0.1.0
  * Requires at least: 6.9
@@ -12,7 +12,6 @@
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: ai-feedback
- * Domain Path: /languages
  *
  * @package AI_Feedback
  */

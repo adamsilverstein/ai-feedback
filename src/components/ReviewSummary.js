@@ -51,8 +51,20 @@ export default function ReviewSummary({ review }) {
 		? Object.keys(blockMapping).length
 		: 0;
 
+	// Calculate severity counts for screen reader summary
+	const criticalCount = summary?.by_severity?.critical || 0;
+	const importantCount = summary?.by_severity?.important || 0;
+	const suggestionCount = summary?.by_severity?.suggestion || 0;
+
 	return (
-		<div className="ai-feedback-review-summary">
+		<section
+			className="ai-feedback-review-summary"
+			aria-labelledby="review-summary-heading"
+		>
+			<h3 id="review-summary-heading" className="screen-reader-text">
+				{__('Review Summary', 'ai-feedback')}
+			</h3>
+
 			{/* AI-generated summary text */}
 			{summaryText && (
 				<div className="ai-summary-text">
@@ -62,7 +74,11 @@ export default function ReviewSummary({ review }) {
 
 			{/* Note count headline */}
 			{noteCount !== undefined && (
-				<div className="summary-headline">
+				<div
+					className="summary-headline"
+					role="status"
+					aria-live="polite"
+				>
 					<strong>
 						{noteCount === 0
 							? __('No feedback items', 'ai-feedback')
@@ -80,26 +96,78 @@ export default function ReviewSummary({ review }) {
 				</div>
 			)}
 
+			{/* Screen reader summary stats */}
+			{summary && summary.by_severity && (
+				<p id="summary-stats" className="screen-reader-text">
+					{sprintf(
+						/* translators: 1: critical count, 2: important count, 3: suggestion count */
+						__(
+							'%1$d critical, %2$d important, %3$d suggestions',
+							'ai-feedback'
+						),
+						criticalCount,
+						importantCount,
+						suggestionCount
+					)}
+				</p>
+			)}
+
 			{/* Statistical breakdown */}
 			{summary && summary.by_severity && (
-				<div className="summary-by-severity">
+				<div
+					className="summary-by-severity"
+					aria-describedby="summary-stats"
+				>
 					<h4>{__('By Severity', 'ai-feedback')}</h4>
-					<ul>
+					<ul aria-label={__('Feedback by severity', 'ai-feedback')}>
 						{summary.by_severity.critical > 0 && (
 							<li className="severity-critical">
-								🔴 {__('Critical', 'ai-feedback')}:{' '}
+								<span
+									className="severity-badge severity-critical"
+									role="img"
+									aria-label={sprintf(
+										/* translators: %s: severity level */
+										__('Severity level: %s', 'ai-feedback'),
+										__('Critical', 'ai-feedback')
+									)}
+								>
+									🔴
+								</span>{' '}
+								{__('Critical', 'ai-feedback')}:{' '}
 								{summary.by_severity.critical}
 							</li>
 						)}
 						{summary.by_severity.important > 0 && (
 							<li className="severity-important">
-								🟡 {__('Important', 'ai-feedback')}:{' '}
+								<span
+									className="severity-badge severity-important"
+									role="img"
+									aria-label={sprintf(
+										/* translators: %s: severity level */
+										__('Severity level: %s', 'ai-feedback'),
+										__('Important', 'ai-feedback')
+									)}
+								>
+									🟡
+								</span>{' '}
+								{__('Important', 'ai-feedback')}:{' '}
 								{summary.by_severity.important}
 							</li>
 						)}
 						{summary.by_severity.suggestion > 0 && (
 							<li className="severity-suggestion">
-								🟢 {__('Suggestion', 'ai-feedback')}:{' '}
+								<span
+									className="severity-badge severity-suggestion"
+									role="img"
+									aria-label={sprintf(
+										/* translators: %s: severity level */
+										__('Severity level: %s', 'ai-feedback'),
+										__('Suggestion', 'ai-feedback')
+									)}
+								>
+									🟢
+								</span>{' '}
+								{__('Suggestion', 'ai-feedback')}:{' '}
 								{summary.by_severity.suggestion}
 							</li>
 						)}
@@ -110,16 +178,26 @@ export default function ReviewSummary({ review }) {
 			{summary && summary.by_category && (
 				<div className="summary-by-category">
 					<h4>{__('By Category', 'ai-feedback')}</h4>
-					<ul>
+					<ul aria-label={__('Feedback by category', 'ai-feedback')}>
 						{Object.entries(summary.by_category)
 							.filter(([, count]) => count > 0)
-							.map(([category, count]) => (
-								<li key={category}>
-									{category.charAt(0).toUpperCase() +
-										category.slice(1)}
-									: {count}
-								</li>
-							))}
+							.map(([category, count], index, array) => {
+								const categoryLabel =
+									category.charAt(0).toUpperCase() +
+									category.slice(1);
+								return (
+									<li
+										key={category}
+										aria-setsize={array.length}
+										aria-posinset={index + 1}
+									>
+										<span className="category-badge">
+											{categoryLabel}
+										</span>
+										: {count}
+									</li>
+								);
+							})}
 					</ul>
 				</div>
 			)}
@@ -175,6 +253,6 @@ export default function ReviewSummary({ review }) {
 					</p>
 				</div>
 			)}
-		</div>
+		</section>
 	);
 }

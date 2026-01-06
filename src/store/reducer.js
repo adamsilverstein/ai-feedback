@@ -19,6 +19,8 @@ export const initialState = {
 	reviewHistory: [],
 	error: null,
 	isLoadingSettings: false,
+	isLoadingPreviousReview: false,
+	hasFetchedPreviousReview: false,
 };
 
 /**
@@ -37,6 +39,8 @@ export const TYPES = {
 	CLEAR_ERROR: 'CLEAR_ERROR',
 	SET_LOADING_SETTINGS: 'SET_LOADING_SETTINGS',
 	UPDATE_BLOCK_NOTES: 'UPDATE_BLOCK_NOTES',
+	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
+	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
 };
 
 /**
@@ -128,6 +132,29 @@ export default function reducer(state = initialState, action) {
 			return {
 				...state,
 				isLoadingSettings: action.isLoading,
+			};
+
+		case TYPES.FETCHING_PREVIOUS_REVIEW:
+			return {
+				...state,
+				isLoadingPreviousReview: true,
+			};
+
+		case TYPES.RECEIVE_PREVIOUS_REVIEW:
+			// Only update lastReview if we don't already have one from the current session.
+			// This prevents overwriting a fresh review with stale data.
+			if (state.lastReview && !state.lastReview.is_persisted) {
+				return {
+					...state,
+					isLoadingPreviousReview: false,
+					hasFetchedPreviousReview: true,
+				};
+			}
+			return {
+				...state,
+				isLoadingPreviousReview: false,
+				hasFetchedPreviousReview: true,
+				lastReview: action.review,
 			};
 
 		default:

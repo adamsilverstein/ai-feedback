@@ -124,6 +124,19 @@ export function* startReview({
 	yield { type: TYPES.START_REVIEW };
 
 	try {
+		// Fetch existing feedback history for continuation reviews.
+		// This will include unresolved notes with their user replies.
+		const feedbackHistory = yield* fetchFeedbackHistory(postId);
+		const existingFeedback = feedbackHistory.has_history
+			? feedbackHistory.notes
+			: [];
+
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Existing feedback for continuation:', {
+			hasHistory: feedbackHistory.has_history,
+			feedbackCount: existingFeedback.length,
+		});
+
 		const response = yield apiFetch({
 			path: '/ai-feedback/v1/review',
 			method: 'POST',
@@ -134,6 +147,7 @@ export function* startReview({
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
+				existing_feedback: existingFeedback,
 			},
 		});
 
@@ -384,4 +398,87 @@ export function setAvailableTones(tones) {
 		type: TYPES.SET_AVAILABLE_TONES,
 		tones,
 	};
+}
+
+/**
+ * Fetch previous review for a post.
+ *
+ * @param {number} postId Post ID.
+ * @return {Object} Action object.
+ */
+export function* fetchPreviousReview(postId) {
+	yield { type: TYPES.FETCHING_PREVIOUS_REVIEW };
+
+	try {
+		const response = yield apiFetch({
+			path: `/ai-feedback/v1/notes/post/${postId}/latest-review`,
+			method: 'GET',
+		});
+
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Previous review fetched:', {
+			hasReview: response.has_review,
+			reviewId: response.review?.review_id,
+			noteCount: response.review?.note_count,
+		});
+
+		if (response.has_review && response.review) {
+			return {
+				type: TYPES.RECEIVE_PREVIOUS_REVIEW,
+				review: response.review,
+			};
+		}
+
+		return {
+			type: TYPES.RECEIVE_PREVIOUS_REVIEW,
+			review: null,
+		};
+	} catch (error) {
+		// eslint-disable-next-line no-console
+		console.error('[AI-Feedback] Failed to fetch previous review:', error);
+		return {
+			type: TYPES.RECEIVE_PREVIOUS_REVIEW,
+			review: null,
+		};
+	}
+}
+
+/**
+ * Receive previous review (called by resolver).
+ *
+ * @param {Object|null} review Review object or null.
+ * @return {Object} Action object.
+ */
+export function receivePreviousReview(review) {
+	return {
+		type: TYPES.RECEIVE_PREVIOUS_REVIEW,
+		review,
+	};
+}
+
+/**
+ * Fetch feedback history for continuation reviews.
+ *
+ * @param {number} postId Post ID.
+ * @return {Object} Feedback history response.
+ */
+export function* fetchFeedbackHistory(postId) {
+	try {
+		const response = yield apiFetch({
+			path: `/ai-feedback/v1/notes/post/${postId}/feedback-history`,
+			method: 'GET',
+		});
+
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] Feedback history fetched:', {
+			hasHistory: response.has_history,
+			noteCount: response.total,
+		});
+
+		return response;
+	} catch (error) {
+		// eslint-disable-next-line no-console
+		console.error('[AI-Feedback] Failed to fetch feedback history:', error);
+		return { notes: [], has_history: false, total: 0 };
+	}
 }

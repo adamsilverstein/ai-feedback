@@ -56,7 +56,10 @@ export default function ModelSelector() {
 			value={selectedModel}
 			options={options}
 			onChange={handleChange}
-			help={__('Select the AI model to use for reviews', 'ai-feedback')}
+			help={__(
+				'Select the AI model to analyze your content',
+				'ai-feedback'
+			)}
 		/>
 	);
 }

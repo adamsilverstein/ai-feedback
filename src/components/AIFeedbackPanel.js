@@ -3,13 +3,18 @@
  */
 import { PanelBody, Notice, Button } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
+import { store as editorStore } from '@wordpress/editor';
+import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
+import { hasTextContent, extractBlockData } from '../utils/block-utils';
 
 import ModelSelector from './ModelSelector';
-import SettingsPanel from './SettingsPanel';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+import EmptyState from './EmptyState';
+import StatusAnnouncer from './StatusAnnouncer';
+import WelcomeModal from './WelcomeModal';
 
 /**
  * Settings page URL.
@@ -68,16 +73,66 @@ function getErrorAction(error) {
  * @return {JSX.Element} Panel component.
  */
 export default function AIFeedbackPanel() {
-	const { error, lastReview, isLoadingSettings } = useSelect(
+	const {
+		error,
+		lastReview,
+		isLoadingSettings,
+		postId,
+		editorBlocks,
+		isReviewing,
+		selectedModel,
+		focusAreas,
+		targetTone,
+		postTitle,
+		availableModels,
+	} = useSelect(
 		(select) => ({
 			error: select(STORE_NAME).getError(),
 			lastReview: select(STORE_NAME).getLastReview(),
 			isLoadingSettings: select(STORE_NAME).isLoadingSettings(),
+			postId: select(editorStore).getCurrentPostId(),
+			editorBlocks: select(blockEditorStore).getBlocks(),
+			isReviewing: select(STORE_NAME).isReviewing(),
+			selectedModel: select(STORE_NAME).getSelectedModel(),
+			focusAreas: select(STORE_NAME).getFocusAreas(),
+			targetTone: select(STORE_NAME).getTargetTone(),
+			postTitle: select(editorStore).getEditedPostAttribute('title'),
+			availableModels: select(STORE_NAME).getAvailableModels(),
 		}),
 		[]
 	);
 
-	const { clearError } = useDispatch(STORE_NAME);
+	const { clearError, startReview } = useDispatch(STORE_NAME);
+
+	// Check if post has content (any text blocks)
+	const hasContent = hasTextContent(editorBlocks);
+
+	const isSaved = !!postId;
+	const canReview = isSaved && hasContent;
+
+	/**
+	 * Handle starting a review from empty state.
+	 */
+	const handleStartReview = async () => {
+		if (!canReview) {
+			return;
+		}
+
+		const blocks = extractBlockData(editorBlocks);
+
+		try {
+			await startReview({
+				postId,
+				title: postTitle,
+				blocks,
+				model: selectedModel,
+				focusAreas,
+				targetTone,
+			});
+		} catch (reviewError) {
+			// Error is already in the store, no additional action needed
+		}
+	};
 
 	if (isLoadingSettings) {
 		return (
@@ -91,6 +146,12 @@ export default function AIFeedbackPanel() {
 
 	return (
 		<div className="ai-feedback-panel">
+			<WelcomeModal />
+			<StatusAnnouncer
+				isReviewing={isReviewing}
+				lastReview={lastReview}
+				error={error}
+			/>
 			{error && (
 				<Notice
 					status="error"
@@ -112,28 +173,40 @@ export default function AIFeedbackPanel() {
 				</Notice>
 			)}
 
-			<PanelBody
-				title={__('Review Settings', 'ai-feedback')}
-				initialOpen={true}
-			>
-				<ModelSelector />
-				<SettingsPanel />
-			</PanelBody>
+			{!lastReview && !isReviewing ? (
+				<EmptyState
+					onStartReview={handleStartReview}
+					canReview={canReview}
+					hasContent={hasContent}
+					isSaved={isSaved}
+				/>
+			) : (
+				<>
+					{availableModels.length > 1 && (
+						<PanelBody
+							title={__('Review Settings', 'ai-feedback')}
+							initialOpen={true}
+						>
+							<ModelSelector />
+						</PanelBody>
+					)}
 
-			<PanelBody
-				title={__('Review Document', 'ai-feedback')}
-				initialOpen={true}
-			>
-				<ReviewButton />
-			</PanelBody>
+					<PanelBody
+						title={__('Review Document', 'ai-feedback')}
+						initialOpen={true}
+					>
+						<ReviewButton />
+					</PanelBody>
 
-			{lastReview && (
-				<PanelBody
-					title={__('Last Review', 'ai-feedback')}
-					initialOpen={true}
-				>
-					<ReviewSummary review={lastReview} />
-				</PanelBody>
+					{lastReview && (
+						<PanelBody
+							title={__('Last Review', 'ai-feedback')}
+							initialOpen={true}
+						>
+							<ReviewSummary review={lastReview} />
+						</PanelBody>
+					)}
+				</>
 			)}
 		</div>
 	);
