@@ -17,7 +17,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Verify welcome modal is visible
 		await expect(
@@ -36,7 +36,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Verify steps are visible
 		await expect(page.getByText('Get started in 3 steps:')).toBeVisible();
@@ -55,7 +55,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Verify buttons are present
 		await expect(
@@ -72,7 +72,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Click Get Started button
 		await page.getByRole('button', { name: 'Get Started' }).click();
@@ -89,7 +89,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Click the close button (X)
 		await page.getByRole('button', { name: 'Close' }).click();
@@ -106,7 +106,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Dismiss modal
 		await page.getByRole('button', { name: 'Get Started' }).click();
@@ -115,6 +115,12 @@ test.describe('Welcome Modal', () => {
 		await expect(
 			page.getByRole('dialog', { name: 'Welcome to AI Feedback' })
 		).not.toBeVisible();
+
+		// For the second navigation, we need to ensure localStorage persists
+		// Clear previous initScripts by adding one that preserves the welcomed state
+		await page.addInitScript(() => {
+			window.localStorage.setItem('ai-feedback-welcomed', 'true');
+		});
 
 		// Create a new post
 		await admin.createNewPost();
@@ -132,7 +138,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Check localStorage before dismissing
 		const beforeDismiss = await page.evaluate(() =>
@@ -156,7 +162,7 @@ test.describe('Welcome Modal', () => {
 		aiFeedback,
 	}) => {
 		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+		await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 		// Get the Learn More link
 		const learnMoreLink = page.getByRole('link', { name: 'Learn More' });
