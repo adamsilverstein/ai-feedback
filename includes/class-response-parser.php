@@ -164,9 +164,14 @@ class Response_Parser {
 
 		Logger::debug( sprintf( 'Parsed %d valid feedback items', count( $parsed ) ) );
 
+		// Group similar feedback items to reduce noise.
+		$grouped = $this->group_similar_feedback( $parsed );
+
+		Logger::debug( sprintf( 'Grouped into %d feedback items', count( $grouped ) ) );
+
 		return array(
 			'summary'  => $this->sanitize_summary( $summary ),
-			'feedback' => $parsed,
+			'feedback' => $grouped,
 		);
 	}
 
@@ -604,5 +609,110 @@ class Response_Parser {
 		}
 
 		return implode( "\n", $output );
+	}
+
+	/**
+	 * Group similar feedback items to reduce noise.
+	 *
+	 * Groups feedback items with the same category and similar titles together.
+	 * This helps users identify patterns and fix similar issues more efficiently.
+	 *
+	 * @param  array $feedback Parsed feedback items.
+	 * @return array Grouped feedback items with is_group, count, and block_ids fields.
+	 */
+	public function group_similar_feedback( array $feedback ): array {
+		if ( empty( $feedback ) ) {
+			return array();
+		}
+
+		$groups = array();
+
+		foreach ( $feedback as $item ) {
+			// Create a key based on category and normalized title.
+			$key = $this->create_group_key( $item );
+
+			if ( isset( $groups[ $key ] ) ) {
+				// Add to existing group.
+				$groups[ $key ]['block_ids'][] = $item['block_id'];
+				++$groups[ $key ]['count'];
+				// Keep highest severity.
+				if ( $this->severity_rank( $item['severity'] ) >
+					$this->severity_rank( $groups[ $key ]['severity'] ) ) {
+					$groups[ $key ]['severity'] = $item['severity'];
+				}
+				// Preserve block_name and block_index arrays.
+				if ( ! empty( $item['block_name'] ) ) {
+					$groups[ $key ]['block_names'][] = $item['block_name'];
+				}
+				if ( isset( $item['block_index'] ) ) {
+					$groups[ $key ]['block_indexes'][] = $item['block_index'];
+				}
+			} else {
+				// Create new group.
+				$groups[ $key ] = array_merge(
+					$item,
+					array(
+						'block_ids'      => array( $item['block_id'] ),
+						'block_names'    => ! empty( $item['block_name'] ) ? array( $item['block_name'] ) : array(),
+						'block_indexes'  => isset( $item['block_index'] ) ? array( $item['block_index'] ) : array(),
+						'count'          => 1,
+						'is_group'       => false,
+						'original_title' => $item['title'],
+					)
+				);
+			}
+		}
+
+		// Mark items that became groups and update their titles.
+		foreach ( $groups as &$group ) {
+			if ( $group['count'] > 1 ) {
+				$group['is_group'] = true;
+				$group['title']    = sprintf(
+					/* translators: 1: original title, 2: occurrence count */
+					__( '%1$s (%2$d occurrences)', 'ai-feedback' ),
+					$group['original_title'],
+					$group['count']
+				);
+			}
+		}
+
+		return array_values( $groups );
+	}
+
+	/**
+	 * Create a normalized key for grouping feedback items.
+	 *
+	 * Generates a grouping key based on category and normalized title.
+	 * Normalization removes punctuation and converts to lowercase.
+	 *
+	 * @param  array $item Feedback item with category and title.
+	 * @return string Grouping key.
+	 */
+	private function create_group_key( array $item ): string {
+		// Normalize title for grouping.
+		$normalized = strtolower( $item['title'] );
+		// Remove all non-alphanumeric characters.
+		$normalized = preg_replace( '/[^a-z0-9]/', '', $normalized );
+
+		return $item['category'] . ':' . $normalized;
+	}
+
+	/**
+	 * Get numeric rank for severity level.
+	 *
+	 * Returns a numeric value for each severity level to enable comparison.
+	 * Higher numbers indicate higher severity.
+	 *
+	 * @param  string $severity Severity level (suggestion, important, critical).
+	 * @return int Numeric rank (1-3, or 0 for unknown).
+	 */
+	private function severity_rank( string $severity ): int {
+		$ranks = array(
+			'suggestion' => 1,
+			'important'  => 2,
+			'critical'   => 3,
+		);
+
+		return $ranks[ $severity ] ?? 0;
 	}
 }
