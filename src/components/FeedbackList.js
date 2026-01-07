@@ -9,7 +9,7 @@ import FeedbackItem from './FeedbackItem';
 /**
  * Feedback list component.
  *
- * @param {Object} props              Component props.
+ * @param {Object} props               Component props.
  * @param {Array}  props.feedbackItems Array of feedback items.
  * @return {JSX.Element|null} Feedback list component.
  */

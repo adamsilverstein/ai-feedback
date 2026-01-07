@@ -7,7 +7,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
-import { useDispatch } from '@wordpress/data';
+import { dispatch } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
 /**
@@ -16,7 +16,7 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
  * @param {string} clientId Block client ID to navigate to.
  */
 function navigateToBlock(clientId) {
-	const { selectBlock } = useDispatch(blockEditorStore);
+	const { selectBlock } = dispatch(blockEditorStore);
 
 	if (selectBlock) {
 		selectBlock(clientId);
@@ -66,8 +66,8 @@ function getSeverityLabel(severity) {
 /**
  * Single feedback item component (non-grouped).
  *
- * @param {Object} props          Component props.
- * @param {Object} props.item     Feedback item data.
+ * @param {Object}   props            Component props.
+ * @param {Object}   props.item       Feedback item data.
  * @param {Function} props.onNavigate Navigation callback.
  * @return {JSX.Element} Feedback item component.
  */
@@ -116,8 +116,8 @@ function SingleFeedbackItem({ item, onNavigate }) {
 /**
  * Grouped feedback items component.
  *
- * @param {Object} props          Component props.
- * @param {Object} props.item     Grouped feedback item data.
+ * @param {Object}   props            Component props.
+ * @param {Object}   props.item       Grouped feedback item data.
  * @param {Function} props.onNavigate Navigation callback.
  * @return {JSX.Element} Feedback group component.
  */
@@ -200,8 +200,8 @@ function GroupedFeedbackItem({ item, onNavigate }) {
  *
  * Determines whether to render a single item or a grouped item.
  *
- * @param {Object} props          Component props.
- * @param {Object} props.item     Feedback item data.
+ * @param {Object} props      Component props.
+ * @param {Object} props.item Feedback item data.
  * @return {JSX.Element} Feedback item component.
  */
 export default function FeedbackItem({ item }) {
