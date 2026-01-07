@@ -683,7 +683,8 @@ class Response_Parser {
 	 * Create a normalized key for grouping feedback items.
 	 *
 	 * Generates a grouping key based on category and normalized title.
-	 * Normalization removes punctuation and converts to lowercase.
+	 * Normalization converts to lowercase and replaces spaces with underscores
+	 * while removing other special characters.
 	 *
 	 * @param  array $item Feedback item with category and title.
 	 * @return string Grouping key.
@@ -691,8 +692,10 @@ class Response_Parser {
 	private function create_group_key( array $item ): string {
 		// Normalize title for grouping.
 		$normalized = strtolower( $item['title'] );
-		// Remove all non-alphanumeric characters.
-		$normalized = preg_replace( '/[^a-z0-9]/', '', $normalized );
+		// Replace spaces with underscores to preserve word boundaries.
+		$normalized = str_replace( ' ', '_', $normalized );
+		// Remove special characters but keep alphanumeric and underscores.
+		$normalized = preg_replace( '/[^a-z0-9_]/', '', $normalized );
 
 		return $item['category'] . ':' . $normalized;
 	}

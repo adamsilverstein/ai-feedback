@@ -360,6 +360,15 @@ class Notes_Manager {
 					$decoded = json_decode( $group_block_ids, true );
 					if ( is_array( $decoded ) ) {
 						$block_ids = $decoded;
+					} else {
+						// Log JSON decode errors for debugging.
+						Logger::debug(
+							sprintf(
+								'Failed to decode group_block_ids for note %d: %s',
+								$comment->comment_ID,
+								json_last_error_msg()
+							)
+						);
 					}
 				}
 				$group_count    = (int) get_comment_meta( $comment->comment_ID, 'group_count', true );

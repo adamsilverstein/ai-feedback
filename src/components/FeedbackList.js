@@ -24,11 +24,21 @@ export default function FeedbackList({ feedbackItems }) {
 			role="list"
 			aria-label={__('Feedback items', 'ai-feedback')}
 		>
-			{feedbackItems.map((item, index) => (
-				<div key={item.block_id || `item-${index}`} role="listitem">
-					<FeedbackItem item={item} />
-				</div>
-			))}
+			{feedbackItems.map((item, index) => {
+				// For grouped items, use the first block_id from block_ids array
+				// For single items, use block_id directly
+				// Fallback to index if neither is available
+				const key =
+					item.id ||
+					(item.is_group ? item.block_ids?.[0] : item.block_id) ||
+					`item-${index}`;
+
+				return (
+					<div key={key} role="listitem">
+						<FeedbackItem item={item} />
+					</div>
+				);
+			})}
 		</div>
 	);
 }
