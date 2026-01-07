@@ -259,13 +259,26 @@ class Notes_Manager {
 			$meta['created_at'] = $review_data['timestamp'];
 		}
 
+		// Add grouping metadata if this is a grouped item.
+		if ( ! empty( $feedback_item['is_group'] ) ) {
+			$meta['is_group']   = '1';
+			$meta['group_count'] = $feedback_item['count'] ?? 1;
+			if ( ! empty( $feedback_item['block_ids'] ) ) {
+				$meta['group_block_ids'] = wp_json_encode( $feedback_item['block_ids'] );
+			}
+			if ( ! empty( $feedback_item['original_title'] ) ) {
+				$meta['original_title'] = $feedback_item['original_title'];
+			}
+		}
+
 		Logger::debug(
 			sprintf(
-				'Built note meta: block_id=%s, block_name=%s, category=%s, severity=%s',
+				'Built note meta: block_id=%s, block_name=%s, category=%s, severity=%s, is_group=%s',
 				$meta['block_id'] ?? 'none',
 				$meta['block_name'] ?? 'none',
 				$meta['feedback_category'],
-				$meta['feedback_severity']
+				$meta['feedback_severity'],
+				! empty( $meta['is_group'] ) ? 'yes' : 'no'
 			)
 		);
 
@@ -335,7 +348,25 @@ class Notes_Manager {
 		$notes = array();
 
 		foreach ( $comments as $comment ) {
-			$notes[] = array(
+			$is_group     = get_comment_meta( $comment->comment_ID, 'is_group', true );
+			$block_ids    = array();
+			$group_count  = 1;
+			$original_title = '';
+
+			// If this is a grouped note, decode the block_ids.
+			if ( $is_group ) {
+				$group_block_ids = get_comment_meta( $comment->comment_ID, 'group_block_ids', true );
+				if ( ! empty( $group_block_ids ) ) {
+					$decoded = json_decode( $group_block_ids, true );
+					if ( is_array( $decoded ) ) {
+						$block_ids = $decoded;
+					}
+				}
+				$group_count    = (int) get_comment_meta( $comment->comment_ID, 'group_count', true );
+				$original_title = get_comment_meta( $comment->comment_ID, 'original_title', true );
+			}
+
+			$note = array(
 				'id'          => (int) $comment->comment_ID,
 				'post'        => (int) $comment->comment_post_ID,
 				'parent'      => (int) $comment->comment_parent,
@@ -356,6 +387,16 @@ class Notes_Manager {
 				'created_at'  => $comment->comment_date,
 				'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
 			);
+
+			// Add grouping information if available.
+			if ( $is_group ) {
+				$note['is_group']       = true;
+				$note['count']          = $group_count;
+				$note['block_ids']      = $block_ids;
+				$note['original_title'] = $original_title;
+			}
+
+			$notes[] = $note;
 		}
 
 		return $notes;

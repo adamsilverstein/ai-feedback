@@ -360,3 +360,181 @@
 		margin: 0 0 16px;
 	}
 }
+
+/* Feedback List Styles */
+.ai-feedback-list {
+	margin-top: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* Feedback Item Styles */
+.ai-feedback-item {
+	margin: 0;
+
+	.components-card__body {
+		padding: 12px;
+	}
+
+	.ai-feedback-item-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 8px;
+
+		.feedback-title {
+			font-size: 14px;
+			font-weight: 600;
+			color: #1e1e1e;
+		}
+	}
+
+	.feedback-text {
+		margin: 0 0 8px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #1e1e1e;
+	}
+
+	.feedback-suggestion {
+		margin: 0 0 8px;
+		padding: 8px;
+		background: #f7f7f7;
+		border-left: 3px solid #0073aa;
+		border-radius: 4px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #1e1e1e;
+	}
+
+	.go-to-block-button {
+		font-size: 12px;
+		padding: 0;
+		height: auto;
+		line-height: 1;
+		text-decoration: none;
+
+		&:hover {
+			text-decoration: underline;
+		}
+	}
+}
+
+/* Grouped Feedback Item Styles */
+.ai-feedback-group {
+	margin: 0;
+
+	.components-card__header {
+		padding: 12px;
+		border-bottom: 1px solid #e0e0e0;
+	}
+
+	.components-card__body {
+		padding: 12px;
+	}
+
+	.ai-feedback-group-header {
+		width: 100%;
+
+		.expand-group-button {
+			width: 100%;
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			padding: 0;
+			height: auto;
+			justify-content: flex-start;
+			text-decoration: none;
+
+			&:hover {
+				text-decoration: none;
+			}
+
+			.group-title {
+				flex: 1;
+				text-align: left;
+				font-size: 14px;
+				font-weight: 600;
+				color: #1e1e1e;
+			}
+		}
+	}
+
+	.feedback-text {
+		margin: 0 0 8px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #1e1e1e;
+	}
+
+	.feedback-suggestion {
+		margin: 0 0 12px;
+		padding: 8px;
+		background: #f7f7f7;
+		border-left: 3px solid #0073aa;
+		border-radius: 4px;
+		font-size: 13px;
+		line-height: 1.5;
+		color: #1e1e1e;
+	}
+
+	.affected-blocks-section {
+		margin-top: 12px;
+		padding-top: 12px;
+		border-top: 1px solid #e0e0e0;
+
+		.affected-blocks-heading {
+			margin: 0 0 8px;
+			font-size: 13px;
+			font-weight: 600;
+			color: #1e1e1e;
+		}
+
+		.affected-blocks-list {
+			margin: 0;
+			padding: 0;
+			list-style: none;
+
+			li {
+				padding: 4px 0;
+			}
+		}
+
+		.go-to-block-button {
+			font-size: 12px;
+			padding: 0;
+			height: auto;
+			line-height: 1;
+			text-decoration: none;
+
+			&:hover {
+				text-decoration: underline;
+			}
+		}
+	}
+}
+
+/* Severity Badges */
+.severity-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 16px;
+	line-height: 1;
+	min-width: 20px;
+}
+
+/* Feedback Details Section */
+.feedback-details {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid #e0e0e0;
+
+	h4 {
+		font-size: 14px;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: #1e1e1e;
+	}
+}
