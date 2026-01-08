@@ -75,43 +75,53 @@ class AIFeedbackUtils {
 			await expect(loadingText).toBeHidden({ timeout: 15000 });
 		}
 
-		// Dismiss the welcome modal if it appears (shown on first use)
+		// Handle welcome modal behavior
+		const welcomeModal = this.page.getByRole('dialog', {
+			name: /Welcome to AI Feedback|AI Feedback Setup Required/,
+		});
+
+		// Wait for either the modal or sidebar content to be ready
+		// The modal might take time to render after sidebar opens (it makes an API call)
+		// Note: The review button might not exist when post is empty (empty state)
+		try {
+			await Promise.race([
+				welcomeModal.waitFor({ state: 'visible', timeout: 5000 }),
+				// Wait for content to be ready - either review button or empty state heading
+				customPanel
+					.locator('h4, button.is-primary')
+					.first()
+					.waitFor({ state: 'visible', timeout: 5000 }),
+			]);
+		} catch {
+			// Neither appeared in time, continue anyway
+		}
+
+		// If dismissWelcomeModal is true, dismiss the modal if it's visible
 		if (dismissWelcomeModal) {
-			const welcomeModal = this.page.getByRole('dialog', {
-				name: 'Welcome to AI Feedback',
-			});
-			const reviewButton = customPanel.locator('button.is-primary');
-
-			// Wait for either the modal or review button to appear
-			// The modal might take time to render after sidebar opens
-			try {
-				await Promise.race([
-					welcomeModal.waitFor({ state: 'visible', timeout: 5000 }),
-					reviewButton
-						.first()
-						.waitFor({ state: 'visible', timeout: 5000 }),
-				]);
-			} catch {
-				// Neither appeared in time, continue anyway
-			}
-
-			// Check if modal is now visible and dismiss it
 			const isWelcomeModalVisible = await welcomeModal
 				.isVisible()
 				.catch(() => false);
 			if (isWelcomeModalVisible) {
-				await this.page
-					.getByRole('button', { name: 'Get Started' })
-					.click();
+				// Try "Get Started" first (normal modal), then "Close" (setup required modal)
+				const getStartedButton = this.page.getByRole('button', {
+					name: 'Get Started',
+				});
+				const closeButton = this.page.getByRole('button', {
+					name: 'Close',
+				});
+
+				const hasGetStarted = await getStartedButton
+					.isVisible()
+					.catch(() => false);
+				if (hasGetStarted) {
+					await getStartedButton.click();
+				} else {
+					await closeButton.click();
+				}
+
 				// Wait for modal to close
 				await welcomeModal.waitFor({ state: 'hidden', timeout: 5000 });
 			}
-
-			// Wait for the primary button to be visible
-			// We use a broader selector as backup since text matching can be tricky with i18n
-			await reviewButton
-				.first()
-				.waitFor({ state: 'visible', timeout: 10000 });
 		}
 	}
 
@@ -285,11 +295,6 @@ const test = base.extend({
 		await use(requestUtils);
 	},
 	aiFeedback: async ({ page, admin }, use) => {
-		// Pre-set localStorage to dismiss welcome modal for all tests
-		// Individual tests (like welcome-modal.spec.js) can override this
-		await page.addInitScript(() => {
-			window.localStorage.setItem('ai-feedback-welcomed', 'true');
-		});
 		await use(new AIFeedbackUtils({ page, admin }));
 	},
 });
