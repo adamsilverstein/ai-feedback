@@ -21,10 +21,10 @@ function IndeterminateProgressBar() {
 		<div
 			className="ai-feedback-progress-container"
 			role="progressbar"
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-label={__('Review progress', 'ai-feedback')}
-			aria-valuetext={__('Processing review', 'ai-feedback')}
+			aria-valuemin={ 0 }
+			aria-valuemax={ 100 }
+			aria-label={ __( 'Review progress', 'ai-feedback' ) }
+			aria-valuetext={ __( 'Processing review', 'ai-feedback' ) }
 		>
 			<div className="ai-feedback-progress-bar">
 				<div className="ai-feedback-progress-indicator" />
@@ -48,82 +48,85 @@ export default function ReviewButton() {
 		focusAreas,
 		targetTone,
 	} = useSelect(
-		(select) => ({
-			postId: select(editorStore).getCurrentPostId(),
-			postTitle: select(editorStore).getEditedPostAttribute('title'),
-			editorBlocks: select(blockEditorStore).getBlocks(),
-			isReviewing: select(STORE_NAME).isReviewing(),
-			selectedModel: select(STORE_NAME).getSelectedModel(),
-			focusAreas: select(STORE_NAME).getFocusAreas(),
-			targetTone: select(STORE_NAME).getTargetTone(),
-		}),
+		( select ) => ( {
+			postId: select( editorStore ).getCurrentPostId(),
+			postTitle: select( editorStore ).getEditedPostAttribute( 'title' ),
+			editorBlocks: select( blockEditorStore ).getBlocks(),
+			isReviewing: select( STORE_NAME ).isReviewing(),
+			selectedModel: select( STORE_NAME ).getSelectedModel(),
+			focusAreas: select( STORE_NAME ).getFocusAreas(),
+			targetTone: select( STORE_NAME ).getTargetTone(),
+		} ),
 		[]
 	);
 
-	const { startReview } = useDispatch(STORE_NAME);
-	const { createWarningNotice } = useDispatch(noticesStore);
+	const { startReview } = useDispatch( STORE_NAME );
+	const { createWarningNotice } = useDispatch( noticesStore );
 
 	const handleReview = async () => {
-		if (!postId) {
+		if ( ! postId ) {
 			return;
 		}
 
 		// Extract block data with clientIds
-		const blocks = extractBlockData(editorBlocks);
+		const blocks = extractBlockData( editorBlocks );
 
-		if (blocks.length === 0) {
+		if ( blocks.length === 0 ) {
 			// eslint-disable-next-line no-console
-			console.warn('No content blocks found to review');
+			console.warn( 'No content blocks found to review' );
 			createWarningNotice(
-				__('No content blocks found to review.', 'ai-feedback'),
+				__( 'No content blocks found to review.', 'ai-feedback' ),
 				{ type: 'snackbar' }
 			);
 			return;
 		}
 
 		try {
-			await startReview({
+			await startReview( {
 				postId,
 				title: postTitle,
 				blocks,
 				model: selectedModel,
 				focusAreas,
 				targetTone,
-			});
-		} catch (error) {
+			} );
+		} catch ( error ) {
 			// Error is already in the store
 			// eslint-disable-next-line no-console
-			console.error('Review failed:', error);
+			console.error( 'Review failed:', error );
 		}
 	};
 
-	const isDisabled = !postId || isReviewing;
+	const isDisabled = ! postId || isReviewing;
 
 	return (
 		<div className="ai-feedback-review-button">
 			<Button
 				variant="primary"
-				onClick={handleReview}
-				disabled={isDisabled}
-				isBusy={isReviewing}
+				onClick={ handleReview }
+				disabled={ isDisabled }
+				isBusy={ isReviewing }
 			>
-				{isReviewing
-					? __('Reviewing…', 'ai-feedback')
-					: __('Review Document', 'ai-feedback')}
+				{ isReviewing
+					? __( 'Reviewing…', 'ai-feedback' )
+					: __( 'Review Document', 'ai-feedback' ) }
 			</Button>
-			{!postId && (
+			{ ! postId && (
 				<p className="description">
-					{__('Save your post first to enable review', 'ai-feedback')}
+					{ __(
+						'Save your post first to enable review',
+						'ai-feedback'
+					) }
 				</p>
-			)}
-			{isReviewing && (
+			) }
+			{ isReviewing && (
 				<>
 					<IndeterminateProgressBar />
 					<p className="description">
-						{__('AI is analyzing your content…', 'ai-feedback')}
+						{ __( 'AI is analyzing your content…', 'ai-feedback' ) }
 					</p>
 				</>
-			)}
+			) }
 		</div>
 	);
 }

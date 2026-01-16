@@ -18,43 +18,43 @@ import { sprintf, __ } from '@wordpress/i18n';
  * @param {Object|null} props.error       Error object if review failed.
  * @return {null} This component renders nothing.
  */
-export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
-	const previousStateRef = useRef({
+export default function StatusAnnouncer( { isReviewing, lastReview, error } ) {
+	const previousStateRef = useRef( {
 		isReviewing: false,
 		hasError: false,
 		reviewCompleted: false,
-	});
+	} );
 
-	useEffect(() => {
+	useEffect( () => {
 		const prevState = previousStateRef.current;
 
 		// Announce error
-		if (error && !prevState.hasError) {
+		if ( error && ! prevState.hasError ) {
 			/* translators: %s: error message */
-			speak(sprintf(__('Error: %s', 'ai-feedback'), error.message));
+			speak( sprintf( __( 'Error: %s', 'ai-feedback' ), error.message ) );
 			prevState.hasError = true;
 			prevState.isReviewing = false;
 			prevState.reviewCompleted = false;
 		}
 		// Announce review started
-		else if (isReviewing && !prevState.isReviewing) {
-			speak(__('Review in progress. Please wait.', 'ai-feedback'));
+		else if ( isReviewing && ! prevState.isReviewing ) {
+			speak( __( 'Review in progress. Please wait.', 'ai-feedback' ) );
 			prevState.isReviewing = true;
 			prevState.hasError = false;
 			prevState.reviewCompleted = false;
 		}
 		// Announce review completed
 		else if (
-			!isReviewing &&
+			! isReviewing &&
 			prevState.isReviewing &&
-			!prevState.reviewCompleted &&
+			! prevState.reviewCompleted &&
 			lastReview
 		) {
 			const noteCount = lastReview.notes?.length || 0;
 			speak(
 				sprintf(
 					/* translators: %d: number of notes created */
-					__('Review complete. %d notes created.', 'ai-feedback'),
+					__( 'Review complete. %d notes created.', 'ai-feedback' ),
 					noteCount
 				)
 			);
@@ -63,10 +63,10 @@ export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
 			prevState.hasError = false;
 		}
 		// Clear error state when error is cleared
-		else if (!error && prevState.hasError) {
+		else if ( ! error && prevState.hasError ) {
 			prevState.hasError = false;
 		}
-	}, [isReviewing, lastReview, error]);
+	}, [ isReviewing, lastReview, error ] );
 
 	// This component doesn't render anything
 	return null;

@@ -1,19 +1,19 @@
 /**
  * Custom test fixtures for AI Feedback E2E tests.
  */
-const { test: base, expect } = require('@playwright/test');
+const { test: base, expect } = require( '@playwright/test' );
 const {
 	Admin,
 	Editor,
 	PageUtils,
 	RequestUtils,
-} = require('@wordpress/e2e-test-utils-playwright');
+} = require( '@wordpress/e2e-test-utils-playwright' );
 
 /**
  * AI Feedback custom utilities.
  */
 class AIFeedbackUtils {
-	constructor({ page, admin }) {
+	constructor( { page, admin } ) {
 		this.page = page;
 		this.admin = admin;
 	}
@@ -23,27 +23,27 @@ class AIFeedbackUtils {
 	 */
 	async openSidebar() {
 		// Click the "AI Feedback" menu item in the editor's more menu
-		const sidebarButton = this.page.getByRole('button', {
+		const sidebarButton = this.page.getByRole( 'button', {
 			name: 'AI Feedback',
-		});
+		} );
 
 		// Check if sidebar is already open by looking for the panel
 		const isOpen = await this.page
-			.getByRole('region', { name: 'AI Feedback' })
+			.getByRole( 'region', { name: 'AI Feedback' } )
 			.isVisible()
-			.catch(() => false);
+			.catch( () => false );
 
-		if (!isOpen) {
+		if ( ! isOpen ) {
 			// Open the options menu if not already open
-			const optionsButton = this.page.getByRole('button', {
+			const optionsButton = this.page.getByRole( 'button', {
 				name: 'Options',
-			});
+			} );
 			const menuVisible = await this.page
-				.getByRole('menu', { name: 'Options' })
+				.getByRole( 'menu', { name: 'Options' } )
 				.isVisible()
-				.catch(() => false);
+				.catch( () => false );
 
-			if (!menuVisible) {
+			if ( ! menuVisible ) {
 				await optionsButton.click();
 			}
 
@@ -53,8 +53,8 @@ class AIFeedbackUtils {
 
 		// Wait for the sidebar to be visible
 		await this.page
-			.getByRole('region', { name: 'AI Feedback' })
-			.waitFor({ state: 'visible' });
+			.getByRole( 'region', { name: 'AI Feedback' } )
+			.waitFor( { state: 'visible' } );
 	}
 
 	/**
@@ -62,9 +62,9 @@ class AIFeedbackUtils {
 	 *
 	 * @param {string} modelId - Model ID to select (e.g., 'gpt-4o').
 	 */
-	async selectModel(modelId) {
-		const modelSelect = this.page.getByLabel('AI Model');
-		await modelSelect.selectOption(modelId);
+	async selectModel( modelId ) {
+		const modelSelect = this.page.getByLabel( 'AI Model' );
+		await modelSelect.selectOption( modelId );
 	}
 
 	/**
@@ -73,9 +73,9 @@ class AIFeedbackUtils {
 	 * @param {string}  label   - Label of the focus area (e.g., 'Content Quality').
 	 * @param {boolean} checked - Whether to check or uncheck.
 	 */
-	async toggleFocusArea(label, checked) {
-		const checkbox = this.page.getByLabel(label, { exact: true });
-		if (checked) {
+	async toggleFocusArea( label, checked ) {
+		const checkbox = this.page.getByLabel( label, { exact: true } );
+		if ( checked ) {
 			await checkbox.check();
 		} else {
 			await checkbox.uncheck();
@@ -87,22 +87,22 @@ class AIFeedbackUtils {
 	 *
 	 * @param {string} toneId - Tone ID to select (e.g., 'academic').
 	 */
-	async selectTone(toneId) {
-		const toneSelect = this.page.getByLabel('Target Tone');
-		await toneSelect.selectOption(toneId);
+	async selectTone( toneId ) {
+		const toneSelect = this.page.getByLabel( 'Target Tone' );
+		await toneSelect.selectOption( toneId );
 	}
 
 	/**
 	 * Expand Review Settings panel if collapsed.
 	 */
 	async expandReviewSettings() {
-		const reviewSettingsButton = this.page.getByRole('button', {
+		const reviewSettingsButton = this.page.getByRole( 'button', {
 			name: 'Review Settings',
-		});
+		} );
 		const isExpanded =
-			await reviewSettingsButton.getAttribute('aria-expanded');
+			await reviewSettingsButton.getAttribute( 'aria-expanded' );
 
-		if (isExpanded === 'false') {
+		if ( isExpanded === 'false' ) {
 			await reviewSettingsButton.click();
 		}
 	}
@@ -113,19 +113,19 @@ class AIFeedbackUtils {
 	 *
 	 * @param {number} timeout - Maximum time to wait in milliseconds (default 3000ms).
 	 */
-	async waitForSettingsSave(timeout = 3000) {
+	async waitForSettingsSave( timeout = 3000 ) {
 		try {
 			// Wait for the settings POST request to complete
 			await this.page.waitForResponse(
-				(response) =>
-					response.url().includes('/ai-feedback/v1/settings') &&
+				( response ) =>
+					response.url().includes( '/ai-feedback/v1/settings' ) &&
 					response.request().method() === 'POST' &&
 					response.status() === 200,
 				{ timeout }
 			);
-		} catch (error) {
+		} catch ( error ) {
 			// If no request was made (settings unchanged), just wait for debounce time
-			await this.page.waitForTimeout(600);
+			await this.page.waitForTimeout( 600 );
 		}
 	}
 }
@@ -133,29 +133,29 @@ class AIFeedbackUtils {
 /**
  * Extend the base test with custom fixtures.
  */
-const test = base.extend({
-	admin: async ({ page, pageUtils }, use) => {
-		await use(new Admin({ page, pageUtils }));
+const test = base.extend( {
+	admin: async ( { page, pageUtils }, use ) => {
+		await use( new Admin( { page, pageUtils } ) );
 	},
-	editor: async ({ page }, use) => {
-		await use(new Editor({ page }));
+	editor: async ( { page }, use ) => {
+		await use( new Editor( { page } ) );
 	},
-	pageUtils: async ({ page }, use) => {
-		await use(new PageUtils({ page }));
+	pageUtils: async ( { page }, use ) => {
+		await use( new PageUtils( { page } ) );
 	},
-	requestUtils: async ({}, use) => {
-		const requestUtils = await RequestUtils.setup({
+	requestUtils: async ( {}, use ) => {
+		const requestUtils = await RequestUtils.setup( {
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {
 				username: 'admin',
 				password: 'password',
 			},
-		});
-		await use(requestUtils);
+		} );
+		await use( requestUtils );
 	},
-	aiFeedback: async ({ page, admin }, use) => {
-		await use(new AIFeedbackUtils({ page, admin }));
+	aiFeedback: async ( { page, admin }, use ) => {
+		await use( new AIFeedbackUtils( { page, admin } ) );
 	},
-});
+} );
 
 module.exports = { test, expect };

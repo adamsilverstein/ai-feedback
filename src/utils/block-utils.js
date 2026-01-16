@@ -9,12 +9,12 @@ import { serialize } from '@wordpress/blocks';
  * @param {string} innerHTML The block's innerHTML.
  * @return {string} Plain text content.
  */
-export function extractTextContent(innerHTML) {
-	if (!innerHTML) {
+export function extractTextContent( innerHTML ) {
+	if ( ! innerHTML ) {
 		return '';
 	}
 	// Create a temporary element to strip HTML tags
-	const temp = document.createElement('div');
+	const temp = document.createElement( 'div' );
 	temp.innerHTML = innerHTML;
 	return temp.textContent || temp.innerText || '';
 }
@@ -25,28 +25,28 @@ export function extractTextContent(innerHTML) {
  * @param {Array} blocks Array of blocks from the editor.
  * @return {Array} Simplified block data for API.
  */
-export function extractBlockData(blocks) {
+export function extractBlockData( blocks ) {
 	const result = [];
 
-	for (const block of blocks) {
+	for ( const block of blocks ) {
 		// Get the serialized content for this block.
 		// Use originalContent if available (parsed from existing HTML),
 		// otherwise serialize the current block state.
-		const rawContent = block.originalContent || serialize(block);
-		const content = extractTextContent(rawContent);
+		const rawContent = block.originalContent || serialize( block );
+		const content = extractTextContent( rawContent );
 
 		// Only include blocks with actual content
-		if (content.trim()) {
-			result.push({
+		if ( content.trim() ) {
+			result.push( {
 				clientId: block.clientId,
 				name: block.name,
 				content: content.trim(),
-			});
+			} );
 		}
 
 		// Recursively process inner blocks
-		if (block.innerBlocks && block.innerBlocks.length > 0) {
-			result.push(...extractBlockData(block.innerBlocks));
+		if ( block.innerBlocks && block.innerBlocks.length > 0 ) {
+			result.push( ...extractBlockData( block.innerBlocks ) );
 		}
 	}
 
@@ -59,14 +59,14 @@ export function extractBlockData(blocks) {
  * @param {Array} blocks Array of blocks from the editor.
  * @return {boolean} True if blocks contain text content.
  */
-export function hasTextContent(blocks) {
-	return blocks.some((block) => {
-		if (!block.name) {
+export function hasTextContent( blocks ) {
+	return blocks.some( ( block ) => {
+		if ( ! block.name ) {
 			return false;
 		}
 		// Get text content from the block
-		const content = block.originalContent || serialize(block);
-		const text = extractTextContent(content);
+		const content = block.originalContent || serialize( block );
+		const text = extractTextContent( content );
 		return text.trim().length > 0;
-	});
+	} );
 }
