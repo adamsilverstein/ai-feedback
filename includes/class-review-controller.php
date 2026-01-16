@@ -82,6 +82,7 @@ class Review_Controller extends WP_REST_Controller {
 		$focus_areas       = $request->get_param( 'focus_areas' );
 		$target_tone       = $request->get_param( 'target_tone' );
 		$existing_feedback = $request->get_param( 'existing_feedback' );
+		$force_refresh     = $request->get_param( 'force_refresh' );
 
 		// Debug logging.
 		Logger::debug( sprintf( 'Review request received for post %d', $post_id ) );
@@ -132,6 +133,7 @@ class Review_Controller extends WP_REST_Controller {
 			'blocks'            => $blocks,
 			'post_title'        => $title,
 			'existing_feedback' => is_array( $existing_feedback ) ? $existing_feedback : array(),
+			'force_refresh'     => (bool) $force_refresh,
 		);
 
 		// Log continuation review status.
@@ -248,6 +250,12 @@ class Review_Controller extends WP_REST_Controller {
 				'type'        => 'array',
 				'default'     => array(),
 				'description' => __( 'Existing feedback from previous reviews for continuation.', 'ai-feedback' ),
+			),
+			'force_refresh'     => array(
+				'required'    => false,
+				'type'        => 'boolean',
+				'default'     => false,
+				'description' => __( 'Force a new review even if cached results exist.', 'ai-feedback' ),
 			),
 		);
 	}

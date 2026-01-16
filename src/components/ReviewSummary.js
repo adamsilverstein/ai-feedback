@@ -3,15 +3,91 @@
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
+import { Button, Notice } from '@wordpress/components';
+import { Icon, update } from '@wordpress/icons';
+
+/**
+ * Format relative time from a Unix timestamp.
+ *
+ * @param {number} timestamp Unix timestamp in seconds.
+ * @return {string} Formatted relative time string.
+ */
+function formatRelativeTime(timestamp) {
+	const now = Math.floor(Date.now() / 1000);
+	const diff = now - timestamp;
+
+	if (diff < 60) {
+		return __('just now', 'ai-feedback');
+	}
+	if (diff < 3600) {
+		const minutes = Math.floor(diff / 60);
+		return sprintf(
+			/* translators: %d: number of minutes */
+			_n('%d minute ago', '%d minutes ago', minutes, 'ai-feedback'),
+			minutes
+		);
+	}
+	const hours = Math.floor(diff / 3600);
+	return sprintf(
+		/* translators: %d: number of hours */
+		_n('%d hour ago', '%d hours ago', hours, 'ai-feedback'),
+		hours
+	);
+}
+
+/**
+ * Cache Indicator component.
+ *
+ * @param {Object}   props              Component props.
+ * @param {boolean}  props.fromCache    Whether results are from cache.
+ * @param {number}   props.cachedAt     Unix timestamp when cached.
+ * @param {Function} props.onForceRefresh Callback for force refresh.
+ * @return {JSX.Element|null} Cache indicator or null.
+ */
+function CacheIndicator({ fromCache, cachedAt, onForceRefresh }) {
+	if (!fromCache) {
+		return null;
+	}
+
+	return (
+		<Notice
+			status="info"
+			isDismissible={false}
+			className="ai-feedback-cache-notice"
+		>
+			<div className="ai-feedback-cache-content">
+				<Icon icon={update} className="ai-feedback-cache-icon" />
+				<span className="ai-feedback-cache-text">
+					{sprintf(
+						/* translators: %s: relative time */
+						__(
+							'Cached results from %s. Content unchanged since last review.',
+							'ai-feedback'
+						),
+						formatRelativeTime(cachedAt)
+					)}
+				</span>
+				<Button
+					variant="link"
+					onClick={onForceRefresh}
+					className="ai-feedback-force-refresh"
+				>
+					{__('Force new review', 'ai-feedback')}
+				</Button>
+			</div>
+		</Notice>
+	);
+}
 
 /**
  * Review Summary component.
  *
- * @param {Object} props        Component props.
- * @param {Object} props.review Review object.
+ * @param {Object}   props                Component props.
+ * @param {Object}   props.review         Review object.
+ * @param {Function} props.onForceRefresh Callback for force refresh.
  * @return {JSX.Element} Review summary component.
  */
-export default function ReviewSummary({ review }) {
+export default function ReviewSummary({ review, onForceRefresh }) {
 	// Debug logging when review changes
 	useEffect(() => {
 		if (review) {
@@ -44,6 +120,8 @@ export default function ReviewSummary({ review }) {
 		note_count: noteCount,
 		model,
 		block_mapping: blockMapping,
+		from_cache: fromCache,
+		cached_at: cachedAt,
 	} = review;
 
 	const hasNotes = notes && notes.length > 0;
@@ -64,6 +142,13 @@ export default function ReviewSummary({ review }) {
 			<h3 id="review-summary-heading" className="screen-reader-text">
 				{__('Review Summary', 'ai-feedback')}
 			</h3>
+
+			{/* Cache indicator */}
+			<CacheIndicator
+				fromCache={fromCache}
+				cachedAt={cachedAt}
+				onForceRefresh={onForceRefresh}
+			/>
 
 			{/* AI-generated summary text */}
 			{summaryText && (

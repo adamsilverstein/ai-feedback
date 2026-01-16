@@ -146,6 +146,36 @@
 
 .ai-feedback-review-summary {
 
+	/* Cache indicator notice */
+	.ai-feedback-cache-notice {
+		margin: 0 0 16px;
+
+		.ai-feedback-cache-content {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.ai-feedback-cache-icon {
+			fill: #0073aa;
+			flex-shrink: 0;
+		}
+
+		.ai-feedback-cache-text {
+			flex: 1;
+			min-width: 150px;
+			font-size: 13px;
+			line-height: 1.4;
+		}
+
+		.ai-feedback-force-refresh {
+			white-space: nowrap;
+			padding: 0;
+			text-decoration: underline;
+		}
+	}
+
 	/* AI-generated summary text */
 	.ai-summary-text {
 		margin: 0 0 16px;

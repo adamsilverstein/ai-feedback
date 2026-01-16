@@ -62,6 +62,105 @@ class Review_Service {
 	}
 
 	/**
+	 * Generate a cache key for review results.
+	 *
+	 * @param  array $blocks  Document blocks.
+	 * @param  array $options Review options.
+	 * @return string Cache key.
+	 */
+	public function generate_cache_key( array $blocks, array $options ): string {
+		// Create hash from content and settings using JSON for security.
+		$content_data = array_map(
+			function ( $block ) {
+				return array(
+					'name'    => $block['name'] ?? '',
+					'content' => $block['content'] ?? '',
+				);
+			},
+			$blocks
+		);
+		$content_hash = md5( wp_json_encode( $content_data ) );
+
+		$options_data = array(
+			'model'       => $options['model'] ?? 'default',
+			'focus_areas' => $options['focus_areas'] ?? array(),
+			'target_tone' => $options['target_tone'] ?? 'professional',
+		);
+		$options_hash = md5( wp_json_encode( $options_data ) );
+
+		return 'ai_feedback_review_' . $content_hash . '_' . $options_hash;
+	}
+
+	/**
+	 * Get cached review results.
+	 *
+	 * @param  string $cache_key Cache key.
+	 * @return array|null Cached review data or null if not found/invalid.
+	 */
+	private function get_cached_review( string $cache_key ): ?array {
+		$cached = get_transient( $cache_key );
+
+		if ( false === $cached ) {
+			Logger::debug( 'Cache miss', array( 'cache_key' => $cache_key ) );
+			return null;
+		}
+
+		// Validate cache structure.
+		if ( ! isset( $cached['feedback'], $cached['summary'], $cached['cached_at'] ) ) {
+			delete_transient( $cache_key );
+			Logger::debug( 'Cache invalid structure, deleted', array( 'cache_key' => $cache_key ) );
+			return null;
+		}
+
+		// Check cache age (additional validation).
+		$cache_age = time() - $cached['cached_at'];
+		if ( $cache_age > HOUR_IN_SECONDS ) {
+			delete_transient( $cache_key );
+			Logger::debug(
+				'Cache expired, deleted',
+				array(
+					'cache_key' => $cache_key,
+					'age'       => $cache_age,
+				)
+			);
+			return null;
+		}
+
+		Logger::debug(
+			'Cache hit',
+			array(
+				'cache_key' => $cache_key,
+				'age'       => $cache_age,
+			)
+		);
+
+		return $cached;
+	}
+
+	/**
+	 * Cache review results.
+	 *
+	 * @param  string $cache_key Cache key.
+	 * @param  array  $review    Review data to cache.
+	 * @return void
+	 */
+	private function cache_review( string $cache_key, array $review ): void {
+		// Store feedback items separately for cache to avoid storing notes.
+		$cached_review = array(
+			'review_id'    => $review['review_id'],
+			'model'        => $review['model'],
+			'summary'      => $review['summary'],
+			'summary_text' => $review['summary_text'] ?? '',
+			'feedback'     => $review['feedback'] ?? array(),
+			'cached_at'    => time(),
+		);
+
+		set_transient( $cache_key, $cached_review, HOUR_IN_SECONDS );
+
+		Logger::debug( 'Cached review', array( 'cache_key' => $cache_key ) );
+	}
+
+	/**
 	 * Review a document.
 	 *
 	 * @param  int   $post_id Post ID to review.
@@ -114,12 +213,87 @@ class Review_Service {
 			Logger::debug( sprintf( 'Continuation review with %d existing feedback items', count( $existing_feedback ) ) );
 		}
 
-		// Build prompt with existing feedback context if available.
-		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
-		$system_instruction = $this->prompt_builder->get_system_instruction( $is_continuation );
+		// Check force refresh option.
+		$force_refresh = $options['force_refresh'] ?? false;
 
 		// Get AI model.
 		$model = $options['model'] ?? 'claude-sonnet-4-20250514';
+
+		// Generate cache key for this request.
+		$cache_key = $this->generate_cache_key( $blocks, $options );
+
+		// Check cache for non-continuation reviews (unless force refresh).
+		if ( ! $is_continuation && ! $force_refresh ) {
+			$cached = $this->get_cached_review( $cache_key );
+
+			if ( null !== $cached ) {
+				Logger::debug( 'Returning cached review results' );
+
+				// Generate new review ID for this cached response.
+				$review_id = wp_generate_uuid4();
+
+				// Build review data for note creation.
+				$review_data = array(
+					'review_id' => $review_id,
+					'post_id'   => $post_id,
+					'model'     => $cached['model'],
+					'timestamp' => current_time( 'mysql' ),
+				);
+
+				// Create notes from cached feedback.
+				$note_result = $this->create_notes_with_threading(
+					$cached['feedback'],
+					$post_id,
+					$review_data,
+					false
+				);
+
+				// Extract note IDs and block mapping.
+				$note_ids      = array();
+				$block_mapping = array();
+				$notes_error   = null;
+
+				if ( is_wp_error( $note_result ) ) {
+					$notes_error = $note_result->get_error_message();
+				} else {
+					$note_ids      = $note_result['note_ids'] ?? array();
+					$block_mapping = $note_result['block_mapping'] ?? array();
+				}
+
+				// Fetch formatted notes.
+				$formatted_notes = $this->notes_manager->get_notes_by_review( $review_id );
+
+				// Return cached response with fresh notes.
+				$response = array(
+					'review_id'     => $review_id,
+					'post_id'       => $post_id,
+					'model'         => $cached['model'],
+					'notes'         => $formatted_notes,
+					'note_ids'      => $note_ids,
+					'block_mapping' => $block_mapping,
+					'summary'       => $cached['summary'],
+					'summary_text'  => $cached['summary_text'] ?? '',
+					'note_count'    => count( $note_ids ),
+					'timestamp'     => $review_data['timestamp'],
+					'from_cache'    => true,
+					'cached_at'     => $cached['cached_at'],
+				);
+
+				if ( null !== $notes_error ) {
+					$response['notes_error'] = $notes_error;
+				}
+
+				return $response;
+			}
+		} elseif ( $force_refresh ) {
+			// Delete existing cache if force refresh.
+			delete_transient( $cache_key );
+			Logger::debug( 'Force refresh requested, cache invalidated' );
+		}
+
+		// Build prompt with existing feedback context if available.
+		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
+		$system_instruction = $this->prompt_builder->get_system_instruction( $is_continuation );
 
 		Logger::debug( sprintf( 'Calling AI model: %s', $model ) );
 
@@ -202,6 +376,20 @@ class Review_Service {
 
 		Logger::debug( sprintf( 'Created %d notes with %d block mappings', count( $note_ids ), count( $block_mapping ) ) );
 
+		// Cache successful non-continuation reviews.
+		if ( ! $is_continuation ) {
+			$this->cache_review(
+				$cache_key,
+				array(
+					'review_id'    => $review_id,
+					'model'        => $model,
+					'summary'      => $stats_summary,
+					'summary_text' => $ai_summary,
+					'feedback'     => $feedback_items,
+				)
+			);
+		}
+
 		// Build response with note IDs and block mapping.
 		return array(
 			'review_id'     => $review_id,
@@ -214,6 +402,7 @@ class Review_Service {
 			'summary_text'  => $ai_summary,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
+			'from_cache'    => false,
 		);
 	}
 

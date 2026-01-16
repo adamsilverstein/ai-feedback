@@ -84,13 +84,14 @@ export function* updateSettings(settings) {
 /**
  * Start a document review.
  *
- * @param {Object} options            Review options.
- * @param {number} options.postId     Post ID to review.
- * @param {string} options.title      Post title from editor.
- * @param {Array}  options.blocks     Blocks with clientIds and content.
- * @param {string} options.model      AI model to use.
- * @param {Array}  options.focusAreas Focus areas.
- * @param {string} options.targetTone Target tone.
+ * @param {Object}  options              Review options.
+ * @param {number}  options.postId       Post ID to review.
+ * @param {string}  options.title        Post title from editor.
+ * @param {Array}   options.blocks       Blocks with clientIds and content.
+ * @param {string}  options.model        AI model to use.
+ * @param {Array}   options.focusAreas   Focus areas.
+ * @param {string}  options.targetTone   Target tone.
+ * @param {boolean} options.forceRefresh Force a new review even if cached.
  * @return {Object} Action object.
  */
 export function* startReview({
@@ -100,6 +101,7 @@ export function* startReview({
 	model,
 	focusAreas,
 	targetTone,
+	forceRefresh = false,
 }) {
 	// eslint-disable-next-line no-console
 	console.log('[AI-Feedback] Starting review', {
@@ -109,6 +111,7 @@ export function* startReview({
 		model,
 		focusAreas,
 		targetTone,
+		forceRefresh,
 	});
 
 	// eslint-disable-next-line no-console
@@ -148,6 +151,7 @@ export function* startReview({
 				focus_areas: focusAreas,
 				target_tone: targetTone,
 				existing_feedback: existingFeedback,
+				force_refresh: forceRefresh,
 			},
 		});
 

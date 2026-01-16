@@ -112,8 +112,10 @@ export default function AIFeedbackPanel() {
 
 	/**
 	 * Handle starting a review from empty state.
+	 *
+	 * @param {boolean} forceRefresh Whether to force a new review.
 	 */
-	const handleStartReview = async () => {
+	const handleStartReview = async (forceRefresh = false) => {
 		if (!canReview) {
 			return;
 		}
@@ -128,10 +130,18 @@ export default function AIFeedbackPanel() {
 				model: selectedModel,
 				focusAreas,
 				targetTone,
+				forceRefresh,
 			});
 		} catch (reviewError) {
 			// Error is already in the store, no additional action needed
 		}
+	};
+
+	/**
+	 * Handle force refresh request.
+	 */
+	const handleForceRefresh = () => {
+		handleStartReview(true);
 	};
 
 	if (isLoadingSettings) {
@@ -203,7 +213,10 @@ export default function AIFeedbackPanel() {
 							title={__('Last Review', 'ai-feedback')}
 							initialOpen={true}
 						>
-							<ReviewSummary review={lastReview} />
+							<ReviewSummary
+								review={lastReview}
+								onForceRefresh={handleForceRefresh}
+							/>
 						</PanelBody>
 					)}
 				</>
