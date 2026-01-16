@@ -14,7 +14,16 @@ import { Icon, update } from '@wordpress/icons';
  */
 function formatRelativeTime(timestamp) {
 	const now = Math.floor(Date.now() / 1000);
-	const diff = now - timestamp;
+
+	// Validate and clamp timestamp.
+	const numericTimestamp = Number(timestamp);
+	if (!Number.isFinite(numericTimestamp) || numericTimestamp <= 0) {
+		return __('just now', 'ai-feedback');
+	}
+	// Clamp to not be in the future.
+	const clampedTimestamp = Math.min(numericTimestamp, now);
+
+	const diff = now - clampedTimestamp;
 
 	if (diff < 60) {
 		return __('just now', 'ai-feedback');
@@ -38,11 +47,11 @@ function formatRelativeTime(timestamp) {
 /**
  * Cache Indicator component.
  *
- * @param {Object}   props              Component props.
- * @param {boolean}  props.fromCache    Whether results are from cache.
- * @param {number}   props.cachedAt     Unix timestamp when cached.
+ * @param {Object}   props                Component props.
+ * @param {boolean}  props.fromCache      Whether results are from cache.
+ * @param {number}   props.cachedAt       Unix timestamp when cached.
  * @param {Function} props.onForceRefresh Callback for force refresh.
- * @return {JSX.Element|null} Cache indicator or null.
+ * @return {JSX.Element|null}             Cache indicator or null.
  */
 function CacheIndicator({ fromCache, cachedAt, onForceRefresh }) {
 	if (!fromCache) {

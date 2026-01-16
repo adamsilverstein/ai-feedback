@@ -70,21 +70,25 @@ class Review_Service {
 	 */
 	public function generate_cache_key( array $blocks, array $options ): string {
 		// Create hash from content and settings using JSON for security.
+		// Include clientId for stable block identification across sessions.
 		$content_data = array_map(
 			function ( $block ) {
 				return array(
-					'name'    => $block['name'] ?? '',
-					'content' => $block['content'] ?? '',
+					'clientId' => $block['clientId'] ?? '',
+					'name'     => $block['name'] ?? '',
+					'content'  => $block['content'] ?? '',
 				);
 			},
 			$blocks
 		);
 		$content_hash = md5( wp_json_encode( $content_data ) );
 
+		// Include post_title to invalidate cache when title changes.
 		$options_data = array(
 			'model'       => $options['model'] ?? 'default',
 			'focus_areas' => $options['focus_areas'] ?? array(),
 			'target_tone' => $options['target_tone'] ?? 'professional',
+			'post_title'  => $options['post_title'] ?? '',
 		);
 		$options_hash = md5( wp_json_encode( $options_data ) );
 
@@ -101,14 +105,14 @@ class Review_Service {
 		$cached = get_transient( $cache_key );
 
 		if ( false === $cached ) {
-			Logger::debug( 'Cache miss', array( 'cache_key' => $cache_key ) );
+			Logger::debug( sprintf( 'Cache miss for key: %s', $cache_key ) );
 			return null;
 		}
 
 		// Validate cache structure.
 		if ( ! isset( $cached['feedback'], $cached['summary'], $cached['cached_at'] ) ) {
 			delete_transient( $cache_key );
-			Logger::debug( 'Cache invalid structure, deleted', array( 'cache_key' => $cache_key ) );
+			Logger::debug( sprintf( 'Cache invalid structure, deleted key: %s', $cache_key ) );
 			return null;
 		}
 
@@ -116,23 +120,11 @@ class Review_Service {
 		$cache_age = time() - $cached['cached_at'];
 		if ( $cache_age > HOUR_IN_SECONDS ) {
 			delete_transient( $cache_key );
-			Logger::debug(
-				'Cache expired, deleted',
-				array(
-					'cache_key' => $cache_key,
-					'age'       => $cache_age,
-				)
-			);
+			Logger::debug( sprintf( 'Cache expired (age: %d seconds), deleted key: %s', $cache_age, $cache_key ) );
 			return null;
 		}
 
-		Logger::debug(
-			'Cache hit',
-			array(
-				'cache_key' => $cache_key,
-				'age'       => $cache_age,
-			)
-		);
+		Logger::debug( sprintf( 'Cache hit (age: %d seconds) for key: %s', $cache_age, $cache_key ) );
 
 		return $cached;
 	}
@@ -157,7 +149,7 @@ class Review_Service {
 
 		set_transient( $cache_key, $cached_review, HOUR_IN_SECONDS );
 
-		Logger::debug( 'Cached review', array( 'cache_key' => $cache_key ) );
+		Logger::debug( sprintf( 'Cached review with key: %s', $cache_key ) );
 	}
 
 	/**
