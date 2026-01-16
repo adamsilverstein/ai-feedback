@@ -28,7 +28,7 @@ const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
  * @param {Object} error Error object with code, message, and data.
  * @return {JSX.Element|null} Action button or null.
  */
-function getErrorAction(error) {
+function getErrorAction( error ) {
 	// Check if error is related to API credits or billing.
 	// Note: We use string matching on error messages because the PHP AI Client
 	// wraps all AI provider errors under the same 'ai_request_failed' code.
@@ -198,6 +198,7 @@ export default function AIFeedbackPanel() {
 							title={ __( 'Review Settings', 'ai-feedback' ) }
 							initialOpen={ true }
 						>
+							{ /* ID used by skip links for keyboard navigation */ }
 							<div id="ai-feedback-model-select">
 								<ModelSelector />
 							</div>
@@ -208,6 +209,7 @@ export default function AIFeedbackPanel() {
 						title={ __( 'Review Document', 'ai-feedback' ) }
 						initialOpen={ true }
 					>
+						{ /* ID used by skip links for keyboard navigation */ }
 						<div id="ai-feedback-review-button">
 							<ReviewButton />
 						</div>
@@ -218,6 +220,7 @@ export default function AIFeedbackPanel() {
 							title={ __( 'Last Review', 'ai-feedback' ) }
 							initialOpen={ true }
 						>
+							{ /* ID used by skip links for keyboard navigation */ }
 							<div id="ai-feedback-results">
 								<ReviewSummary review={ lastReview } />
 							</div>
