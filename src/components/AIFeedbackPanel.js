@@ -28,7 +28,7 @@ const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
  * @param {Object} error Error object with code, message, and data.
  * @return {JSX.Element|null} Action button or null.
  */
-function getErrorAction( error ) {
+function getErrorAction(error) {
 	// Check if error is related to API credits or billing.
 	// Note: We use string matching on error messages because the PHP AI Client
 	// wraps all AI provider errors under the same 'ai_request_failed' code.

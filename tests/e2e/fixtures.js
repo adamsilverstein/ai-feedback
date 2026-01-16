@@ -143,7 +143,7 @@ const test = base.extend( {
 	pageUtils: async ( { page }, use ) => {
 		await use( new PageUtils( { page } ) );
 	},
-	requestUtils: async ( {}, use ) => {
+	requestUtils: async ( _, use ) => {
 		const requestUtils = await RequestUtils.setup( {
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {
