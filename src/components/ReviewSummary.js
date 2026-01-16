@@ -13,13 +13,13 @@ import { Icon, update } from '@wordpress/icons';
  * @return {string} Formatted relative time string.
  */
 function formatRelativeTime(timestamp) {
-	const now = Math.floor(Date.now() / 1000);
-
 	// Validate and clamp timestamp.
 	const numericTimestamp = Number(timestamp);
 	if (!Number.isFinite(numericTimestamp) || numericTimestamp <= 0) {
 		return __('just now', 'ai-feedback');
 	}
+
+	const now = Math.floor(Date.now() / 1000);
 	// Clamp to not be in the future.
 	const clampedTimestamp = Math.min(numericTimestamp, now);
 
