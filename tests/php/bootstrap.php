@@ -86,11 +86,11 @@ if (! class_exists('WP_Error') ) {
             return $codes[0] ?? '';
         }
 
-        / **
-        * Retrieve all error codes stored in the object.
-        *
-        * @return array An array of error codes present in the error collection; empty if no errors.
-        */
+        /**
+         * Retrieve all error codes stored in the object.
+         *
+         * @return array An array of error codes present in the error collection; empty if no errors.
+         */
         public function get_error_codes()
         {
             return array_keys($this->errors);
