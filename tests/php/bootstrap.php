@@ -213,3 +213,103 @@ if (! function_exists('sanitize_text_field') ) {
         return $str;
     }
 }
+
+// Mock WordPress transient functions for testing.
+if (! function_exists('get_transient') ) {
+    /**
+     * Mock get_transient for testing.
+     *
+     * @param  string $transient Transient name.
+     * @return mixed Transient value or false if not found.
+     */
+    function get_transient( $transient )
+    {
+        return $GLOBALS['test_transients'][ $transient ] ?? false;
+    }
+}
+
+if (! function_exists('set_transient') ) {
+    /**
+     * Mock set_transient for testing.
+     *
+     * @param  string $transient  Transient name.
+     * @param  mixed  $value      Transient value.
+     * @param  int    $expiration Expiration time in seconds.
+     * @return bool Always true.
+     */
+    function set_transient( $transient, $value, $expiration )
+    {
+        $GLOBALS['test_transients'][ $transient ] = $value;
+        return true;
+    }
+}
+
+if (! function_exists('delete_transient') ) {
+    /**
+     * Mock delete_transient for testing.
+     *
+     * @param  string $transient Transient name.
+     * @return bool Always true.
+     */
+    function delete_transient( $transient )
+    {
+        unset($GLOBALS['test_transients'][ $transient ]);
+        return true;
+    }
+}
+
+if (! function_exists('wp_json_encode') ) {
+    /**
+     * Mock wp_json_encode for testing.
+     *
+     * @param  mixed $data    Data to encode.
+     * @param  int   $options Optional. JSON encode options.
+     * @param  int   $depth   Optional. Maximum depth.
+     * @return string|false JSON string or false on failure.
+     */
+    function wp_json_encode( $data, $options = 0, $depth = 512 )
+    {
+        return json_encode($data, $options, $depth);
+    }
+}
+
+if (! function_exists('wp_generate_uuid4') ) {
+    /**
+     * Mock wp_generate_uuid4 for testing.
+     *
+     * @return string UUID v4 string.
+     */
+    function wp_generate_uuid4()
+    {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff)
+        );
+    }
+}
+
+if (! function_exists('current_time') ) {
+    /**
+     * Mock current_time for testing.
+     *
+     * @param  string $type Type of time to retrieve.
+     * @return string|int Current time.
+     */
+    function current_time( $type )
+    {
+        if ('mysql' === $type ) {
+            return gmdate('Y-m-d H:i:s');
+        }
+        return time();
+    }
+}
+
+// Initialize transient storage.
+$GLOBALS['test_transients'] = array();

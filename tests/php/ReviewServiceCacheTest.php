@@ -12,24 +12,58 @@ use AI_Feedback\Review_Service;
 use WP_Error;
 
 /**
+ * Testable subclass of Review_Service that exposes cache methods.
+ */
+class TestableCacheReviewService extends Review_Service
+{
+	/**
+	 * Constructor that skips parent dependencies.
+	 */
+	public function __construct()
+	{
+		// Skip parent constructor to avoid loading dependencies.
+	}
+
+	/**
+	 * Expose get_cached_review for testing using reflection.
+	 *
+	 * @param  string $cache_key Cache key.
+	 * @return array|null Cached review data or null.
+	 */
+	public function test_get_cached_review( string $cache_key ): ?array
+	{
+		$method = new \ReflectionMethod( Review_Service::class, 'get_cached_review' );
+		$method->setAccessible( true );
+		return $method->invoke( $this, $cache_key );
+	}
+
+	/**
+	 * Expose cache_review for testing using reflection.
+	 *
+	 * @param  string $cache_key Cache key.
+	 * @param  array  $review    Review data to cache.
+	 * @return void
+	 */
+	public function test_cache_review( string $cache_key, array $review ): void
+	{
+		$method = new \ReflectionMethod( Review_Service::class, 'cache_review' );
+		$method->setAccessible( true );
+		$method->invoke( $this, $cache_key, $review );
+	}
+}
+
+/**
  * Test cases for caching methods in Review_Service.
  */
 class ReviewServiceCacheTest extends TestCase
 {
 
 	/**
-	 * Mock transient storage.
-	 *
-	 * @var array
-	 */
-	private static array $transients = array();
-
-	/**
 	 * Review service instance.
 	 *
-	 * @var Review_Service
+	 * @var TestableCacheReviewService
 	 */
-	private Review_Service $service;
+	private TestableCacheReviewService $service;
 
 	/**
 	 * Set up test environment before each test.
@@ -39,10 +73,10 @@ class ReviewServiceCacheTest extends TestCase
 		parent::setUp();
 
 		// Clear transient storage.
-		self::$transients = array();
+		$GLOBALS['test_transients'] = array();
 
 		// Create service instance.
-		$this->service = new Review_Service();
+		$this->service = new TestableCacheReviewService();
 
 		// Mock WordPress constants.
 		if (! defined('HOUR_IN_SECONDS')) {
@@ -364,101 +398,151 @@ class ReviewServiceCacheTest extends TestCase
 		$this->assertIsString($key, 'Cache key should handle blocks with missing fields');
 		$this->assertStringStartsWith('ai_feedback_review_', $key, 'Cache key should have proper prefix');
 	}
-}
 
-// Mock WordPress transient functions for testing.
-if (! function_exists('get_transient')) {
 	/**
-	 * Mock get_transient for testing.
-	 *
-	 * @param  string $transient Transient name.
-	 * @return mixed Transient value or false if not found.
+	 * Test cache miss returns null when cache doesn't exist.
 	 */
-	function get_transient(string $transient)
+	public function test_cache_miss(): void
 	{
-		return ReviewServiceCacheTest::$transients[ $transient ] ?? false;
+		$cache_key = 'ai_feedback_review_test_miss';
+
+		$result = $this->service->test_get_cached_review( $cache_key );
+
+		$this->assertNull( $result, 'Cache miss should return null' );
 	}
-}
 
-if (! function_exists('set_transient')) {
 	/**
-	 * Mock set_transient for testing.
-	 *
-	 * @param  string $transient  Transient name.
-	 * @param  mixed  $value      Transient value.
-	 * @param  int    $expiration Expiration time in seconds.
-	 * @return bool Always true.
+	 * Test cache hit returns cached data.
 	 */
-	function set_transient(string $transient, $value, int $expiration): bool
+	public function test_cache_hit(): void
 	{
-		ReviewServiceCacheTest::$transients[ $transient ] = $value;
-		return true;
-	}
-}
+		$cache_key = 'ai_feedback_review_test_hit';
 
-if (! function_exists('delete_transient')) {
-	/**
-	 * Mock delete_transient for testing.
-	 *
-	 * @param  string $transient Transient name.
-	 * @return bool Always true.
-	 */
-	function delete_transient(string $transient): bool
-	{
-		unset(ReviewServiceCacheTest::$transients[ $transient ]);
-		return true;
-	}
-}
-
-if (! function_exists('wp_json_encode')) {
-	/**
-	 * Mock wp_json_encode for testing.
-	 *
-	 * @param  mixed $data    Data to encode.
-	 * @param  int   $options Optional. JSON encode options.
-	 * @param  int   $depth   Optional. Maximum depth.
-	 * @return string|false JSON string or false on failure.
-	 */
-	function wp_json_encode($data, int $options = 0, int $depth = 512)
-	{
-		return json_encode($data, $options, $depth);
-	}
-}
-
-if (! function_exists('wp_generate_uuid4')) {
-	/**
-	 * Mock wp_generate_uuid4 for testing.
-	 *
-	 * @return string UUID v4 string.
-	 */
-	function wp_generate_uuid4(): string
-	{
-		return sprintf(
-			'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-			mt_rand(0, 0xffff),
-			mt_rand(0, 0xffff),
-			mt_rand(0, 0xffff),
-			mt_rand(0, 0x0fff) | 0x4000,
-			mt_rand(0, 0x3fff) | 0x8000,
-			mt_rand(0, 0xffff),
-			mt_rand(0, 0xffff),
-			mt_rand(0, 0xffff)
+		// Create cache data.
+		$review_data = array(
+			'review_id'    => 'test-uuid-123',
+			'model'        => 'claude-sonnet-4',
+			'summary'      => 'Great article!',
+			'summary_text' => 'This is a well-written article.',
+			'feedback'     => array(
+				array(
+					'block_id' => 'abc123',
+					'text'     => 'Consider adding more details.',
+					'severity' => 'suggestion',
+				),
+			),
+			'cached_at'    => time(),
 		);
-	}
-}
 
-if (! function_exists('current_time')) {
+		// Cache the review.
+		$this->service->test_cache_review( $cache_key, $review_data );
+
+		// Retrieve from cache.
+		$result = $this->service->test_get_cached_review( $cache_key );
+
+		$this->assertIsArray( $result, 'Cache hit should return array' );
+		$this->assertEquals( $review_data['review_id'], $result['review_id'], 'Review ID should match' );
+		$this->assertEquals( $review_data['model'], $result['model'], 'Model should match' );
+		$this->assertEquals( $review_data['summary'], $result['summary'], 'Summary should match' );
+		$this->assertEquals( $review_data['feedback'], $result['feedback'], 'Feedback should match' );
+	}
+
 	/**
-	 * Mock current_time for testing.
-	 *
-	 * @param  string $type Type of time to retrieve.
-	 * @return string|int Current time.
+	 * Test cache expiration deletes expired cache.
 	 */
-	function current_time(string $type)
+	public function test_cache_expiration(): void
 	{
-		if ('mysql' === $type) {
-			return gmdate('Y-m-d H:i:s');
-		}
-		return time();
+		$cache_key = 'ai_feedback_review_test_expired';
+
+		// Create expired cache data (more than 1 hour old).
+		$review_data = array(
+			'review_id'    => 'test-uuid-expired',
+			'model'        => 'claude-sonnet-4',
+			'summary'      => 'Old review',
+			'summary_text' => 'This is an old review.',
+			'feedback'     => array(),
+			'cached_at'    => time() - (HOUR_IN_SECONDS + 100), // Expired by 100 seconds.
+		);
+
+		// Manually set the transient (bypass cache_review to test expiration).
+		set_transient( $cache_key, $review_data, HOUR_IN_SECONDS );
+
+		// Attempt to retrieve from cache.
+		$result = $this->service->test_get_cached_review( $cache_key );
+
+		$this->assertNull( $result, 'Expired cache should return null' );
+
+		// Verify cache was deleted.
+		$transient_exists = get_transient( $cache_key );
+		$this->assertFalse( $transient_exists, 'Expired cache should be deleted' );
+	}
+
+	/**
+	 * Test cache with invalid structure is deleted.
+	 */
+	public function test_cache_invalid_structure(): void
+	{
+		$cache_key = 'ai_feedback_review_test_invalid';
+
+		// Create invalid cache data (missing required fields).
+		$invalid_data = array(
+			'review_id' => 'test-uuid-invalid',
+			// Missing 'summary', 'feedback', 'cached_at'.
+		);
+
+		// Manually set the transient.
+		set_transient( $cache_key, $invalid_data, HOUR_IN_SECONDS );
+
+		// Attempt to retrieve from cache.
+		$result = $this->service->test_get_cached_review( $cache_key );
+
+		$this->assertNull( $result, 'Invalid cache structure should return null' );
+
+		// Verify cache was deleted.
+		$transient_exists = get_transient( $cache_key );
+		$this->assertFalse( $transient_exists, 'Invalid cache should be deleted' );
+	}
+
+	/**
+	 * Test cache stores all required fields.
+	 */
+	public function test_cache_stores_required_fields(): void
+	{
+		$cache_key = 'ai_feedback_review_test_fields';
+
+		// Create comprehensive review data.
+		$review_data = array(
+			'review_id'    => 'test-uuid-fields',
+			'model'        => 'claude-opus-4',
+			'summary'      => 'Excellent content',
+			'summary_text' => 'The article is well-structured and informative.',
+			'feedback'     => array(
+				array(
+					'block_id' => 'block-1',
+					'text'     => 'Great introduction',
+					'severity' => 'praise',
+				),
+				array(
+					'block_id' => 'block-2',
+					'text'     => 'Add more examples',
+					'severity' => 'suggestion',
+				),
+			),
+			'cached_at'    => time(),
+		);
+
+		// Cache the review.
+		$this->service->test_cache_review( $cache_key, $review_data );
+
+		// Verify transient contains all fields.
+		$cached = get_transient( $cache_key );
+
+		$this->assertIsArray( $cached, 'Cached data should be an array' );
+		$this->assertArrayHasKey( 'review_id', $cached, 'Cache should have review_id' );
+		$this->assertArrayHasKey( 'model', $cached, 'Cache should have model' );
+		$this->assertArrayHasKey( 'summary', $cached, 'Cache should have summary' );
+		$this->assertArrayHasKey( 'summary_text', $cached, 'Cache should have summary_text' );
+		$this->assertArrayHasKey( 'feedback', $cached, 'Cache should have feedback' );
+		$this->assertArrayHasKey( 'cached_at', $cached, 'Cache should have cached_at timestamp' );
 	}
 }

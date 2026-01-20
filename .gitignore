@@ -5,4 +5,4 @@ build/
 .phpunit.cache/
 artifacts/
 test-results/
-playwright-report/
+playwright-report/.phpunit.result.cache
