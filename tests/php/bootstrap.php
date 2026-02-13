@@ -86,8 +86,8 @@ if (! class_exists('WP_Error') ) {
             return $codes[0] ?? '';
         }
 
-        / **
-        * Retrieve all error codes stored in the object.
+        /**
+         * Retrieve all error codes stored in the object.
         *
         * @return array An array of error codes present in the error collection; empty if no errors.
         */
@@ -211,5 +211,36 @@ if (! function_exists('sanitize_text_field') ) {
     function sanitize_text_field( $str )
     {
         return $str;
+    }
+}
+
+if (! function_exists('wp_parse_args') ) {
+    /**
+     * Merge user-defined arguments into defaults array.
+     *
+     * @param  string|array $args     Value to merge with $defaults.
+     * @param  array        $defaults Array that serves as the defaults.
+     * @return array Merged array.
+     */
+    function wp_parse_args( $args, $defaults = array() )
+    {
+        if ( is_string( $args ) ) {
+            parse_str( $args, $args );
+        }
+        return array_merge( $defaults, $args );
+    }
+}
+
+if (! function_exists('wp_strip_all_tags') ) {
+    /**
+     * Strip all HTML tags including script and style contents.
+     *
+     * @param  string $text          String to strip tags from.
+     * @param  bool   $remove_breaks Whether to remove line breaks.
+     * @return string Stripped string.
+     */
+    function wp_strip_all_tags( $text, $remove_breaks = false )
+    {
+        return strip_tags( $text );
     }
 }
