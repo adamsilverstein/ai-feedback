@@ -201,8 +201,8 @@ class Prompt_Builder {
 		$formatted = array();
 
 		foreach ( $blocks as $block ) {
-			$client_id  = $block['clientId'] ?? 'unknown';
-			$block_type = $block['name'] ?? 'unknown';
+			$client_id  = sanitize_text_field( $block['clientId'] ?? 'unknown' );
+			$block_type = sanitize_text_field( $block['name'] ?? 'unknown' );
 			$content    = $block['content'] ?? '';
 
 			// Truncate very long content.
@@ -215,14 +215,14 @@ class Prompt_Builder {
 				continue;
 			}
 
-			$hint       = $this->get_block_type_hint( $block_type );
+			$hint       = sanitize_text_field( $this->get_block_type_hint( $block_type ) );
 			$type_label = $hint ? $block_type . ' - ' . $hint : $block_type;
 
 			$formatted[] = sprintf(
 				"Block ID: %s [%s]\n%s",
 				$client_id,
 				$type_label,
-				$content
+				wp_strip_all_tags( $content )
 			);
 		}
 
