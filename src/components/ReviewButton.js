@@ -48,6 +48,7 @@ export default function ReviewButton() {
 		selectedModel,
 		focusAreas,
 		targetTone,
+		feedbackLocale,
 	} = useSelect(
 		(select) => ({
 			postId: select(editorStore).getCurrentPostId(),
@@ -58,6 +59,7 @@ export default function ReviewButton() {
 			selectedModel: select(STORE_NAME).getSelectedModel(),
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
+			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
 		}),
 		[]
 	);
@@ -91,6 +93,7 @@ export default function ReviewButton() {
 				model: selectedModel,
 				focusAreas,
 				targetTone,
+				locale: feedbackLocale,
 			});
 		} catch (error) {
 			// Error is already in the store
