@@ -12,7 +12,7 @@ import { __ } from '@wordpress/i18n';
  */
 function handleSkipClick(e) {
 	e.preventDefault();
-	const targetId = e.target.getAttribute('href').slice(1);
+	const targetId = e.currentTarget.getAttribute('href').slice(1);
 	const target = document.getElementById(targetId);
 
 	if (target) {
