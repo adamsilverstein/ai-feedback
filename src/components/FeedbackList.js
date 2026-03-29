@@ -11,7 +11,7 @@ import FeedbackItem from './FeedbackItem';
  *
  * @param {Object} props               Component props.
  * @param {Array}  props.feedbackItems Array of feedback items.
- * @return {JSX.Element|null} Feedback list component.
+ * @return {Element|null} Feedback list component.
  */
 export default function FeedbackList({ feedbackItems }) {
 	if (!feedbackItems || feedbackItems.length === 0) {

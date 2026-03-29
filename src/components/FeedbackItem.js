@@ -69,7 +69,7 @@ function getSeverityLabel(severity) {
  * @param {Object}   props            Component props.
  * @param {Object}   props.item       Feedback item data.
  * @param {Function} props.onNavigate Navigation callback.
- * @return {JSX.Element} Feedback item component.
+ * @return {Element} Feedback item component.
  */
 function SingleFeedbackItem({ item, onNavigate }) {
 	return (
@@ -119,7 +119,7 @@ function SingleFeedbackItem({ item, onNavigate }) {
  * @param {Object}   props            Component props.
  * @param {Object}   props.item       Grouped feedback item data.
  * @param {Function} props.onNavigate Navigation callback.
- * @return {JSX.Element} Feedback group component.
+ * @return {Element} Feedback group component.
  */
 function GroupedFeedbackItem({ item, onNavigate }) {
 	const [expanded, setExpanded] = useState(false);
@@ -202,7 +202,7 @@ function GroupedFeedbackItem({ item, onNavigate }) {
  *
  * @param {Object} props      Component props.
  * @param {Object} props.item Feedback item data.
- * @return {JSX.Element} Feedback item component.
+ * @return {Element} Feedback item component.
  */
 export default function FeedbackItem({ item }) {
 	const handleNavigate = (blockId) => {

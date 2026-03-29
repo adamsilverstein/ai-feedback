@@ -261,7 +261,7 @@ class Notes_Manager {
 
 		// Add grouping metadata if this is a grouped item.
 		if ( ! empty( $feedback_item['is_group'] ) ) {
-			$meta['is_group']   = '1';
+			$meta['is_group']    = '1';
 			$meta['group_count'] = $feedback_item['count'] ?? 1;
 			if ( ! empty( $feedback_item['block_ids'] ) ) {
 				$meta['group_block_ids'] = wp_json_encode( $feedback_item['block_ids'] );
@@ -348,9 +348,9 @@ class Notes_Manager {
 		$notes = array();
 
 		foreach ( $comments as $comment ) {
-			$is_group     = get_comment_meta( $comment->comment_ID, 'is_group', true );
-			$block_ids    = array();
-			$group_count  = 1;
+			$is_group       = get_comment_meta( $comment->comment_ID, 'is_group', true );
+			$block_ids      = array();
+			$group_count    = 1;
 			$original_title = '';
 
 			// If this is a grouped note, decode the block_ids.
