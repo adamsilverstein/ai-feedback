@@ -81,6 +81,7 @@ class Review_Controller extends WP_REST_Controller {
 		$model             = $request->get_param( 'model' );
 		$focus_areas       = $request->get_param( 'focus_areas' );
 		$target_tone       = $request->get_param( 'target_tone' );
+		$locale            = $request->get_param( 'locale' );
 		$existing_feedback = $request->get_param( 'existing_feedback' );
 
 		// Debug logging.
@@ -129,6 +130,7 @@ class Review_Controller extends WP_REST_Controller {
 			'model'             => $model,
 			'focus_areas'       => $focus_areas,
 			'target_tone'       => $target_tone,
+			'locale'            => $locale,
 			'blocks'            => $blocks,
 			'post_title'        => $title,
 			'existing_feedback' => is_array( $existing_feedback ) ? $existing_feedback : array(),
@@ -242,6 +244,13 @@ class Review_Controller extends WP_REST_Controller {
 				'default'           => 'professional',
 				'sanitize_callback' => 'sanitize_text_field',
 				'enum'              => array( 'professional', 'casual', 'academic', 'friendly' ),
+			),
+			'locale'            => array(
+				'required'          => false,
+				'type'              => 'string',
+				'default'           => 'auto',
+				'sanitize_callback' => 'sanitize_text_field',
+				'description'       => __( 'Locale for feedback language.', 'ai-feedback' ),
 			),
 			'existing_feedback' => array(
 				'required'    => false,
