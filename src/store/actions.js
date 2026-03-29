@@ -91,6 +91,7 @@ export function* updateSettings(settings) {
  * @param {string} options.model      AI model to use.
  * @param {Array}  options.focusAreas Focus areas.
  * @param {string} options.targetTone Target tone.
+ * @param {string} options.locale     Feedback locale.
  * @return {Object} Action object.
  */
 export function* startReview({
@@ -100,6 +101,7 @@ export function* startReview({
 	model,
 	focusAreas,
 	targetTone,
+	locale,
 }) {
 	// eslint-disable-next-line no-console
 	console.log('[AI-Feedback] Starting review', {
@@ -109,6 +111,7 @@ export function* startReview({
 		model,
 		focusAreas,
 		targetTone,
+		locale,
 	});
 
 	// eslint-disable-next-line no-console
@@ -147,6 +150,7 @@ export function* startReview({
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
+				locale,
 				existing_feedback: existingFeedback,
 			},
 		});

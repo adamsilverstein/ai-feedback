@@ -3,13 +3,14 @@
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
+import FeedbackList from './FeedbackList';
 
 /**
  * Review Summary component.
  *
  * @param {Object} props        Component props.
  * @param {Object} props.review Review object.
- * @return {JSX.Element} Review summary component.
+ * @return {Element} Review summary component.
  */
 export default function ReviewSummary({ review }) {
 	// Debug logging when review changes
@@ -251,6 +252,14 @@ export default function ReviewSummary({ review }) {
 							'ai-feedback'
 						)}
 					</p>
+				</div>
+			)}
+
+			{/* Detailed feedback list */}
+			{hasNotes && notes && notes.length > 0 && (
+				<div className="feedback-details">
+					<h4>{__('Feedback Details', 'ai-feedback')}</h4>
+					<FeedbackList feedbackItems={notes} />
 				</div>
 			)}
 		</section>

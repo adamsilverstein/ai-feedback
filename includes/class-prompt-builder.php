@@ -30,6 +30,7 @@ class Prompt_Builder {
 			'focus_areas' => array( 'content', 'tone', 'flow' ),
 			'target_tone' => 'professional',
 			'post_title'  => '',
+			'locale'      => get_locale(),
 		);
 
 		$options = wp_parse_args( $options, $defaults );
@@ -42,6 +43,9 @@ class Prompt_Builder {
 
 		// Build tone guidance.
 		$tone_guidance = $this->build_tone_guidance( $options['target_tone'] );
+
+		// Build language instruction.
+		$language_instruction = $this->get_language_instruction( $options['locale'] );
 
 		// Build existing feedback section for continuation reviews.
 		$existing_feedback_section = '';
@@ -64,6 +68,7 @@ class Prompt_Builder {
 		$prompt .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
 		$prompt .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
 		$prompt .= "TARGET TONE:\n" . $tone_guidance;
+		$prompt .= $language_instruction;
 		$prompt .= $continuation_instructions . "\n\n";
 		$prompt .= $this->get_block_type_instructions() . "\n\n";
 		$prompt .= "INSTRUCTIONS:\n";
@@ -338,5 +343,71 @@ class Prompt_Builder {
 		);
 
 		return $hints[ $block_type ] ?? '';
+	}
+
+	/**
+	 * Get default language configurations.
+	 *
+	 * @return array Language configurations.
+	 */
+	private function get_default_language_configs(): array {
+		return array(
+			'es_ES' => array(
+				'name'        => 'Spanish',
+				'instruction' => 'Provide all feedback in Spanish. Apply Spanish grammar and style conventions. Consider RAE (Real Academia Española) guidelines.',
+			),
+			'fr_FR' => array(
+				'name'        => 'French',
+				'instruction' => 'Provide all feedback in French. Apply French grammar rules including accent marks and agreement. Consider Académie française guidelines.',
+			),
+			'de_DE' => array(
+				'name'        => 'German',
+				'instruction' => 'Provide all feedback in German. Apply German grammar rules including case and compound words. Consider Duden guidelines.',
+			),
+			'it_IT' => array(
+				'name'        => 'Italian',
+				'instruction' => 'Provide all feedback in Italian. Apply Italian grammar and style conventions.',
+			),
+			'pt_BR' => array(
+				'name'        => 'Brazilian Portuguese',
+				'instruction' => 'Provide all feedback in Brazilian Portuguese. Apply Brazilian Portuguese conventions.',
+			),
+			'nl_NL' => array(
+				'name'        => 'Dutch',
+				'instruction' => 'Provide all feedback in Dutch. Apply Dutch grammar and spelling conventions.',
+			),
+			'ja'    => array(
+				'name'        => 'Japanese',
+				'instruction' => 'Provide all feedback in Japanese. Consider keigo (敬語) levels appropriate for the content type.',
+			),
+			'zh_CN' => array(
+				'name'        => 'Simplified Chinese',
+				'instruction' => 'Provide all feedback in Simplified Chinese.',
+			),
+		);
+	}
+
+	/**
+	 * Get language instruction for the AI based on locale.
+	 *
+	 * @param  string $locale WordPress locale code.
+	 * @return string Language instruction for the prompt.
+	 */
+	private function get_language_instruction( string $locale ): string {
+		$language_configs = $this->get_default_language_configs();
+
+		// Allow filtering of language configurations.
+		$language_configs = apply_filters( 'ai_feedback_language_configs', $language_configs );
+
+		if ( isset( $language_configs[ $locale ] ) ) {
+			return sprintf(
+				"\n\n## LANGUAGE\n\nThe content is in %s. %s\n",
+				$language_configs[ $locale ]['name'],
+				$language_configs[ $locale ]['instruction']
+			);
+		}
+
+		// Default to English.
+		return "\n\n## LANGUAGE\n\nProvide feedback in English.\n";
 	}
 }

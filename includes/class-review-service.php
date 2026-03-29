@@ -106,6 +106,11 @@ class Review_Service {
 			$options['post_title'] = $post->post_title;
 		}
 
+		// Resolve locale if set to 'auto' or not provided.
+		if ( empty( $options['locale'] ) || 'auto' === $options['locale'] ) {
+			$options['locale'] = get_locale();
+		}
+
 		// Get existing feedback for continuation reviews if not already provided.
 		$existing_feedback = $options['existing_feedback'] ?? array();
 		$is_continuation   = ! empty( $existing_feedback );

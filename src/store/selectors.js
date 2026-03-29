@@ -73,6 +73,26 @@ export function getTargetTone(state) {
 }
 
 /**
+ * Get available locales.
+ *
+ * @param {Object} state Store state.
+ * @return {Array} Available locales.
+ */
+export function getAvailableLocales(state) {
+	return state.availableLocales;
+}
+
+/**
+ * Get feedback locale.
+ *
+ * @param {Object} state Store state.
+ * @return {string} Feedback locale.
+ */
+export function getFeedbackLocale(state) {
+	return state.settings.feedbackLocale;
+}
+
+/**
  * Check if a review is in progress.
  *
  * @param {Object} state Store state.
