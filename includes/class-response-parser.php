@@ -692,8 +692,8 @@ class Response_Parser {
 	private function create_group_key( array $item ): string {
 		// Normalize title for grouping.
 		$normalized = strtolower( $item['title'] );
-		// Replace spaces with underscores to preserve word boundaries.
-		$normalized = str_replace( ' ', '_', $normalized );
+		// Replace spaces and hyphens with underscores to preserve word boundaries.
+		$normalized = str_replace( array( ' ', '-' ), '_', $normalized );
 		// Remove special characters but keep alphanumeric and underscores.
 		$normalized = preg_replace( '/[^a-z0-9_]/', '', $normalized );
 
