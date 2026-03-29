@@ -10,6 +10,7 @@ import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 
 import ModelSelector from './ModelSelector';
+import LanguageSelector from './LanguageSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
@@ -83,6 +84,7 @@ export default function AIFeedbackPanel() {
 		selectedModel,
 		focusAreas,
 		targetTone,
+		feedbackLocale,
 		postTitle,
 		availableModels,
 	} = useSelect(
@@ -96,6 +98,7 @@ export default function AIFeedbackPanel() {
 			selectedModel: select(STORE_NAME).getSelectedModel(),
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
+			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
 		}),
@@ -128,6 +131,7 @@ export default function AIFeedbackPanel() {
 				model: selectedModel,
 				focusAreas,
 				targetTone,
+				locale: feedbackLocale,
 			});
 		} catch (reviewError) {
 			// Error is already in the store, no additional action needed
@@ -188,6 +192,16 @@ export default function AIFeedbackPanel() {
 							initialOpen={true}
 						>
 							<ModelSelector />
+							<LanguageSelector />
+						</PanelBody>
+					)}
+
+					{availableModels.length === 1 && (
+						<PanelBody
+							title={__('Review Settings', 'ai-feedback')}
+							initialOpen={true}
+						>
+							<LanguageSelector />
 						</PanelBody>
 					)}
 
