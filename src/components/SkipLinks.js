@@ -10,21 +10,21 @@ import { __ } from '@wordpress/i18n';
  *
  * @param {Event} e Click event.
  */
-function handleSkipClick( e ) {
+function handleSkipClick(e) {
 	e.preventDefault();
-	const targetId = e.target.getAttribute( 'href' ).slice( 1 );
-	const target = document.getElementById( targetId );
+	const targetId = e.target.getAttribute('href').slice(1);
+	const target = document.getElementById(targetId);
 
-	if ( target ) {
+	if (target) {
 		// Make the target focusable if it isn't already
-		target.setAttribute( 'tabindex', '-1' );
+		target.setAttribute('tabindex', '-1');
 		target.focus();
 
 		// Remove tabindex after blur to maintain normal tab order
 		target.addEventListener(
 			'blur',
 			() => {
-				target.removeAttribute( 'tabindex' );
+				target.removeAttribute('tabindex');
 			},
 			{ once: true }
 		);
@@ -37,39 +37,39 @@ function handleSkipClick( e ) {
  * @param {Object}  props            Component props.
  * @param {boolean} props.hasResults Whether review results are available.
  * @param {boolean} props.showModel  Whether model selector is visible.
- * @return {JSX.Element} Skip links component.
+ * @return {Element} Skip links component.
  */
-export default function SkipLinks( { hasResults, showModel } ) {
+export default function SkipLinks({ hasResults, showModel }) {
 	return (
 		<nav
 			className="ai-feedback-skip-links"
-			aria-label={ __( 'Skip links', 'ai-feedback' ) }
+			aria-label={__('Skip links', 'ai-feedback')}
 		>
-			{ showModel && (
+			{showModel && (
 				<a
 					href="#ai-feedback-model-select"
 					className="skip-link"
-					onClick={ handleSkipClick }
+					onClick={handleSkipClick}
 				>
-					{ __( 'Skip to model selection', 'ai-feedback' ) }
+					{__('Skip to model selection', 'ai-feedback')}
 				</a>
-			) }
+			)}
 			<a
 				href="#ai-feedback-review-button"
 				className="skip-link"
-				onClick={ handleSkipClick }
+				onClick={handleSkipClick}
 			>
-				{ __( 'Skip to review button', 'ai-feedback' ) }
+				{__('Skip to review button', 'ai-feedback')}
 			</a>
-			{ hasResults && (
+			{hasResults && (
 				<a
 					href="#ai-feedback-results"
 					className="skip-link"
-					onClick={ handleSkipClick }
+					onClick={handleSkipClick}
 				>
-					{ __( 'Skip to review results', 'ai-feedback' ) }
+					{__('Skip to review results', 'ai-feedback')}
 				</a>
-			) }
+			)}
 		</nav>
 	);
 }

@@ -18,13 +18,13 @@ export function* fetchSettings() {
 	yield { type: TYPES.SET_LOADING_SETTINGS, isLoading: true };
 
 	try {
-		const settings = yield apiFetch( {
+		const settings = yield apiFetch({
 			path: '/ai-feedback/v1/settings',
 			method: 'GET',
-		} );
+		});
 
 		return settings;
-	} catch ( error ) {
+	} catch (error) {
 		yield {
 			type: TYPES.REVIEW_ERROR,
 			error: {
@@ -43,7 +43,7 @@ export function* fetchSettings() {
  * @param {Object} settings Settings object.
  * @return {Object} Action object.
  */
-export function receiveSettings( settings ) {
+export function receiveSettings(settings) {
 	return {
 		type: TYPES.SET_SETTINGS,
 		settings,
@@ -56,19 +56,19 @@ export function receiveSettings( settings ) {
  * @param {Object} settings Settings to update.
  * @return {Object} Action object.
  */
-export function* updateSettings( settings ) {
+export function* updateSettings(settings) {
 	try {
-		const response = yield apiFetch( {
+		const response = yield apiFetch({
 			path: '/ai-feedback/v1/settings',
 			method: 'POST',
 			data: settings,
-		} );
+		});
 
 		return {
 			type: TYPES.SET_SETTINGS,
 			settings: response,
 		};
-	} catch ( error ) {
+	} catch (error) {
 		yield {
 			type: TYPES.REVIEW_ERROR,
 			error: {
@@ -91,34 +91,37 @@ export function* updateSettings( settings ) {
  * @param {string} options.model      AI model to use.
  * @param {Array}  options.focusAreas Focus areas.
  * @param {string} options.targetTone Target tone.
+ * @param {string} options.locale     Feedback locale.
  * @return {Object} Action object.
  */
-export function* startReview( {
+export function* startReview({
 	postId,
 	title,
 	blocks,
 	model,
 	focusAreas,
 	targetTone,
-} ) {
+	locale,
+}) {
 	// eslint-disable-next-line no-console
-	console.log( '[AI-Feedback] Starting review', {
+	console.log('[AI-Feedback] Starting review', {
 		postId,
 		title,
 		blocksCount: blocks.length,
 		model,
 		focusAreas,
 		targetTone,
-	} );
+		locale,
+	});
 
 	// eslint-disable-next-line no-console
 	console.log(
 		'[AI-Feedback] Blocks being sent:',
-		blocks.map( ( b ) => ( {
+		blocks.map((b) => ({
 			clientId: b.clientId,
 			name: b.name,
 			contentLength: b.content?.length || 0,
-		} ) )
+		}))
 	);
 
 	yield { type: TYPES.START_REVIEW };
@@ -126,18 +129,18 @@ export function* startReview( {
 	try {
 		// Fetch existing feedback history for continuation reviews.
 		// This will include unresolved notes with their user replies.
-		const feedbackHistory = yield* fetchFeedbackHistory( postId );
+		const feedbackHistory = yield* fetchFeedbackHistory(postId);
 		const existingFeedback = feedbackHistory.has_history
 			? feedbackHistory.notes
 			: [];
 
 		// eslint-disable-next-line no-console
-		console.log( '[AI-Feedback] Existing feedback for continuation:', {
+		console.log('[AI-Feedback] Existing feedback for continuation:', {
 			hasHistory: feedbackHistory.has_history,
 			feedbackCount: existingFeedback.length,
-		} );
+		});
 
-		const response = yield apiFetch( {
+		const response = yield apiFetch({
 			path: '/ai-feedback/v1/review',
 			method: 'POST',
 			data: {
@@ -147,12 +150,13 @@ export function* startReview( {
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
+				locale,
 				existing_feedback: existingFeedback,
 			},
-		} );
+		});
 
 		// eslint-disable-next-line no-console
-		console.log( '[AI-Feedback] Review API response received:', {
+		console.log('[AI-Feedback] Review API response received:', {
 			reviewId: response.review_id,
 			postId: response.post_id,
 			model: response.model,
@@ -160,20 +164,20 @@ export function* startReview( {
 			notesCount: response.notes?.length || 0,
 			noteIdsCount: response.note_ids?.length || 0,
 			blockMappingKeys: response.block_mapping
-				? Object.keys( response.block_mapping )
+				? Object.keys(response.block_mapping)
 				: [],
-			summaryText: response.summary_text?.substring( 0, 100 ) + '...',
-			hasSummary: !! response.summary,
-		} );
+			summaryText: response.summary_text?.substring(0, 100) + '...',
+			hasSummary: !!response.summary,
+		});
 
 		// Debug: Log full response for inspection
 		// eslint-disable-next-line no-console
-		console.log( '[AI-Feedback] Full response:', response );
+		console.log('[AI-Feedback] Full response:', response);
 
 		// Update block metadata with note IDs if block_mapping is present
 		if (
 			response.block_mapping &&
-			Object.keys( response.block_mapping ).length > 0
+			Object.keys(response.block_mapping).length > 0
 		) {
 			// eslint-disable-next-line no-console
 			console.log(
@@ -186,19 +190,17 @@ export function* startReview( {
 			let updatedCount = 0;
 			let errorCount = 0;
 
-			Object.entries( response.block_mapping ).forEach(
-				( [ clientId, noteId ] ) => {
+			Object.entries(response.block_mapping).forEach(
+				([clientId, noteId]) => {
 					try {
 						// Get the current block to access existing metadata
 						const block =
-							registrySelect( blockEditorStore ).getBlock(
-								clientId
-							);
+							registrySelect(blockEditorStore).getBlock(clientId);
 
-						if ( ! block ) {
+						if (!block) {
 							// eslint-disable-next-line no-console
 							console.warn(
-								`[AI-Feedback] Block ${ clientId } not found in editor`
+								`[AI-Feedback] Block ${clientId} not found in editor`
 							);
 							errorCount++;
 							return;
@@ -210,7 +212,7 @@ export function* startReview( {
 
 						// eslint-disable-next-line no-console
 						console.log(
-							`[AI-Feedback] Updating block ${ clientId } with noteId ${ noteId }`,
+							`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`,
 							{
 								existingMetadata,
 								blockName: block.name,
@@ -220,22 +222,22 @@ export function* startReview( {
 						// Update block attributes with the noteId in metadata
 						registryDispatch(
 							blockEditorStore
-						).updateBlockAttributes( clientId, {
+						).updateBlockAttributes(clientId, {
 							metadata: {
 								...existingMetadata,
 								noteId,
 							},
-						} );
+						});
 
 						// eslint-disable-next-line no-console
 						console.log(
-							`[AI-Feedback] Successfully updated block ${ clientId } with noteId ${ noteId }`
+							`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`
 						);
 						updatedCount++;
-					} catch ( error ) {
+					} catch (error) {
 						// eslint-disable-next-line no-console
 						console.error(
-							`[AI-Feedback] Could not update block ${ clientId }:`,
+							`[AI-Feedback] Could not update block ${clientId}:`,
 							error.message,
 							error
 						);
@@ -246,7 +248,7 @@ export function* startReview( {
 
 			// eslint-disable-next-line no-console
 			console.log(
-				`[AI-Feedback] Block metadata update complete: ${ updatedCount } updated, ${ errorCount } errors`
+				`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`
 			);
 
 			// Invalidate core notes/comments resolution to force a refresh in the UI.
@@ -254,7 +256,7 @@ export function* startReview( {
 			try {
 				// Inject the notes directly into the core data store.
 				// We use 'root' kind and exact query params used by Gutenberg's useBlockComments.
-				if ( response.notes && response.notes.length > 0 ) {
+				if (response.notes && response.notes.length > 0) {
 					const queryArgs = {
 						post: postId,
 						type: 'note',
@@ -262,7 +264,7 @@ export function* startReview( {
 						per_page: -1,
 					};
 
-					registryDispatch( 'core' ).receiveEntityRecords(
+					registryDispatch('core').receiveEntityRecords(
 						'root',
 						'comment',
 						response.notes,
@@ -271,18 +273,18 @@ export function* startReview( {
 					);
 
 					// Also explicitly invalidate to be sure.
-					registryDispatch( 'core' ).invalidateResolution(
+					registryDispatch('core').invalidateResolution(
 						'getEntityRecords',
-						[ 'root', 'comment', queryArgs ]
+						['root', 'comment', queryArgs]
 					);
 				}
 
 				// Also try to invalidate core/notes if it exists.
-				registryDispatch( 'core/notes' )?.invalidateResolution(
+				registryDispatch('core/notes')?.invalidateResolution(
 					'getNotes',
-					[ postId ]
+					[postId]
 				);
-			} catch ( e ) {
+			} catch (e) {
 				// Fallback to core comments invalidation if specific store isn't available.
 				try {
 					const queryArgs = {
@@ -291,15 +293,15 @@ export function* startReview( {
 						status: 'all',
 						per_page: -1,
 					};
-					registryDispatch( 'core' )?.invalidateResolution(
+					registryDispatch('core')?.invalidateResolution(
 						'getComments',
 						{ post: postId }
 					);
-					registryDispatch( 'core' )?.invalidateResolution(
+					registryDispatch('core')?.invalidateResolution(
 						'getEntityRecords',
-						[ 'root', 'comment', queryArgs ]
+						['root', 'comment', queryArgs]
 					);
-				} catch ( e2 ) {
+				} catch (e2) {
 					// Ignore errors if stores aren't initialized yet.
 				}
 			}
@@ -311,9 +313,7 @@ export function* startReview( {
 			};
 		} else {
 			// eslint-disable-next-line no-console
-			console.log(
-				'[AI-Feedback] No block_mapping in response or empty'
-			);
+			console.log('[AI-Feedback] No block_mapping in response or empty');
 		}
 
 		// eslint-disable-next-line no-console
@@ -325,9 +325,9 @@ export function* startReview( {
 			type: TYPES.REVIEW_SUCCESS,
 			review: response,
 		};
-	} catch ( error ) {
+	} catch (error) {
 		// eslint-disable-next-line no-console
-		console.error( '[AI-Feedback] Review failed:', error );
+		console.error('[AI-Feedback] Review failed:', error);
 
 		return {
 			type: TYPES.REVIEW_ERROR,
@@ -347,7 +347,7 @@ export function* startReview( {
  * @param {Object} blockMapping Map of clientId to noteId.
  * @return {Object} Action object.
  */
-export function updateBlockNotes( blockMapping ) {
+export function updateBlockNotes(blockMapping) {
 	return {
 		type: TYPES.UPDATE_BLOCK_NOTES,
 		blockMapping,
@@ -371,7 +371,7 @@ export function clearError() {
  * @param {Array} models Available models.
  * @return {Object} Action object.
  */
-export function setAvailableModels( models ) {
+export function setAvailableModels(models) {
 	return {
 		type: TYPES.SET_AVAILABLE_MODELS,
 		models,
@@ -384,7 +384,7 @@ export function setAvailableModels( models ) {
  * @param {Array} areas Available focus areas.
  * @return {Object} Action object.
  */
-export function setAvailableFocusAreas( areas ) {
+export function setAvailableFocusAreas(areas) {
 	return {
 		type: TYPES.SET_AVAILABLE_FOCUS_AREAS,
 		areas,
@@ -397,7 +397,7 @@ export function setAvailableFocusAreas( areas ) {
  * @param {Array} tones Available tones.
  * @return {Object} Action object.
  */
-export function setAvailableTones( tones ) {
+export function setAvailableTones(tones) {
 	return {
 		type: TYPES.SET_AVAILABLE_TONES,
 		tones,
@@ -410,23 +410,23 @@ export function setAvailableTones( tones ) {
  * @param {number} postId Post ID.
  * @return {Object} Action object.
  */
-export function* fetchPreviousReview( postId ) {
+export function* fetchPreviousReview(postId) {
 	yield { type: TYPES.FETCHING_PREVIOUS_REVIEW };
 
 	try {
-		const response = yield apiFetch( {
-			path: `/ai-feedback/v1/notes/post/${ postId }/latest-review`,
+		const response = yield apiFetch({
+			path: `/ai-feedback/v1/notes/post/${postId}/latest-review`,
 			method: 'GET',
-		} );
+		});
 
 		// eslint-disable-next-line no-console
-		console.log( '[AI-Feedback] Previous review fetched:', {
+		console.log('[AI-Feedback] Previous review fetched:', {
 			hasReview: response.has_review,
 			reviewId: response.review?.review_id,
 			noteCount: response.review?.note_count,
-		} );
+		});
 
-		if ( response.has_review && response.review ) {
+		if (response.has_review && response.review) {
 			return {
 				type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 				review: response.review,
@@ -437,12 +437,9 @@ export function* fetchPreviousReview( postId ) {
 			type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 			review: null,
 		};
-	} catch ( error ) {
+	} catch (error) {
 		// eslint-disable-next-line no-console
-		console.error(
-			'[AI-Feedback] Failed to fetch previous review:',
-			error
-		);
+		console.error('[AI-Feedback] Failed to fetch previous review:', error);
 		return {
 			type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 			review: null,
@@ -456,7 +453,7 @@ export function* fetchPreviousReview( postId ) {
  * @param {Object|null} review Review object or null.
  * @return {Object} Action object.
  */
-export function receivePreviousReview( review ) {
+export function receivePreviousReview(review) {
 	return {
 		type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 		review,
@@ -469,26 +466,23 @@ export function receivePreviousReview( review ) {
  * @param {number} postId Post ID.
  * @return {Object} Feedback history response.
  */
-export function* fetchFeedbackHistory( postId ) {
+export function* fetchFeedbackHistory(postId) {
 	try {
-		const response = yield apiFetch( {
-			path: `/ai-feedback/v1/notes/post/${ postId }/feedback-history`,
+		const response = yield apiFetch({
+			path: `/ai-feedback/v1/notes/post/${postId}/feedback-history`,
 			method: 'GET',
-		} );
+		});
 
 		// eslint-disable-next-line no-console
-		console.log( '[AI-Feedback] Feedback history fetched:', {
+		console.log('[AI-Feedback] Feedback history fetched:', {
 			hasHistory: response.has_history,
 			noteCount: response.total,
-		} );
+		});
 
 		return response;
-	} catch ( error ) {
+	} catch (error) {
 		// eslint-disable-next-line no-console
-		console.error(
-			'[AI-Feedback] Failed to fetch feedback history:',
-			error
-		);
+		console.error('[AI-Feedback] Failed to fetch feedback history:', error);
 		return { notes: [], has_history: false, total: 0 };
 	}
 }

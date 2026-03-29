@@ -15,56 +15,53 @@ import { __ } from '@wordpress/i18n';
  * @param {boolean}  props.isSaved       Whether the post is saved.
  * @return {JSX.Element} EmptyState component.
  */
-export default function EmptyState( {
+export default function EmptyState({
 	onStartReview,
 	canReview,
 	hasContent,
 	isSaved,
-} ) {
+}) {
 	return (
 		<div className="ai-feedback-empty-state">
 			<div className="ai-feedback-empty-icon">
-				<Icon icon={ commentContent } size={ 48 } />
+				<Icon icon={commentContent} size={48} />
 			</div>
 
-			<h4>{ __( 'No reviews yet', 'ai-feedback' ) }</h4>
+			<h4>{__('No reviews yet', 'ai-feedback')}</h4>
 
 			<p className="ai-feedback-empty-description">
-				{ __(
+				{__(
 					'Get AI-powered feedback on your writing to improve clarity, tone, and structure.',
 					'ai-feedback'
-				) }
+				)}
 			</p>
 
-			{ ! canReview ? (
+			{!canReview ? (
 				<div className="ai-feedback-empty-prereq">
-					<h5>{ __( 'Before you start:', 'ai-feedback' ) }</h5>
+					<h5>{__('Before you start:', 'ai-feedback')}</h5>
 					<ul>
-						{ ! hasContent && (
+						{!hasContent && (
 							<li>
-								<Icon icon={ pencil } size={ 16 } />
-								{ __(
+								<Icon icon={pencil} size={16} />
+								{__(
 									'Add some content to your post',
 									'ai-feedback'
-								) }
+								)}
 							</li>
-						) }
-						{ ! isSaved && (
+						)}
+						{!isSaved && (
 							<li>
-								<Icon icon={ check } size={ 16 } />
-								{ __(
-									'Save your post as a draft',
-									'ai-feedback'
-								) }
+								<Icon icon={check} size={16} />
+								{__('Save your post as a draft', 'ai-feedback')}
 							</li>
-						) }
+						)}
 					</ul>
 				</div>
 			) : (
-				<Button variant="primary" onClick={ onStartReview }>
-					{ __( 'Review Document', 'ai-feedback' ) }
+				<Button variant="primary" onClick={onStartReview}>
+					{__('Review Document', 'ai-feedback')}
 				</Button>
-			) }
+			)}
 		</div>
 	);
 }

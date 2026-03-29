@@ -27,7 +27,7 @@ const storeConfig = {
 	resolvers: {
 		*getSettings() {
 			const settings = yield actions.fetchSettings();
-			return actions.receiveSettings( settings );
+			return actions.receiveSettings(settings);
 		},
 
 		/**
@@ -38,14 +38,14 @@ const storeConfig = {
 		 */
 		*getLastReview() {
 			// Get the current post ID from the editor store.
-			const postId = select( editorStore ).getCurrentPostId();
+			const postId = select(editorStore).getCurrentPostId();
 
-			if ( ! postId ) {
+			if (!postId) {
 				// eslint-disable-next-line no-console
 				console.log(
 					'[AI-Feedback] No post ID available, skipping previous review fetch'
 				);
-				return actions.receivePreviousReview( null );
+				return actions.receivePreviousReview(null);
 			}
 
 			// Fetch the previous review.
@@ -56,7 +56,7 @@ const storeConfig = {
 			);
 
 			// Use the generator action to fetch.
-			const result = yield* actions.fetchPreviousReview( postId );
+			const result = yield* actions.fetchPreviousReview(postId);
 			return result;
 		},
 	},
@@ -65,8 +65,8 @@ const storeConfig = {
 /**
  * Create and register the store.
  */
-const store = createReduxStore( STORE_NAME, storeConfig );
-register( store );
+const store = createReduxStore(STORE_NAME, storeConfig);
+register(store);
 
 export { STORE_NAME };
 export default store;
