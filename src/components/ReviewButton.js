@@ -14,7 +14,7 @@ import { extractBlockData } from '../utils/block-utils';
  * Indeterminate Progress Bar component.
  * Shows an animated progress bar that moves back and forth.
  *
- * @return {JSX.Element} Progress bar component.
+ * @return {Element} Progress bar component.
  */
 function IndeterminateProgressBar() {
 	return (
@@ -36,7 +36,7 @@ function IndeterminateProgressBar() {
 /**
  * Review Button component.
  *
- * @return {JSX.Element} Review button component.
+ * @return {Element} Review button component.
  */
 export default function ReviewButton() {
 	const {

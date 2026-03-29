@@ -9,7 +9,7 @@ import { STORE_NAME } from '../store';
 /**
  * Model Selector component.
  *
- * @return {JSX.Element} Model selector component.
+ * @return {Element} Model selector component.
  */
 export default function ModelSelector() {
 	const { availableModels, selectedModel } = useSelect(

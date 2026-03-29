@@ -9,7 +9,7 @@ import { useEffect } from '@wordpress/element';
  *
  * @param {Object} props        Component props.
  * @param {Object} props.review Review object.
- * @return {JSX.Element} Review summary component.
+ * @return {Element} Review summary component.
  */
 export default function ReviewSummary({ review }) {
 	// Debug logging when review changes

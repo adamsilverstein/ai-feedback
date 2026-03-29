@@ -25,7 +25,7 @@ const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
  * Get action button for specific error types.
  *
  * @param {Object} error Error object with code, message, and data.
- * @return {JSX.Element|null} Action button or null.
+ * @return {Element|null} Action button or null.
  */
 function getErrorAction(error) {
 	// Check if error is related to API credits or billing.
@@ -70,7 +70,7 @@ function getErrorAction(error) {
 /**
  * AI Feedback Panel component.
  *
- * @return {JSX.Element} Panel component.
+ * @return {Element} Panel component.
  */
 export default function AIFeedbackPanel() {
 	const {
