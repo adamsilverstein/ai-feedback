@@ -22,6 +22,33 @@ $ai-feedback-text-muted: #595959;
 .ai-feedback-panel {
 	padding: 16px;
 
+	/* Focus indicators for keyboard navigation */
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	.components-button:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--wp-admin-theme-color, #007cba);
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.components-select-control__input:focus-visible {
+		border-color: var(--wp-admin-theme-color, #007cba);
+		box-shadow: 0 0 0 2px var(--wp-admin-theme-color, #007cba);
+		outline: none;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.components-checkbox-control__input:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--wp-admin-theme-color, #007cba);
+		outline: none;
+	}
+
+	a:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
 	.components-notice {
 		margin: 0 0 16px;
 	}
@@ -376,6 +403,11 @@ $ai-feedback-text-muted: #595959;
 .ai-feedback-item {
 	margin: 0;
 
+	&:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: -2px;
+	}
+
 	.components-card__body {
 		padding: 12px;
 	}
@@ -427,6 +459,11 @@ $ai-feedback-text-muted: #595959;
 /* Grouped Feedback Item Styles */
 .ai-feedback-group {
 	margin: 0;
+
+	&:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: -2px;
+	}
 
 	.components-card__header {
 		padding: 12px;
@@ -539,5 +576,31 @@ $ai-feedback-text-muted: #595959;
 		font-weight: 600;
 		margin: 0 0 12px;
 		color: #1e1e1e;
+	}
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+
+	.ai-feedback-panel .components-button:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.ai-feedback-panel .components-select-control__input:focus-visible,
+	/* stylelint-disable-next-line selector-class-pattern */
+	.ai-feedback-panel .components-checkbox-control__input:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;
+	}
+
+	.ai-feedback-item:focus-visible,
+	.ai-feedback-group:focus-visible {
+		outline: 3px solid currentcolor;
+		outline-offset: -3px;
+	}
+
+	.ai-feedback-panel a:focus-visible {
+		outline: 3px solid currentcolor;
+		outline-offset: 3px;
 	}
 }
