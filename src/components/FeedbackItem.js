@@ -73,7 +73,7 @@ function getSeverityLabel(severity) {
  */
 function SingleFeedbackItem({ item, onNavigate }) {
 	return (
-		<Card className="ai-feedback-item" size="small">
+		<Card className="ai-feedback-item" size="small" tabIndex={0}>
 			<CardBody>
 				<div className="ai-feedback-item-header">
 					<span
@@ -125,7 +125,7 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 	const [expanded, setExpanded] = useState(false);
 
 	return (
-		<Card className="ai-feedback-group" size="small">
+		<Card className="ai-feedback-group" size="small" tabIndex={0}>
 			<CardHeader>
 				<div className="ai-feedback-group-header">
 					<Button
