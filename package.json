@@ -53,6 +53,7 @@
 		"@playwright/test": "^1.57.0",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/react": "^16.3.0",
+		"@testing-library/user-event": "^14.6.1",
 		"@wordpress/blocks": "^15.10.0",
 		"@wordpress/env": "^10.36.0",
 		"@wordpress/scripts": "^31.6.0",
