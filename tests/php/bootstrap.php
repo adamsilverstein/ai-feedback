@@ -36,6 +36,58 @@ if (! function_exists('esc_html__') ) {
     }
 }
 
+// Mock WP REST classes if not available.
+if ( ! class_exists( 'WP_REST_Controller' ) ) {
+	class WP_REST_Controller {
+		protected $namespace;
+		protected $rest_base;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE = 'GET';
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		public $data;
+		public $status;
+
+		public function __construct( $data = null, $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+
+		public function get_data() {
+			return $this->data;
+		}
+
+		public function get_status() {
+			return $this->status;
+		}
+	}
+}
+
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	/**
+	 * Mock get_bloginfo for tests.
+	 *
+	 * @param  string $show The info to retrieve.
+	 * @return string The requested info.
+	 */
+	function get_bloginfo( $show ) {
+		if ( 'version' === $show ) {
+			return '7.0';
+		}
+		return '';
+	}
+}
+
+// Load classes that depend on WP REST mocks.
+require_once $includes_dir . 'class-health-controller.php';
+
 // Mock WP_Error class if not available.
 if (! class_exists('WP_Error') ) {
     class WP_Error
