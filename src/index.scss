@@ -93,6 +93,27 @@ $ai-feedback-text-muted: #595959;
 	}
 }
 
+.ai-feedback-focus-areas {
+	margin: 12px 0 0;
+	padding: 0;
+	border: 0;
+
+	legend {
+		font-weight: 600;
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		margin-bottom: 8px;
+		color: $ai-feedback-text-muted;
+	}
+
+	> .description {
+		margin: 0 0 12px;
+		font-size: 12px;
+		color: $ai-feedback-text-muted;
+	}
+}
+
 .ai-feedback-settings {
 
 	fieldset {

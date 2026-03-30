@@ -11,6 +11,8 @@ import { hasTextContent, extractBlockData } from '../utils/block-utils';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
+import FocusAreaSelector from './FocusAreaSelector';
+import ToneSelector from './ToneSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
@@ -186,24 +188,15 @@ export default function AIFeedbackPanel() {
 				/>
 			) : (
 				<>
-					{availableModels.length > 1 && (
-						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
-							initialOpen={true}
-						>
-							<ModelSelector />
-							<LanguageSelector />
-						</PanelBody>
-					)}
-
-					{availableModels.length === 1 && (
-						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
-							initialOpen={true}
-						>
-							<LanguageSelector />
-						</PanelBody>
-					)}
+					<PanelBody
+						title={__('Review Settings', 'ai-feedback')}
+						initialOpen={true}
+					>
+						{availableModels.length > 1 && <ModelSelector />}
+						<LanguageSelector />
+						<ToneSelector />
+						<FocusAreaSelector />
+					</PanelBody>
 
 					<PanelBody
 						title={__('Review Document', 'ai-feedback')}
