@@ -43,11 +43,12 @@ export default function FocusAreaSelector() {
 	);
 
 	const { updateSettings } = useDispatch(STORE_NAME);
+	const selectedAreas = Array.isArray(focusAreas) ? focusAreas : [];
 
 	const handleChange = (areaId, checked) => {
 		const updated = checked
-			? [...focusAreas, areaId]
-			: focusAreas.filter((id) => id !== areaId);
+			? [...selectedAreas, areaId]
+			: selectedAreas.filter((id) => id !== areaId);
 
 		updateSettings({
 			default_focus_areas: updated,
@@ -71,7 +72,7 @@ export default function FocusAreaSelector() {
 				<CheckboxControl
 					key={area.id}
 					label={area.label}
-					checked={focusAreas.includes(area.id)}
+					checked={selectedAreas.includes(area.id)}
 					onChange={(checked) => handleChange(area.id, checked)}
 					help={FOCUS_AREA_HELP[area.id] || area.description}
 				/>

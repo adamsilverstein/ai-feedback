@@ -14,15 +14,17 @@ jest.mock('@wordpress/data', () => ({
 }));
 
 jest.mock('@wordpress/components', () => ({
+	// eslint-disable-next-line jsx-a11y/label-has-associated-control
 	CheckboxControl: ({ label, checked, onChange, help }) => (
-		<label>
+		<label htmlFor={`cb-${label}`}>
+			{label}
 			<input
+				id={`cb-${label}`}
 				type="checkbox"
 				checked={checked}
 				onChange={(e) => onChange(e.target.checked)}
 				aria-label={label}
 			/>
-			{label}
 			{help && <span>{help}</span>}
 		</label>
 	),
@@ -37,15 +39,26 @@ jest.mock('../../store', () => ({
 }));
 
 const MOCK_FOCUS_AREAS = [
-	{ id: 'content', label: 'Content Quality', description: 'Clarity, accuracy' },
+	{
+		id: 'content',
+		label: 'Content Quality',
+		description: 'Clarity, accuracy',
+	},
 	{ id: 'tone', label: 'Tone & Voice', description: 'Consistency' },
 	{ id: 'flow', label: 'Flow & Structure', description: 'Progression' },
-	{ id: 'design', label: 'Design & Formatting', description: 'Visual hierarchy' },
+	{
+		id: 'design',
+		label: 'Design & Formatting',
+		description: 'Visual hierarchy',
+	},
 ];
 
 const mockUpdateSettings = jest.fn();
 
-function setupMocks(focusAreas = ['content', 'tone', 'flow'], availableFocusAreas = MOCK_FOCUS_AREAS) {
+function setupMocks(
+	focusAreas = ['content', 'tone', 'flow'],
+	availableFocusAreas = MOCK_FOCUS_AREAS
+) {
 	useSelect.mockImplementation((selector) =>
 		selector(() => ({
 			getAvailableFocusAreas: () => availableFocusAreas,
@@ -67,7 +80,9 @@ describe('FocusAreaSelector', () => {
 		expect(screen.getByLabelText('Content Quality')).toBeInTheDocument();
 		expect(screen.getByLabelText('Tone & Voice')).toBeInTheDocument();
 		expect(screen.getByLabelText('Flow & Structure')).toBeInTheDocument();
-		expect(screen.getByLabelText('Design & Formatting')).toBeInTheDocument();
+		expect(
+			screen.getByLabelText('Design & Formatting')
+		).toBeInTheDocument();
 	});
 
 	it('checks boxes matching selected focus areas', () => {
@@ -113,7 +128,9 @@ describe('FocusAreaSelector', () => {
 		setupMocks();
 		render(<FocusAreaSelector />);
 
-		expect(screen.getByText(/grammar, spelling, clarity/i)).toBeInTheDocument();
+		expect(
+			screen.getByText(/grammar, spelling, clarity/i)
+		).toBeInTheDocument();
 		expect(screen.getByText(/voice consistency/i)).toBeInTheDocument();
 		expect(screen.getByText(/logical progression/i)).toBeInTheDocument();
 		expect(screen.getByText(/formatting, headings/i)).toBeInTheDocument();

@@ -14,10 +14,12 @@ jest.mock('@wordpress/data', () => ({
 }));
 
 jest.mock('@wordpress/components', () => ({
+	// eslint-disable-next-line jsx-a11y/label-has-associated-control
 	SelectControl: ({ label, value, options, onChange, help }) => (
-		<label>
+		<label htmlFor={`sel-${label}`}>
 			{label}
 			<select
+				id={`sel-${label}`}
 				aria-label={label}
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -127,8 +129,6 @@ describe('ToneSelector', () => {
 		setupMocks('casual');
 		render(<ToneSelector />);
 
-		expect(
-			screen.getByText(/blogs and social media/i)
-		).toBeInTheDocument();
+		expect(screen.getByText(/blogs and social media/i)).toBeInTheDocument();
 	});
 });
