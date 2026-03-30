@@ -21,6 +21,19 @@ if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
 
+// Mock WordPress core functions.
+if ( ! function_exists( 'get_locale' ) ) {
+	function get_locale() {
+		return 'en_US';
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook_name, $value ) {
+		return $value;
+	}
+}
+
 // Mock WordPress translation functions.
 if (! function_exists('__') ) {
     function __( $text, $domain = 'default' )

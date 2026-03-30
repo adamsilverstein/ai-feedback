@@ -93,6 +93,7 @@ class Prompt_Builder {
 		$prompt .= "    }\n";
 		$prompt .= "  ]\n";
 		$prompt .= "}\n\n";
+		$prompt .= $this->get_few_shot_examples() . "\n\n";
 		$prompt .= "IMPORTANT:\n";
 		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
 		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
@@ -409,5 +410,66 @@ class Prompt_Builder {
 
 		// Default to English.
 		return "\n\n## LANGUAGE\n\nProvide feedback in English.\n";
+	}
+
+	/**
+	 * Get few-shot examples to guide consistent AI output.
+	 *
+	 * Provides reference examples for each feedback category and severity
+	 * level so the AI produces consistently formatted, high-quality feedback.
+	 *
+	 * @return string Few-shot examples for the prompt.
+	 */
+	private function get_few_shot_examples(): string {
+		$examples  = "REFERENCE EXAMPLES:\n";
+		$examples .= "Use these as a guide for the quality, format, and tone of your feedback:\n\n";
+
+		$examples .= "Content quality example:\n";
+		$examples .= "{\n";
+		$examples .= '  "block_id": "example-1",' . "\n";
+		$examples .= '  "category": "content",' . "\n";
+		$examples .= '  "severity": "important",' . "\n";
+		$examples .= '  "title": "Cite your source",' . "\n";
+		$examples .= '  "feedback": "The statistic \'80% of users prefer...\' needs attribution. Unsourced data weakens credibility.",' . "\n";
+		$examples .= '  "suggestion": "Add source: \'According to [Study Name, Year], 80% of users prefer...\'"' . "\n";
+		$examples .= "}\n\n";
+
+		$examples .= "Tone example:\n";
+		$examples .= "{\n";
+		$examples .= '  "block_id": "example-2",' . "\n";
+		$examples .= '  "category": "tone",' . "\n";
+		$examples .= '  "severity": "suggestion",' . "\n";
+		$examples .= '  "title": "Match formal tone",' . "\n";
+		$examples .= '  "feedback": "The phrase \'pretty cool feature\' is too casual for this technical document.",' . "\n";
+		$examples .= '  "suggestion": "Replace with: \'This feature significantly improves...\'"' . "\n";
+		$examples .= "}\n\n";
+
+		$examples .= "Flow example:\n";
+		$examples .= "{\n";
+		$examples .= '  "block_id": "example-3",' . "\n";
+		$examples .= '  "category": "flow",' . "\n";
+		$examples .= '  "severity": "important",' . "\n";
+		$examples .= '  "title": "Add transition",' . "\n";
+		$examples .= '  "feedback": "Abrupt topic shift between pricing and features. Readers need context.",' . "\n";
+		$examples .= '  "suggestion": "Add transition: \'Beyond pricing benefits, the feature also offers...\'"' . "\n";
+		$examples .= "}\n\n";
+
+		$examples .= "Design example:\n";
+		$examples .= "{\n";
+		$examples .= '  "block_id": "example-4",' . "\n";
+		$examples .= '  "category": "design",' . "\n";
+		$examples .= '  "severity": "suggestion",' . "\n";
+		$examples .= '  "title": "Use a list for scannability",' . "\n";
+		$examples .= '  "feedback": "Five items listed in one paragraph are hard to scan.",' . "\n";
+		$examples .= '  "suggestion": "Convert to a bulleted list with one item per benefit."' . "\n";
+		$examples .= "}\n\n";
+
+		$examples .= "When content is well-written, return minimal or no feedback:\n";
+		$examples .= "{\n";
+		$examples .= '  "summary": "Well-structured content with clear arguments and consistent tone.",' . "\n";
+		$examples .= '  "feedback": []' . "\n";
+		$examples .= '}';
+
+		return $examples;
 	}
 }

@@ -276,4 +276,74 @@ class PromptBuilderTest extends TestCase {
 		$this->assertGreaterThan( $block_type_pos, $instructions_pos );
 		$this->assertGreaterThan( $instructions_pos, $output_pos );
 	}
+
+	/**
+	 * Test few-shot examples contain all four categories.
+	 */
+	public function test_few_shot_examples_cover_all_categories(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples' );
+
+		$this->assertStringContainsString( '"category": "content"', $examples );
+		$this->assertStringContainsString( '"category": "tone"', $examples );
+		$this->assertStringContainsString( '"category": "flow"', $examples );
+		$this->assertStringContainsString( '"category": "design"', $examples );
+	}
+
+	/**
+	 * Test few-shot examples include both severity levels.
+	 */
+	public function test_few_shot_examples_cover_severities(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples' );
+
+		$this->assertStringContainsString( '"severity": "important"', $examples );
+		$this->assertStringContainsString( '"severity": "suggestion"', $examples );
+	}
+
+	/**
+	 * Test few-shot examples include good content case.
+	 */
+	public function test_few_shot_examples_include_good_content_case(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples' );
+
+		$this->assertStringContainsString( '"feedback": []', $examples );
+	}
+
+	/**
+	 * Test few-shot examples are included in the full prompt.
+	 */
+	public function test_few_shot_examples_in_prompt(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'test-1',
+				'name'     => 'core/paragraph',
+				'content'  => 'Test content.',
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringContainsString( 'REFERENCE EXAMPLES:', $prompt );
+	}
+
+	/**
+	 * Test few-shot examples appear between OUTPUT FORMAT and IMPORTANT.
+	 */
+	public function test_few_shot_examples_position(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'test-1',
+				'name'     => 'core/paragraph',
+				'content'  => 'Test content.',
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$output_pos   = strpos( $prompt, 'OUTPUT FORMAT:' );
+		$examples_pos = strpos( $prompt, 'REFERENCE EXAMPLES:' );
+		$important_pos = strpos( $prompt, 'IMPORTANT:' );
+
+		$this->assertGreaterThan( $output_pos, $examples_pos );
+		$this->assertGreaterThan( $examples_pos, $important_pos );
+	}
 }
