@@ -44,6 +44,10 @@ export default function ToneSelector() {
 
 	const { updateSettings } = useDispatch(STORE_NAME);
 
+	if (!availableTones || availableTones.length === 0) {
+		return null;
+	}
+
 	const options = availableTones.map((tone) => ({
 		label: tone.label,
 		value: tone.id,
