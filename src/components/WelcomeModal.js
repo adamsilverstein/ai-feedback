@@ -16,7 +16,7 @@ const AI_SETTINGS_URL = '/wp-admin/options-general.php?page=wp-ai-client';
 /**
  * WelcomeModal component shown on first sidebar open.
  *
- * @return {JSX.Element|null} WelcomeModal component or null if already welcomed.
+ * @return {Element|null} WelcomeModal component or null if already welcomed.
  */
 export default function WelcomeModal() {
 	const [isOpen, setIsOpen] = useState(false);

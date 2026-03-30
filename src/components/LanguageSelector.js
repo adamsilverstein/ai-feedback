@@ -9,7 +9,7 @@ import { STORE_NAME } from '../store';
 /**
  * Language Selector component.
  *
- * @return {JSX.Element} Language selector component.
+ * @return {Element} Language selector component.
  */
 export default function LanguageSelector() {
 	const { availableLocales, feedbackLocale } = useSelect(

@@ -7,6 +7,7 @@ const {
 	Editor,
 	PageUtils,
 	RequestUtils,
+	// eslint-disable-next-line import/no-extraneous-dependencies
 } = require('@wordpress/e2e-test-utils-playwright');
 
 /**
