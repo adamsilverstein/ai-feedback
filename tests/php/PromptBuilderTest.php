@@ -270,11 +270,18 @@ class PromptBuilderTest extends TestCase {
 		$instructions_pos = strpos( $prompt, 'INSTRUCTIONS:' );
 		$output_pos       = strpos( $prompt, 'OUTPUT FORMAT:' );
 
-		$this->assertGreaterThan( $doc_pos, $focus_pos );
-		$this->assertGreaterThan( $focus_pos, $tone_pos );
-		$this->assertGreaterThan( $tone_pos, $block_type_pos );
-		$this->assertGreaterThan( $block_type_pos, $instructions_pos );
-		$this->assertGreaterThan( $instructions_pos, $output_pos );
+		$this->assertNotFalse( $doc_pos, 'DOCUMENT BLOCKS section must exist' );
+		$this->assertNotFalse( $focus_pos, 'FOCUS AREAS section must exist' );
+		$this->assertNotFalse( $tone_pos, 'TARGET TONE section must exist' );
+		$this->assertNotFalse( $block_type_pos, 'BLOCK-TYPE SPECIFIC GUIDANCE section must exist' );
+		$this->assertNotFalse( $instructions_pos, 'INSTRUCTIONS section must exist' );
+		$this->assertNotFalse( $output_pos, 'OUTPUT FORMAT section must exist' );
+
+		$this->assertLessThan( $focus_pos, $doc_pos );
+		$this->assertLessThan( $tone_pos, $focus_pos );
+		$this->assertLessThan( $block_type_pos, $tone_pos );
+		$this->assertLessThan( $instructions_pos, $block_type_pos );
+		$this->assertLessThan( $output_pos, $instructions_pos );
 	}
 
 	/**
@@ -309,6 +316,16 @@ class PromptBuilderTest extends TestCase {
 	}
 
 	/**
+	 * Test few-shot examples wrap items in the full response structure.
+	 */
+	public function test_few_shot_examples_show_full_response_structure(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples' );
+
+		$this->assertStringContainsString( '"summary":', $examples );
+		$this->assertStringContainsString( '"feedback": [', $examples );
+	}
+
+	/**
 	 * Test few-shot examples are included in the full prompt.
 	 */
 	public function test_few_shot_examples_in_prompt(): void {
@@ -339,11 +356,52 @@ class PromptBuilderTest extends TestCase {
 
 		$prompt = $this->builder->build_review_prompt( $blocks );
 
-		$output_pos   = strpos( $prompt, 'OUTPUT FORMAT:' );
-		$examples_pos = strpos( $prompt, 'REFERENCE EXAMPLES:' );
+		$output_pos    = strpos( $prompt, 'OUTPUT FORMAT:' );
+		$examples_pos  = strpos( $prompt, 'REFERENCE EXAMPLES:' );
 		$important_pos = strpos( $prompt, 'IMPORTANT:' );
 
-		$this->assertGreaterThan( $output_pos, $examples_pos );
-		$this->assertGreaterThan( $examples_pos, $important_pos );
+		$this->assertNotFalse( $output_pos, 'OUTPUT FORMAT section must exist' );
+		$this->assertNotFalse( $examples_pos, 'REFERENCE EXAMPLES section must exist' );
+		$this->assertNotFalse( $important_pos, 'IMPORTANT section must exist' );
+
+		$this->assertLessThan( $examples_pos, $output_pos );
+		$this->assertLessThan( $important_pos, $examples_pos );
+	}
+
+	/**
+	 * Test few-shot examples include language note for non-English locales.
+	 */
+	public function test_few_shot_examples_locale_note_for_non_english(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples', array( 'es_ES' ) );
+
+		$this->assertStringContainsString( 'language specified in the LANGUAGE section', $examples );
+	}
+
+	/**
+	 * Test few-shot examples omit language note for English locale.
+	 */
+	public function test_few_shot_examples_no_locale_note_for_english(): void {
+		$examples = $this->invoke_private( 'get_few_shot_examples', array( 'en_US' ) );
+
+		$this->assertStringNotContainsString( 'language specified in the LANGUAGE section', $examples );
+	}
+
+	/**
+	 * Test few-shot examples are skipped when prompt is too long.
+	 */
+	public function test_few_shot_examples_skipped_for_long_prompts(): void {
+		// Create enough blocks to push the prompt over the 12000-char budget.
+		$blocks = array();
+		for ( $i = 0; $i < 10; $i++ ) {
+			$blocks[] = array(
+				'clientId' => "long-$i",
+				'name'     => 'core/paragraph',
+				'content'  => str_repeat( 'Word ', 400 ),
+			);
+		}
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringNotContainsString( 'REFERENCE EXAMPLES:', $prompt );
 	}
 }

@@ -93,7 +93,13 @@ class Prompt_Builder {
 		$prompt .= "    }\n";
 		$prompt .= "  ]\n";
 		$prompt .= "}\n\n";
-		$prompt .= $this->get_few_shot_examples() . "\n\n";
+		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] );
+
+		// Only append examples if the prompt stays within a safe token budget.
+		if ( strlen( $prompt ) + strlen( $few_shot_examples ) < 12000 ) {
+			$prompt .= $few_shot_examples . "\n\n";
+		}
+
 		$prompt .= "IMPORTANT:\n";
 		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
 		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
@@ -418,58 +424,98 @@ class Prompt_Builder {
 	 * Provides reference examples for each feedback category and severity
 	 * level so the AI produces consistently formatted, high-quality feedback.
 	 *
+	 * @param  string $locale WordPress locale code.
 	 * @return string Few-shot examples for the prompt.
 	 */
-	private function get_few_shot_examples(): string {
-		$examples  = "REFERENCE EXAMPLES:\n";
-		$examples .= "Use these as a guide for the quality, format, and tone of your feedback:\n\n";
+	private function get_few_shot_examples( string $locale = 'en_US' ): string {
+		$language_note = '';
+		if ( 'en_US' !== $locale && 'en' !== substr( $locale, 0, 2 ) ) {
+			$language_note = "Note: These examples are in English for format reference only. "
+				. "Your actual feedback MUST be written in the language specified in the LANGUAGE section above.\n\n";
+		}
 
-		$examples .= "Content quality example:\n";
-		$examples .= "{\n";
-		$examples .= '  "block_id": "example-1",' . "\n";
-		$examples .= '  "category": "content",' . "\n";
-		$examples .= '  "severity": "important",' . "\n";
-		$examples .= '  "title": "Cite your source",' . "\n";
-		$examples .= '  "feedback": "The statistic \'80% of users prefer...\' needs attribution. Unsourced data weakens credibility.",' . "\n";
-		$examples .= '  "suggestion": "Add source: \'According to [Study Name, Year], 80% of users prefer...\'"' . "\n";
-		$examples .= "}\n\n";
+		$examples = <<<'EOT'
+REFERENCE EXAMPLES:
+Use these as a guide for the quality, format, and tone of your feedback.
+Each item in the "feedback" array should follow this format:
 
-		$examples .= "Tone example:\n";
-		$examples .= "{\n";
-		$examples .= '  "block_id": "example-2",' . "\n";
-		$examples .= '  "category": "tone",' . "\n";
-		$examples .= '  "severity": "suggestion",' . "\n";
-		$examples .= '  "title": "Match formal tone",' . "\n";
-		$examples .= '  "feedback": "The phrase \'pretty cool feature\' is too casual for this technical document.",' . "\n";
-		$examples .= '  "suggestion": "Replace with: \'This feature significantly improves...\'"' . "\n";
-		$examples .= "}\n\n";
+Content quality example (severity: important):
+{
+  "summary": "The document has strong structure but several claims lack supporting evidence.",
+  "feedback": [
+    {
+      "block_id": "example-1",
+      "category": "content",
+      "severity": "important",
+      "title": "Cite your source",
+      "feedback": "The statistic '80% of users prefer...' needs attribution. Unsourced data weakens credibility.",
+      "suggestion": "Add source: 'According to [Study Name, Year], 80% of users prefer...'"
+    }
+  ]
+}
 
-		$examples .= "Flow example:\n";
-		$examples .= "{\n";
-		$examples .= '  "block_id": "example-3",' . "\n";
-		$examples .= '  "category": "flow",' . "\n";
-		$examples .= '  "severity": "important",' . "\n";
-		$examples .= '  "title": "Add transition",' . "\n";
-		$examples .= '  "feedback": "Abrupt topic shift between pricing and features. Readers need context.",' . "\n";
-		$examples .= '  "suggestion": "Add transition: \'Beyond pricing benefits, the feature also offers...\'"' . "\n";
-		$examples .= "}\n\n";
+Tone example (severity: suggestion):
+{
+  "summary": "Good content overall, but a few phrases break the formal tone.",
+  "feedback": [
+    {
+      "block_id": "example-2",
+      "category": "tone",
+      "severity": "suggestion",
+      "title": "Match formal tone",
+      "feedback": "The phrase 'pretty cool feature' is too casual for this technical document.",
+      "suggestion": "Replace with: 'This feature significantly improves...'"
+    }
+  ]
+}
 
-		$examples .= "Design example:\n";
-		$examples .= "{\n";
-		$examples .= '  "block_id": "example-4",' . "\n";
-		$examples .= '  "category": "design",' . "\n";
-		$examples .= '  "severity": "suggestion",' . "\n";
-		$examples .= '  "title": "Use a list for scannability",' . "\n";
-		$examples .= '  "feedback": "Five items listed in one paragraph are hard to scan.",' . "\n";
-		$examples .= '  "suggestion": "Convert to a bulleted list with one item per benefit."' . "\n";
-		$examples .= "}\n\n";
+Flow example (severity: important):
+{
+  "summary": "Content is well-written but transitions between sections need work.",
+  "feedback": [
+    {
+      "block_id": "example-3",
+      "category": "flow",
+      "severity": "important",
+      "title": "Add transition",
+      "feedback": "Abrupt topic shift between pricing and features. Readers need context.",
+      "suggestion": "Add transition: 'Beyond pricing benefits, the feature also offers...'"
+    }
+  ]
+}
 
-		$examples .= "When content is well-written, return minimal or no feedback:\n";
-		$examples .= "{\n";
-		$examples .= '  "summary": "Well-structured content with clear arguments and consistent tone.",' . "\n";
-		$examples .= '  "feedback": []' . "\n";
-		$examples .= '}';
+Design example (severity: suggestion):
+{
+  "summary": "Content reads well but formatting could improve scannability.",
+  "feedback": [
+    {
+      "block_id": "example-4",
+      "category": "design",
+      "severity": "suggestion",
+      "title": "Use a list for scannability",
+      "feedback": "Five items listed in one paragraph are hard to scan.",
+      "suggestion": "Convert to a bulleted list with one item per benefit."
+    }
+  ]
+}
 
-		return $examples;
+When content is well-written, return minimal or no feedback:
+{
+  "summary": "Well-structured content with clear arguments and consistent tone.",
+  "feedback": []
+}
+EOT;
+
+		$examples = $language_note . $examples;
+
+		/**
+		 * Filters the few-shot examples appended to the AI review prompt.
+		 *
+		 * Return an empty string to disable few-shot examples entirely.
+		 *
+		 * @param string $examples The formatted few-shot examples.
+		 * @param string $locale   The current WordPress locale.
+		 */
+		return apply_filters( 'ai_feedback_few_shot_examples', $examples, $locale );
 	}
 }
