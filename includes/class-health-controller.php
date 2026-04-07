@@ -10,6 +10,7 @@ namespace AI_Feedback;
 use WP_REST_Controller;
 use WP_REST_Server;
 use WP_REST_Response;
+use WP_Error;
 
 /**
  * Health check REST API controller.
@@ -56,10 +57,18 @@ class Health_Controller extends WP_REST_Controller {
 	 * Requires edit_posts capability so only authenticated editors
 	 * and above can access dependency/version details.
 	 *
-	 * @return bool
+	 * @return true|WP_Error
 	 */
-	public function get_health_permissions_check(): bool {
-		return \current_user_can( 'edit_posts' );
+	public function get_health_permissions_check() {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to access health status.', 'ai-feedback' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -69,17 +78,18 @@ class Health_Controller extends WP_REST_Controller {
 	 */
 	public function get_health(): WP_REST_Response {
 		$ai_available = class_exists( 'WordPress\AiClient\AiClient' );
+		$notes_api    = version_compare( get_bloginfo( 'version' ), '6.9', '>=' );
 
-		$status = $ai_available ? 'ok' : 'degraded';
+		$status = ( $ai_available && $notes_api ) ? 'ok' : 'degraded';
 
 		return new WP_REST_Response(
 			array(
 				'status'       => $status,
 				'version'      => AI_FEEDBACK_VERSION,
 				'ai_available' => $ai_available,
-				'notes_api'    => true,
+				'notes_api'    => $notes_api,
 				'php_version'  => PHP_VERSION,
-				'wp_version'   => \get_bloginfo( 'version' ),
+				'wp_version'   => get_bloginfo( 'version' ),
 			)
 		);
 	}

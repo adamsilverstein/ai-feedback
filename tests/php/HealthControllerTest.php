@@ -15,7 +15,6 @@ if ( ! defined( 'AI_FEEDBACK_VERSION' ) ) {
 	define( 'AI_FEEDBACK_VERSION', '0.1.0' );
 }
 
-
 /**
  * Test cases for Health_Controller.
  */
@@ -34,6 +33,16 @@ class HealthControllerTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		$this->controller = new Health_Controller();
+		// Default to authenticated user with permissions.
+		$GLOBALS['test_current_user_can'] = true;
+	}
+
+	/**
+	 * Clean up globals after each test.
+	 */
+	protected function tearDown(): void {
+		unset( $GLOBALS['test_current_user_can'] );
+		parent::tearDown();
 	}
 
 	/**
@@ -52,13 +61,13 @@ class HealthControllerTest extends TestCase {
 	}
 
 	/**
-	 * Test health response returns correct version.
+	 * Test health response returns correct version using constant.
 	 */
 	public function test_health_response_version(): void {
 		$response = $this->controller->get_health();
 		$data     = $response->get_data();
 
-		$this->assertSame( '0.1.0', $data['version'] );
+		$this->assertSame( AI_FEEDBACK_VERSION, $data['version'] );
 	}
 
 	/**
@@ -82,9 +91,20 @@ class HealthControllerTest extends TestCase {
 	}
 
 	/**
-	 * Test notes_api is always true.
+	 * Test notes_api is computed dynamically from WP version.
 	 */
-	public function test_health_response_notes_api(): void {
+	public function test_health_response_notes_api_is_boolean(): void {
+		$response = $this->controller->get_health();
+		$data     = $response->get_data();
+
+		$this->assertIsBool( $data['notes_api'] );
+	}
+
+	/**
+	 * Test notes_api is true when WP version >= 6.9.
+	 */
+	public function test_health_notes_api_true_for_supported_wp(): void {
+		// Our mock returns '7.0' which is >= 6.9.
 		$response = $this->controller->get_health();
 		$data     = $response->get_data();
 
@@ -102,17 +122,29 @@ class HealthControllerTest extends TestCase {
 	}
 
 	/**
-	 * Test status reflects AI availability.
+	 * Test status is ok when both AI client and Notes API are available.
 	 */
-	public function test_health_status_reflects_ai_availability(): void {
+	public function test_health_status_ok_when_dependencies_available(): void {
 		$response = $this->controller->get_health();
 		$data     = $response->get_data();
 
-		if ( $data['ai_available'] ) {
+		// In the test environment AiClient is loaded via Composer and
+		// the mocked WP version is 7.0 (>= 6.9), so both are available.
+		if ( $data['ai_available'] && $data['notes_api'] ) {
 			$this->assertSame( 'ok', $data['status'] );
 		} else {
 			$this->assertSame( 'degraded', $data['status'] );
 		}
+	}
+
+	/**
+	 * Test status value is always ok or degraded.
+	 */
+	public function test_health_status_is_valid_value(): void {
+		$response = $this->controller->get_health();
+		$data     = $response->get_data();
+
+		$this->assertContains( $data['status'], array( 'ok', 'degraded' ) );
 	}
 
 	/**
@@ -122,5 +154,28 @@ class HealthControllerTest extends TestCase {
 		$response = $this->controller->get_health();
 
 		$this->assertSame( 200, $response->get_status() );
+	}
+
+	/**
+	 * Test permission check returns true for authorized users.
+	 */
+	public function test_permissions_check_allows_authorized_user(): void {
+		$GLOBALS['test_current_user_can'] = true;
+
+		$result = $this->controller->get_health_permissions_check();
+
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * Test permission check returns WP_Error for unauthorized users.
+	 */
+	public function test_permissions_check_denies_unauthorized_user(): void {
+		$GLOBALS['test_current_user_can'] = false;
+
+		$result = $this->controller->get_health_permissions_check();
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
 	}
 }

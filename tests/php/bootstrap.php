@@ -85,6 +85,20 @@ if ( ! function_exists( 'get_bloginfo' ) ) {
 	}
 }
 
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * Mock current_user_can for tests.
+	 *
+	 * Defaults to true. Override via $GLOBALS['test_current_user_can'].
+	 *
+	 * @param  string $capability The capability to check.
+	 * @return bool Whether the user has the capability.
+	 */
+	function current_user_can( $capability ) {
+		return $GLOBALS['test_current_user_can'] ?? true;
+	}
+}
+
 // Load classes that depend on WP REST mocks.
 require_once $includes_dir . 'class-health-controller.php';
 
