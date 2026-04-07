@@ -58,9 +58,11 @@ export default function EmptyState({
 					</ul>
 				</div>
 			) : (
-				<Button variant="primary" onClick={onStartReview}>
-					{__('Review Document', 'ai-feedback')}
-				</Button>
+				<div id="ai-feedback-review-button">
+					<Button variant="primary" onClick={onStartReview}>
+						{__('Review Document', 'ai-feedback')}
+					</Button>
+				</div>
 			)}
 		</div>
 	);

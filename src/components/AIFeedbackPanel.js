@@ -150,7 +150,6 @@ export default function AIFeedbackPanel() {
 	}
 
 	const showModelSelector = availableModels.length > 1;
-	const hasReviewContent = lastReview || isReviewing;
 
 	return (
 		<div className="ai-feedback-panel">
@@ -160,12 +159,10 @@ export default function AIFeedbackPanel() {
 				lastReview={lastReview}
 				error={error}
 			/>
-			{hasReviewContent && (
-				<SkipLinks
-					hasResults={!!lastReview}
-					showModel={showModelSelector}
-				/>
-			)}
+			<SkipLinks
+				hasResults={!!lastReview}
+				showModel={showModelSelector}
+			/>
 			{error && (
 				<Notice
 					status="error"

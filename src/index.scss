@@ -22,6 +22,7 @@
 
 	.skip-link {
 		/* Hidden state using clip pattern (matches screen-reader-text) */
+		display: block;
 		border: 0;
 		clip: rect(1px, 1px, 1px, 1px);
 		clip-path: inset(50%);

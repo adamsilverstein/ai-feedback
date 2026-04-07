@@ -5,23 +5,6 @@ const { test, expect } = require('../fixtures');
 
 test.describe('Skip Links', () => {
 	test.beforeEach(async ({ admin, page, editor, aiFeedback }) => {
-		// Mock the review endpoint to return a successful response
-		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					review_id: 1,
-					post_id: 1,
-					model: 'test-model',
-					note_count: 2,
-					notes: [],
-					summary_text: 'Test review summary',
-					block_mapping: {},
-				}),
-			});
-		});
-
 		await admin.createNewPost();
 
 		// Add content and save
@@ -38,17 +21,6 @@ test.describe('Skip Links', () => {
 		});
 
 		await aiFeedback.openSidebar();
-
-		// Click review to show skip links (they only appear after review content exists)
-		await page
-			.getByRole('button', { name: 'Review Document' })
-			.first()
-			.click();
-
-		// Wait for the review to complete
-		await expect(
-			page.getByRole('button', { name: 'Last Review' })
-		).toBeVisible({ timeout: 5000 });
 	});
 
 	test('skip links are hidden by default', async ({ page }) => {
@@ -57,9 +29,9 @@ test.describe('Skip Links', () => {
 		const count = await skipLinks.count();
 		expect(count).toBeGreaterThan(0);
 
-		// None of them should be visible
+		// None of them should be visible (they are visually hidden via CSS clip)
 		for (let i = 0; i < count; i++) {
-			await expect(skipLinks.nth(i)).not.toBeInViewport();
+			await expect(skipLinks.nth(i)).not.toBeVisible();
 		}
 	});
 
@@ -86,7 +58,20 @@ test.describe('Skip Links', () => {
 
 	test('skip to review results link appears when results exist', async ({
 		page,
+		aiFeedback,
 	}) => {
+		// Mock and run a review so results exist
+		await aiFeedback.mockReviewAPI({
+			review_id: 1,
+			post_id: 1,
+			model: 'test-model',
+			note_count: 2,
+			notes: [],
+			summary_text: 'Test review summary',
+			block_mapping: {},
+		});
+		await aiFeedback.startReviewAndWait();
+
 		const resultsLink = page.locator(
 			'a.skip-link[href="#ai-feedback-results"]'
 		);
@@ -111,7 +96,20 @@ test.describe('Skip Links', () => {
 
 	test('skip link target receives visible focus indicator', async ({
 		page,
+		aiFeedback,
 	}) => {
+		// Mock and run a review so results target exists
+		await aiFeedback.mockReviewAPI({
+			review_id: 1,
+			post_id: 1,
+			model: 'test-model',
+			note_count: 2,
+			notes: [],
+			summary_text: 'Test review summary',
+			block_mapping: {},
+		});
+		await aiFeedback.startReviewAndWait();
+
 		// Focus and activate the skip link to review results
 		const skipLink = page.locator(
 			'a.skip-link[href="#ai-feedback-results"]'
