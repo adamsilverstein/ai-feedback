@@ -63,36 +63,36 @@ class Prompt_Builder {
 		}
 
 		// Construct the full prompt.
-		$prompt  = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
-		$prompt .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
-		$prompt .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
-		$prompt .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
-		$prompt .= "TARGET TONE:\n" . $tone_guidance;
-		$prompt .= $language_instruction;
-		$prompt .= $continuation_instructions . "\n\n";
-		$prompt .= $this->get_block_type_instructions() . "\n\n";
-		$prompt .= "INSTRUCTIONS:\n";
-		$prompt .= "- Provide specific, actionable feedback for each issue you identify\n";
-		$prompt .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
-		$prompt .= "- Prioritize the most impactful suggestions\n";
-		$prompt .= "- Be encouraging but honest\n";
-		$prompt .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
-		$prompt .= "- Include an overall summary of the document quality\n\n";
-		$prompt .= "OUTPUT FORMAT:\n";
-		$prompt .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
-		$prompt .= "{\n";
-		$prompt .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
-		$prompt .= '  "feedback": [' . "\n";
-		$prompt .= "    {\n";
-		$prompt .= '      "block_id": "abc123-def456",' . "\n";
-		$prompt .= '      "category": "content|tone|flow|design",' . "\n";
-		$prompt .= '      "severity": "suggestion|important|critical",' . "\n";
-		$prompt .= '      "title": "Brief title (max 50 chars)",' . "\n";
-		$prompt .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
-		$prompt .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
-		$prompt .= "    }\n";
-		$prompt .= "  ]\n";
-		$prompt .= "}\n\n";
+		$prompt            = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
+		$prompt           .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
+		$prompt           .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
+		$prompt           .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
+		$prompt           .= "TARGET TONE:\n" . $tone_guidance;
+		$prompt           .= $language_instruction;
+		$prompt           .= $continuation_instructions . "\n\n";
+		$prompt           .= $this->get_block_type_instructions() . "\n\n";
+		$prompt           .= "INSTRUCTIONS:\n";
+		$prompt           .= "- Provide specific, actionable feedback for each issue you identify\n";
+		$prompt           .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
+		$prompt           .= "- Prioritize the most impactful suggestions\n";
+		$prompt           .= "- Be encouraging but honest\n";
+		$prompt           .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
+		$prompt           .= "- Include an overall summary of the document quality\n\n";
+		$prompt           .= "OUTPUT FORMAT:\n";
+		$prompt           .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
+		$prompt           .= "{\n";
+		$prompt           .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
+		$prompt           .= '  "feedback": [' . "\n";
+		$prompt           .= "    {\n";
+		$prompt           .= '      "block_id": "abc123-def456",' . "\n";
+		$prompt           .= '      "category": "content|tone|flow|design",' . "\n";
+		$prompt           .= '      "severity": "suggestion|important|critical",' . "\n";
+		$prompt           .= '      "title": "Brief title (max 50 chars)",' . "\n";
+		$prompt           .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
+		$prompt           .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
+		$prompt           .= "    }\n";
+		$prompt           .= "  ]\n";
+		$prompt           .= "}\n\n";
 		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] ?? 'en_US' );
 
 		// Only append examples if the base prompt is already under the character
