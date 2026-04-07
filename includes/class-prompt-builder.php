@@ -93,9 +93,11 @@ class Prompt_Builder {
 		$prompt .= "    }\n";
 		$prompt .= "  ]\n";
 		$prompt .= "}\n\n";
-		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] );
+		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] ?? 'en_US' );
 
-		// Only append examples if the prompt stays within a safe token budget.
+		// Only append examples if the base prompt is already under the character
+		// budget. 12000 chars ≈ 3000 tokens — conservative to avoid inflating cost
+		// on very long documents while staying well within model context limits.
 		if ( strlen( $prompt ) + strlen( $few_shot_examples ) < 12000 ) {
 			$prompt .= $few_shot_examples . "\n\n";
 		}
@@ -430,8 +432,9 @@ class Prompt_Builder {
 	private function get_few_shot_examples( string $locale = 'en_US' ): string {
 		$language_note = '';
 		if ( 'en_US' !== $locale && 'en' !== substr( $locale, 0, 2 ) ) {
-			$language_note = "Note: These examples are in English for format reference only. "
-				. "Your actual feedback MUST be written in the language specified in the LANGUAGE section above.\n\n";
+			$language_note = 'Note: These examples are in English for format reference only. '
+				. 'Your actual feedback MUST be written in the language specified in the LANGUAGE section above.'
+				. "\n\n";
 		}
 
 		$examples = <<<'EOT'
