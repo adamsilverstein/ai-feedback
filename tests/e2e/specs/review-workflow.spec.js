@@ -33,26 +33,22 @@ test.describe('Review Workflow', () => {
 		// Button should exist in the panel
 		expect(buttonExists).toBe(true);
 
-		// The test passes if either of these conditions are met for an unsaved post:
-		// - Helper text is shown
-		// - Button is disabled
+		// For an unsaved post, at least one safeguard must be present
 		expect(hasHelperText || isDisabled).toBe(true);
 	});
 
 	test('review button enables after saving post with content', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Add title and paragraph content
-		await admin.createNewPost({ title: 'Test Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('This is test content for the AI review.');
-
-		// Save draft to get post ID
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{
+				title: 'Test Post',
+				content: 'This is test content for the AI review.',
+			},
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -69,17 +65,14 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('shows reviewing state when review is initiated', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup: Add content and save
-		await admin.createNewPost({ title: 'Test Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Test content for review.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Test Post', content: 'Test content for review.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -120,17 +113,14 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('displays review summary after completion', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup: Add content and save
-		await admin.createNewPost({ title: 'Test Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Test content for review.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Test Post', content: 'Test content for review.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -192,17 +182,14 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('shows success message when no issues found', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Perfect Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Well-written content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Perfect Post', content: 'Well-written content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -248,17 +235,14 @@ test.describe('Review Workflow', () => {
 	});
 
 	test('displays error message when API fails', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Error Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content to trigger error.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Error Post', content: 'Content to trigger error.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 

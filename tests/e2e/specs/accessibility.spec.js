@@ -37,9 +37,6 @@ test.describe('Accessibility', () => {
 	}) => {
 		await aiFeedback.openSidebar();
 
-		// Wait for settings to load
-		await page.waitForTimeout(1000);
-
 		// Find any focusable element in the sidebar (model selector may not be present if no models configured)
 		const focusableElement = page
 			.locator('.ai-feedback-panel')
@@ -61,9 +58,6 @@ test.describe('Accessibility', () => {
 	}) => {
 		await aiFeedback.openSidebar();
 		await aiFeedback.expandReviewSettings();
-
-		// Wait for settings to load
-		await page.waitForTimeout(1000);
 
 		// Find checkboxes in the settings panel
 		const checkboxLocator = page.locator(
@@ -96,9 +90,6 @@ test.describe('Accessibility', () => {
 	}) => {
 		await aiFeedback.openSidebar();
 
-		// Wait for settings to load
-		await page.waitForTimeout(1000);
-
 		const modelSelect = page.getByLabel('AI Model');
 		const isVisible = await modelSelect.isVisible().catch(() => false);
 
@@ -120,17 +111,14 @@ test.describe('Accessibility', () => {
 	});
 
 	test('review button has proper aria attributes when busy', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Loading State A11y' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Loading State A11y', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -154,30 +142,19 @@ test.describe('Accessibility', () => {
 			.first()
 			.click();
 
-		// Button should indicate busy state
-		const reviewButton = page.locator('button.is-primary.is-busy');
-		await expect(reviewButton).toBeVisible();
-
-		// Check that button has busy indicator (class or attribute)
-		// WordPress Button component may use is-busy class instead of aria-busy
-		const hasBusyClass = await reviewButton.evaluate((el) =>
-			el.classList.contains('is-busy')
-		);
-		expect(hasBusyClass).toBe(true);
+		// Button should indicate busy state via the is-busy class
+		await expect(page.locator('button.is-primary.is-busy')).toBeVisible();
 	});
 
 	test('error notices have proper role for screen readers', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup for error
-		await admin.createNewPost({ title: 'A11y Error Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'A11y Error Test', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 

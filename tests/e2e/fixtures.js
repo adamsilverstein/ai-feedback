@@ -126,6 +126,23 @@ class AIFeedbackUtils {
 	}
 
 	/**
+	 * Create a new post with content and save it as draft.
+	 *
+	 * @param {Object} options         - Options object.
+	 * @param {string} options.title   - Post title.
+	 * @param {string} options.content - Paragraph content to type.
+	 * @param {Object} deps            - Dependencies.
+	 * @param {Object} deps.editor     - Editor fixture.
+	 */
+	async createAndSavePost({ title, content }, { editor }) {
+		await this.admin.createNewPost({ title });
+		await editor.insertBlock({ name: 'core/paragraph' });
+		await this.page.keyboard.type(content);
+		await this.page.getByRole('button', { name: 'Save draft' }).click();
+		await this.page.waitForSelector('.editor-post-saved-state.is-saved');
+	}
+
+	/**
 	 * Select a model from the model selector.
 	 *
 	 * @param {string} modelId - Model ID to select (e.g., 'gpt-4o').
@@ -257,7 +274,11 @@ class AIFeedbackUtils {
 				timeout: reviewingTimeout,
 			});
 		} catch (error) {
-			// Reviewing state might not appear if review completes very quickly
+			// Reviewing state might not appear if review completes very quickly.
+			// Only ignore timeout errors, re-throw others.
+			if (!error.message?.includes('Timeout')) {
+				throw error;
+			}
 		}
 
 		// Wait for review to complete (button no longer busy)
@@ -281,10 +302,10 @@ const test = base.extend({
 	editor: async ({ page }, use) => {
 		await use(new Editor({ page }));
 	},
-	admin: async ({ page, pageUtils, editor }, use) => {
-		await use(new Admin({ page, pageUtils, editor }));
+	admin: async ({ page, pageUtils }, use) => {
+		await use(new Admin({ page, pageUtils }));
 	},
-	requestUtils: async ({}, use) => {
+	requestUtils: async (_, use) => {
 		const requestUtils = await RequestUtils.setup({
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {

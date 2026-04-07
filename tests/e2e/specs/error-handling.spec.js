@@ -5,17 +5,14 @@ const { test, expect } = require('../fixtures');
 
 test.describe('Error Handling', () => {
 	test('displays error notice when API request fails', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup - create post with title and content
-		await admin.createNewPost({ title: 'Error Test Post' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content for error test.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Error Test Post', content: 'Content for error test.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -29,33 +26,21 @@ test.describe('Error Handling', () => {
 		// Start review and wait for completion (it will return to normal state even on error)
 		await aiFeedback.startReviewAndWait();
 
-		// Verify error notice appears - look for the error notice component
-		const errorNotice = page.locator('.components-notice.is-error').first();
-		const noticeVisible = await errorNotice.isVisible().catch(() => false);
-
-		// Either error notice is visible OR the button returned to normal state (error was handled)
-		const buttonEnabled = await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.isEnabled()
-			.catch(() => false);
-
-		expect(noticeVisible || buttonEnabled).toBe(true);
+		// Verify error notice appears
+		await expect(
+			page.locator('.components-notice.is-error').first()
+		).toBeVisible({ timeout: 5000 });
 	});
 
 	test('error notice can be dismissed', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup with error
-		await admin.createNewPost({ title: 'Dismissable Error' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Dismissable Error', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -99,29 +84,20 @@ test.describe('Error Handling', () => {
 				expect(noticeVisible).toBe(true);
 			}
 		} else {
-			// Error was handled differently, test still passes
-			const buttonEnabled = await page
-				.locator('button.is-primary')
-				.filter({ hasText: /Review( Document)?/i })
-				.first()
-				.isEnabled()
-				.catch(() => false);
-			expect(buttonEnabled).toBe(true);
+			// Error notice should have appeared — fail explicitly
+			expect(noticeVisible).toBe(true);
 		}
 	});
 
 	test('displays rate limit error with appropriate message', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Rate Limit Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Rate Limit Test', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -154,17 +130,14 @@ test.describe('Error Handling', () => {
 	});
 
 	test('displays billing/credit error with settings link', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Billing Error Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Billing Error Test', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -177,33 +150,20 @@ test.describe('Error Handling', () => {
 		// Start review and wait for completion
 		await aiFeedback.startReviewAndWait();
 
-		// Verify error notice appears
+		// Verify error notice appears with billing-related message
 		const errorNotice = page.locator('.components-notice.is-error').first();
-		const noticeVisible = await errorNotice.isVisible().catch(() => false);
-
-		// Either error notice is visible OR the button returned to normal state
-		const buttonEnabled = await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.isEnabled()
-			.catch(() => false);
-
-		expect(noticeVisible || buttonEnabled).toBe(true);
+		await expect(errorNotice).toBeVisible({ timeout: 5000 });
 	});
 
 	test('handles network timeout gracefully', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Timeout Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Timeout Test', content: 'Content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 

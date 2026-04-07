@@ -5,17 +5,17 @@ const { test, expect } = require('../fixtures');
 
 test.describe('Notes Creation', () => {
 	test('review creates notes that appear in summary', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Post with Notes' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Content that will receive feedback.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{
+				title: 'Post with Notes',
+				content: 'Content that will receive feedback.',
+			},
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -41,43 +41,22 @@ test.describe('Notes Creation', () => {
 
 		await aiFeedback.startReviewAndWait();
 
-		// Wait for the summary to render
-		await page.waitForTimeout(1000);
-
-		// Verify review completed - look for any indication of feedback count or summary
+		// Verify the summary section rendered
 		const panel = page.locator('.ai-feedback-panel');
-
-		// The summary should be rendered - look for the summary class or Last Review panel
-		const summarySection = panel.locator('.ai-feedback-review-summary');
-		const lastReviewPanel = panel.getByText(/Last Review/i);
-
-		const hasSummary =
-			(await summarySection.isVisible().catch(() => false)) ||
-			(await lastReviewPanel.isVisible().catch(() => false));
-
-		// If summary is visible, test passes
-		// If not, the review button should still be functional
-		const reviewButton = panel
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first();
-		const buttonEnabled = await reviewButton.isEnabled().catch(() => false);
-
-		expect(hasSummary || buttonEnabled).toBe(true);
+		await expect(panel.locator('.ai-feedback-review-summary')).toBeVisible({
+			timeout: 10000,
+		});
 	});
 
 	test('displays severity breakdown in summary', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Severity Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Test content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Severity Test', content: 'Test content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -99,59 +78,27 @@ test.describe('Notes Creation', () => {
 
 		await aiFeedback.startReviewAndWait();
 
-		// Wait for the summary to render
-		await page.waitForTimeout(1000);
-
-		// Check that review completed
+		// Verify the summary rendered with severity/feedback indicators
 		const panel = page.locator('.ai-feedback-panel');
+		await expect(panel.locator('.ai-feedback-review-summary')).toBeVisible({
+			timeout: 10000,
+		});
 
-		// The summary should be rendered - look for the summary class or Last Review panel
-		const summarySection = panel.locator('.ai-feedback-review-summary');
-		const lastReviewPanel = panel.getByText(/Last Review/i);
-
-		const hasSummary =
-			(await summarySection.isVisible().catch(() => false)) ||
-			(await lastReviewPanel.isVisible().catch(() => false));
-
-		// If summary visible, also check for severity-related content
-		if (hasSummary) {
-			const hasSeveritySection = await panel
-				.getByText(/severity/i)
-				.isVisible()
-				.catch(() => false);
-			const hasCritical = await panel
-				.getByText(/critical/i)
-				.isVisible()
-				.catch(() => false);
-			const hasFeedback = await panel
-				.getByText(/feedback/i)
-				.isVisible()
-				.catch(() => false);
-
-			// At least some indication should be present
-			expect(hasSeveritySection || hasCritical || hasFeedback).toBe(true);
-		} else {
-			// Review completed, button should be functional
-			const reviewButton = panel
-				.locator('button.is-primary')
-				.filter({ hasText: /Review( Document)?/i })
-				.first();
-			await expect(reviewButton).toBeEnabled();
-		}
+		// At least one severity or feedback indicator should be present
+		await expect(
+			panel.getByText(/critical|feedback|severity/i).first()
+		).toBeVisible();
 	});
 
 	test('displays category breakdown in summary', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Category Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Test content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Category Test', content: 'Test content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -176,39 +123,27 @@ test.describe('Notes Creation', () => {
 
 		await aiFeedback.startReviewAndWait();
 
-		// Check that review completed with summary info
+		// Verify summary rendered with category indicators
 		const panel = page.locator('.ai-feedback-panel');
+		await expect(panel.locator('.ai-feedback-review-summary')).toBeVisible({
+			timeout: 10000,
+		});
 
-		// Look for category indicators in the summary
-		const hasCategorySection = await panel
-			.getByText(/category/i)
-			.isVisible()
-			.catch(() => false);
-		const hasContent = await panel
-			.getByText(/content/i)
-			.isVisible()
-			.catch(() => false);
-		const hasTone = await panel
-			.getByText(/tone/i)
-			.isVisible()
-			.catch(() => false);
-
-		// At least some indication of the review results should be present
-		expect(hasCategorySection || hasContent || hasTone).toBe(true);
+		// At least one category indicator should be present
+		await expect(
+			panel.getByText(/content|tone|category/i).first()
+		).toBeVisible();
 	});
 
 	test('displays model used in review summary', async ({
-		admin,
 		page,
 		editor,
 		aiFeedback,
 	}) => {
-		// Setup
-		await admin.createNewPost({ title: 'Model Display Test' });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await page.keyboard.type('Test content.');
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
+		await aiFeedback.createAndSavePost(
+			{ title: 'Model Display Test', content: 'Test content.' },
+			{ editor }
+		);
 
 		await aiFeedback.openSidebar();
 
@@ -227,31 +162,10 @@ test.describe('Notes Creation', () => {
 
 		await aiFeedback.startReviewAndWait();
 
-		// Wait for the summary to render
-		await page.waitForTimeout(1000);
-
-		// Check that review completed
+		// Verify the summary section rendered after review
 		const panel = page.locator('.ai-feedback-panel');
-
-		// The summary should be rendered - look for the summary class or Last Review panel
-		const summarySection = panel.locator('.ai-feedback-review-summary');
-		const lastReviewPanel = panel.getByText(/Last Review/i);
-
-		const hasSummary =
-			(await summarySection.isVisible().catch(() => false)) ||
-			(await lastReviewPanel.isVisible().catch(() => false));
-
-		// If summary visible, test passes
-		if (hasSummary) {
-			// Summary is visible, which indicates review completed successfully
-			expect(hasSummary).toBe(true);
-		} else {
-			// Review completed, button should be functional
-			const reviewButton = panel
-				.locator('button.is-primary')
-				.filter({ hasText: /Review( Document)?/i })
-				.first();
-			await expect(reviewButton).toBeEnabled();
-		}
+		await expect(panel.locator('.ai-feedback-review-summary')).toBeVisible({
+			timeout: 10000,
+		});
 	});
 });
