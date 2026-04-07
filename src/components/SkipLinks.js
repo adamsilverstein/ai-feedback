@@ -48,7 +48,7 @@ export default function SkipLinks({ hasResults, showModel }) {
 			{showModel && (
 				<a
 					href="#ai-feedback-model-select"
-					className="skip-link"
+					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
 					{__('Skip to model selection', 'ai-feedback')}
@@ -56,7 +56,7 @@ export default function SkipLinks({ hasResults, showModel }) {
 			)}
 			<a
 				href="#ai-feedback-review-button"
-				className="skip-link"
+				className="ai-feedback-skip-link"
 				onClick={handleSkipClick}
 			>
 				{__('Skip to review button', 'ai-feedback')}
@@ -64,7 +64,7 @@ export default function SkipLinks({ hasResults, showModel }) {
 			{hasResults && (
 				<a
 					href="#ai-feedback-results"
-					className="skip-link"
+					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
 					{__('Skip to review results', 'ai-feedback')}

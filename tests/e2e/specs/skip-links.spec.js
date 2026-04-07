@@ -25,12 +25,15 @@ test.describe('Skip Links', () => {
 
 	test('skip links are hidden by default', async ({ page }) => {
 		// Skip links should not be visible when not focused
-		const skipLinks = page.locator('.ai-feedback-skip-links .skip-link');
+		const skipLinks = page.locator(
+			'.ai-feedback-skip-links .ai-feedback-skip-link'
+		);
 		const count = await skipLinks.count();
 		expect(count).toBeGreaterThan(0);
 
-		// None of them should be visible (they are visually hidden via CSS clip)
+		// All should be in the DOM but visually hidden via CSS clip
 		for (let i = 0; i < count; i++) {
+			await expect(skipLinks.nth(i)).toBeAttached();
 			await expect(skipLinks.nth(i)).not.toBeVisible();
 		}
 	});
@@ -44,13 +47,13 @@ test.describe('Skip Links', () => {
 		await page.keyboard.press('Tab');
 
 		// The skip link should now be visible
-		const focusedElement = page.locator('.skip-link:focus');
+		const focusedElement = page.locator('.ai-feedback-skip-link:focus');
 		await expect(focusedElement).toBeVisible();
 	});
 
 	test('skip to review button link is always present', async ({ page }) => {
 		const reviewButtonLink = page.locator(
-			'a.skip-link[href="#ai-feedback-review-button"]'
+			'a.ai-feedback-skip-link[href="#ai-feedback-review-button"]'
 		);
 		await expect(reviewButtonLink).toBeAttached();
 		await expect(reviewButtonLink).toHaveText('Skip to review button');
@@ -73,7 +76,7 @@ test.describe('Skip Links', () => {
 		await aiFeedback.startReviewAndWait();
 
 		const resultsLink = page.locator(
-			'a.skip-link[href="#ai-feedback-results"]'
+			'a.ai-feedback-skip-link[href="#ai-feedback-results"]'
 		);
 		await expect(resultsLink).toBeAttached();
 		await expect(resultsLink).toHaveText('Skip to review results');
@@ -84,7 +87,7 @@ test.describe('Skip Links', () => {
 	}) => {
 		// Focus and activate the skip link to review button
 		const skipLink = page.locator(
-			'a.skip-link[href="#ai-feedback-review-button"]'
+			'a.ai-feedback-skip-link[href="#ai-feedback-review-button"]'
 		);
 		await skipLink.focus();
 		await skipLink.click();
@@ -112,7 +115,7 @@ test.describe('Skip Links', () => {
 
 		// Focus and activate the skip link to review results
 		const skipLink = page.locator(
-			'a.skip-link[href="#ai-feedback-results"]'
+			'a.ai-feedback-skip-link[href="#ai-feedback-results"]'
 		);
 		await skipLink.focus();
 		await skipLink.click();
@@ -156,7 +159,9 @@ test.describe('Skip Links', () => {
 		await expect(nav).toHaveAttribute('aria-label', 'Skip links');
 
 		// Check that links have href attributes pointing to valid targets
-		const links = page.locator('.ai-feedback-skip-links .skip-link');
+		const links = page.locator(
+			'.ai-feedback-skip-links .ai-feedback-skip-link'
+		);
 		const count = await links.count();
 
 		for (let i = 0; i < count; i++) {

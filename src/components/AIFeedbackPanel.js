@@ -153,15 +153,15 @@ export default function AIFeedbackPanel() {
 
 	return (
 		<div className="ai-feedback-panel">
+			<SkipLinks
+				hasResults={!!lastReview}
+				showModel={showModelSelector}
+			/>
 			<WelcomeModal />
 			<StatusAnnouncer
 				isReviewing={isReviewing}
 				lastReview={lastReview}
 				error={error}
-			/>
-			<SkipLinks
-				hasResults={!!lastReview}
-				showModel={showModelSelector}
 			/>
 			{error && (
 				<Notice
@@ -184,6 +184,8 @@ export default function AIFeedbackPanel() {
 				</Notice>
 			)}
 
+			{/* EmptyState and the review panel are mutually exclusive render paths,
+			    so the id="ai-feedback-review-button" in both won't create duplicate IDs. */}
 			{!lastReview && !isReviewing ? (
 				<EmptyState
 					onStartReview={handleStartReview}
