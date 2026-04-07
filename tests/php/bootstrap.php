@@ -99,10 +99,8 @@ if ( ! function_exists( 'current_user_can' ) ) {
 	}
 }
 
-// Load classes that depend on WP REST mocks.
-require_once $includes_dir . 'class-health-controller.php';
-
 // Mock WP_Error class if not available.
+// Must be defined before loading plugin classes that use WP_Error in method signatures.
 if (! class_exists('WP_Error') ) {
     class WP_Error
     {
@@ -237,6 +235,9 @@ if (! function_exists('is_wp_error') ) {
         return ( $thing instanceof WP_Error );
     }
 }
+
+// Load classes that depend on WP REST and WP_Error mocks.
+require_once $includes_dir . 'class-health-controller.php';
 
 // Mock WordPress sanitization functions.
 if (! function_exists('wp_kses_post') ) {

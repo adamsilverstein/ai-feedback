@@ -177,5 +177,6 @@ class HealthControllerTest extends TestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
+		$this->assertSame( 403, $result->get_error_data( 'rest_forbidden' )['status'] );
 	}
 }
