@@ -305,7 +305,7 @@ const test = base.extend({
 	admin: async ({ page, pageUtils }, use) => {
 		await use(new Admin({ page, pageUtils }));
 	},
-	requestUtils: async (_, use) => {
+	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
 			baseURL: process.env.WP_BASE_URL || 'http://localhost:8889',
 			user: {
