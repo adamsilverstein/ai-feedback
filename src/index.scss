@@ -408,6 +408,7 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: -2px;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -465,11 +466,13 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: -2px;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__header {
 		padding: 12px;
 		border-bottom: 1px solid #e0e0e0;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -571,6 +574,7 @@ $ai-feedback-text-muted: #595959;
 	padding-top: 16px;
 	border-top: 1px solid #e0e0e0;
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	h4 {
 		font-size: 14px;
 		font-weight: 600;
