@@ -48,6 +48,13 @@ class Plugin {
 	private ?Notes_Controller $notes_controller = null;
 
 	/**
+	 * Health controller instance.
+	 *
+	 * @var Health_Controller|null
+	 */
+	private ?Health_Controller $health_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -98,6 +105,9 @@ class Plugin {
 
 		$this->notes_controller = new Notes_Controller();
 		$this->notes_controller->register_routes();
+
+		$this->health_controller = new Health_Controller();
+		$this->health_controller->register_routes();
 	}
 
 	/**

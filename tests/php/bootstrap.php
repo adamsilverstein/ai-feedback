@@ -36,7 +36,71 @@ if (! function_exists('esc_html__') ) {
     }
 }
 
+// Mock WP REST classes if not available.
+if ( ! class_exists( 'WP_REST_Controller' ) ) {
+	class WP_REST_Controller {
+		protected $namespace;
+		protected $rest_base;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE = 'GET';
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		public $data;
+		public $status;
+
+		public function __construct( $data = null, $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+
+		public function get_data() {
+			return $this->data;
+		}
+
+		public function get_status() {
+			return $this->status;
+		}
+	}
+}
+
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	/**
+	 * Mock get_bloginfo for tests.
+	 *
+	 * @param  string $show The info to retrieve.
+	 * @return string The requested info.
+	 */
+	function get_bloginfo( $show ) {
+		if ( 'version' === $show ) {
+			return '7.0';
+		}
+		return '';
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * Mock current_user_can for tests.
+	 *
+	 * Defaults to true. Override via $GLOBALS['test_current_user_can'].
+	 *
+	 * @param  string $capability The capability to check.
+	 * @return bool Whether the user has the capability.
+	 */
+	function current_user_can( $capability ) {
+		return $GLOBALS['test_current_user_can'] ?? true;
+	}
+}
+
 // Mock WP_Error class if not available.
+// Must be defined before loading plugin classes that use WP_Error in method signatures.
 if (! class_exists('WP_Error') ) {
     class WP_Error
     {
@@ -86,8 +150,8 @@ if (! class_exists('WP_Error') ) {
             return $codes[0] ?? '';
         }
 
-        / **
-        * Retrieve all error codes stored in the object.
+        /**
+         * Retrieve all error codes stored in the object.
         *
         * @return array An array of error codes present in the error collection; empty if no errors.
         */
@@ -172,6 +236,9 @@ if (! function_exists('is_wp_error') ) {
     }
 }
 
+// Load classes that depend on WP REST and WP_Error mocks.
+require_once $includes_dir . 'class-health-controller.php';
+
 // Mock WordPress sanitization functions.
 if (! function_exists('wp_kses_post') ) {
     /**
@@ -211,5 +278,36 @@ if (! function_exists('sanitize_text_field') ) {
     function sanitize_text_field( $str )
     {
         return $str;
+    }
+}
+
+if (! function_exists('wp_parse_args') ) {
+    /**
+     * Merge user-defined arguments into defaults array.
+     *
+     * @param  string|array $args     Value to merge with $defaults.
+     * @param  array        $defaults Array that serves as the defaults.
+     * @return array Merged array.
+     */
+    function wp_parse_args( $args, $defaults = array() )
+    {
+        if ( is_string( $args ) ) {
+            parse_str( $args, $args );
+        }
+        return array_merge( $defaults, $args );
+    }
+}
+
+if (! function_exists('wp_strip_all_tags') ) {
+    /**
+     * Strip all HTML tags including script and style contents.
+     *
+     * @param  string $text          String to strip tags from.
+     * @param  bool   $remove_breaks Whether to remove line breaks.
+     * @return string Stripped string.
+     */
+    function wp_strip_all_tags( $text, $remove_breaks = false )
+    {
+        return strip_tags( $text );
     }
 }
