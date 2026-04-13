@@ -36,7 +36,71 @@ if (! function_exists('esc_html__') ) {
     }
 }
 
+// Mock WP REST classes if not available.
+if ( ! class_exists( 'WP_REST_Controller' ) ) {
+	class WP_REST_Controller {
+		protected $namespace;
+		protected $rest_base;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	class WP_REST_Server {
+		const READABLE = 'GET';
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	class WP_REST_Response {
+		public $data;
+		public $status;
+
+		public function __construct( $data = null, $status = 200 ) {
+			$this->data   = $data;
+			$this->status = $status;
+		}
+
+		public function get_data() {
+			return $this->data;
+		}
+
+		public function get_status() {
+			return $this->status;
+		}
+	}
+}
+
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	/**
+	 * Mock get_bloginfo for tests.
+	 *
+	 * @param  string $show The info to retrieve.
+	 * @return string The requested info.
+	 */
+	function get_bloginfo( $show ) {
+		if ( 'version' === $show ) {
+			return '7.0';
+		}
+		return '';
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	/**
+	 * Mock current_user_can for tests.
+	 *
+	 * Defaults to true. Override via $GLOBALS['test_current_user_can'].
+	 *
+	 * @param  string $capability The capability to check.
+	 * @return bool Whether the user has the capability.
+	 */
+	function current_user_can( $capability ) {
+		return $GLOBALS['test_current_user_can'] ?? true;
+	}
+}
+
 // Mock WP_Error class if not available.
+// Must be defined before loading plugin classes that use WP_Error in method signatures.
 if (! class_exists('WP_Error') ) {
     class WP_Error
     {
@@ -171,6 +235,9 @@ if (! function_exists('is_wp_error') ) {
         return ( $thing instanceof WP_Error );
     }
 }
+
+// Load classes that depend on WP REST and WP_Error mocks.
+require_once $includes_dir . 'class-health-controller.php';
 
 // Mock WordPress sanitization functions.
 if (! function_exists('wp_kses_post') ) {
