@@ -8,11 +8,12 @@ import { __ } from '@wordpress/i18n';
 /**
  * EmptyState component shown when no reviews exist.
  *
- * @param {Object}   props               Component props.
- * @param {Function} props.onStartReview Function to start a review.
- * @param {boolean}  props.canReview     Whether a review can be started.
- * @param {boolean}  props.hasContent    Whether the post has content.
- * @param {boolean}  props.isSaved       Whether the post is saved.
+ * @param {Object}   props                  Component props.
+ * @param {Function} props.onStartReview    Function to start a review.
+ * @param {boolean}  props.canReview        Whether a review can be started.
+ * @param {boolean}  props.hasContent       Whether the post has content.
+ * @param {boolean}  props.isSaved          Whether the post is saved.
+ * @param {string}   [props.reviewButtonId] Optional id for the review button wrapper (used as a skip-link anchor).
  * @return {Element} EmptyState component.
  */
 export default function EmptyState({
@@ -20,6 +21,7 @@ export default function EmptyState({
 	canReview,
 	hasContent,
 	isSaved,
+	reviewButtonId,
 }) {
 	return (
 		<div className="ai-feedback-empty-state">
@@ -58,9 +60,11 @@ export default function EmptyState({
 					</ul>
 				</div>
 			) : (
-				<Button variant="primary" onClick={onStartReview}>
-					{__('Review Document', 'ai-feedback')}
-				</Button>
+				<div id={reviewButtonId}>
+					<Button variant="primary" onClick={onStartReview}>
+						{__('Review Document', 'ai-feedback')}
+					</Button>
+				</div>
 			)}
 		</div>
 	);
