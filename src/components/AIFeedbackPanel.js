@@ -184,62 +184,61 @@ export default function AIFeedbackPanel() {
 				</Notice>
 			)}
 
-			{/* EmptyState and the review panel are mutually exclusive render paths,
-			    so the id="ai-feedback-review-button" in both won't create duplicate IDs. */}
-			{!lastReview && !isReviewing ? (
-				<EmptyState
-					onStartReview={handleStartReview}
-					canReview={canReview}
-					hasContent={hasContent}
-					isSaved={isSaved}
-				/>
-			) : (
-				<>
-					{showModelSelector && (
+			{/* Wrap both render paths so the skip-link anchor ID exists
+			    in the DOM exactly once, regardless of which branch renders. */}
+			<div id="ai-feedback-review-button">
+				{!lastReview && !isReviewing ? (
+					<EmptyState
+						onStartReview={handleStartReview}
+						canReview={canReview}
+						hasContent={hasContent}
+						isSaved={isSaved}
+					/>
+				) : (
+					<>
+						{showModelSelector && (
+							<PanelBody
+								title={__('Review Settings', 'ai-feedback')}
+								initialOpen={true}
+							>
+								{/* ID used by skip links for keyboard navigation */}
+								<div id="ai-feedback-model-select">
+									<ModelSelector />
+								</div>
+								<LanguageSelector />
+							</PanelBody>
+						)}
+
+						{availableModels.length === 1 && (
+							<PanelBody
+								title={__('Review Settings', 'ai-feedback')}
+								initialOpen={true}
+							>
+								<LanguageSelector />
+							</PanelBody>
+						)}
+
 						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
+							title={__('Review Document', 'ai-feedback')}
 							initialOpen={true}
 						>
-							{/* ID used by skip links for keyboard navigation */}
-							<div id="ai-feedback-model-select">
-								<ModelSelector />
-							</div>
-							<LanguageSelector />
-						</PanelBody>
-					)}
-
-					{availableModels.length === 1 && (
-						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
-							initialOpen={true}
-						>
-							<LanguageSelector />
-						</PanelBody>
-					)}
-
-					<PanelBody
-						title={__('Review Document', 'ai-feedback')}
-						initialOpen={true}
-					>
-						{/* ID used by skip links for keyboard navigation */}
-						<div id="ai-feedback-review-button">
 							<ReviewButton />
-						</div>
-					</PanelBody>
-
-					{lastReview && (
-						<PanelBody
-							title={__('Last Review', 'ai-feedback')}
-							initialOpen={true}
-						>
-							{/* ID used by skip links for keyboard navigation */}
-							<div id="ai-feedback-results">
-								<ReviewSummary review={lastReview} />
-							</div>
 						</PanelBody>
-					)}
-				</>
-			)}
+
+						{lastReview && (
+							<PanelBody
+								title={__('Last Review', 'ai-feedback')}
+								initialOpen={true}
+							>
+								{/* ID used by skip links for keyboard navigation */}
+								<div id="ai-feedback-results">
+									<ReviewSummary review={lastReview} />
+								</div>
+							</PanelBody>
+						)}
+					</>
+				)}
+			</div>
 		</div>
 	);
 }

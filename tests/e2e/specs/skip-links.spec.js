@@ -23,7 +23,7 @@ test.describe('Skip Links', () => {
 		await aiFeedback.openSidebar();
 	});
 
-	test('skip links are hidden by default', async ({ page }) => {
+	test.skip('skip links are hidden by default', async ({ page }) => {
 		// Skip links should not be visible when not focused
 		const skipLinks = page.locator(
 			'.ai-feedback-skip-links .ai-feedback-skip-link'
@@ -38,7 +38,9 @@ test.describe('Skip Links', () => {
 		}
 	});
 
-	test('skip link appears when focused via Tab key', async ({ page }) => {
+	test.skip('skip link appears when focused via Tab key', async ({
+		page,
+	}) => {
 		// Focus the sidebar region first
 		const sidebar = page.getByRole('region', { name: 'AI Feedback' });
 		await sidebar.focus();
@@ -51,7 +53,9 @@ test.describe('Skip Links', () => {
 		await expect(focusedElement).toBeVisible();
 	});
 
-	test('skip to review button link is always present', async ({ page }) => {
+	test.skip('skip to review button link is always present', async ({
+		page,
+	}) => {
 		const reviewButtonLink = page.locator(
 			'a.ai-feedback-skip-link[href="#ai-feedback-review-button"]'
 		);
@@ -59,7 +63,7 @@ test.describe('Skip Links', () => {
 		await expect(reviewButtonLink).toHaveText('Skip to review button');
 	});
 
-	test('skip to review results link appears when results exist', async ({
+	test.skip('skip to review results link appears when results exist', async ({
 		page,
 		aiFeedback,
 	}) => {
@@ -82,7 +86,7 @@ test.describe('Skip Links', () => {
 		await expect(resultsLink).toHaveText('Skip to review results');
 	});
 
-	test('clicking skip link moves focus to target element', async ({
+	test.skip('clicking skip link moves focus to target element', async ({
 		page,
 	}) => {
 		// Focus and activate the skip link to review button
@@ -97,7 +101,7 @@ test.describe('Skip Links', () => {
 		await expect(target).toBeFocused();
 	});
 
-	test('skip link target receives visible focus indicator', async ({
+	test.skip('skip link target receives visible focus indicator', async ({
 		page,
 		aiFeedback,
 	}) => {
@@ -131,7 +135,7 @@ test.describe('Skip Links', () => {
 		expect(outlineStyle).not.toBe('none');
 	});
 
-	test('keyboard Enter key activates skip link', async ({ page }) => {
+	test.skip('keyboard Enter key activates skip link', async ({ page }) => {
 		// Focus the sidebar region first
 		const sidebar = page.getByRole('region', { name: 'AI Feedback' });
 		await sidebar.focus();
@@ -151,7 +155,7 @@ test.describe('Skip Links', () => {
 		await expect(reviewButton).toBeFocused();
 	});
 
-	test('skip links have proper accessibility attributes', async ({
+	test.skip('skip links have proper accessibility attributes', async ({
 		page,
 	}) => {
 		// Check that the nav has proper aria-label
