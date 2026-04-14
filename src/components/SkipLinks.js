@@ -34,12 +34,19 @@ function handleSkipClick(e) {
 /**
  * Skip Links component for keyboard navigation.
  *
- * @param {Object}  props            Component props.
- * @param {boolean} props.hasResults Whether review results are available.
- * @param {boolean} props.showModel  Whether model selector is visible.
+ * @param {Object}  props                  Component props.
+ * @param {boolean} props.hasResults       Whether review results are available.
+ * @param {boolean} props.showModel        Whether model selector is visible.
+ * @param {boolean} props.hasSettings      Whether the review settings panel is visible.
+ * @param {boolean} props.hasFeedbackItems Whether individual feedback items are available.
  * @return {Element} Skip links component.
  */
-export default function SkipLinks({ hasResults, showModel }) {
+export default function SkipLinks({
+	hasResults,
+	showModel,
+	hasSettings,
+	hasFeedbackItems,
+}) {
 	return (
 		<nav
 			className="ai-feedback-skip-links"
@@ -52,6 +59,15 @@ export default function SkipLinks({ hasResults, showModel }) {
 					onClick={handleSkipClick}
 				>
 					{__('Skip to model selection', 'ai-feedback')}
+				</a>
+			)}
+			{hasSettings && (
+				<a
+					href="#ai-feedback-settings"
+					className="ai-feedback-skip-link"
+					onClick={handleSkipClick}
+				>
+					{__('Skip to review settings', 'ai-feedback')}
 				</a>
 			)}
 			<a
@@ -68,6 +84,15 @@ export default function SkipLinks({ hasResults, showModel }) {
 					onClick={handleSkipClick}
 				>
 					{__('Skip to review results', 'ai-feedback')}
+				</a>
+			)}
+			{hasFeedbackItems && (
+				<a
+					href="#ai-feedback-items"
+					className="ai-feedback-skip-link"
+					onClick={handleSkipClick}
+				>
+					{__('Skip to feedback items', 'ai-feedback')}
 				</a>
 			)}
 		</nav>
