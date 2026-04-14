@@ -13,7 +13,7 @@ import { __ } from '@wordpress/i18n';
  * @param {boolean}  props.canReview     Whether a review can be started.
  * @param {boolean}  props.hasContent    Whether the post has content.
  * @param {boolean}  props.isSaved       Whether the post is saved.
- * @return {JSX.Element} EmptyState component.
+ * @return {Element} EmptyState component.
  */
 export default function EmptyState({
 	onStartReview,
