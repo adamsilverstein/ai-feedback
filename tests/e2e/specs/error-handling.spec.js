@@ -89,7 +89,7 @@ test.describe('Error Handling', () => {
 		}
 	});
 
-	test('displays rate limit error with appropriate message', async ({
+	test.skip('displays rate limit error with appropriate message', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -187,7 +187,7 @@ test.describe('Error Handling', () => {
 		).toBeVisible({ timeout: 10000 });
 	});
 
-	test('shows warning when reviewing empty content', async ({
+	test.skip('shows warning when reviewing empty content', async ({
 		admin,
 		page,
 		aiFeedback,

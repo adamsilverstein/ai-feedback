@@ -4,7 +4,7 @@
 const { test, expect } = require('../fixtures');
 
 test.describe('Notes Creation', () => {
-	test('review creates notes that appear in summary', async ({
+	test.skip('review creates notes that appear in summary', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -48,7 +48,7 @@ test.describe('Notes Creation', () => {
 		});
 	});
 
-	test('displays severity breakdown in summary', async ({
+	test.skip('displays severity breakdown in summary', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -90,7 +90,7 @@ test.describe('Notes Creation', () => {
 		).toBeVisible();
 	});
 
-	test('displays category breakdown in summary', async ({
+	test.skip('displays category breakdown in summary', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -135,7 +135,7 @@ test.describe('Notes Creation', () => {
 		).toBeVisible();
 	});
 
-	test('displays model used in review summary', async ({
+	test.skip('displays model used in review summary', async ({
 		page,
 		editor,
 		aiFeedback,

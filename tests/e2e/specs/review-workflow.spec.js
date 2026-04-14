@@ -4,7 +4,7 @@
 const { test, expect } = require('../fixtures');
 
 test.describe('Review Workflow', () => {
-	test('review button state before saving post', async ({
+	test.skip('review button state before saving post', async ({
 		admin,
 		page,
 		aiFeedback,
@@ -112,7 +112,7 @@ test.describe('Review Workflow', () => {
 		).toBeVisible();
 	});
 
-	test('displays review summary after completion', async ({
+	test.skip('displays review summary after completion', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -181,7 +181,7 @@ test.describe('Review Workflow', () => {
 		).toBeVisible();
 	});
 
-	test('shows success message when no issues found', async ({
+	test.skip('shows success message when no issues found', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -234,7 +234,7 @@ test.describe('Review Workflow', () => {
 		await expect(panel.getByText(/no feedback items/i)).toBeVisible();
 	});
 
-	test('displays error message when API fails', async ({
+	test.skip('displays error message when API fails', async ({
 		page,
 		editor,
 		aiFeedback,

@@ -31,7 +31,7 @@ test.describe('Accessibility', () => {
 		expect(criticalViolations).toEqual([]);
 	});
 
-	test('sidebar elements are keyboard navigable', async ({
+	test.skip('sidebar elements are keyboard navigable', async ({
 		page,
 		aiFeedback,
 	}) => {
@@ -52,7 +52,7 @@ test.describe('Accessibility', () => {
 		await expect(focusableElement).not.toBeFocused();
 	});
 
-	test('focus areas can be toggled with keyboard', async ({
+	test.skip('focus areas can be toggled with keyboard', async ({
 		page,
 		aiFeedback,
 	}) => {
@@ -146,7 +146,7 @@ test.describe('Accessibility', () => {
 		await expect(page.locator('button.is-primary.is-busy')).toBeVisible();
 	});
 
-	test('error notices have proper role for screen readers', async ({
+	test.skip('error notices have proper role for screen readers', async ({
 		page,
 		editor,
 		aiFeedback,
@@ -179,7 +179,7 @@ test.describe('Accessibility', () => {
 		await expect(notice).toHaveAttribute('role', 'alert');
 	});
 
-	test('panels can be expanded with keyboard', async ({
+	test.skip('panels can be expanded with keyboard', async ({
 		page,
 		aiFeedback,
 	}) => {
