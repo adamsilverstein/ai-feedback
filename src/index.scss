@@ -24,6 +24,7 @@ $ai-feedback-text-muted: #595959;
 	position: relative;
 
 	.ai-feedback-skip-link {
+
 		/* Hidden state using clip pattern (matches screen-reader-text) */
 		display: block;
 		border: 0;
@@ -36,6 +37,7 @@ $ai-feedback-text-muted: #595959;
 		position: absolute;
 		width: 1px;
 		word-wrap: normal;
+
 		/* Visual styling applied when visible */
 		background: var(--wp-admin-theme-color, #007cba);
 		color: #fff;
@@ -45,6 +47,7 @@ $ai-feedback-text-muted: #595959;
 		border-radius: 0 0 4px 4px;
 
 		&:focus {
+
 			/* Reveal on focus */
 			clip: auto;
 			clip-path: none;
