@@ -70,6 +70,7 @@ class Prompt_Builder {
 		$prompt .= "TARGET TONE:\n" . $tone_guidance;
 		$prompt .= $language_instruction;
 		$prompt .= $continuation_instructions . "\n\n";
+		$prompt .= $this->get_block_type_instructions() . "\n\n";
 		$prompt .= "INSTRUCTIONS:\n";
 		$prompt .= "- Provide specific, actionable feedback for each issue you identify\n";
 		$prompt .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
@@ -205,8 +206,8 @@ class Prompt_Builder {
 		$formatted = array();
 
 		foreach ( $blocks as $block ) {
-			$client_id  = $block['clientId'] ?? 'unknown';
-			$block_type = $block['name'] ?? 'unknown';
+			$client_id  = sanitize_text_field( $block['clientId'] ?? 'unknown' );
+			$block_type = sanitize_text_field( $block['name'] ?? 'unknown' );
 			$content    = $block['content'] ?? '';
 
 			// Truncate very long content.
@@ -219,11 +220,14 @@ class Prompt_Builder {
 				continue;
 			}
 
+			$hint       = sanitize_text_field( $this->get_block_type_hint( $block_type ) );
+			$type_label = $hint ? $block_type . ' - ' . $hint : $block_type;
+
 			$formatted[] = sprintf(
 				"Block ID: %s [%s]\n%s",
 				$client_id,
-				$block_type,
-				$content
+				$type_label,
+				wp_strip_all_tags( $content )
 			);
 		}
 
@@ -270,6 +274,75 @@ class Prompt_Builder {
 		);
 
 		return $tone_definitions[ $target_tone ] ?? $tone_definitions['professional'];
+	}
+
+	/**
+	 * Get block-type specific review instructions.
+	 *
+	 * Returns a prompt section with detailed guidance for reviewing
+	 * different block types with type-appropriate criteria.
+	 *
+	 * @return string Block-type instructions for the prompt.
+	 */
+	private function get_block_type_instructions(): string {
+		$instructions  = "BLOCK-TYPE SPECIFIC GUIDANCE:\n";
+		$instructions .= "When reviewing blocks, apply these type-specific criteria in addition to the general review focus areas:\n\n";
+
+		$instructions .= "Headings (core/heading):\n";
+		$instructions .= "- Verify proper heading hierarchy (H1 → H2 → H3, no skipped levels)\n";
+		$instructions .= "- Check that headings are descriptive and support scannability\n";
+		$instructions .= "- Evaluate SEO value of heading text\n\n";
+
+		$instructions .= "Paragraphs (core/paragraph):\n";
+		$instructions .= "- Assess readability and sentence length variation\n";
+		$instructions .= "- Check for clarity, conciseness, and unnecessary jargon\n";
+		$instructions .= "- Look for passive voice overuse\n\n";
+
+		$instructions .= "Lists (core/list):\n";
+		$instructions .= "- Verify parallel grammatical structure across items\n";
+		$instructions .= "- Check consistent punctuation and capitalization\n";
+		$instructions .= "- Ensure logical ordering of items\n\n";
+
+		$instructions .= "Quotes (core/quote):\n";
+		$instructions .= "- Verify attribution is present and accurate\n";
+		$instructions .= "- Check that the quote supports the surrounding context\n\n";
+
+		$instructions .= "Images (core/image):\n";
+		$instructions .= "- Evaluate alt text quality (descriptive, concise, not redundant)\n";
+		$instructions .= "- Check that the image supports the surrounding content\n\n";
+
+		$instructions .= "Tables (core/table):\n";
+		$instructions .= "- Review data organization and header clarity\n";
+		$instructions .= "- Check for consistent formatting across cells\n\n";
+
+		$instructions .= "Code (core/code):\n";
+		$instructions .= "- Check that code blocks have sufficient context or explanation\n";
+		$instructions .= '- Verify language is specified when relevant';
+
+		return $instructions;
+	}
+
+	/**
+	 * Get a short review hint for a specific block type.
+	 *
+	 * Returns a brief phrase describing what to focus on when reviewing
+	 * a block of the given type. Returns empty string for unrecognized types.
+	 *
+	 * @param  string $block_type The block type name (e.g. 'core/heading').
+	 * @return string Short hint for the block type, or empty string.
+	 */
+	private function get_block_type_hint( string $block_type ): string {
+		$hints = array(
+			'core/heading'   => 'review for hierarchy and SEO',
+			'core/paragraph' => 'review for readability and clarity',
+			'core/list'      => 'review for parallel structure',
+			'core/quote'     => 'verify attribution',
+			'core/image'     => 'evaluate alt text quality',
+			'core/table'     => 'review organization and headers',
+			'core/code'      => 'check for context and explanation',
+		);
+
+		return $hints[ $block_type ] ?? '';
 	}
 
 	/**

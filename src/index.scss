@@ -2,6 +2,9 @@
  * AI Feedback Plugin Styles
  */
 
+/* Secondary/muted text — must maintain ≥4.5:1 contrast on #f0f0f0 (lightest bg used) */
+$ai-feedback-text-muted: #595959;
+
 /* Screen reader only text - visually hidden but available to assistive technologies */
 .screen-reader-text {
 	border: 0;
@@ -89,6 +92,33 @@
 .ai-feedback-panel {
 	padding: 16px;
 
+	/* Focus indicators for keyboard navigation */
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	.components-button:focus-visible {
+		outline: none;
+		box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--wp-admin-theme-color, #007cba);
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.components-select-control__input:focus-visible {
+		border-color: var(--wp-admin-theme-color, #007cba);
+		box-shadow: 0 0 0 2px var(--wp-admin-theme-color, #007cba);
+		outline: none;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.components-checkbox-control__input:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--wp-admin-theme-color, #007cba);
+		outline: none;
+	}
+
+	a:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
 	.components-notice {
 		margin: 0 0 16px;
 	}
@@ -107,7 +137,7 @@
 
 			.ai-feedback-error-code {
 				font-size: 12px;
-				color: #757575;
+				color: $ai-feedback-text-muted;
 				font-family: monospace;
 				margin-top: 4px;
 			}
@@ -127,7 +157,7 @@
 				margin-top: 8px;
 				margin-bottom: 0;
 				font-size: 13px;
-				color: #757575;
+				color: $ai-feedback-text-muted;
 			}
 		}
 	}
@@ -147,7 +177,7 @@
 
 		.description {
 			margin: 0 0 12px;
-			color: #757575;
+			color: $ai-feedback-text-muted;
 			font-size: 13px;
 		}
 	}
@@ -169,7 +199,7 @@
 	/* stylelint-disable-next-line no-descending-specificity */
 	.description {
 		margin: 8px 0 0;
-		color: #757575;
+		color: $ai-feedback-text-muted;
 		font-size: 13px;
 		text-align: center;
 	}
@@ -266,7 +296,7 @@
 
 			span {
 				font-size: 12px;
-				color: #757575;
+				color: $ai-feedback-text-muted;
 			}
 		}
 	}
@@ -297,7 +327,7 @@
 	.model-used {
 		margin: 16px 0 0;
 		font-size: 12px;
-		color: #757575;
+		color: $ai-feedback-text-muted;
 	}
 
 	.notes-info {
@@ -340,7 +370,7 @@
 
 	.ai-feedback-empty-icon {
 		margin-bottom: 16px;
-		color: #757575;
+		color: $ai-feedback-text-muted;
 	}
 
 	/* stylelint-disable-next-line no-descending-specificity */
@@ -350,7 +380,7 @@
 	}
 
 	.ai-feedback-empty-description {
-		color: #666;
+		color: $ai-feedback-text-muted;
 		margin-bottom: 20px;
 	}
 
@@ -443,6 +473,12 @@
 .ai-feedback-item {
 	margin: 0;
 
+	&:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: -2px;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -495,11 +531,18 @@
 .ai-feedback-group {
 	margin: 0;
 
+	&:focus-visible {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: -2px;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__header {
 		padding: 12px;
 		border-bottom: 1px solid #e0e0e0;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -601,10 +644,37 @@
 	padding-top: 16px;
 	border-top: 1px solid #e0e0e0;
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	h4 {
 		font-size: 14px;
 		font-weight: 600;
 		margin: 0 0 12px;
 		color: #1e1e1e;
+	}
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+
+	.ai-feedback-panel .components-button:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;
+	}
+
+	/* stylelint-disable-next-line selector-class-pattern */
+	.ai-feedback-panel .components-select-control__input:focus-visible,
+	/* stylelint-disable-next-line selector-class-pattern */
+	.ai-feedback-panel .components-checkbox-control__input:focus-visible {
+		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;
+	}
+
+	.ai-feedback-item:focus-visible,
+	.ai-feedback-group:focus-visible {
+		outline: 3px solid currentcolor;
+		outline-offset: -3px;
+	}
+
+	.ai-feedback-panel a:focus-visible {
+		outline: 3px solid currentcolor;
+		outline-offset: 3px;
 	}
 }
