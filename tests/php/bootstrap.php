@@ -29,7 +29,7 @@ if ( ! function_exists( 'get_locale' ) ) {
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
-	function apply_filters( $hook_name, $value, ...$args ) {
+	function apply_filters( $_hook_name, $value, ...$args ) {
 		return $value;
 	}
 }
