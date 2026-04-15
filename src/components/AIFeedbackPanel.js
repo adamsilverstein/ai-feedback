@@ -16,6 +16,7 @@ import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
+import SkipLinks from './SkipLinks';
 
 /**
  * Settings page URL.
@@ -148,8 +149,22 @@ export default function AIFeedbackPanel() {
 		);
 	}
 
+	const showModelSelector = availableModels.length > 1;
+	const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
+	const hasReviewContent = !!lastReview || isReviewing;
+	const hasFeedbackItems =
+		!!lastReview && Array.isArray(lastReview.notes)
+			? lastReview.notes.length > 0
+			: false;
+
 	return (
 		<div className="ai-feedback-panel">
+			<SkipLinks
+				hasResults={!!lastReview}
+				showModel={showModelSelector}
+				hasSettings={hasReviewContent}
+				hasFeedbackItems={hasFeedbackItems}
+			/>
 			<WelcomeModal />
 			<StatusAnnouncer
 				isReviewing={isReviewing}
@@ -177,39 +192,52 @@ export default function AIFeedbackPanel() {
 				</Notice>
 			)}
 
+			{/* EmptyState and the review panel are mutually exclusive render
+			    paths, so the REVIEW_BUTTON_ID below is in the DOM exactly
+			    once at a time and always wraps the actionable button. */}
 			{!lastReview && !isReviewing ? (
 				<EmptyState
 					onStartReview={handleStartReview}
 					canReview={canReview}
 					hasContent={hasContent}
 					isSaved={isSaved}
+					reviewButtonId={REVIEW_BUTTON_ID}
 				/>
 			) : (
 				<>
-					{availableModels.length > 1 && (
-						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
-							initialOpen={true}
-						>
-							<ModelSelector />
-							<LanguageSelector />
-						</PanelBody>
-					)}
+					{/* ID used by skip links for keyboard navigation */}
+					<div id="ai-feedback-settings">
+						{showModelSelector && (
+							<PanelBody
+								title={__('Review Settings', 'ai-feedback')}
+								initialOpen={true}
+							>
+								{/* ID used by skip links for keyboard navigation */}
+								<div id="ai-feedback-model-select">
+									<ModelSelector />
+								</div>
+								<LanguageSelector />
+							</PanelBody>
+						)}
 
-					{availableModels.length === 1 && (
-						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
-							initialOpen={true}
-						>
-							<LanguageSelector />
-						</PanelBody>
-					)}
+						{!showModelSelector && (
+							<PanelBody
+								title={__('Review Settings', 'ai-feedback')}
+								initialOpen={true}
+							>
+								<LanguageSelector />
+							</PanelBody>
+						)}
+					</div>
 
 					<PanelBody
 						title={__('Review Document', 'ai-feedback')}
 						initialOpen={true}
 					>
-						<ReviewButton />
+						{/* ID used by skip links for keyboard navigation */}
+						<div id={REVIEW_BUTTON_ID}>
+							<ReviewButton />
+						</div>
 					</PanelBody>
 
 					{lastReview && (
@@ -217,7 +245,10 @@ export default function AIFeedbackPanel() {
 							title={__('Last Review', 'ai-feedback')}
 							initialOpen={true}
 						>
-							<ReviewSummary review={lastReview} />
+							{/* ID used by skip links for keyboard navigation */}
+							<div id="ai-feedback-results">
+								<ReviewSummary review={lastReview} />
+							</div>
 						</PanelBody>
 					)}
 				</>
