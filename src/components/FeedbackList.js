@@ -20,6 +20,7 @@ export default function FeedbackList({ feedbackItems }) {
 
 	return (
 		<div
+			id="ai-feedback-items"
 			className="ai-feedback-list"
 			role="list"
 			aria-label={__('Feedback items', 'ai-feedback')}

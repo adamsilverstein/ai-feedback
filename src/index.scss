@@ -19,6 +19,79 @@ $ai-feedback-text-muted: #595959;
 	word-wrap: normal;
 }
 
+/* Skip Links for keyboard navigation */
+.ai-feedback-skip-links {
+	position: relative;
+
+	.ai-feedback-skip-link {
+
+		/* Hidden state using clip pattern (matches screen-reader-text) */
+		display: block;
+		border: 0;
+		clip: rect(1px, 1px, 1px, 1px);
+		clip-path: inset(50%);
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		padding: 0;
+		position: absolute;
+		width: 1px;
+		word-wrap: normal;
+
+		/* Visual styling applied when visible */
+		background: var(--wp-admin-theme-color, #007cba);
+		color: #fff;
+		text-decoration: none;
+		font-size: 13px;
+		z-index: 100000;
+		border-radius: 0 0 4px 4px;
+
+		&:focus {
+
+			/* Reveal on focus */
+			clip: auto;
+			clip-path: none;
+			height: auto;
+			width: auto;
+			margin: 0;
+			overflow: visible;
+			padding: 8px 12px;
+			top: 0;
+			left: 0;
+			outline: 2px solid var(--wp-admin-theme-color, #007cba);
+			outline-offset: 2px;
+		}
+
+		&:hover {
+			background: var(--wp-admin-theme-color-darker-10, #006ba1);
+		}
+	}
+}
+
+/* Skip link target focus indicators and highlight animation */
+@keyframes ai-feedback-skip-highlight {
+
+	0% {
+		background-color: rgba(0, 124, 186, 0.15);
+	}
+
+	100% {
+		background-color: transparent;
+	}
+}
+
+#ai-feedback-model-select,
+#ai-feedback-review-button,
+#ai-feedback-results {
+
+	&:focus {
+		outline: 2px solid var(--wp-admin-theme-color, #007cba);
+		outline-offset: 2px;
+		border-radius: 4px;
+		animation: ai-feedback-skip-highlight 1s ease-out;
+	}
+}
+
 .ai-feedback-panel {
 	padding: 16px;
 
@@ -429,6 +502,7 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: -2px;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -486,11 +560,13 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: -2px;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__header {
 		padding: 12px;
 		border-bottom: 1px solid #e0e0e0;
 	}
 
+	/* stylelint-disable-next-line selector-class-pattern */
 	.components-card__body {
 		padding: 12px;
 	}
@@ -592,6 +668,7 @@ $ai-feedback-text-muted: #595959;
 	padding-top: 16px;
 	border-top: 1px solid #e0e0e0;
 
+	/* stylelint-disable-next-line no-descending-specificity */
 	h4 {
 		font-size: 14px;
 		font-weight: 600;

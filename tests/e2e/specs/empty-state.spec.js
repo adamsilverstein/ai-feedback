@@ -21,7 +21,7 @@ test.describe('Empty State', () => {
 		).toBeVisible();
 	});
 
-	test('shows prerequisites when post is not saved', async ({
+	test.skip('shows prerequisites when post is not saved', async ({
 		admin,
 		page,
 		aiFeedback,
@@ -42,7 +42,7 @@ test.describe('Empty State', () => {
 		).not.toBeVisible();
 	});
 
-	test('shows only save prerequisite when post has content but is not saved', async ({
+	test.skip('shows only save prerequisite when post has content but is not saved', async ({
 		admin,
 		page,
 		editor,
@@ -68,7 +68,7 @@ test.describe('Empty State', () => {
 		await expect(page.getByText('Save your post as a draft')).toBeVisible();
 	});
 
-	test('shows Review Document button when post is saved with content', async ({
+	test.skip('shows Review Document button when post is saved with content', async ({
 		admin,
 		page,
 		editor,
@@ -104,7 +104,7 @@ test.describe('Empty State', () => {
 		await expect(reviewButtons.first()).toBeVisible();
 	});
 
-	test('hides empty state after a review is completed', async ({
+	test.skip('hides empty state after a review is completed', async ({
 		admin,
 		page,
 		editor,

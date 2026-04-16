@@ -63,36 +63,45 @@ class Prompt_Builder {
 		}
 
 		// Construct the full prompt.
-		$prompt  = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
-		$prompt .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
-		$prompt .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
-		$prompt .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
-		$prompt .= "TARGET TONE:\n" . $tone_guidance;
-		$prompt .= $language_instruction;
-		$prompt .= $continuation_instructions . "\n\n";
-		$prompt .= $this->get_block_type_instructions() . "\n\n";
-		$prompt .= "INSTRUCTIONS:\n";
-		$prompt .= "- Provide specific, actionable feedback for each issue you identify\n";
-		$prompt .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
-		$prompt .= "- Prioritize the most impactful suggestions\n";
-		$prompt .= "- Be encouraging but honest\n";
-		$prompt .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
-		$prompt .= "- Include an overall summary of the document quality\n\n";
-		$prompt .= "OUTPUT FORMAT:\n";
-		$prompt .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
-		$prompt .= "{\n";
-		$prompt .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
-		$prompt .= '  "feedback": [' . "\n";
-		$prompt .= "    {\n";
-		$prompt .= '      "block_id": "abc123-def456",' . "\n";
-		$prompt .= '      "category": "content|tone|flow|design",' . "\n";
-		$prompt .= '      "severity": "suggestion|important|critical",' . "\n";
-		$prompt .= '      "title": "Brief title (max 50 chars)",' . "\n";
-		$prompt .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
-		$prompt .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
-		$prompt .= "    }\n";
-		$prompt .= "  ]\n";
-		$prompt .= "}\n\n";
+		$prompt            = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
+		$prompt           .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
+		$prompt           .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
+		$prompt           .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
+		$prompt           .= "TARGET TONE:\n" . $tone_guidance;
+		$prompt           .= $language_instruction;
+		$prompt           .= $continuation_instructions . "\n\n";
+		$prompt           .= $this->get_block_type_instructions() . "\n\n";
+		$prompt           .= "INSTRUCTIONS:\n";
+		$prompt           .= "- Provide specific, actionable feedback for each issue you identify\n";
+		$prompt           .= "- Reference blocks by their block_id (the unique identifier shown for each block)\n";
+		$prompt           .= "- Prioritize the most impactful suggestions\n";
+		$prompt           .= "- Be encouraging but honest\n";
+		$prompt           .= "- Each feedback item should explain WHY it matters and HOW to improve it\n";
+		$prompt           .= "- Include an overall summary of the document quality\n\n";
+		$prompt           .= "OUTPUT FORMAT:\n";
+		$prompt           .= 'Return your response as a JSON object with two properties: "summary" and "feedback".' . "\n\n";
+		$prompt           .= "{\n";
+		$prompt           .= '  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",' . "\n";
+		$prompt           .= '  "feedback": [' . "\n";
+		$prompt           .= "    {\n";
+		$prompt           .= '      "block_id": "abc123-def456",' . "\n";
+		$prompt           .= '      "category": "content|tone|flow|design",' . "\n";
+		$prompt           .= '      "severity": "suggestion|important|critical",' . "\n";
+		$prompt           .= '      "title": "Brief title (max 50 chars)",' . "\n";
+		$prompt           .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
+		$prompt           .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
+		$prompt           .= "    }\n";
+		$prompt           .= "  ]\n";
+		$prompt           .= "}\n\n";
+		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] ?? 'en_US' );
+
+		// Only append examples if the base prompt is already under the character
+		// budget. 12000 chars ≈ 3000 tokens — conservative to avoid inflating cost
+		// on very long documents while staying well within model context limits.
+		if ( strlen( $prompt ) + strlen( $few_shot_examples ) < 12000 ) {
+			$prompt .= $few_shot_examples . "\n\n";
+		}
+
 		$prompt .= "IMPORTANT:\n";
 		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
 		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
@@ -409,5 +418,107 @@ class Prompt_Builder {
 
 		// Default to English.
 		return "\n\n## LANGUAGE\n\nProvide feedback in English.\n";
+	}
+
+	/**
+	 * Get few-shot examples to guide consistent AI output.
+	 *
+	 * Provides reference examples for each feedback category and severity
+	 * level so the AI produces consistently formatted, high-quality feedback.
+	 *
+	 * @param  string $locale WordPress locale code.
+	 * @return string Few-shot examples for the prompt.
+	 */
+	private function get_few_shot_examples( string $locale = 'en_US' ): string {
+		$language_note = '';
+		if ( 'en_US' !== $locale && 'en' !== substr( $locale, 0, 2 ) ) {
+			$language_note = 'Note: These examples are in English for format reference only. '
+				. 'Your actual feedback MUST be written in the language specified in the LANGUAGE section above.'
+				. "\n\n";
+		}
+
+		$examples = <<<'EOT'
+REFERENCE EXAMPLES:
+Use these as a guide for the quality, format, and tone of your feedback.
+Each item in the "feedback" array should follow this format:
+
+Content quality example (severity: important):
+{
+  "summary": "The document has strong structure but several claims lack supporting evidence.",
+  "feedback": [
+    {
+      "block_id": "example-1",
+      "category": "content",
+      "severity": "important",
+      "title": "Cite your source",
+      "feedback": "The statistic '80% of users prefer...' needs attribution. Unsourced data weakens credibility.",
+      "suggestion": "Add source: 'According to [Study Name, Year], 80% of users prefer...'"
+    }
+  ]
+}
+
+Tone example (severity: suggestion):
+{
+  "summary": "Good content overall, but a few phrases break the formal tone.",
+  "feedback": [
+    {
+      "block_id": "example-2",
+      "category": "tone",
+      "severity": "suggestion",
+      "title": "Match formal tone",
+      "feedback": "The phrase 'pretty cool feature' is too casual for this technical document.",
+      "suggestion": "Replace with: 'This feature significantly improves...'"
+    }
+  ]
+}
+
+Flow example (severity: important):
+{
+  "summary": "Content is well-written but transitions between sections need work.",
+  "feedback": [
+    {
+      "block_id": "example-3",
+      "category": "flow",
+      "severity": "important",
+      "title": "Add transition",
+      "feedback": "Abrupt topic shift between pricing and features. Readers need context.",
+      "suggestion": "Add transition: 'Beyond pricing benefits, the feature also offers...'"
+    }
+  ]
+}
+
+Design example (severity: suggestion):
+{
+  "summary": "Content reads well but formatting could improve scannability.",
+  "feedback": [
+    {
+      "block_id": "example-4",
+      "category": "design",
+      "severity": "suggestion",
+      "title": "Use a list for scannability",
+      "feedback": "Five items listed in one paragraph are hard to scan.",
+      "suggestion": "Convert to a bulleted list with one item per benefit."
+    }
+  ]
+}
+
+When content is well-written, return minimal or no feedback:
+{
+  "summary": "Well-structured content with clear arguments and consistent tone.",
+  "feedback": []
+}
+EOT;
+
+		$examples = $language_note . $examples;
+
+		/**
+		 * Filters the few-shot examples appended to the AI review prompt.
+		 *
+		 * Return an empty string to disable few-shot examples entirely.
+		 *
+		 * @param string $examples The formatted few-shot examples.
+		 * @param string $locale   The current WordPress locale.
+		 */
+		return apply_filters( 'ai_feedback_few_shot_examples', $examples, $locale );
 	}
 }
