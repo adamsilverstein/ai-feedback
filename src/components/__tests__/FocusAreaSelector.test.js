@@ -142,4 +142,24 @@ describe('FocusAreaSelector', () => {
 
 		expect(screen.getByText('Focus Areas')).toBeInTheDocument();
 	});
+
+	it('accumulates consecutive toggles even when store state has not yet updated', async () => {
+		// Regression: previously, rapid clicks each recomputed from the stale
+		// `focusAreas` closure, so later clicks would overwrite earlier ones
+		// instead of building on them. The functional setState form must
+		// accumulate updates against the latest draft.
+		setupMocks(['content']);
+		render(<FocusAreaSelector />);
+
+		await userEvent.click(screen.getByLabelText('Tone & Voice'));
+		await userEvent.click(screen.getByLabelText('Flow & Structure'));
+
+		expect(mockUpdateSettings).toHaveBeenCalledTimes(2);
+		expect(mockUpdateSettings).toHaveBeenNthCalledWith(1, {
+			default_focus_areas: ['content', 'tone'],
+		});
+		expect(mockUpdateSettings).toHaveBeenNthCalledWith(2, {
+			default_focus_areas: ['content', 'tone', 'flow'],
+		});
+	});
 });
