@@ -3,6 +3,7 @@
  */
 import { CheckboxControl } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
+import { useEffect, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
@@ -44,14 +45,23 @@ export default function FocusAreaSelector() {
 
 	const { updateSettings } = useDispatch(STORE_NAME);
 	const selectedAreas = Array.isArray(focusAreas) ? focusAreas : [];
+	const [draftAreas, setDraftAreas] = useState(selectedAreas);
+
+	useEffect(() => {
+		setDraftAreas(Array.isArray(focusAreas) ? focusAreas : []);
+	}, [focusAreas]);
 
 	const handleChange = (areaId, checked) => {
-		const updated = checked
-			? [...selectedAreas, areaId]
-			: selectedAreas.filter((id) => id !== areaId);
+		setDraftAreas((prev) => {
+			const base = Array.isArray(prev) ? prev : [];
+			const updated = checked
+				? Array.from(new Set([...base, areaId]))
+				: base.filter((id) => id !== areaId);
 
-		updateSettings({
-			default_focus_areas: updated,
+			updateSettings({
+				default_focus_areas: updated,
+			});
+			return updated;
 		});
 	};
 
@@ -72,7 +82,7 @@ export default function FocusAreaSelector() {
 				<CheckboxControl
 					key={area.id}
 					label={area.label}
-					checked={selectedAreas.includes(area.id)}
+					checked={draftAreas.includes(area.id)}
 					onChange={(checked) => handleChange(area.id, checked)}
 					help={FOCUS_AREA_HELP[area.id] || area.description}
 				/>
