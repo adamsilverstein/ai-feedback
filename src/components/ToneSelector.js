@@ -3,6 +3,7 @@
  */
 import { SelectControl } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
+import { useEffect, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
@@ -43,6 +44,11 @@ export default function ToneSelector() {
 	);
 
 	const { updateSettings } = useDispatch(STORE_NAME);
+	const [draftTone, setDraftTone] = useState(targetTone);
+
+	useEffect(() => {
+		setDraftTone(targetTone);
+	}, [targetTone]);
 
 	if (!availableTones || availableTones.length === 0) {
 		return null;
@@ -54,19 +60,25 @@ export default function ToneSelector() {
 	}));
 
 	const handleChange = (value) => {
+		setDraftTone(value);
 		updateSettings({
 			default_tone: value,
 		});
 	};
 
+	const toneDescription = availableTones.find(
+		(tone) => tone.id === draftTone
+	)?.description;
+
 	return (
 		<SelectControl
 			label={__('Target Tone', 'ai-feedback')}
-			value={targetTone}
+			value={draftTone}
 			options={options}
 			onChange={handleChange}
 			help={
-				TONE_HELP[targetTone] ||
+				TONE_HELP[draftTone] ||
+				toneDescription ||
 				__(
 					'The tone the AI will evaluate your content against.',
 					'ai-feedback'

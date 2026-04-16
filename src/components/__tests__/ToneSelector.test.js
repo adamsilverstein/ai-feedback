@@ -131,4 +131,23 @@ describe('ToneSelector', () => {
 
 		expect(screen.getByText(/blogs and social media/i)).toBeInTheDocument();
 	});
+
+	it('updates displayed value and help text immediately without waiting on store', async () => {
+		// The store's targetTone stays at 'professional' because updateSettings
+		// is mocked and never dispatches back. The draft state must drive the
+		// visible selection and help text so the UI does not flicker back to
+		// the previous value between click and server response.
+		setupMocks('professional');
+		render(<ToneSelector />);
+
+		await userEvent.selectOptions(
+			screen.getByLabelText('Target Tone'),
+			'academic'
+		);
+
+		expect(screen.getByLabelText('Target Tone')).toHaveValue('academic');
+		expect(
+			screen.getByText(/research and educational content/i)
+		).toBeInTheDocument();
+	});
 });
