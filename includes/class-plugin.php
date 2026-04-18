@@ -55,6 +55,13 @@ class Plugin {
 	private ?Health_Controller $health_controller = null;
 
 	/**
+	 * Reply detector instance.
+	 *
+	 * @var Reply_Detector|null
+	 */
+	private ?Reply_Detector $reply_detector = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -91,6 +98,9 @@ class Plugin {
 
 		// Add custom avatar for AI Feedback comments/notes.
 		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
+
+		$this->reply_detector = new Reply_Detector();
+		$this->reply_detector->register();
 	}
 
 	/**
