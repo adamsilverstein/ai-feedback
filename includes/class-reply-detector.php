@@ -17,10 +17,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Detects replies to AI Feedback notes.
  *
- * A "reply" is any block_comment whose parent is an AI-authored note
- * (a comment with `ai_feedback` meta set to '1') AND which was not
- * itself authored by AI Feedback — the latter check prevents our own
- * generated replies from re-triggering detection.
+ * A "reply" is any `note`-type comment whose parent is an AI-authored
+ * note (a comment with `ai_feedback` meta set to '1') AND which was
+ * not itself authored by AI Feedback — the latter check prevents our
+ * own generated replies from re-triggering detection.
+ *
+ * WordPress 6.9+ stores block-level notes as comments with
+ * `comment_type = 'note'` (see Notes_Manager::create_note()).
  */
 class Reply_Detector {
 
@@ -47,8 +50,8 @@ class Reply_Detector {
 	 * @param object $comment    Comment object (WP_Comment in production).
 	 */
 	public function maybe_dispatch_reply( int $comment_id, $comment ): void {
-		// Only care about block-level comments.
-		if ( 'block_comment' !== ( $comment->comment_type ?? '' ) ) {
+		// Only care about block-level notes.
+		if ( 'note' !== ( $comment->comment_type ?? '' ) ) {
 			return;
 		}
 

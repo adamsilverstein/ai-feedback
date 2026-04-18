@@ -57,7 +57,7 @@ class ReplyDetectorTest extends TestCase {
 		);
 
 		$reply = (object) array(
-			'comment_type'    => 'block_comment',
+			'comment_type'    => 'note',
 			'comment_parent'  => 100,
 			'comment_post_ID' => 42,
 		);
@@ -78,7 +78,7 @@ class ReplyDetectorTest extends TestCase {
 		$GLOBALS['test_comment_meta'][100] = array();
 
 		$reply = (object) array(
-			'comment_type'    => 'block_comment',
+			'comment_type'    => 'note',
 			'comment_parent'  => 100,
 			'comment_post_ID' => 42,
 		);
@@ -93,7 +93,7 @@ class ReplyDetectorTest extends TestCase {
 	 */
 	public function test_top_level_comment_is_ignored(): void {
 		$comment = (object) array(
-			'comment_type'    => 'block_comment',
+			'comment_type'    => 'note',
 			'comment_parent'  => 0,
 			'comment_post_ID' => 42,
 		);
@@ -112,7 +112,7 @@ class ReplyDetectorTest extends TestCase {
 		$GLOBALS['test_comment_meta'][200] = array( 'ai_feedback' => '1' );
 
 		$reply = (object) array(
-			'comment_type'    => 'block_comment',
+			'comment_type'    => 'note',
 			'comment_parent'  => 100,
 			'comment_post_ID' => 42,
 		);
@@ -125,7 +125,7 @@ class ReplyDetectorTest extends TestCase {
 	/**
 	 * A non-block-comment reply (e.g. a regular post comment) is ignored.
 	 */
-	public function test_non_block_comment_is_ignored(): void {
+	public function test_non_note_is_ignored(): void {
 		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
 
 		$comment = (object) array(
