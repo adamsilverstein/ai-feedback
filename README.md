@@ -368,8 +368,7 @@ GPL v2 or later
 
 ### Coming Soon
 - Phase 4: Conversational replies to AI feedback
-- Phase 5: Abilities API, streaming responses, v1.0.0 release
-
+- Phase 5: Abilities API, streaming responses, performance optimization, final accessibility audit, complete documentation, v1.0.0 release
 ---
 
 Built with ❤️ for WordPress
