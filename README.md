@@ -260,9 +260,11 @@ Editor → Plugin Sidebar → Data Store → REST API → PHP Services → AI Cl
 Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI Response
 ```
 
-## Phase 1 Status (Current)
+## Project Status
 
-✅ **Completed:**
+**Current phase:** Phase 5 (Polish & Release) — in progress. Phase 4 (Conversation Loop) is the remaining major feature and has not yet started.
+
+### Phase 1: Foundation ✅ Complete
 - Plugin scaffold with build system
 - Plugin sidebar UI with settings
 - Model selector with provider grouping
@@ -271,40 +273,36 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - WordPress data store (selectors, actions, reducer)
 - Review button with loading states
 
-🚧 **Next Steps (Phase 2):**
-- Review Service implementation
-- Prompt Builder with focus area logic
-- PHP AI Client integration
-- Response Parser with validation
-- Review REST endpoint
-- Mock AI responses for testing
+### Phase 2: AI Integration & Review ✅ Complete
+- [x] Review Service with block parsing
+- [x] Prompt engineering for different focus areas
+- [x] AI response parsing and validation
+- [x] Review REST endpoint
+- [x] Error handling and rate limiting
 
-## Roadmap
+### Phase 3: Notes Integration ✅ Complete
+- [x] Notes Manager for WordPress Notes API
+- [x] Block-level note indicators
+- [x] Note resolution tracking
+- [x] Review history display
 
-### Phase 2: AI Integration & Review (Next)
-- [ ] Review Service with block parsing
-- [ ] Prompt engineering for different focus areas
-- [ ] AI response parsing and validation
-- [ ] Review REST endpoint
-- [ ] Error handling and rate limiting
+### Phase 4: Conversation Loop 🚧 Not started
+Tracked in issues [#131](https://github.com/adamsilverstein/ai-feedback/issues/131)–[#134](https://github.com/adamsilverstein/ai-feedback/issues/134).
+- [ ] Reply detection hook (#131)
+- [ ] Context-aware reply prompts / Reply Service (#132)
+- [ ] Async reply processing (#133)
+- [ ] Conversation threading UI (#134)
 
-### Phase 3: Notes Integration
-- [ ] Notes Manager for WordPress Notes API
-- [ ] Block-level note indicators
-- [ ] Note resolution tracking
-- [ ] Review history display
-
-### Phase 4: Conversation Loop
-- [ ] Reply detection hook
-- [ ] Context-aware reply prompts
-- [ ] Async reply processing
-- [ ] Conversation threading UI
-
-### Phase 5: Polish & Release
+### Phase 5: Polish & Release 🚧 In progress
+- [x] Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions, descriptive screen reader labels
+- [x] Onboarding: first-run welcome modal, empty state guidance
+- [x] AI quality: few-shot examples, block-type specific instructions, multi-language support, deduplication
+- [x] Health check REST endpoint
+- [x] E2E infrastructure with Playwright
 - [ ] Abilities API integration
 - [ ] Streaming responses
 - [ ] Performance optimization
-- [ ] Accessibility audit
+- [ ] Accessibility audit (final sweep)
 - [ ] Complete documentation
 - [ ] Release v1.0.0
 
@@ -352,18 +350,25 @@ GPL v2 or later
 
 ## Changelog
 
-### 0.1.0 (Current - Phase 1)
-- Initial plugin scaffold
-- Settings UI and REST API
-- Model selection
-- Focus areas configuration
-- Review button (UI only)
+### 0.1.0 (Current)
+- Plugin scaffold and build system
+- Settings UI, REST API, and data store
+- Model selection with provider grouping
+- Focus areas and tone configuration
+- Document review with AI provider integration (Anthropic, OpenAI, Gemini)
+- Prompt builder with focus-area and block-type specific instructions
+- Few-shot examples for consistent AI output
+- Multi-language feedback support
+- Feedback deduplication and grouping
+- WordPress Notes API integration (block-level comments)
+- Health check REST endpoint
+- Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions
+- Onboarding: first-run welcome modal, empty state guidance
+- E2E test infrastructure with Playwright
 
-### Coming Soon (Phase 2)
-- Full AI integration
-- Document review functionality
-- Note creation
-
+### Coming Soon
+- Phase 4: Conversational replies to AI feedback
+- Phase 5: Abilities API, streaming responses, performance optimization, final accessibility audit, complete documentation, v1.0.0 release
 ---
 
 Built with ❤️ for WordPress
