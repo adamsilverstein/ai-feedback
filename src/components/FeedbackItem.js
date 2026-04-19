@@ -9,6 +9,7 @@ import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
 import { dispatch } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import FeedbackReplies from './FeedbackReplies';
 
 /**
  * Navigate to a specific block in the editor.
@@ -108,6 +109,11 @@ function SingleFeedbackItem({ item, onNavigate }) {
 						{__('Go to block', 'ai-feedback')} →
 					</Button>
 				)}
+
+				<FeedbackReplies
+					replies={item.replies || []}
+					pendingReplyId={item.pending_reply_id || null}
+				/>
 			</CardBody>
 		</Card>
 	);
