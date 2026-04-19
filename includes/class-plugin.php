@@ -69,6 +69,20 @@ class Plugin {
 	private ?Reply_Service $reply_service = null;
 
 	/**
+	 * Reply cron dispatcher instance.
+	 *
+	 * @var Reply_Cron_Dispatcher|null
+	 */
+	private ?Reply_Cron_Dispatcher $reply_cron_dispatcher = null;
+
+	/**
+	 * Reply status controller instance.
+	 *
+	 * @var Reply_Status_Controller|null
+	 */
+	private ?Reply_Status_Controller $reply_status_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -109,6 +123,9 @@ class Plugin {
 		$this->reply_detector = new Reply_Detector();
 		$this->reply_detector->register();
 
+		$this->reply_cron_dispatcher = new Reply_Cron_Dispatcher();
+		$this->reply_cron_dispatcher->register();
+
 		$this->reply_service = new Reply_Service();
 		$this->reply_service->register();
 	}
@@ -128,6 +145,9 @@ class Plugin {
 
 		$this->health_controller = new Health_Controller();
 		$this->health_controller->register_routes();
+
+		$this->reply_status_controller = new Reply_Status_Controller();
+		$this->reply_status_controller->register_routes();
 	}
 
 	/**

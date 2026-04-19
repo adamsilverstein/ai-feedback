@@ -53,7 +53,7 @@ class Reply_Service {
 	 */
 	public function register(): void {
 		add_action(
-			Reply_Detector::ACTION_REPLY_RECEIVED,
+			Reply_Cron_Dispatcher::CRON_HOOK,
 			array( $this, 'on_reply_received' ),
 			10,
 			4
@@ -61,11 +61,12 @@ class Reply_Service {
 	}
 
 	/**
-	 * Action callback for Reply_Detector::ACTION_REPLY_RECEIVED.
+	 * Cron callback for Reply_Cron_Dispatcher::CRON_HOOK.
 	 *
 	 * Wraps handle_reply() to satisfy the void-return contract that
 	 * WordPress actions require; handle_reply() returns a value for
-	 * direct testability.
+	 * direct testability. Also records final status on the reply comment
+	 * so the frontend can poll for completion.
 	 *
 	 * @param  int    $comment_id Reply comment ID.
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
@@ -73,7 +74,16 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 */
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
-		$this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+		$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+
+		if ( is_wp_error( $result ) ) {
+			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
+			update_comment_meta( $comment_id, 'ai_feedback_reply_error', $result->get_error_message() );
+			return;
+		}
+
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'complete' );
+		update_comment_meta( $comment_id, 'ai_feedback_reply_comment_id', (int) $result );
 	}
 
 	/**
