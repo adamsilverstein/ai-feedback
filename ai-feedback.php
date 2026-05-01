@@ -141,9 +141,13 @@ function display_ai_client_notice()
     <div class="notice notice-error">
         <p>
     <?php
-    esc_html_e(
-        'AI Feedback requires the WordPress core AI Client (introduced in WordPress 7.0). Please update WordPress to use this plugin.',
-        'ai-feedback'
+    printf(
+        /* translators: %s: URL of the WordPress updates screen */
+        wp_kses(
+            __( 'AI Feedback requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'ai-feedback' ),
+            array( 'a' => array( 'href' => array() ) )
+        ),
+        esc_url(admin_url('update-core.php'))
     );
     ?>
         </p>
