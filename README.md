@@ -1,25 +1,25 @@
 # AI Feedback Plugin
 
-AI-powered editorial feedback for WordPress Gutenberg editor using WordPress 6.9's Notes feature.
+AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
 
 ## Overview
 
-The AI Feedback plugin integrates AI-powered content review directly into the WordPress block editor. It leverages the native Notes API (WordPress 6.9+) to provide contextual, block-level feedback on your content.
+The AI Feedback plugin integrates AI-powered content review directly into the WordPress block editor. It uses the WordPress 7.0 core [AI Client](https://make.wordpress.org/core/2026/03/24/introducing-the-ai-client-in-wordpress-7-0/) for provider-agnostic AI access, the [Connectors API](https://make.wordpress.org/core/2026/03/18/introducing-the-connectors-api-in-wordpress-7-0/) for credentials, and the native Notes API for contextual, block-level feedback.
 
 ## Features
 
 - 🤖 **AI-Powered Reviews**: Get intelligent feedback on content quality, tone, flow, and design
 - 📝 **Native Notes Integration**: Feedback appears as WordPress block comments
-- ⚙️ **Configurable Settings**: Choose AI models, focus areas, and target tone
-- 🔄 **Multiple AI Providers**: Support for Claude, GPT-4, Gemini, and more
+- 🔌 **Core Connectors API**: Reuses the credentials configured in Settings → Connectors
+- 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other provider registered with the core AI Client
 - 💬 **Conversational Feedback**: Reply to AI suggestions and get clarifications (Phase 4)
 - 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
 
 ## Requirements
 
-- **WordPress**: 6.9 or higher
-- **PHP**: 8.0 or higher
-- **Plugins**: [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
+- **WordPress**: 7.0 or higher
+- **PHP**: 8.1 or higher
+- **AI Provider**: At least one provider configured under Settings → Connectors
 - **Node.js**: 18.0 or higher (for development)
 - **npm**: 9.0 or higher (for development)
 
@@ -27,16 +27,13 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 
 ### Prerequisites
 
-The AI Feedback plugin requires the [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/) to be installed and activated. The AI Experiments plugin provides:
-- Centralized AI settings screen for configuring API keys
-- Support for multiple AI providers (Anthropic, OpenAI, Google Gemini, etc.)
-- Common interface for AI configuration across WordPress plugins
+WordPress 7.0 ships the AI Client and Connectors API in core, so AI Feedback no longer needs the standalone AI Experiments plugin or a separate Composer-installed AI SDK.
 
-**Install the AI Experiments plugin first:**
-1. Go to WordPress Admin → Plugins → Add New
-2. Search for "AI Experiments" or "AI"
-3. Click "Install Now" and then "Activate"
-4. Configure your AI provider API keys in Settings → AI
+Before using AI Feedback, configure an AI provider:
+1. Go to WordPress Admin → **Settings → Connectors**.
+2. Choose a provider (Anthropic, OpenAI, Google, etc.).
+3. Provide an API key directly, or set the corresponding environment variable / PHP constant (e.g. `ANTHROPIC_API_KEY`). Environment variables and PHP constants take precedence over database-stored values.
+4. Save.
 
 ### 1. Clone the Repository
 
@@ -87,29 +84,27 @@ If using wp-env, the plugin is automatically activated. Otherwise:
 
 ### AI Provider Setup
 
-The plugin uses the [WordPress PHP AI Client](https://github.com/WordPress/php-ai-client) which works in conjunction with the [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/) for managing AI provider credentials.
+The plugin calls WordPress 7.0's `wp_ai_client_prompt()` directly, so credentials are managed by the core [Connectors API](https://make.wordpress.org/core/2026/03/18/introducing-the-connectors-api-in-wordpress-7-0/).
 
-**Option 1: Using the AI Experiments Plugin (Recommended)**
+**Option 1: Settings → Connectors (recommended)**
 
-Configure your AI provider through the WordPress admin interface:
-1. Go to Settings → AI in WordPress admin
-2. Select your preferred AI provider (Anthropic, OpenAI, Google Gemini, etc.)
-3. Enter your API key
-4. Save settings
+1. Go to **Settings → Connectors** in WordPress admin.
+2. Pick a provider (Anthropic, OpenAI, Google, etc.).
+3. Enter the API key.
+4. Save.
 
-**Option 2: Using wp-config.php**
+**Option 2: Environment variables or PHP constants**
 
-Alternatively, you can configure your AI provider directly in `wp-config.php`:
+The Connectors API checks for credentials in this order:
+1. Environment variable (e.g. `ANTHROPIC_API_KEY`)
+2. PHP constant (defined via `define()`)
+3. Database setting saved via the Connectors screen
 
 ```php
-// For Anthropic Claude (default)
+// In wp-config.php — these take precedence over the database value.
 define( 'ANTHROPIC_API_KEY', 'your-api-key-here' );
-
-// For OpenAI
-define( 'OPENAI_API_KEY', 'your-api-key-here' );
-
-// For Google Gemini
-define( 'GOOGLE_AI_API_KEY', 'your-api-key-here' );
+define( 'OPENAI_API_KEY',    'your-api-key-here' );
+define( 'GOOGLE_API_KEY',    'your-api-key-here' );
 ```
 
 ### Default Settings
@@ -337,16 +332,15 @@ GPL v2 or later
 
 ## Credits
 
-- Requires [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/)
-- Built with [WordPress PHP AI Client](https://github.com/WordPress/php-ai-client)
-- Uses WordPress 6.9+ Notes API
-- Powered by AI providers: Anthropic, OpenAI, Google
+- Built on the WordPress 7.0 core [AI Client](https://make.wordpress.org/core/2026/03/24/introducing-the-ai-client-in-wordpress-7-0/) and [Connectors API](https://make.wordpress.org/core/2026/03/18/introducing-the-connectors-api-in-wordpress-7-0/)
+- Uses the WordPress Notes API for block-level comments
+- Powered by AI providers: Anthropic, OpenAI, Google (any provider registered with the core AI Client)
 
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/ai-feedback/issues)
 - **Documentation**: [docs/](docs/)
-- **WordPress**: Requires 6.9+
+- **WordPress**: Requires 7.0+
 
 ## Changelog
 
