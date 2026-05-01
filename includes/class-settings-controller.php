@@ -88,27 +88,33 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response Status response.
 	 */
 	public function get_status(): \WP_REST_Response {
-		$ai_client_available = function_exists( 'wp_ai_client_prompt' );
-
-		// Detect whether at least one AI provider connector is configured via
-		// the WordPress 7.0 Connectors API.
-		$connector_configured = false;
-		if ( function_exists( 'wp_get_connectors' ) ) {
-			foreach ( wp_get_connectors() as $connector ) {
-				if ( ( $connector['type'] ?? '' ) === 'ai_provider' ) {
-					$connector_configured = true;
-					break;
-				}
-			}
-		}
-
 		$status = array(
-			'ai_client_available'  => $ai_client_available,
-			'connector_configured' => $connector_configured,
+			'ai_client_available'  => function_exists( 'wp_ai_client_prompt' ),
+			'connector_configured' => $this->has_ai_provider_connector(),
 			'settings_url'         => admin_url( 'options-general.php?page=connectors' ),
 		);
 
 		return rest_ensure_response( $status );
+	}
+
+	/**
+	 * Whether at least one AI provider connector is registered with the
+	 * WordPress 7.0 Connectors API.
+	 *
+	 * @return bool True when an `ai_provider` connector exists.
+	 */
+	protected function has_ai_provider_connector(): bool {
+		if ( ! function_exists( 'wp_get_connectors' ) ) {
+			return false;
+		}
+
+		foreach ( wp_get_connectors() as $connector ) {
+			if ( ( $connector['type'] ?? '' ) === 'ai_provider' ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

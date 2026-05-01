@@ -21,6 +21,10 @@ class Review_Service {
 	/**
 	 * Non-retryable error codes that should fail immediately without retry.
 	 *
+	 * Codes are matched against the WP_Error returned by
+	 * wp_ai_client_prompt()->generate_text(). Unknown codes fall through to
+	 * the retry path, which is the safer default for transient failures.
+	 *
 	 * @var array
 	 */
 	const NON_RETRYABLE_ERRORS = array(
@@ -222,6 +226,10 @@ class Review_Service {
 
 	/**
 	 * Call AI service via the WordPress 7.0 core AI Client.
+	 *
+	 * Request timeouts are owned by the WordPress HTTP transport that the
+	 * core AI Client uses internally; they can be tuned globally via the
+	 * `http_request_timeout` filter rather than per-call here.
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.

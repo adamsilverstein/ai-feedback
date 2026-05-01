@@ -251,6 +251,76 @@ if (! function_exists('is_wp_error') ) {
 
 // Load classes that depend on WP REST and WP_Error mocks.
 require_once $includes_dir . 'class-health-controller.php';
+require_once $includes_dir . 'class-settings-controller.php';
+
+// Mock WP REST request and additional response helpers needed by Settings_Controller.
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		private array $params = array();
+		public function has_param( $key ) {
+			return array_key_exists( $key, $this->params );
+		}
+		public function get_param( $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+		public function set_param( $key, $value ) {
+			$this->params[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( $path = '', $scheme = 'admin' ) {
+		return 'http://example.test/wp-admin/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'rest_ensure_response' ) ) {
+	function rest_ensure_response( $response ) {
+		if ( $response instanceof \WP_REST_Response ) {
+			return $response;
+		}
+		return new \WP_REST_Response( $response );
+	}
+}
+
+if ( ! function_exists( 'register_rest_route' ) ) {
+	function register_rest_route( $namespace, $route, $args ) {
+		// No-op for unit tests.
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $name, $default = false ) {
+		return $GLOBALS['test_options'][ $name ] ?? $default;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $name, $value, $autoload = null ) {
+		$GLOBALS['test_options'][ $name ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( $key, $value, $expiration = 0 ) {
+		$GLOBALS['test_transients'][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( $key ) {
+		return $GLOBALS['test_transients'][ $key ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'rest_url' ) ) {
+	function rest_url( $path = '' ) {
+		return 'http://example.test/wp-json/' . ltrim( $path, '/' );
+	}
+}
 
 // Mock WordPress sanitization functions.
 if (! function_exists('wp_kses_post') ) {
