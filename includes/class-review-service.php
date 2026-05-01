@@ -41,7 +41,6 @@ class Review_Service {
 	 * @var array
 	 */
 	const NON_RETRYABLE_ERRORS = array(
-		'rate_limit_exceeded',
 		'invalid_api_key',
 		'billing_error',
 		'rest_forbidden',
@@ -411,8 +410,23 @@ class Review_Service {
 		}
 
 		$message = strtolower( (string) $error->get_error_message() );
-		foreach ( self::NON_RETRYABLE_MESSAGE_KEYWORDS as $keyword ) {
-			if ( '' !== $message && str_contains( $message, $keyword ) ) {
+		if ( '' === $message ) {
+			return false;
+		}
+
+		/**
+		 * Filters the message-keyword fallback used to classify errors as
+		 * non-retryable when their code does not match.
+		 *
+		 * @param string[] $keywords Lowercase substrings to match.
+		 */
+		$keywords = (array) apply_filters(
+			'ai_feedback_non_retryable_message_keywords',
+			self::NON_RETRYABLE_MESSAGE_KEYWORDS
+		);
+
+		foreach ( $keywords as $keyword ) {
+			if ( str_contains( $message, $keyword ) ) {
 				return true;
 			}
 		}

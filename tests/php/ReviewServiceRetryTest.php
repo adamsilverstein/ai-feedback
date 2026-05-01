@@ -97,21 +97,19 @@ class ReviewServiceRetryTest extends TestCase
     }
 
     /**
-     * Test that NON_RETRYABLE_ERRORS constant covers the legacy plugin codes
-     * plus the broader set introduced for the WordPress 7.0 core AI Client.
+     * Test that NON_RETRYABLE_ERRORS contains only permanent-failure codes.
      *
-     * `http_request_failed` is intentionally NOT in this list: WordPress uses
-     * it for transient transport failures (timeouts, network glitches) which
-     * should be retried.
+     * Transient codes (rate_limit_exceeded, http_request_failed) are
+     * intentionally excluded so the retry loop can wait and try again.
      */
     public function test_non_retryable_errors_constant(): void
     {
         $codes = Review_Service::NON_RETRYABLE_ERRORS;
 
-        $this->assertContains('rate_limit_exceeded', $codes);
         $this->assertContains('invalid_api_key', $codes);
         $this->assertContains('billing_error', $codes);
         $this->assertContains('rest_forbidden', $codes);
+        $this->assertNotContains('rate_limit_exceeded', $codes);
         $this->assertNotContains('http_request_failed', $codes);
     }
 
@@ -154,6 +152,31 @@ class ReviewServiceRetryTest extends TestCase
         $reflection->setAccessible(true);
 
         $this->assertFalse($reflection->invoke($this->service, $error));
+    }
+
+    /**
+     * call_ai() returns ai_client_missing when the WP 7.0 AI Client function
+     * is not available, instead of throwing or fataling.
+     */
+    public function test_call_ai_returns_error_when_function_missing(): void
+    {
+        $this->assertFalse(
+            function_exists('wp_ai_client_prompt'),
+            'Test environment unexpectedly defines wp_ai_client_prompt(); the early-return path cannot be exercised.'
+        );
+
+        $reflection = new ReflectionMethod(Review_Service::class, 'call_ai');
+        $reflection->setAccessible(true);
+
+        $result = $reflection->invoke(
+            $this->service,
+            'prompt',
+            'system',
+            'model'
+        );
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('ai_client_missing', $result->get_error_code());
     }
 
     /**
@@ -221,13 +244,18 @@ class ReviewServiceRetryTest extends TestCase
     }
 
     /**
-     * Test that rate_limit_exceeded error fails immediately.
+     * Test that a rate_limit_exceeded error is retried with backoff.
+     *
+     * Rate limits are transient: the right behaviour is to wait and try
+     * again, not to abort the review.
      */
-    public function test_rate_limit_exceeded_fails_immediately(): void
+    public function test_rate_limit_exceeded_is_retried(): void
     {
-        $error = new WP_Error('rate_limit_exceeded', 'Rate limit exceeded');
+        $mock_response = '{"feedback": []}';
+        $error         = new WP_Error('rate_limit_exceeded', 'Rate limit exceeded');
 
-        $this->service->call_ai_responses = array( $error );
+        // Fail twice, then succeed.
+        $this->service->call_ai_responses = array( $error, $error, $mock_response );
 
         $result = $this->service->test_call_ai_with_retry(
             'test prompt',
@@ -236,9 +264,8 @@ class ReviewServiceRetryTest extends TestCase
             3
         );
 
-        $this->assertInstanceOf(WP_Error::class, $result);
-        $this->assertSame('rate_limit_exceeded', $result->get_error_code());
-        $this->assertSame(1, $this->service->call_ai_count);
+        $this->assertSame($mock_response, $result);
+        $this->assertSame(3, $this->service->call_ai_count);
     }
 
     /**
