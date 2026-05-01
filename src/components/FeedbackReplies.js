@@ -29,10 +29,11 @@ export default function FeedbackReplies({
 	pendingReplyId = null,
 }) {
 	const { status } = useReplyStatus(pendingReplyId);
+	const hasPendingSlot = Boolean(pendingReplyId);
 	const isPolling =
-		Boolean(pendingReplyId) && status !== 'complete' && status !== 'failed';
+		hasPendingSlot && status !== 'complete' && status !== 'failed';
 
-	if (replies.length === 0 && !isPolling) {
+	if (replies.length === 0 && !hasPendingSlot) {
 		return null;
 	}
 
@@ -63,20 +64,26 @@ export default function FeedbackReplies({
 			))}
 
 			{/*
-			 * The aria-live region must be present in the DOM before its
-			 * content changes for screen readers to announce reliably; we
-			 * always render the <li> when polling and toggle inner content.
+			 * The aria-live region must already be in the DOM before its
+			 * content changes for NVDA / JAWS to announce reliably. Render
+			 * the <li> for the entire pending lifecycle (any time
+			 * pendingReplyId is set) and toggle the spinner content based
+			 * on whether we are still polling.
 			 */}
-			{isPolling && (
+			{hasPendingSlot && (
 				<li
 					className="ai-feedback-reply ai-feedback-reply-pending"
 					aria-live="polite"
 					aria-atomic="true"
 				>
-					<Spinner />
-					<span className="ai-feedback-reply-content">
-						{__('AI is replying…', 'ai-feedback')}
-					</span>
+					{isPolling && (
+						<>
+							<Spinner />
+							<span className="ai-feedback-reply-content">
+								{__('AI is replying…', 'ai-feedback')}
+							</span>
+						</>
+					)}
 				</li>
 			)}
 		</ul>
