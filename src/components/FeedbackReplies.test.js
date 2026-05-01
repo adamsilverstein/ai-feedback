@@ -51,11 +51,7 @@ describe('FeedbackReplies', () => {
 		expect(screen.getByText('The 40% growth claim.')).toBeInTheDocument();
 	});
 
-	it('keeps showing existing replies while an AI reply is being generated', async () => {
-		// Pending reply id ⇒ the hook will poll; apiFetch is mocked to never
-		// resolve so the local status stays 'idle' then would flip to
-		// 'pending' on first response. For this component test we just verify
-		// the thread renders existing entries regardless.
+	it('shows the pending spinner immediately when a reply is being generated', () => {
 		render(
 			<FeedbackReplies
 				replies={[
@@ -70,6 +66,11 @@ describe('FeedbackReplies', () => {
 			/>
 		);
 
+		// Existing replies still render alongside the pending row.
 		expect(screen.getByText('Clarify please.')).toBeInTheDocument();
+
+		// Spinner is visible synchronously — no first-poll gap.
+		expect(screen.getByTestId('wp-spinner')).toBeInTheDocument();
+		expect(screen.getByText('AI is replying…')).toBeInTheDocument();
 	});
 });

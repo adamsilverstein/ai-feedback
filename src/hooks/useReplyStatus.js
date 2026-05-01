@@ -18,11 +18,11 @@ const POLL_INTERVAL_MS = 2000;
  *         Current reply status. `status` is one of `idle | pending | complete | failed | unknown`.
  */
 export default function useReplyStatus(replyId) {
-	const [state, setState] = useState({
-		status: 'idle',
+	const [state, setState] = useState(() => ({
+		status: replyId ? 'pending' : 'idle',
 		aiReplyCommentId: null,
 		error: null,
-	});
+	}));
 
 	// Track an active timer so unmount/deps change can cancel it cleanly.
 	const timeoutRef = useRef(null);
@@ -32,6 +32,14 @@ export default function useReplyStatus(replyId) {
 			setState({ status: 'idle', aiReplyCommentId: null, error: null });
 			return undefined;
 		}
+
+		// Show the pending state synchronously so the spinner is visible
+		// before the first poll returns (otherwise there is a ~2s blank gap).
+		setState((prev) =>
+			prev.status === 'pending' && prev.aiReplyCommentId === null
+				? prev
+				: { status: 'pending', aiReplyCommentId: null, error: null }
+		);
 
 		let cancelled = false;
 

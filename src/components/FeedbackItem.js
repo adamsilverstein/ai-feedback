@@ -112,7 +112,7 @@ function SingleFeedbackItem({ item, onNavigate }) {
 
 				<FeedbackReplies
 					replies={item.replies || []}
-					pendingReplyId={item.pending_reply_id || null}
+					pendingReplyId={item.pending_reply_id ?? null}
 				/>
 			</CardBody>
 		</Card>
