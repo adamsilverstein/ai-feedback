@@ -8,6 +8,7 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
+import { getConnectorsUrl } from '../utils/connectors-url';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -17,11 +18,6 @@ import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
 import SkipLinks from './SkipLinks';
-
-/**
- * URL of the WordPress 7.0 Connectors admin screen.
- */
-const CONNECTORS_PAGE_URL = '/wp-admin/options-general.php?page=connectors';
 
 /**
  * Get action button for specific error types.
@@ -42,7 +38,7 @@ function getErrorAction(error) {
 		return (
 			<Button
 				variant="link"
-				href={CONNECTORS_PAGE_URL}
+				href={getConnectorsUrl()}
 				target="_blank"
 				rel="noopener noreferrer"
 				className="ai-feedback-error-action"

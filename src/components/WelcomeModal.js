@@ -9,9 +9,9 @@ import { __ } from '@wordpress/i18n';
 import { useState, useEffect } from '@wordpress/element';
 import { check, pencil, commentContent } from '@wordpress/icons';
 import apiFetch from '@wordpress/api-fetch';
+import { getConnectorsUrl } from '../utils/connectors-url';
 
 const STORAGE_KEY = 'ai-feedback-welcomed';
-const AI_SETTINGS_URL = '/wp-admin/options-general.php?page=connectors';
 
 /**
  * WelcomeModal component shown on first sidebar open.
@@ -23,7 +23,7 @@ export default function WelcomeModal() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [aiClientAvailable, setAiClientAvailable] = useState(null);
 	const [statusError, setStatusError] = useState(null);
-	const [settingsUrl, setSettingsUrl] = useState(AI_SETTINGS_URL);
+	const [settingsUrl, setSettingsUrl] = useState(getConnectorsUrl());
 
 	useEffect(() => {
 		// Check if already welcomed first.
