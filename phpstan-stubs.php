@@ -5,6 +5,11 @@
  *
  * Loaded only by PHPStan; never executed at runtime.
  *
+ * TODO: Remove this file once php-stubs/wordpress-stubs ships v7.0.x and
+ * Composer is bumped to require it; the upstream stubs will provide the
+ * real signatures for wp_ai_client_prompt(), WP_AI_Client_Prompt_Builder,
+ * wp_get_connectors(), wp_get_connector(), and wp_is_connector_registered().
+ *
  * @package AI_Feedback
  */
 
