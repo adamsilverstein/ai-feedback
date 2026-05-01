@@ -44,7 +44,6 @@ class Review_Service {
 		'rate_limit_exceeded',
 		'invalid_api_key',
 		'billing_error',
-		'http_request_failed',
 		'rest_forbidden',
 	);
 
@@ -282,8 +281,8 @@ class Review_Service {
 		 *
 		 * @param int $timeout Timeout in seconds. Default 60.
 		 */
-		$timeout         = (int) apply_filters( 'ai_feedback_http_timeout', self::AI_HTTP_TIMEOUT );
-		$timeout_filter  = static function () use ( $timeout ) {
+		$timeout        = (int) apply_filters( 'ai_feedback_http_timeout', self::AI_HTTP_TIMEOUT );
+		$timeout_filter = static function () use ( $timeout ) {
 			return $timeout;
 		};
 		add_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
@@ -297,6 +296,11 @@ class Review_Service {
 				->using_temperature( 0.3 )
 				->using_max_tokens( 8000 )
 				->generate_text();
+		} catch ( \Throwable $e ) {
+			// Defensive: the core AI Client should already convert SDK
+			// exceptions to WP_Error, but transport-level throws would
+			// otherwise propagate as a 500 with no useful body.
+			return new WP_Error( 'ai_request_failed', $e->getMessage() );
 		} finally {
 			remove_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
 		}

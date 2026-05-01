@@ -99,6 +99,10 @@ class ReviewServiceRetryTest extends TestCase
     /**
      * Test that NON_RETRYABLE_ERRORS constant covers the legacy plugin codes
      * plus the broader set introduced for the WordPress 7.0 core AI Client.
+     *
+     * `http_request_failed` is intentionally NOT in this list: WordPress uses
+     * it for transient transport failures (timeouts, network glitches) which
+     * should be retried.
      */
     public function test_non_retryable_errors_constant(): void
     {
@@ -107,7 +111,49 @@ class ReviewServiceRetryTest extends TestCase
         $this->assertContains('rate_limit_exceeded', $codes);
         $this->assertContains('invalid_api_key', $codes);
         $this->assertContains('billing_error', $codes);
-        $this->assertContains('http_request_failed', $codes);
+        $this->assertContains('rest_forbidden', $codes);
+        $this->assertNotContains('http_request_failed', $codes);
+    }
+
+    /**
+     * is_non_retryable_error() classifies via error code for known codes.
+     */
+    public function test_is_non_retryable_error_matches_code(): void
+    {
+        $error = new WP_Error('invalid_api_key', 'Some unrelated message');
+
+        $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
+        $reflection->setAccessible(true);
+
+        $this->assertTrue($reflection->invoke($this->service, $error));
+    }
+
+    /**
+     * is_non_retryable_error() falls back to the message keyword check
+     * when core wraps auth/billing failures under a generic code.
+     */
+    public function test_is_non_retryable_error_matches_message_keyword(): void
+    {
+        $error = new WP_Error('ai_request_failed', 'Invalid API key supplied');
+
+        $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
+        $reflection->setAccessible(true);
+
+        $this->assertTrue($reflection->invoke($this->service, $error));
+    }
+
+    /**
+     * is_non_retryable_error() returns false for retryable transient errors
+     * (e.g. http_request_failed timeouts).
+     */
+    public function test_is_non_retryable_error_returns_false_for_transient(): void
+    {
+        $error = new WP_Error('http_request_failed', 'cURL error 28: timeout');
+
+        $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
+        $reflection->setAccessible(true);
+
+        $this->assertFalse($reflection->invoke($this->service, $error));
     }
 
     /**
