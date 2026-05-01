@@ -19,11 +19,24 @@ class Review_Service {
 
 
 	/**
+	 * HTTP request timeout (seconds) applied while calling the AI Client.
+	 *
+	 * Default WordPress HTTP timeout is 5 seconds, which is well below the
+	 * latency budget of an AI generation. Tunable via the
+	 * `ai_feedback_http_timeout` filter.
+	 *
+	 * @var int
+	 */
+	const AI_HTTP_TIMEOUT = 60;
+
+	/**
 	 * Non-retryable error codes that should fail immediately without retry.
 	 *
 	 * Codes are matched against the WP_Error returned by
-	 * wp_ai_client_prompt()->generate_text(). Unknown codes fall through to
-	 * the retry path, which is the safer default for transient failures.
+	 * wp_ai_client_prompt()->generate_text(). The defaults cover both the
+	 * codes the plugin used historically and a broader set likely to surface
+	 * from core's HTTP transport / AI Client. Adopters can extend the list
+	 * via the `ai_feedback_non_retryable_errors` filter.
 	 *
 	 * @var array
 	 */
@@ -31,6 +44,25 @@ class Review_Service {
 		'rate_limit_exceeded',
 		'invalid_api_key',
 		'billing_error',
+		'http_request_failed',
+		'rest_forbidden',
+	);
+
+	/**
+	 * Substrings that indicate a permanent (non-retryable) failure when found
+	 * in an error message, regardless of the error code. This is a defensive
+	 * fallback for cases where the core AI Client reports auth/billing
+	 * failures under a generic code.
+	 *
+	 * @var array
+	 */
+	const NON_RETRYABLE_MESSAGE_KEYWORDS = array(
+		'invalid api key',
+		'unauthorized',
+		'authentication',
+		'billing',
+		'quota',
+		'insufficient',
 	);
 
 	/**
@@ -227,9 +259,10 @@ class Review_Service {
 	/**
 	 * Call AI service via the WordPress 7.0 core AI Client.
 	 *
-	 * Request timeouts are owned by the WordPress HTTP transport that the
-	 * core AI Client uses internally; they can be tuned globally via the
-	 * `http_request_timeout` filter rather than per-call here.
+	 * Wraps the request with a scoped `http_request_timeout` filter so the
+	 * WordPress HTTP transport waits long enough for AI generation. The
+	 * filter is removed immediately after the call so it does not affect
+	 * other HTTP requests in the same pageload.
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
@@ -244,14 +277,29 @@ class Review_Service {
 			);
 		}
 
-		// Lower temperature keeps feedback consistent. Max tokens covers large
-		// documents while staying within all supported models' limits.
-		return wp_ai_client_prompt( $prompt )
-			->using_system_instruction( $system_instruction )
-			->using_model_preference( $model )
-			->using_temperature( 0.3 )
-			->using_max_tokens( 8000 )
-			->generate_text();
+		/**
+		 * Filters the HTTP timeout (in seconds) used for AI generation requests.
+		 *
+		 * @param int $timeout Timeout in seconds. Default 60.
+		 */
+		$timeout         = (int) apply_filters( 'ai_feedback_http_timeout', self::AI_HTTP_TIMEOUT );
+		$timeout_filter  = static function () use ( $timeout ) {
+			return $timeout;
+		};
+		add_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
+
+		try {
+			// Lower temperature keeps feedback consistent. Max tokens covers large
+			// documents while staying within all supported models' limits.
+			return wp_ai_client_prompt( $prompt )
+				->using_system_instruction( $system_instruction )
+				->using_model_preference( $model )
+				->using_temperature( 0.3 )
+				->using_max_tokens( 8000 )
+				->generate_text();
+		} finally {
+			remove_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
+		}
 	}
 
 	/**
@@ -301,7 +349,7 @@ class Review_Service {
 			$error_code = $response->get_error_code();
 
 			// Check if error is non-retryable - fail immediately.
-			if ( in_array( $error_code, self::NON_RETRYABLE_ERRORS, true ) ) {
+			if ( $this->is_non_retryable_error( $response ) ) {
 				Logger::debug(
 					sprintf(
 						'Non-retryable error encountered: %s - %s',
@@ -331,6 +379,41 @@ class Review_Service {
 			)
 		);
 		return $last_error;
+	}
+
+	/**
+	 * Whether a WP_Error returned by the AI Client should fail fast.
+	 *
+	 * Matches both error codes and error message keywords so that
+	 * permanently-failing requests (auth, billing, quota) bypass the retry
+	 * loop even when core wraps them under a generic code.
+	 *
+	 * @param  WP_Error $error The error returned by the AI Client.
+	 * @return bool True when the request should not be retried.
+	 */
+	protected function is_non_retryable_error( WP_Error $error ): bool {
+		/**
+		 * Filters the list of error codes treated as non-retryable.
+		 *
+		 * @param string[] $codes Error codes that should fail immediately.
+		 */
+		$codes = (array) apply_filters(
+			'ai_feedback_non_retryable_errors',
+			self::NON_RETRYABLE_ERRORS
+		);
+
+		if ( in_array( $error->get_error_code(), $codes, true ) ) {
+			return true;
+		}
+
+		$message = strtolower( (string) $error->get_error_message() );
+		foreach ( self::NON_RETRYABLE_MESSAGE_KEYWORDS as $keyword ) {
+			if ( '' !== $message && str_contains( $message, $keyword ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

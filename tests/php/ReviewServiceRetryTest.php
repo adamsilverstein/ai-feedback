@@ -97,17 +97,17 @@ class ReviewServiceRetryTest extends TestCase
     }
 
     /**
-     * Test that NON_RETRYABLE_ERRORS constant contains expected error codes.
+     * Test that NON_RETRYABLE_ERRORS constant covers the legacy plugin codes
+     * plus the broader set introduced for the WordPress 7.0 core AI Client.
      */
     public function test_non_retryable_errors_constant(): void
     {
-        $expected = array(
-        'rate_limit_exceeded',
-        'invalid_api_key',
-        'billing_error',
-        );
+        $codes = Review_Service::NON_RETRYABLE_ERRORS;
 
-        $this->assertSame($expected, Review_Service::NON_RETRYABLE_ERRORS);
+        $this->assertContains('rate_limit_exceeded', $codes);
+        $this->assertContains('invalid_api_key', $codes);
+        $this->assertContains('billing_error', $codes);
+        $this->assertContains('http_request_failed', $codes);
     }
 
     /**
