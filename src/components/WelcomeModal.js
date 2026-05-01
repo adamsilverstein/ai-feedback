@@ -11,7 +11,7 @@ import { check, pencil, commentContent } from '@wordpress/icons';
 import apiFetch from '@wordpress/api-fetch';
 
 const STORAGE_KEY = 'ai-feedback-welcomed';
-const AI_SETTINGS_URL = '/wp-admin/options-general.php?page=wp-ai-client';
+const AI_SETTINGS_URL = '/wp-admin/options-general.php?page=connectors';
 
 /**
  * WelcomeModal component shown on first sidebar open.
@@ -118,7 +118,7 @@ export default function WelcomeModal() {
 					<Notice status="warning" isDismissible={false}>
 						<p>
 							{__(
-								'The WordPress AI Experiments plugin must be installed and configured before using AI Feedback.',
+								'AI Feedback uses the WordPress core AI Client. Configure an AI provider in Settings → Connectors before continuing.',
 								'ai-feedback'
 							)}
 						</p>
@@ -131,7 +131,7 @@ export default function WelcomeModal() {
 								<Icon icon={pencil} />
 								<span>
 									{__(
-										'Install the WordPress AI Experiments plugin',
+										'Open Settings → Connectors in WordPress admin',
 										'ai-feedback'
 									)}
 								</span>
@@ -140,7 +140,7 @@ export default function WelcomeModal() {
 								<Icon icon={check} />
 								<span>
 									{__(
-										'Configure an AI provider (OpenAI, Anthropic, or Google)',
+										'Configure an AI provider (Anthropic, OpenAI, or Google)',
 										'ai-feedback'
 									)}
 								</span>
@@ -164,7 +164,7 @@ export default function WelcomeModal() {
 							target="_blank"
 							rel="noopener noreferrer"
 						>
-							{__('Configure AI Settings', 'ai-feedback')}
+							{__('Open Connectors Settings', 'ai-feedback')}
 						</Button>
 						<Button
 							variant="secondary"

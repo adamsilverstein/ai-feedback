@@ -19,9 +19,9 @@ import WelcomeModal from './WelcomeModal';
 import SkipLinks from './SkipLinks';
 
 /**
- * Settings page URL.
+ * URL of the WordPress 7.0 Connectors admin screen.
  */
-const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
+const CONNECTORS_PAGE_URL = '/wp-admin/options-general.php?page=connectors';
 
 /**
  * Get action button for specific error types.
@@ -30,11 +30,9 @@ const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
  * @return {Element|null} Action button or null.
  */
 function getErrorAction(error) {
-	// Check if error is related to API credits or billing.
-	// Note: We use string matching on error messages because the PHP AI Client
-	// wraps all AI provider errors under the same 'ai_request_failed' code.
-	// Credit/billing errors from providers (Anthropic, OpenAI) typically include
-	// these keywords in a stable format.
+	// Credit/billing errors typically surface via the core AI Client wrapper
+	// using the generic ai_request_failed code; match on keywords so users get
+	// a direct link to the Connectors screen where credentials are managed.
 	if (
 		error.code === 'ai_request_failed' &&
 		typeof error.message === 'string' &&
@@ -44,12 +42,12 @@ function getErrorAction(error) {
 		return (
 			<Button
 				variant="link"
-				href={SETTINGS_PAGE_URL}
+				href={CONNECTORS_PAGE_URL}
 				target="_blank"
 				rel="noopener noreferrer"
 				className="ai-feedback-error-action"
 			>
-				{__('Go to Settings', 'ai-feedback')}
+				{__('Open Connectors Settings', 'ai-feedback')}
 			</Button>
 		);
 	}
