@@ -138,4 +138,44 @@ class ReplyDetectorTest extends TestCase {
 
 		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
 	}
+
+	/**
+	 * A reply whose parent has no block_id meta is ignored — consumers
+	 * cannot resolve the target block, so dispatching with an empty
+	 * block_id is worse than not dispatching at all.
+	 */
+	public function test_reply_without_parent_block_id_is_ignored(): void {
+		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
+
+		$reply = (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => 100,
+			'comment_post_ID' => 42,
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * A comment without a valid post association (post_id <= 0) is ignored.
+	 */
+	public function test_reply_with_invalid_post_id_is_ignored(): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+
+		$reply = (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => 100,
+			'comment_post_ID' => 0,
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
+
 }

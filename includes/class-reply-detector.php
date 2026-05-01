@@ -46,8 +46,8 @@ class Reply_Detector {
 	 * Inspect a newly inserted comment and dispatch the reply action when
 	 * it is a user reply to an AI Feedback note.
 	 *
-	 * @param int    $comment_id Inserted comment ID.
-	 * @param object $comment    Comment object (WP_Comment in production).
+	 * @param int                   $comment_id Inserted comment ID.
+	 * @param \WP_Comment|\stdClass $comment    Comment object (stdClass accepted for unit tests).
 	 */
 	public function maybe_dispatch_reply( int $comment_id, $comment ): void {
 		// Only care about block-level notes.
@@ -73,8 +73,17 @@ class Reply_Detector {
 			return;
 		}
 
-		$post_id  = (int) ( $comment->comment_post_ID ?? 0 );
-		$block_id = (string) get_comment_meta( $parent_id, 'block_id', true );
+		$post_id = (int) ( $comment->comment_post_ID ?? 0 );
+		if ( $post_id <= 0 ) {
+			// Comment without a valid post association — nothing to route.
+			return;
+		}
+
+		$block_id = sanitize_text_field( (string) get_comment_meta( $parent_id, 'block_id', true ) );
+		if ( '' === $block_id ) {
+			// Parent note has no block association; consumers cannot resolve the target.
+			return;
+		}
 
 		do_action( self::ACTION_REPLY_RECEIVED, $comment_id, $parent_id, $post_id, $block_id );
 	}
