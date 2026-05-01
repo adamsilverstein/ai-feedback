@@ -12,8 +12,10 @@ use AI_Feedback\Reply_Service;
 use AI_Feedback\Prompt_Builder;
 use AI_Feedback\Notes_Manager;
 
+require_once dirname( __DIR__, 2 ) . '/includes/class-reply-cron-dispatcher.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-service.php';
 require_once __DIR__ . '/reply-service-mocks.php';
+require_once __DIR__ . '/reply-cron-mocks.php';
 
 /**
  * Subclass that captures the prompt and returns a canned AI reply.
@@ -246,5 +248,101 @@ class ReplyServiceTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'ai_request_failed', $result->get_error_code() );
 		$this->assertSame( array(), $fake_notes->last_reply, 'Notes_Manager must not be called when the AI fails.' );
+	}
+
+	/**
+	 * on_reply_received records 'complete' status meta and the resulting AI
+	 * reply comment ID when handle_reply succeeds.
+	 */
+	public function test_on_reply_received_records_complete_status_on_success(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Vague.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
+		$GLOBALS['test_comments'][200]     = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'Intentional.',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+
+		$service->on_reply_received( 200, 100, 42, 'abc-123' );
+
+		$this->assertSame(
+			'complete',
+			$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ]
+		);
+		$this->assertSame(
+			999,
+			$GLOBALS['test_comment_meta'][200]['ai_feedback_reply_comment_id']
+		);
+	}
+
+	/**
+	 * on_reply_received records 'failed' status with the error message when
+	 * handle_reply returns WP_Error (e.g. missing parent).
+	 */
+	public function test_on_reply_received_records_failed_status_on_error(): void {
+		$GLOBALS['test_comments'][200] = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'Reply without parent.',
+			'comment_author'  => 'Jane',
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+
+		$service->on_reply_received( 200, 999, 42, 'abc-123' );
+
+		$this->assertSame(
+			'failed',
+			$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ]
+		);
+		$this->assertNotEmpty(
+			$GLOBALS['test_comment_meta'][200]['ai_feedback_reply_error'] ?? null
+		);
+	}
+
+	/**
+	 * If handle_reply returns a non-error, non-positive value (e.g. 0 from a
+	 * silent wp_insert_comment failure), on_reply_received must not mark the
+	 * reply 'complete' — that would leave the frontend polling forever on a
+	 * non-existent comment ID.
+	 */
+	public function test_on_reply_received_records_failed_status_when_persistence_returns_zero(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Original feedback.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
+		$GLOBALS['test_comments'][200]     = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'User reply.',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+
+		$silent_failure_notes = new class() extends Notes_Manager {
+			public function add_reply_to_thread( array $feedback_item, int $post_id, int $parent_id, array $review_data = array() ): int|\WP_Error {
+				return 0;
+			}
+		};
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), $silent_failure_notes );
+
+		$service->on_reply_received( 200, 100, 42, 'abc-123' );
+
+		$this->assertSame(
+			'failed',
+			$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ]
+		);
+		$this->assertArrayNotHasKey(
+			'ai_feedback_reply_comment_id',
+			$GLOBALS['test_comment_meta'][200]
+		);
 	}
 }
