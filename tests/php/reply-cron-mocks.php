@@ -92,9 +92,4 @@ namespace {
 			return true;
 		}
 	}
-
-	if ( ! function_exists( 'time' ) ) {
-		// PHP's `time()` already exists, but keep this slot in case a future
-		// test wants a deterministic value — currently unused.
-	}
 }

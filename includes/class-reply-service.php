@@ -78,12 +78,32 @@ class Reply_Service {
 
 		if ( is_wp_error( $result ) ) {
 			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
-			update_comment_meta( $comment_id, 'ai_feedback_reply_error', $result->get_error_message() );
+			update_comment_meta(
+				$comment_id,
+				'ai_feedback_reply_error',
+				sanitize_text_field( $result->get_error_message() )
+			);
+			return;
+		}
+
+		$reply_id = (int) $result;
+
+		// A non-error, non-positive return from handle_reply means persistence
+		// silently failed (e.g. wp_insert_comment returned 0 or false). Marking
+		// it 'complete' would leave the frontend polling indefinitely on a
+		// non-existent reply, so route it through the failed branch instead.
+		if ( $reply_id <= 0 ) {
+			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
+			update_comment_meta(
+				$comment_id,
+				'ai_feedback_reply_error',
+				__( 'Reply persistence returned no comment ID.', 'ai-feedback' )
+			);
 			return;
 		}
 
 		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'complete' );
-		update_comment_meta( $comment_id, 'ai_feedback_reply_comment_id', (int) $result );
+		update_comment_meta( $comment_id, 'ai_feedback_reply_comment_id', $reply_id );
 	}
 
 	/**
