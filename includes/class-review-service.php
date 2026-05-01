@@ -10,8 +10,6 @@
 namespace AI_Feedback;
 
 use WP_Error;
-use WordPress\AiClient\AiClient;
-use WordPress\AiClient\Providers\Http\DTO\RequestOptions;
 use AI_Feedback\Logger;
 
 /**
@@ -223,7 +221,7 @@ class Review_Service {
 	}
 
 	/**
-	 * Call AI service.
+	 * Call AI service via the WordPress 7.0 core AI Client.
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
@@ -231,41 +229,21 @@ class Review_Service {
 	 * @return string|WP_Error AI response or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
-		// Check if PHP AI Client is available.
-		if ( ! class_exists( 'WordPress\AiClient\AiClient' ) ) {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
-				__( 'PHP AI Client library is not installed. Please run: composer install', 'ai-feedback' )
+				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'ai-feedback' )
 			);
 		}
 
-		try {
-			// Create request options with timeout.
-			$request_options = new RequestOptions();
-			$request_options->setTimeout( 60.0 ); // 60 second timeout.
-
-			// Call AI using WordPress PHP AI Client.
-			$response = AiClient::prompt( $prompt )
-				->usingSystemInstruction( $system_instruction )
-				->usingModelPreference( $model )
-				->usingTemperature( 0.3 ) // Lower temperature for consistent feedback.
-				->usingMaxTokens( 8000 ) // Sufficient for large documents; within limits of all supported models.
-				->usingRequestOptions( $request_options )
-				->generateText();
-
-			return $response;
-
-		} catch ( \Exception $e ) {
-			$error_code = $this->extract_error_code_from_exception( $e );
-			return new WP_Error(
-				$error_code,
-				sprintf(
-				/* translators: %s: error message */
-					__( 'AI request failed: %s', 'ai-feedback' ),
-					$e->getMessage()
-				)
-			);
-		}
+		// Lower temperature keeps feedback consistent. Max tokens covers large
+		// documents while staying within all supported models' limits.
+		return wp_ai_client_prompt( $prompt )
+			->using_system_instruction( $system_instruction )
+			->using_model_preference( $model )
+			->using_temperature( 0.3 )
+			->using_max_tokens( 8000 )
+			->generate_text();
 	}
 
 	/**
@@ -345,52 +323,6 @@ class Review_Service {
 			)
 		);
 		return $last_error;
-	}
-
-	/**
-	 * Extract error code from exception.
-	 *
-	 * Attempts to identify specific error types from exception messages
-	 * or exception class names for better retry handling.
-	 *
-	 * @param  \Exception $e The exception to analyze.
-	 * @return string Error code for WP_Error.
-	 */
-	protected function extract_error_code_from_exception( \Exception $e ): string {
-		$message    = strtolower( $e->getMessage() );
-		$class_name = strtolower( get_class( $e ) );
-
-		// Check for rate limiting errors.
-		if ( str_contains( $message, 'rate limit' )
-			|| str_contains( $message, 'rate_limit' )
-			|| str_contains( $message, 'too many requests' )
-			|| str_contains( $class_name, 'ratelimit' )
-		) {
-			return 'rate_limit_exceeded';
-		}
-
-		// Check for authentication errors.
-		if ( str_contains( $message, 'invalid api key' )
-			|| str_contains( $message, 'invalid_api_key' )
-			|| str_contains( $message, 'unauthorized' )
-			|| str_contains( $message, 'authentication' )
-			|| str_contains( $class_name, 'authentication' )
-			|| str_contains( $class_name, 'unauthorized' )
-		) {
-			return 'invalid_api_key';
-		}
-
-		// Check for billing errors.
-		if ( str_contains( $message, 'billing' )
-			|| str_contains( $message, 'payment' )
-			|| str_contains( $message, 'quota exceeded' )
-			|| str_contains( $message, 'insufficient' )
-		) {
-			return 'billing_error';
-		}
-
-		// Default to generic error code.
-		return 'ai_request_failed';
 	}
 
 	/**

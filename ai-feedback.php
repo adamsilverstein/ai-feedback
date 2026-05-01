@@ -2,11 +2,10 @@
 /**
  * Plugin Name: AI Feedback
  * Plugin URI: https://github.com/adamsilverstein/ai-feedback
- * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 6.9's Notes feature.
- * Version: 0.1.0
- * Requires at least: 6.9
- * Requires PHP: 8.0
- * Requires Plugins: ai
+ * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 7.0's core AI Client and Notes feature.
+ * Version: 0.2.0
+ * Requires at least: 7.0
+ * Requires PHP: 8.1
  * Author: Adam Silverstein
  * Author URI: https://wordpress.org/profiles/adamsilverstein/
  * License: GPL v2 or later
@@ -24,7 +23,7 @@ if (! defined('ABSPATH') ) {
 }
 
 // Define plugin constants.
-define('AI_FEEDBACK_VERSION', '0.1.0');
+define('AI_FEEDBACK_VERSION', '0.2.0');
 define('AI_FEEDBACK_PLUGIN_FILE', __FILE__);
 define('AI_FEEDBACK_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AI_FEEDBACK_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -71,25 +70,20 @@ if (! defined('AI_FEEDBACK_MOCK_MODE') ) {
 function init()
 {
     // Check WordPress version.
-    if (version_compare(get_bloginfo('version'), '6.9', '<') ) {
+    if (version_compare(get_bloginfo('version'), '7.0', '<') ) {
         add_action('admin_notices', __NAMESPACE__ . '\\display_version_notice');
         return;
     }
 
     // Check PHP version.
-    if (version_compare(PHP_VERSION, '8.0', '<') ) {
+    if (version_compare(PHP_VERSION, '8.1', '<') ) {
         add_action('admin_notices', __NAMESPACE__ . '\\display_php_version_notice');
         return;
     }
 
-    // Check for AI Experiments plugin dependency.
-    // Include plugin.php for is_plugin_active function.
-    if (! function_exists('is_plugin_active') ) {
-        include_once ABSPATH . 'wp-admin/includes/plugin.php';
-    }
-
-    if (! is_plugin_active('ai/ai.php') && ! is_plugin_active('ai-experiments/ai.php') ) {
-        add_action('admin_notices', __NAMESPACE__ . '\\display_ai_plugin_notice');
+    // Verify the core AI Client is available (introduced in WordPress 7.0).
+    if (! function_exists('wp_ai_client_prompt') ) {
+        add_action('admin_notices', __NAMESPACE__ . '\\display_ai_client_notice');
         return;
     }
 
@@ -110,7 +104,7 @@ function display_version_notice()
     printf(
                 /* translators: %s: required WordPress version */
         esc_html__('AI Feedback requires WordPress %s or higher.', 'ai-feedback'),
-        '6.9'
+        '7.0'
     );
     ?>
         </p>
@@ -130,7 +124,7 @@ function display_php_version_notice()
     printf(
                 /* translators: %s: required PHP version */
         esc_html__('AI Feedback requires PHP %s or higher.', 'ai-feedback'),
-        '8.0'
+        '8.1'
     );
     ?>
         </p>
@@ -139,18 +133,17 @@ function display_php_version_notice()
 }
 
 /**
- * Display AI Experiments plugin dependency notice.
+ * Display core AI Client unavailable notice.
  */
-function display_ai_plugin_notice()
+function display_ai_client_notice()
 {
     ?>
     <div class="notice notice-error">
         <p>
     <?php
-    printf(
-                /* translators: %s: link to AI plugin */
-        wp_kses_post(__('AI Feedback requires the <a href="%s" target="_blank">WordPress AI Experiments plugin</a> to be installed and activated.', 'ai-feedback')),
-        'https://wordpress.org/plugins/ai/'
+    esc_html_e(
+        'AI Feedback requires the WordPress core AI Client (introduced in WordPress 7.0). Please update WordPress to use this plugin.',
+        'ai-feedback'
     );
     ?>
         </p>

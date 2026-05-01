@@ -77,8 +77,9 @@ class Health_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function get_health(): WP_REST_Response {
-		$ai_available = class_exists( 'WordPress\AiClient\AiClient' );
-		$notes_api    = version_compare( get_bloginfo( 'version' ), '6.9', '>=' );
+		$ai_available = function_exists( 'wp_ai_client_prompt' );
+		$wp_version   = get_bloginfo( 'version' );
+		$notes_api    = version_compare( $wp_version, '7.0', '>=' );
 
 		$status = ( $ai_available && $notes_api ) ? 'ok' : 'degraded';
 
@@ -89,7 +90,7 @@ class Health_Controller extends WP_REST_Controller {
 				'ai_available' => $ai_available,
 				'notes_api'    => $notes_api,
 				'php_version'  => PHP_VERSION,
-				'wp_version'   => get_bloginfo( 'version' ),
+				'wp_version'   => $wp_version,
 			)
 		);
 	}

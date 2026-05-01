@@ -72,17 +72,6 @@ class TestableReviewService extends Review_Service
     ): string|WP_Error {
         return $this->call_ai_with_retry($prompt, $system_instruction, $model, $max_retries);
     }
-
-    /**
-     * Expose extract_error_code_from_exception for testing.
-     *
-     * @param  \Exception $e Exception to analyze.
-     * @return string Error code.
-     */
-    public function test_extract_error_code( \Exception $e ): string
-    {
-        return $this->extract_error_code_from_exception($e);
-    }
 }
 
 /**
@@ -119,116 +108,6 @@ class ReviewServiceRetryTest extends TestCase
         );
 
         $this->assertSame($expected, Review_Service::NON_RETRYABLE_ERRORS);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with rate limit error.
-     */
-    public function test_extract_error_code_rate_limit(): void
-    {
-        $exception = new \Exception('Rate limit exceeded. Please try again later.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('rate_limit_exceeded', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with rate_limit in message.
-     */
-    public function test_extract_error_code_rate_limit_underscore(): void
-    {
-        $exception = new \Exception('Error: rate_limit reached');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('rate_limit_exceeded', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with too many requests.
-     */
-    public function test_extract_error_code_too_many_requests(): void
-    {
-        $exception = new \Exception('Too many requests. Slow down!');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('rate_limit_exceeded', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with invalid API key.
-     */
-    public function test_extract_error_code_invalid_api_key(): void
-    {
-        $exception = new \Exception('Invalid API key provided.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('invalid_api_key', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with unauthorized.
-     */
-    public function test_extract_error_code_unauthorized(): void
-    {
-        $exception = new \Exception('Unauthorized access to API.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('invalid_api_key', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with authentication error.
-     */
-    public function test_extract_error_code_authentication(): void
-    {
-        $exception = new \Exception('Authentication failed. Check your credentials.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('invalid_api_key', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with billing error.
-     */
-    public function test_extract_error_code_billing(): void
-    {
-        $exception = new \Exception('Billing error: payment method declined.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('billing_error', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with quota exceeded.
-     */
-    public function test_extract_error_code_quota_exceeded(): void
-    {
-        $exception = new \Exception('Quota exceeded for the current billing period.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('billing_error', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with insufficient funds.
-     */
-    public function test_extract_error_code_insufficient(): void
-    {
-        $exception = new \Exception('Insufficient credits remaining.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('billing_error', $code);
-    }
-
-    /**
-     * Test extract_error_code_from_exception with generic error.
-     */
-    public function test_extract_error_code_generic(): void
-    {
-        $exception = new \Exception('Something went wrong on the server.');
-        $code      = $this->service->test_extract_error_code($exception);
-
-        $this->assertSame('ai_request_failed', $code);
     }
 
     /**
