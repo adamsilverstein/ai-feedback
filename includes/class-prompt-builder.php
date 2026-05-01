@@ -521,4 +521,124 @@ EOT;
 		 */
 		return apply_filters( 'ai_feedback_few_shot_examples', $examples, $locale );
 	}
+
+	/**
+	 * Build a prompt for replying to a user comment on an AI feedback note.
+	 *
+	 * Unlike `build_review_prompt()`, which asks the AI to produce structured
+	 * JSON feedback across the whole document, this method asks for a single
+	 * conversational reply scoped to one block and one note thread.
+	 *
+	 * @param  array $context {
+	 *     Reply context.
+	 *
+	 *     @type string $block_content     The raw content of the block being discussed.
+	 *     @type string $block_type        Optional. The block type (e.g. `core/paragraph`).
+	 *     @type string $original_feedback The original AI feedback text on this block.
+	 *     @type string $original_category Optional. Category of the original feedback (content|tone|flow|design).
+	 *     @type string $original_severity Optional. Severity of the original feedback (suggestion|important|critical).
+	 *     @type array  $thread             Prior replies in chronological order. Each entry:
+	 *                                      { string $author, string $content, bool $is_ai }.
+	 *     @type string $user_reply        The new user reply to respond to.
+	 *     @type string $target_tone       Optional. Target tone to preserve (default: professional).
+	 *     @type string $locale            Optional. Locale for the reply.
+	 * }
+	 * @return string The constructed prompt.
+	 */
+	public function build_reply_prompt( array $context ): string {
+		$block_content     = (string) ( $context['block_content'] ?? '' );
+		$block_type        = (string) ( $context['block_type'] ?? '' );
+		$original_feedback = (string) ( $context['original_feedback'] ?? '' );
+		$original_category = (string) ( $context['original_category'] ?? '' );
+		$original_severity = (string) ( $context['original_severity'] ?? '' );
+		$thread            = is_array( $context['thread'] ?? null ) ? $context['thread'] : array();
+		$user_reply        = (string) ( $context['user_reply'] ?? '' );
+		$target_tone       = (string) ( $context['target_tone'] ?? 'professional' );
+		$locale            = (string) ( $context['locale'] ?? get_locale() );
+
+		// Truncate long block content to keep prompt size bounded.
+		if ( strlen( $block_content ) > 2000 ) {
+			$block_content = substr( $block_content, 0, 2000 ) . '... [truncated]';
+		}
+
+		$prompt  = "You are continuing an editorial conversation about a specific block in a document. The user has replied to feedback you previously gave. Respond directly and conversationally.\n\n";
+		$prompt .= "BLOCK CONTEXT:\n";
+		if ( '' !== $block_type ) {
+			$prompt .= 'Block type: ' . $block_type . "\n";
+		}
+		$prompt .= 'Block content: ' . wp_strip_all_tags( $block_content ) . "\n\n";
+
+		$prompt .= "ORIGINAL FEEDBACK:\n";
+		if ( '' !== $original_category || '' !== $original_severity ) {
+			$prompt .= sprintf(
+				'[%s/%s] ',
+				'' !== $original_category ? $original_category : 'general',
+				'' !== $original_severity ? $original_severity : 'suggestion'
+			);
+		}
+		$prompt .= wp_strip_all_tags( $original_feedback ) . "\n\n";
+
+		if ( ! empty( $thread ) ) {
+			$prompt .= "CONVERSATION SO FAR (chronological):\n";
+			foreach ( $thread as $entry ) {
+				$author  = (string) ( $entry['author'] ?? 'User' );
+				$content = (string) ( $entry['content'] ?? '' );
+				$is_ai   = (bool) ( $entry['is_ai'] ?? false );
+
+				if ( strlen( $content ) > 600 ) {
+					$content = substr( $content, 0, 600 ) . '... [truncated]';
+				}
+
+				$prompt .= sprintf(
+					"- %s: %s\n",
+					$is_ai ? 'AI' : $author,
+					wp_strip_all_tags( $content )
+				);
+			}
+			$prompt .= "\n";
+		}
+
+		$prompt .= "NEW USER REPLY:\n" . wp_strip_all_tags( $user_reply ) . "\n\n";
+
+		$prompt .= "RESPONSE REQUIREMENTS:\n";
+		$prompt .= "- Reply in 2-3 sentences. One paragraph maximum.\n";
+		$prompt .= "- Address the user's reply directly. If they pushed back on your original feedback with a good reason, acknowledge it.\n";
+		$prompt .= "- If they asked for clarification, answer specifically with an example from their block content.\n";
+		$prompt .= '- Keep the ' . $target_tone . " tone.\n";
+		$prompt .= "- Do NOT restate the original feedback verbatim.\n";
+		$prompt .= "- Output plain text only — no JSON, no markdown headers, no bullet list.\n";
+
+		$language_instruction = $this->get_language_instruction( $locale );
+		if ( '' !== trim( $language_instruction ) ) {
+			$prompt .= $language_instruction;
+		}
+
+		/**
+		 * Filters the AI reply prompt before it is sent to the model.
+		 *
+		 * @param string $prompt  The full reply prompt.
+		 * @param array  $context Reply context data (block, thread, user reply, etc.).
+		 */
+		return apply_filters( 'ai_feedback_reply_prompt', $prompt, $context );
+	}
+
+	/**
+	 * Get the system instruction for reply generation.
+	 *
+	 * Kept separate from `get_system_instruction()` because replies
+	 * are short conversational prose, not JSON feedback items.
+	 *
+	 * @return string System instruction.
+	 */
+	public function get_reply_system_instruction(): string {
+		$instruction  = "You are a concise editorial assistant continuing a conversation about a specific block of content.\n\n";
+		$instruction .= "RULES:\n";
+		$instruction .= "- Plain text only. No JSON, no code blocks, no markdown headers.\n";
+		$instruction .= "- 2-3 sentences. Maximum one paragraph.\n";
+		$instruction .= "- Stay on the specific block and the conversation so far — do not pivot to other parts of the document.\n";
+		$instruction .= "- If the user disagrees with you and gives a valid reason, acknowledge it; do not double down.\n";
+		$instruction .= '- Be specific. When suggesting phrasing, quote or paraphrase from the block content rather than speaking in generalities.';
+
+		return $instruction;
+	}
 }
