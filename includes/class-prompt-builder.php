@@ -585,8 +585,8 @@ EOT;
 				$content = (string) ( $entry['content'] ?? '' );
 				$is_ai   = (bool) ( $entry['is_ai'] ?? false );
 
-				if ( strlen( $content ) > 300 ) {
-					$content = substr( $content, 0, 300 ) . '...';
+				if ( strlen( $content ) > 600 ) {
+					$content = substr( $content, 0, 600 ) . '... [truncated]';
 				}
 
 				$prompt .= sprintf(
@@ -613,13 +613,19 @@ EOT;
 			$prompt .= $language_instruction;
 		}
 
-		return $prompt;
+		/**
+		 * Filters the AI reply prompt before it is sent to the model.
+		 *
+		 * @param string $prompt  The full reply prompt.
+		 * @param array  $context Reply context data (block, thread, user reply, etc.).
+		 */
+		return apply_filters( 'ai_feedback_reply_prompt', $prompt, $context );
 	}
 
 	/**
 	 * Get the system instruction for reply generation.
 	 *
-	 * Kept separate from `get_system_instruction()` because reply replies
+	 * Kept separate from `get_system_instruction()` because replies
 	 * are short conversational prose, not JSON feedback items.
 	 *
 	 * @return string System instruction.

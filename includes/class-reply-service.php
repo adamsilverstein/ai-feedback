@@ -86,7 +86,7 @@ class Reply_Service {
 	 * @return int|WP_Error New AI reply comment ID on success, WP_Error on failure.
 	 */
 	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ) {
-		$context = $this->build_context( $comment_id, $parent_id );
+		$context = $this->build_context( $comment_id, $parent_id, $post_id );
 		if ( is_wp_error( $context ) ) {
 			Logger::debug( 'Reply_Service: failed to build context: ' . $context->get_error_message() );
 			return $context;
@@ -121,9 +121,10 @@ class Reply_Service {
 	 *
 	 * @param  int $comment_id Reply comment ID.
 	 * @param  int $parent_id  Parent (original AI note) comment ID.
+	 * @param  int $post_id    Post ID — used to scope the siblings query.
 	 * @return array|WP_Error Context array for Prompt_Builder::build_reply_prompt(), or error.
 	 */
-	private function build_context( int $comment_id, int $parent_id ) {
+	private function build_context( int $comment_id, int $parent_id, int $post_id ) {
 		$reply = get_comment( $comment_id );
 		if ( ! $reply ) {
 			return new WP_Error( 'reply_not_found', 'Reply comment not found.' );
@@ -140,6 +141,7 @@ class Reply_Service {
 		$siblings = get_comments(
 			array(
 				'parent'  => $parent_id,
+				'post_id' => $post_id,
 				'type'    => 'note',
 				'status'  => 'all',
 				'orderby' => 'comment_date',
@@ -183,7 +185,7 @@ class Reply_Service {
 	 * @return string|WP_Error AI reply text or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ) {
-		if ( ! class_exists( 'WordPress\\AiClient\\AiClient' ) ) {
+		if ( ! class_exists( AiClient::class ) ) {
 			return new WP_Error(
 				'ai_client_missing',
 				__( 'PHP AI Client library is not installed.', 'ai-feedback' )

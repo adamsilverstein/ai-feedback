@@ -168,11 +168,6 @@ class ReplyServiceTest extends TestCase {
 		$this->assertStringContainsString( 'NEW USER REPLY:', $service->captured_prompt );
 		$this->assertStringContainsString( 'SHOULD_NOT_APPEAR_IN_THREAD', $service->captured_prompt );
 
-		$conversation_section = strstr( $service->captured_prompt, 'CONVERSATION SO FAR', true );
-		$new_reply_section    = substr(
-			$service->captured_prompt,
-			strpos( $service->captured_prompt, 'NEW USER REPLY:' )
-		);
 		$before_reply_section = substr(
 			$service->captured_prompt,
 			0,
@@ -202,5 +197,54 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'parent_not_found', $result->get_error_code() );
+	}
+
+	/**
+	 * Missing reply comment surfaces a WP_Error.
+	 */
+	public function test_missing_reply_returns_wp_error(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Original feedback.',
+			'comment_author'  => 'AI Feedback',
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+
+		$result = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'reply_not_found', $result->get_error_code() );
+	}
+
+	/**
+	 * AI failure propagates as a WP_Error and the reply is not persisted.
+	 */
+	public function test_ai_failure_returns_wp_error_and_skips_persistence(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Original feedback.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
+		$GLOBALS['test_comments'][200]     = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'User reply.',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+
+		$fake_notes = new Reply_Service_Fake_Notes_Manager();
+		$service    = new class( new Prompt_Builder(), $fake_notes ) extends Reply_Service {
+			protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
+				return new \WP_Error( 'ai_request_failed', 'simulated provider failure' );
+			}
+		};
+
+		$result = $service->handle_reply( 200, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ai_request_failed', $result->get_error_code() );
+		$this->assertSame( array(), $fake_notes->last_reply, 'Notes_Manager must not be called when the AI fails.' );
 	}
 }
