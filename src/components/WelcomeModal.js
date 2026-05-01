@@ -21,9 +21,8 @@ const STORAGE_KEY = 'ai-feedback-welcomed';
 export default function WelcomeModal() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
-	const [aiClientAvailable, setAiClientAvailable] = useState(null);
+	const [status, setStatus] = useState(null);
 	const [statusError, setStatusError] = useState(null);
-	const [settingsUrl, setSettingsUrl] = useState(getConnectorsUrl());
 
 	useEffect(() => {
 		// Check if already welcomed first.
@@ -37,13 +36,10 @@ export default function WelcomeModal() {
 			// Ignore localStorage errors, continue with status check.
 		}
 
-		// Check AI client status before showing modal.
+		// Check AI client + connector status before showing modal.
 		apiFetch({ path: '/ai-feedback/v1/status' })
 			.then((response) => {
-				setAiClientAvailable(response.ai_client_available);
-				if (response.settings_url) {
-					setSettingsUrl(response.settings_url);
-				}
+				setStatus(response);
 				setIsOpen(true);
 				setIsLoading(false);
 			})
@@ -57,9 +53,14 @@ export default function WelcomeModal() {
 			});
 	}, []);
 
+	const aiClientAvailable = status?.ai_client_available === true;
+	const connectorConfigured = status?.connector_configured === true;
+	const setupRequired = !aiClientAvailable || !connectorConfigured;
+	const settingsUrl = status?.settings_url || getConnectorsUrl();
+
 	const dismiss = () => {
-		// Only save welcomed state if AI client is available.
-		if (aiClientAvailable) {
+		// Only save welcomed state when the plugin is fully configured.
+		if (!setupRequired) {
 			try {
 				window.localStorage.setItem(STORAGE_KEY, 'true');
 			} catch (error) {
@@ -106,8 +107,18 @@ export default function WelcomeModal() {
 		);
 	}
 
-	// Show configuration required message if AI client is not available.
-	if (!aiClientAvailable) {
+	// Show configuration required message if AI client is unavailable or no
+	// AI provider connector is configured yet.
+	if (setupRequired) {
+		const message = !aiClientAvailable
+			? __(
+					'AI Feedback requires the WordPress 7.0 core AI Client. Update WordPress to continue.',
+					'ai-feedback'
+				)
+			: __(
+					'AI Feedback uses the WordPress core AI Client. Configure an AI provider in Settings → Connectors before continuing.',
+					'ai-feedback'
+				);
 		return (
 			<Modal
 				title={__('AI Feedback Setup Required', 'ai-feedback')}
@@ -116,12 +127,7 @@ export default function WelcomeModal() {
 			>
 				<div className="ai-feedback-welcome">
 					<Notice status="warning" isDismissible={false}>
-						<p>
-							{__(
-								'AI Feedback uses the WordPress core AI Client. Configure an AI provider in Settings → Connectors before continuing.',
-								'ai-feedback'
-							)}
-						</p>
+						<p>{message}</p>
 					</Notice>
 
 					<div className="ai-feedback-welcome-prereq">
