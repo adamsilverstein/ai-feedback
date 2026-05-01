@@ -52,16 +52,14 @@ export default function FocusAreaSelector() {
 	}, [focusAreas]);
 
 	const handleChange = (areaId, checked) => {
-		setDraftAreas((prev) => {
-			const base = Array.isArray(prev) ? prev : [];
-			const updated = checked
-				? Array.from(new Set([...base, areaId]))
-				: base.filter((id) => id !== areaId);
+		const base = Array.isArray(draftAreas) ? draftAreas : [];
+		const updated = checked
+			? Array.from(new Set([...base, areaId]))
+			: base.filter((id) => id !== areaId);
 
-			updateSettings({
-				default_focus_areas: updated,
-			});
-			return updated;
+		setDraftAreas(updated);
+		updateSettings({
+			default_focus_areas: updated,
 		});
 	};
 
