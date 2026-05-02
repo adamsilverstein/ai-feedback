@@ -464,12 +464,47 @@ $ai-feedback-text-muted: #595959;
 	}
 }
 
+/* Feedback List Sort Controls */
+.ai-feedback-list-controls {
+	margin-top: 16px;
+	margin-bottom: 8px;
+}
+
 /* Feedback List Styles */
 .ai-feedback-list {
-	margin-top: 16px;
+	margin-top: 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
+}
+
+/* Priority Indicator Badge */
+.priority-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 6px;
+	border-radius: 9px;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+	color: #fff;
+
+	&.priority-high {
+		background: #d63638;
+	}
+
+	&.priority-medium {
+		background: #dba617;
+	}
+
+	&.priority-low {
+
+		/* Low priority is implied; render nothing rather than a dim chip. */
+		display: none;
+	}
 }
 
 /* Feedback Item Styles */

@@ -49,6 +49,63 @@ function getSeverityBadge(severity) {
 }
 
 /**
+ * Score thresholds — kept in sync with PRIORITY_*_THRESHOLD in
+ * includes/class-response-parser.php so PHP and JS bucket scores identically.
+ */
+const PRIORITY_HIGH_THRESHOLD = 100;
+const PRIORITY_MEDIUM_THRESHOLD = 50;
+
+/**
+ * Bucket a numeric priority score into 'high' | 'medium' | 'low'.
+ *
+ * @param {number} score Priority score.
+ * @return {string} Priority level.
+ */
+export function getPriorityLevel(score) {
+	if (typeof score !== 'number' || Number.isNaN(score)) {
+		return 'low';
+	}
+	if (score >= PRIORITY_HIGH_THRESHOLD) {
+		return 'high';
+	}
+	if (score >= PRIORITY_MEDIUM_THRESHOLD) {
+		return 'medium';
+	}
+	return 'low';
+}
+
+/**
+ * Priority indicator badge.
+ *
+ * @param {Object} props          Component props.
+ * @param {number} props.priority Priority score.
+ * @return {Element|null} Badge element or null when no score is available.
+ */
+function PriorityBadge({ priority }) {
+	if (typeof priority !== 'number') {
+		return null;
+	}
+
+	const level = getPriorityLevel(priority);
+	const labels = {
+		high: __('High priority', 'ai-feedback'),
+		medium: __('Medium priority', 'ai-feedback'),
+		low: __('Low priority', 'ai-feedback'),
+	};
+
+	return (
+		<span
+			className={`priority-badge priority-${level}`}
+			role="img"
+			aria-label={labels[level]}
+			title={labels[level]}
+		>
+			{level === 'high' ? '!' : ''}
+		</span>
+	);
+}
+
+/**
  * Get severity label.
  *
  * @param {string} severity Severity level.
@@ -87,6 +144,7 @@ function SingleFeedbackItem({ item, onNavigate }) {
 					>
 						{getSeverityBadge(item.severity)}
 					</span>
+					<PriorityBadge priority={item.priority} />
 					<strong className="feedback-title">{item.title}</strong>
 				</div>
 
@@ -145,6 +203,7 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 						>
 							{getSeverityBadge(item.severity)}
 						</span>
+						<PriorityBadge priority={item.priority} />
 						<span className="group-title">{item.title}</span>
 						<Icon
 							icon={expanded ? chevronUp : chevronDown}
