@@ -71,12 +71,12 @@ ai-feedback/
 
 ### Notes (WordPress 6.9+)
 
-Notes are block-level comments stored in `wp_comments` with `comment_type = 'block_comment'`. The plugin creates notes when AI generates feedback:
+Notes are block-level comments stored in `wp_comments` with `comment_type = 'note'`. The plugin creates notes when AI generates feedback:
 
 ```php
 // Creating a note (simplified)
 wp_insert_comment( [
-    'comment_type'    => 'block_comment',
+    'comment_type'    => 'note',
     'comment_post_ID' => $post_id,
     'comment_content' => $feedback,
     'comment_meta'    => [ 'block_id' => $client_id, 'ai_feedback' => true ],
