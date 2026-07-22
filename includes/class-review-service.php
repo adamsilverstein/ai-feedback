@@ -10,8 +10,6 @@
 namespace AI_Feedback;
 
 use WP_Error;
-use WordPress\AiClient\AiClient;
-use WordPress\AiClient\Providers\Http\DTO\RequestOptions;
 use AI_Feedback\Logger;
 
 /**
@@ -21,14 +19,48 @@ class Review_Service {
 
 
 	/**
+	 * HTTP request timeout (seconds) applied while calling the AI Client.
+	 *
+	 * Default WordPress HTTP timeout is 5 seconds, which is well below the
+	 * latency budget of an AI generation. Tunable via the
+	 * `ai_feedback_http_timeout` filter.
+	 *
+	 * @var int
+	 */
+	const AI_HTTP_TIMEOUT = 60;
+
+	/**
 	 * Non-retryable error codes that should fail immediately without retry.
+	 *
+	 * Codes are matched against the WP_Error returned by
+	 * wp_ai_client_prompt()->generate_text(). The defaults cover both the
+	 * codes the plugin used historically and a broader set likely to surface
+	 * from core's HTTP transport / AI Client. Adopters can extend the list
+	 * via the `ai_feedback_non_retryable_errors` filter.
 	 *
 	 * @var array
 	 */
 	const NON_RETRYABLE_ERRORS = array(
-		'rate_limit_exceeded',
 		'invalid_api_key',
 		'billing_error',
+		'rest_forbidden',
+	);
+
+	/**
+	 * Substrings that indicate a permanent (non-retryable) failure when found
+	 * in an error message, regardless of the error code. This is a defensive
+	 * fallback for cases where the core AI Client reports auth/billing
+	 * failures under a generic code.
+	 *
+	 * @var array
+	 */
+	const NON_RETRYABLE_MESSAGE_KEYWORDS = array(
+		'invalid api key',
+		'unauthorized',
+		'authentication',
+		'billing',
+		'quota',
+		'insufficient',
 	);
 
 	/**
@@ -223,7 +255,12 @@ class Review_Service {
 	}
 
 	/**
-	 * Call AI service.
+	 * Call AI service via the WordPress 7.0 core AI Client.
+	 *
+	 * Wraps the request with a scoped `http_request_timeout` filter so the
+	 * WordPress HTTP transport waits long enough for AI generation. The
+	 * filter is removed immediately after the call so it does not affect
+	 * other HTTP requests in the same pageload.
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
@@ -231,40 +268,40 @@ class Review_Service {
 	 * @return string|WP_Error AI response or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
-		// Check if PHP AI Client is available.
-		if ( ! class_exists( 'WordPress\AiClient\AiClient' ) ) {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
-				__( 'PHP AI Client library is not installed. Please run: composer install', 'ai-feedback' )
+				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'ai-feedback' )
 			);
 		}
 
+		/**
+		 * Filters the HTTP timeout (in seconds) used for AI generation requests.
+		 *
+		 * @param int $timeout Timeout in seconds. Default 60.
+		 */
+		$timeout        = (int) apply_filters( 'ai_feedback_http_timeout', self::AI_HTTP_TIMEOUT );
+		$timeout_filter = static function () use ( $timeout ) {
+			return $timeout;
+		};
+		add_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
+
 		try {
-			// Create request options with timeout.
-			$request_options = new RequestOptions();
-			$request_options->setTimeout( 60.0 ); // 60 second timeout.
-
-			// Call AI using WordPress PHP AI Client.
-			$response = AiClient::prompt( $prompt )
-				->usingSystemInstruction( $system_instruction )
-				->usingModelPreference( $model )
-				->usingTemperature( 0.3 ) // Lower temperature for consistent feedback.
-				->usingMaxTokens( 8000 ) // Sufficient for large documents; within limits of all supported models.
-				->usingRequestOptions( $request_options )
-				->generateText();
-
-			return $response;
-
-		} catch ( \Exception $e ) {
-			$error_code = $this->extract_error_code_from_exception( $e );
-			return new WP_Error(
-				$error_code,
-				sprintf(
-				/* translators: %s: error message */
-					__( 'AI request failed: %s', 'ai-feedback' ),
-					$e->getMessage()
-				)
-			);
+			// Lower temperature keeps feedback consistent. Max tokens covers large
+			// documents while staying within all supported models' limits.
+			return wp_ai_client_prompt( $prompt )
+				->using_system_instruction( $system_instruction )
+				->using_model_preference( $model )
+				->using_temperature( 0.3 )
+				->using_max_tokens( 8000 )
+				->generate_text();
+		} catch ( \Throwable $e ) {
+			// Defensive: the core AI Client should already convert SDK
+			// exceptions to WP_Error, but transport-level throws would
+			// otherwise propagate as a 500 with no useful body.
+			return new WP_Error( 'ai_request_failed', $e->getMessage() );
+		} finally {
+			remove_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
 		}
 	}
 
@@ -315,7 +352,7 @@ class Review_Service {
 			$error_code = $response->get_error_code();
 
 			// Check if error is non-retryable - fail immediately.
-			if ( in_array( $error_code, self::NON_RETRYABLE_ERRORS, true ) ) {
+			if ( $this->is_non_retryable_error( $response ) ) {
 				Logger::debug(
 					sprintf(
 						'Non-retryable error encountered: %s - %s',
@@ -348,49 +385,53 @@ class Review_Service {
 	}
 
 	/**
-	 * Extract error code from exception.
+	 * Whether a WP_Error returned by the AI Client should fail fast.
 	 *
-	 * Attempts to identify specific error types from exception messages
-	 * or exception class names for better retry handling.
+	 * Matches both error codes and error message keywords so that
+	 * permanently-failing requests (auth, billing, quota) bypass the retry
+	 * loop even when core wraps them under a generic code.
 	 *
-	 * @param  \Exception $e The exception to analyze.
-	 * @return string Error code for WP_Error.
+	 * @param  WP_Error $error The error returned by the AI Client.
+	 * @return bool True when the request should not be retried.
 	 */
-	protected function extract_error_code_from_exception( \Exception $e ): string {
-		$message    = strtolower( $e->getMessage() );
-		$class_name = strtolower( get_class( $e ) );
+	protected function is_non_retryable_error( WP_Error $error ): bool {
+		/**
+		 * Filters the list of error codes treated as non-retryable.
+		 *
+		 * @param string[] $codes Error codes that should fail immediately.
+		 */
+		$codes = (array) apply_filters(
+			'ai_feedback_non_retryable_errors',
+			self::NON_RETRYABLE_ERRORS
+		);
 
-		// Check for rate limiting errors.
-		if ( str_contains( $message, 'rate limit' )
-			|| str_contains( $message, 'rate_limit' )
-			|| str_contains( $message, 'too many requests' )
-			|| str_contains( $class_name, 'ratelimit' )
-		) {
-			return 'rate_limit_exceeded';
+		if ( in_array( $error->get_error_code(), $codes, true ) ) {
+			return true;
 		}
 
-		// Check for authentication errors.
-		if ( str_contains( $message, 'invalid api key' )
-			|| str_contains( $message, 'invalid_api_key' )
-			|| str_contains( $message, 'unauthorized' )
-			|| str_contains( $message, 'authentication' )
-			|| str_contains( $class_name, 'authentication' )
-			|| str_contains( $class_name, 'unauthorized' )
-		) {
-			return 'invalid_api_key';
+		$message = strtolower( (string) $error->get_error_message() );
+		if ( '' === $message ) {
+			return false;
 		}
 
-		// Check for billing errors.
-		if ( str_contains( $message, 'billing' )
-			|| str_contains( $message, 'payment' )
-			|| str_contains( $message, 'quota exceeded' )
-			|| str_contains( $message, 'insufficient' )
-		) {
-			return 'billing_error';
+		/**
+		 * Filters the message-keyword fallback used to classify errors as
+		 * non-retryable when their code does not match.
+		 *
+		 * @param string[] $keywords Lowercase substrings to match.
+		 */
+		$keywords = (array) apply_filters(
+			'ai_feedback_non_retryable_message_keywords',
+			self::NON_RETRYABLE_MESSAGE_KEYWORDS
+		);
+
+		foreach ( $keywords as $keyword ) {
+			if ( str_contains( $message, $keyword ) ) {
+				return true;
+			}
 		}
 
-		// Default to generic error code.
-		return 'ai_request_failed';
+		return false;
 	}
 
 	/**

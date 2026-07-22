@@ -5,6 +5,8 @@ parameters:
         - ai-feedback.php
     scanFiles:
         - ai-feedback.php
+    bootstrapFiles:
+        - phpstan-stubs.php
     excludePaths:
         - vendor/ (?)
         - node_modules/ (?)
