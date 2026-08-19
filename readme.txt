@@ -2,7 +2,7 @@
 Contributors: adamsilverstein
 Tags: ai, gutenberg, feedback, block-editor, notes
 Requires at least: 6.9
-Tested up to: 6.9
+Tested up to: 7.1
 Requires PHP: 8.0
 Stable tag: 0.1.0
 License: GPLv2 or later
