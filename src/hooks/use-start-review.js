@@ -1,10 +1,11 @@
 /**
  * Hook for starting a review from anywhere in the editor.
  */
-import { useSelect, useDispatch } from '@wordpress/data';
+import { useDispatch, useRegistry } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as noticesStore } from '@wordpress/notices';
+import { speak } from '@wordpress/a11y';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { extractBlockData } from '../utils/block-utils';
@@ -12,51 +13,41 @@ import { extractBlockData } from '../utils/block-utils';
 /**
  * Get a callback that starts a review of the current post.
  *
- * @return {{ startReview: Function, canStartReview: boolean }} Review starter.
+ * Store values are read when the callback runs, so the hook doesn't re-render
+ * its component on every editor change.
+ *
+ * @return {{ startReview: Function }} Review starter.
  */
 export default function useStartReview() {
-	const {
-		postId,
-		postStatus,
-		postTitle,
-		isReviewing,
-		selectedModel,
-		focusAreas,
-		targetTone,
-		feedbackLocale,
-	} = useSelect(
-		(select) => ({
-			postId: select(editorStore).getCurrentPostId(),
-			postStatus: select(editorStore).getEditedPostAttribute('status'),
-			postTitle: select(editorStore).getEditedPostAttribute('title'),
-			isReviewing: select(STORE_NAME).isReviewing(),
-			selectedModel: select(STORE_NAME).getSelectedModel(),
-			focusAreas: select(STORE_NAME).getFocusAreas(),
-			targetTone: select(STORE_NAME).getTargetTone(),
-			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
-		}),
-		[]
-	);
-
+	const registry = useRegistry();
 	const { startReview } = useDispatch(STORE_NAME);
 	const { createWarningNotice } = useDispatch(noticesStore);
-	const { getBlocks } = useSelect(blockEditorStore);
-
-	const canStartReview =
-		!!postId && postStatus !== 'auto-draft' && !isReviewing;
 
 	const start = async () => {
-		if (!canStartReview) {
-			if (!isReviewing) {
-				createWarningNotice(
-					__('Save your post first to enable review.', 'ai-feedback'),
-					{ type: 'snackbar' }
-				);
-			}
+		const feedback = registry.select(STORE_NAME);
+
+		if (feedback.isReviewing()) {
+			speak(__('A review is already in progress.', 'ai-feedback'));
 			return;
 		}
 
-		const blocks = extractBlockData(getBlocks());
+		const editor = registry.select(editorStore);
+
+		const postId = editor.getCurrentPostId();
+		if (
+			!postId ||
+			editor.getEditedPostAttribute('status') === 'auto-draft'
+		) {
+			createWarningNotice(
+				__('Save your post first to enable review.', 'ai-feedback'),
+				{ type: 'snackbar' }
+			);
+			return;
+		}
+
+		const blocks = extractBlockData(
+			registry.select(blockEditorStore).getBlocks()
+		);
 
 		if (blocks.length === 0) {
 			createWarningNotice(
@@ -69,17 +60,17 @@ export default function useStartReview() {
 		try {
 			await startReview({
 				postId,
-				title: postTitle,
+				title: editor.getEditedPostAttribute('title'),
 				blocks,
-				model: selectedModel,
-				focusAreas,
-				targetTone,
-				locale: feedbackLocale,
+				model: feedback.getSelectedModel(),
+				focusAreas: feedback.getFocusAreas(),
+				targetTone: feedback.getTargetTone(),
+				locale: feedback.getFeedbackLocale(),
 			});
 		} catch (error) {
 			// The error is already in the store and shown in the sidebar.
 		}
 	};
 
-	return { startReview: start, canStartReview };
+	return { startReview: start };
 }

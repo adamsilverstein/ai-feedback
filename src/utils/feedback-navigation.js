@@ -39,23 +39,24 @@ export function getAdjacentFeedbackBlock(
 	currentId,
 	direction
 ) {
+	const positions = new Map(orderedIds.map((id, index) => [id, index]));
 	const candidates = orderedIds.filter((id) => feedbackIds.has(id));
 
 	if (candidates.length === 0) {
 		return null;
 	}
 
-	const currentIndex = currentId ? orderedIds.indexOf(currentId) : -1;
+	const currentIndex = positions.get(currentId) ?? -1;
 
 	if (direction > 0) {
 		return (
-			candidates.find((id) => orderedIds.indexOf(id) > currentIndex) ??
+			candidates.find((id) => positions.get(id) > currentIndex) ??
 			candidates[0]
 		);
 	}
 
 	const before = candidates.filter(
-		(id) => currentIndex === -1 || orderedIds.indexOf(id) < currentIndex
+		(id) => currentIndex === -1 || positions.get(id) < currentIndex
 	);
 
 	return before.length > 0

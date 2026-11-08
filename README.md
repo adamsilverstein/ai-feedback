@@ -30,7 +30,6 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 WordPress 7.0 ships the AI Client and Connectors API in core, so AI Feedback no longer needs the standalone AI Experiments plugin or a separate Composer-installed AI SDK.
 
 Before using AI Feedback, configure an AI provider:
-
 1. Go to WordPress Admin → **Settings → Connectors**.
 2. Choose a provider (Anthropic, OpenAI, Google, etc.) and install its provider plugin if prompted.
 3. Provide an API key directly, or set the corresponding environment variable / PHP constant (e.g. `ANTHROPIC_API_KEY`). Environment variables and PHP constants take precedence over database-stored values.
@@ -97,7 +96,6 @@ The plugin calls WordPress 7.0's `wp_ai_client_prompt()` directly, so credential
 **Option 2: Environment variables or PHP constants**
 
 The Connectors API checks for credentials in this order:
-
 1. Environment variable (e.g. `ANTHROPIC_API_KEY`)
 2. PHP constant (defined via `define()`)
 3. Database setting saved via the Connectors screen
@@ -126,9 +124,9 @@ You can change these in the plugin sidebar within the block editor.
 1. Open a post in the block editor
 2. Click the **AI Feedback** icon in the toolbar (or open from "Options" menu)
 3. Adjust settings if needed:
-    - Select AI model
-    - Choose focus areas
-    - Set target tone
+   - Select AI model
+   - Choose focus areas
+   - Set target tone
 4. Click **Review Document**
 5. AI will analyze your content and attach notes to relevant blocks
 
@@ -136,11 +134,11 @@ You can change these in the plugin sidebar within the block editor.
 
 The shortcuts use the editor's "access" modifier: <kbd>Shift</kbd>+<kbd>Alt</kbd> on Windows and Linux, <kbd>Ctrl</kbd>+<kbd>Option</kbd> on a Mac. They are also listed in the editor's Keyboard shortcuts help (Access + H).
 
-| Shortcut   | Action                                    |
-| ---------- | ----------------------------------------- |
-| Access + R | Open the sidebar and review the document  |
-| Access + F | Show or hide the AI Feedback sidebar      |
-| Access + J | Go to the next block with AI feedback     |
+| Shortcut | Action |
+|----------|--------|
+| Access + R | Open the sidebar and review the document |
+| Access + F | Show or hide the AI Feedback sidebar |
+| Access + J | Go to the next block with AI feedback |
 | Access + K | Go to the previous block with AI feedback |
 
 ### Working with Notes
@@ -148,15 +146,14 @@ The shortcuts use the editor's "access" modifier: <kbd>Shift</kbd>+<kbd>Alt</kbd
 - 📝 Notes appear as indicators on blocks with feedback
 - Click a note indicator to read the feedback
 - Each note includes:
-    - **Title**: Brief summary
-    - **Feedback**: Detailed explanation
-    - **Suggestion**: Actionable recommendation (if applicable)
-    - **Severity**: 🟢 Suggestion, 🟡 Important, 🔴 Critical
+  - **Title**: Brief summary
+  - **Feedback**: Detailed explanation
+  - **Suggestion**: Actionable recommendation (if applicable)
+  - **Severity**: 🟢 Suggestion, 🟡 Important, 🔴 Critical
 
 ### Reply to Feedback (Phase 4)
 
 Once implemented, you'll be able to:
-
 1. Click on a note to open it
 2. Type a reply asking for clarification
 3. AI will respond with context-aware suggestions
@@ -231,7 +228,6 @@ npm run test:all
 ### Code Standards
 
 The plugin follows:
-
 - **PHP**: WordPress Coding Standards
 - **JavaScript**: WordPress ESLint configuration
 - **CSS**: WordPress Stylelint configuration
@@ -239,7 +235,6 @@ The plugin follows:
 ### Continuous Integration
 
 All pull requests automatically run through GitHub Actions CI/CD:
-
 - ✅ JavaScript linting (ESLint, Stylelint, Prettier)
 - ✅ PHP linting (PHPCS, PHPStan)
 - ✅ JavaScript unit tests (Jest)
@@ -276,7 +271,6 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 **Current phase:** Phase 5 (Polish & Release) — in progress. Phase 4 (Conversation Loop) is the remaining major feature and has not yet started.
 
 ### Phase 1: Foundation ✅ Complete
-
 - Plugin scaffold with build system
 - Plugin sidebar UI with settings
 - Model selector with provider grouping
@@ -286,7 +280,6 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - Review button with loading states
 
 ### Phase 2: AI Integration & Review ✅ Complete
-
 - [x] Review Service with block parsing
 - [x] Prompt engineering for different focus areas
 - [x] AI response parsing and validation
@@ -294,23 +287,19 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - [x] Error handling and rate limiting
 
 ### Phase 3: Notes Integration ✅ Complete
-
 - [x] Notes Manager for WordPress Notes API
 - [x] Block-level note indicators
 - [x] Note resolution tracking
 - [x] Review history display
 
 ### Phase 4: Conversation Loop 🚧 Not started
-
 Tracked in issues [#131](https://github.com/adamsilverstein/ai-feedback/issues/131)–[#134](https://github.com/adamsilverstein/ai-feedback/issues/134).
-
 - [ ] Reply detection hook (#131)
 - [ ] Context-aware reply prompts / Reply Service (#132)
 - [ ] Async reply processing (#133)
 - [ ] Conversation threading UI (#134)
 
 ### Phase 5: Polish & Release 🚧 In progress
-
 - [x] Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions, descriptive screen reader labels
 - [x] Onboarding: first-run welcome modal, empty state guidance
 - [x] AI quality: few-shot examples, block-type specific instructions, multi-language support, deduplication
@@ -367,7 +356,6 @@ GPL v2 or later
 ## Changelog
 
 ### 0.1.0 (Current)
-
 - Plugin scaffold and build system
 - Settings UI, REST API, and data store
 - Model selection with provider grouping
@@ -384,10 +372,8 @@ GPL v2 or later
 - E2E test infrastructure with Playwright
 
 ### Coming Soon
-
 - Phase 4: Conversational replies to AI feedback
 - Phase 5: Abilities API, streaming responses, performance optimization, final accessibility audit, complete documentation, v1.0.0 release
-
 ---
 
 Built with ❤️ for WordPress

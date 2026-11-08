@@ -23,7 +23,9 @@ export function navigateToBlock(clientId) {
 	const documents = [iframe?.contentDocument, document].filter(Boolean);
 
 	for (const doc of documents) {
-		const blockElement = doc.querySelector(`[data-block="${clientId}"]`);
+		const blockElement = doc.querySelector(
+			`[data-block="${window.CSS?.escape?.(clientId) ?? clientId}"]`
+		);
 		if (blockElement) {
 			blockElement.scrollIntoView({
 				behavior: 'smooth',

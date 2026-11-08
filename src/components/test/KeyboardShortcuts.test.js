@@ -34,7 +34,8 @@ describe('getShortcuts', () => {
 	});
 
 	it('avoids access-key combinations used by core', () => {
-		// Core editor shortcuts on the access modifier.
+		// Core's access-modifier shortcuts, from the registerShortcut calls in
+		// Gutenberg's editor, block-editor and edit-post packages.
 		const coreAccessKeys = [
 			'0',
 			'1',
