@@ -146,6 +146,12 @@ class Review_Controller extends WP_REST_Controller {
 
 		if ( is_wp_error( $result ) ) {
 			Logger::debug( sprintf( 'Error: Review failed - %s', $result->get_error_message() ) );
+
+			// An outage is not the user's fault, so a retry should not cost them.
+			if ( 'ai_service_unavailable' === $result->get_error_code() ) {
+				$this->review_service->refund_rate_limit( get_current_user_id() );
+			}
+
 			return $result;
 		}
 

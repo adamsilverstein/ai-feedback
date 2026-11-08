@@ -322,6 +322,19 @@ if ( ! function_exists( 'get_transient' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_user_meta' ) ) {
+	function get_user_meta( $user_id, $key = '', $single = false ) {
+		return $GLOBALS['test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
+	}
+}
+
+if ( ! function_exists( 'update_user_meta' ) ) {
+	function update_user_meta( $user_id, $key, $value ) {
+		$GLOBALS['test_user_meta'][ $user_id ][ $key ] = $value;
+		return true;
+	}
+}
+
 if ( ! function_exists( 'rest_url' ) ) {
 	function rest_url( $path = '' ) {
 		return 'http://example.test/wp-json/' . ltrim( $path, '/' );
