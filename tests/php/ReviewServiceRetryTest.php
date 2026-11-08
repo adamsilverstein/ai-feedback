@@ -155,6 +155,39 @@ class ReviewServiceRetryTest extends TestCase
     }
 
     /**
+     * Core AI Client errors are classified by code, status and message.
+     *
+     * @param WP_Error $error         Error returned by the AI Client.
+     * @param bool     $non_retryable Expected classification.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('data_core_errors')]
+    public function test_is_non_retryable_error_classifies_core_errors(WP_Error $error, bool $non_retryable): void
+    {
+        $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
+
+        $this->assertSame($non_retryable, $reflection->invoke($this->service, $error));
+    }
+
+    /**
+     * Data provider for test_is_non_retryable_error_classifies_core_errors().
+     *
+     * @return array<string, array{WP_Error, bool}>
+     */
+    public static function data_core_errors(): array
+    {
+        return array(
+            'unauthorized'           => array(new WP_Error('prompt_client_error', 'Request failed', array('status' => 401)), true),
+            'payment required'       => array(new WP_Error('prompt_client_error', 'Request failed', array('status' => 402)), true),
+            'token limit'            => array(new WP_Error('prompt_token_limit_reached', 'Too long', array('status' => 400)), true),
+            'exhausted quota on 429' => array(new WP_Error('prompt_client_error', 'You exceeded your current quota', array('status' => 429)), true),
+            'rate limited'           => array(new WP_Error('prompt_client_error', 'Rate limit reached for requests', array('status' => 429)), false),
+            'per-minute quota'       => array(new WP_Error('prompt_client_error', 'Per-minute quota reached, retry later', array('status' => 429)), false),
+            'overloaded upstream'    => array(new WP_Error('prompt_upstream_server_error', 'Insufficient capacity', array('status' => 503)), false),
+            'network error'          => array(new WP_Error('prompt_network_error', 'Connection reset', array('status' => 503)), false),
+        );
+    }
+
+    /**
      * call_ai() returns ai_client_missing when the WP 7.0 AI Client function
      * is not available, instead of throwing or fataling.
      */

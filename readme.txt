@@ -83,6 +83,8 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * Bumped minimum requirements to WordPress 7.0 and PHP 8.1.
 * Removed the `wordpress/php-ai-client` Composer dependency.
 * Updated onboarding and error messaging to point users at Settings → Connectors.
+* Rate-limited AI requests are now retried with backoff; auth and billing failures still fail fast.
+* AI requests use a 60 second timeout (filterable via `ai_feedback_http_timeout`) instead of core's 30 second default.
 
 = 0.1.0 =
 * Initial release.
