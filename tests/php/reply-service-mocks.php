@@ -61,33 +61,47 @@ namespace {
 
 	if ( ! function_exists( 'get_comments' ) ) {
 		/**
-		 * get_comments mock that filters $GLOBALS['test_comments'] by parent
-		 * and orders by comment_ID ascending (chronological proxy).
+		 * get_comments mock over $GLOBALS['test_comments'].
 		 *
-		 * Only recognises the `parent` arg; other filters (`type`, `status`)
-		 * are accepted for signature compatibility but ignored.
+		 * Honors `parent`, `type` (comment_type defaults to 'note' when unset),
+		 * `number`, and the direction of an `orderby` array. comment_ID stands
+		 * in for comment_date as the chronological key.
 		 *
 		 * @param array $args Query args.
 		 * @return array
 		 */
 		function get_comments( $args = array() ) {
+			$GLOBALS['test_get_comments_args'] = $args;
+
 			$store  = $GLOBALS['test_comments'] ?? array();
 			$parent = isset( $args['parent'] ) ? (int) $args['parent'] : null;
+			$type   = $args['type'] ?? null;
 
 			$matches = array();
 			foreach ( $store as $comment ) {
 				if ( null !== $parent && (int) ( $comment->comment_parent ?? 0 ) !== $parent ) {
 					continue;
 				}
+				if ( null !== $type && ( $comment->comment_type ?? 'note' ) !== $type ) {
+					continue;
+				}
 				$matches[] = $comment;
 			}
 
+			$descending = is_array( $args['orderby'] ?? null )
+				&& 'DESC' === strtoupper( (string) reset( $args['orderby'] ) );
+
 			usort(
 				$matches,
-				static function ( $a, $b ) {
-					return ( (int) $a->comment_ID ) <=> ( (int) $b->comment_ID );
+				static function ( $a, $b ) use ( $descending ) {
+					$cmp = ( (int) $a->comment_ID ) <=> ( (int) $b->comment_ID );
+					return $descending ? -$cmp : $cmp;
 				}
 			);
+
+			if ( ! empty( $args['number'] ) ) {
+				$matches = array_slice( $matches, 0, (int) $args['number'] );
+			}
 
 			return $matches;
 		}

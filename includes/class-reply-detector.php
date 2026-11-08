@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * A "reply" is any `note`-type comment whose parent is an AI-authored
  * note (a comment with `ai_feedback` meta set to '1') AND which was
- * not itself authored by AI Feedback — the latter check prevents our
+ * not itself authored by AI Feedback - the latter check prevents our
  * own generated replies from re-triggering detection.
  *
  * WordPress 6.9+ stores block-level notes as comments with
@@ -46,16 +46,16 @@ class Reply_Detector {
 	 * Inspect a newly inserted comment and dispatch the reply action when
 	 * it is a user reply to an AI Feedback note.
 	 *
-	 * @param int                   $comment_id Inserted comment ID.
-	 * @param \WP_Comment|\stdClass $comment    Comment object (stdClass accepted for unit tests).
+	 * @param int    $comment_id Inserted comment ID.
+	 * @param object $comment    WP_Comment (stdClass accepted for unit tests).
 	 */
-	public function maybe_dispatch_reply( int $comment_id, $comment ): void {
+	public function maybe_dispatch_reply( int $comment_id, object $comment ): void {
 		// Only care about block-level notes.
 		if ( 'note' !== ( $comment->comment_type ?? '' ) ) {
 			return;
 		}
 
-		$parent_id = (int) ( $comment->comment_parent ?? 0 );
+		$parent_id = self::int_field( $comment, 'comment_parent' );
 		if ( $parent_id <= 0 ) {
 			// Top-level note, not a reply.
 			return;
@@ -73,18 +73,33 @@ class Reply_Detector {
 			return;
 		}
 
-		$post_id = (int) ( $comment->comment_post_ID ?? 0 );
+		$post_id = self::int_field( $comment, 'comment_post_ID' );
 		if ( $post_id <= 0 ) {
-			// Comment without a valid post association — nothing to route.
+			// Comment without a valid post association - nothing to route.
 			return;
 		}
 
-		$block_id = sanitize_text_field( (string) get_comment_meta( $parent_id, 'block_id', true ) );
+		$raw_block_id = get_comment_meta( $parent_id, 'block_id', true );
+		$block_id     = is_string( $raw_block_id ) ? sanitize_text_field( $raw_block_id ) : '';
 		if ( '' === $block_id ) {
 			// Parent note has no block association; consumers cannot resolve the target.
 			return;
 		}
 
 		do_action( self::ACTION_REPLY_RECEIVED, $comment_id, $parent_id, $post_id, $block_id );
+	}
+
+	/**
+	 * Read a numeric comment field as an int.
+	 *
+	 * WP_Comment stores IDs as numeric strings.
+	 *
+	 * @param object $comment Comment object.
+	 * @param string $field   Property name.
+	 * @return int Field value, or 0 when missing or non-numeric.
+	 */
+	private static function int_field( object $comment, string $field ): int {
+		$value = $comment->$field ?? 0;
+		return is_numeric( $value ) ? (int) $value : 0;
 	}
 }
