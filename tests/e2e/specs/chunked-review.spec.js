@@ -23,7 +23,13 @@ test.describe('Chunked review', () => {
 		await aiFeedback.openSidebar();
 
 		const requests = [];
-		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
+		// Match both pretty permalinks and the ?rest_route= form, plus any
+		// query args apiFetch adds.
+		const isReviewRequest = (url) =>
+			/\/ai-feedback\/v1\/review(?:$|[?&])/.test(
+				decodeURIComponent(url.toString())
+			);
+		await page.route(isReviewRequest, async (route) => {
 			const data = route.request().postDataJSON();
 			requests.push(data);
 			const isLast = data.chunk_index === data.chunk_total - 1;
