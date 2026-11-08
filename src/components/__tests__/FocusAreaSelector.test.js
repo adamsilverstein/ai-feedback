@@ -193,4 +193,19 @@ describe('FocusAreaSelector', () => {
 		expect(screen.getByLabelText('Content Quality')).not.toBeChecked();
 		expect(screen.getByLabelText('Design & Formatting')).toBeChecked();
 	});
+
+	it('rolls back to the saved value, not an unsaved draft, when a later save fails', async () => {
+		setupMocks(['content']);
+		mockUpdateSettings
+			.mockReturnValueOnce(new Promise(() => {}))
+			.mockRejectedValueOnce(new Error('nope'));
+		render(<FocusAreaSelector />);
+
+		await userEvent.click(screen.getByLabelText('Tone & Voice'));
+		await userEvent.click(screen.getByLabelText('Flow & Structure'));
+
+		expect(screen.getByLabelText('Content Quality')).toBeChecked();
+		expect(screen.getByLabelText('Tone & Voice')).not.toBeChecked();
+		expect(screen.getByLabelText('Flow & Structure')).not.toBeChecked();
+	});
 });

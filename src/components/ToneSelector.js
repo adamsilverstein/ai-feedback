@@ -9,8 +9,12 @@ import { STORE_NAME } from '../store';
 
 /**
  * Help text for each tone option.
+ *
+ * Built at render time rather than module load so translations are applied.
+ *
+ * @return {Object} Help text keyed by tone id.
  */
-const TONE_HELP = {
+const getToneHelp = () => ({
 	professional: __(
 		'Clear and authoritative. Best for business content and documentation.',
 		'ai-feedback'
@@ -27,7 +31,7 @@ const TONE_HELP = {
 		'Warm and engaging. Best for community and customer content.',
 		'ai-feedback'
 	),
-};
+});
 
 /**
  * Tone Selector component.
@@ -60,16 +64,17 @@ export default function ToneSelector() {
 	}));
 
 	const handleChange = (value) => {
-		const previous = draftTone;
 		setDraftTone(value);
-		// Revert the optimistic change if saving fails; the store surfaces
-		// the error notice.
+		// Roll back to the last saved tone if saving fails; the store
+		// surfaces the error notice.
 		Promise.resolve(
 			updateSettings({
 				default_tone: value,
 			})
 		).catch(() => {
-			setDraftTone((current) => (current === value ? previous : current));
+			setDraftTone((current) =>
+				current === value ? (targetTone ?? '') : current
+			);
 		});
 	};
 
@@ -84,7 +89,7 @@ export default function ToneSelector() {
 			options={options}
 			onChange={handleChange}
 			help={
-				TONE_HELP[draftTone] ||
+				getToneHelp()[draftTone] ||
 				toneDescription ||
 				__(
 					'The tone the AI will evaluate your content against.',

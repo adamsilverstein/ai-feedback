@@ -9,8 +9,12 @@ import { STORE_NAME } from '../store';
 
 /**
  * Help text for each focus area explaining what it checks.
+ *
+ * Built at render time rather than module load so translations are applied.
+ *
+ * @return {Object} Help text keyed by focus area id.
  */
-const FOCUS_AREA_HELP = {
+const getFocusAreaHelp = () => ({
 	content: __(
 		'Checks grammar, spelling, clarity, and factual accuracy.',
 		'ai-feedback'
@@ -27,7 +31,7 @@ const FOCUS_AREA_HELP = {
 		'Evaluates formatting, headings, lists, and visual hierarchy.',
 		'ai-feedback'
 	),
-};
+});
 
 /**
  * Focus Area Selector component.
@@ -50,10 +54,13 @@ export default function FocusAreaSelector() {
 	// Latest draft, read by handleChange so toggles that land in the same
 	// render batch build on each other instead of on a stale closure.
 	const draftRef = useRef(selectedAreas);
+	// Last saved value, used to roll back a failed save.
+	const savedRef = useRef(selectedAreas);
 
 	useEffect(() => {
 		const synced = Array.isArray(focusAreas) ? focusAreas : [];
 		draftRef.current = synced;
+		savedRef.current = synced;
 		setDraftAreas(synced);
 	}, [focusAreas]);
 
@@ -63,10 +70,9 @@ export default function FocusAreaSelector() {
 	};
 
 	const handleChange = (areaId, checked) => {
-		const previous = draftRef.current;
 		const updated = checked
-			? Array.from(new Set([...previous, areaId]))
-			: previous.filter((id) => id !== areaId);
+			? Array.from(new Set([...draftRef.current, areaId]))
+			: draftRef.current.filter((id) => id !== areaId);
 
 		// A review needs at least one focus area.
 		if (updated.length === 0) {
@@ -74,15 +80,15 @@ export default function FocusAreaSelector() {
 		}
 
 		setDraft(updated);
-		// Revert the optimistic change if saving fails; the store surfaces
-		// the error notice.
+		// Roll back to the last saved value if saving fails; the store
+		// surfaces the error notice.
 		Promise.resolve(
 			updateSettings({
 				default_focus_areas: updated,
 			})
 		).catch(() => {
 			if (draftRef.current === updated) {
-				setDraft(previous);
+				setDraft(savedRef.current);
 			}
 		});
 	};
@@ -90,6 +96,8 @@ export default function FocusAreaSelector() {
 	if (!availableFocusAreas || availableFocusAreas.length === 0) {
 		return null;
 	}
+
+	const focusAreaHelp = getFocusAreaHelp();
 
 	return (
 		<fieldset className="ai-feedback-focus-areas">
@@ -109,7 +117,7 @@ export default function FocusAreaSelector() {
 						draftAreas.length === 1 && draftAreas.includes(area.id)
 					}
 					onChange={(checked) => handleChange(area.id, checked)}
-					help={FOCUS_AREA_HELP[area.id] || area.description}
+					help={focusAreaHelp[area.id] || area.description}
 				/>
 			))}
 		</fieldset>
