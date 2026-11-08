@@ -85,6 +85,22 @@ class Review_Service {
 	const DEFAULT_RETRY_AFTER = 30;
 
 	/**
+	 * Longest retry delay the filter may set, in seconds.
+	 *
+	 * @var int
+	 */
+	const MAX_RETRY_AFTER = 300;
+
+	/**
+	 * Rate limit refunds allowed per user per hour.
+	 *
+	 * Bounds how many requests a user can send to a failing provider.
+	 *
+	 * @var int
+	 */
+	const MAX_REFUNDS_PER_HOUR = 10;
+
+	/**
 	 * Prompt builder instance.
 	 *
 	 * @var Prompt_Builder
@@ -502,10 +518,10 @@ class Review_Service {
 		 * Filters how many seconds the editor waits before retrying a review
 		 * that failed because the AI service was unavailable.
 		 *
-		 * @param int      $retry_after Seconds to wait. Default 30.
+		 * @param int      $retry_after Seconds to wait, between 5 and 300. Default 30.
 		 * @param WP_Error $error       The original AI Client error.
 		 */
-		$retry_after = max( 5, (int) apply_filters( 'ai_feedback_retry_after', self::DEFAULT_RETRY_AFTER, $error ) );
+		$retry_after = min( self::MAX_RETRY_AFTER, max( 5, (int) apply_filters( 'ai_feedback_retry_after', self::DEFAULT_RETRY_AFTER, $error ) ) );
 
 		return new WP_Error(
 			'ai_service_unavailable',
@@ -732,19 +748,42 @@ class Review_Service {
 	 * Give back the rate limit slot used by the user's latest review.
 	 *
 	 * Called when a review failed because the AI service was unavailable,
-	 * so retrying does not use up the hourly limit.
+	 * so retrying does not use up the hourly limit. Refunds are capped at
+	 * MAX_REFUNDS_PER_HOUR, so a failing provider still sees a bounded
+	 * number of requests. Entries are plain timestamps, so removing the
+	 * latest one is equivalent to removing this request's own entry.
 	 *
 	 * @param  int $user_id User ID.
-	 * @return void
+	 * @return bool True when a slot was refunded.
 	 */
-	public function refund_rate_limit( int $user_id ): void {
+	public function refund_rate_limit( int $user_id ): bool {
 		$reviews = get_user_meta( $user_id, 'ai_feedback_reviews', true );
 
 		if ( ! is_array( $reviews ) || empty( $reviews ) ) {
-			return;
+			return false;
+		}
+
+		$refunds      = get_user_meta( $user_id, 'ai_feedback_refunds', true );
+		$one_hour_ago = time() - HOUR_IN_SECONDS;
+		$refunds      = array_values(
+			array_filter(
+				is_array( $refunds ) ? $refunds : array(),
+				static function ( $timestamp ) use ( $one_hour_ago ): bool {
+					return is_int( $timestamp ) && $timestamp > $one_hour_ago;
+				}
+			)
+		);
+
+		if ( count( $refunds ) >= self::MAX_REFUNDS_PER_HOUR ) {
+			return false;
 		}
 
 		array_pop( $reviews );
 		update_user_meta( $user_id, 'ai_feedback_reviews', array_values( $reviews ) );
+
+		$refunds[] = time();
+		update_user_meta( $user_id, 'ai_feedback_refunds', $refunds );
+
+		return true;
 	}
 }

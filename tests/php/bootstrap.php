@@ -17,6 +17,9 @@ require_once $includes_dir . 'class-notes-manager.php';
 require_once $includes_dir . 'class-review-service.php';
 
 // Define WordPress constants needed for testing.
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
 if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }

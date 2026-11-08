@@ -128,16 +128,39 @@ class ReviewServiceUnavailableTest extends TestCase {
 	public function test_refund_rate_limit_removes_latest_review(): void {
 		update_user_meta( 7, 'ai_feedback_reviews', array( 100, 200, 300 ) );
 
-		$this->service->refund_rate_limit( 7 );
+		$this->assertTrue( $this->service->refund_rate_limit( 7 ) );
 
 		$this->assertSame( array( 100, 200 ), get_user_meta( 7, 'ai_feedback_reviews', true ) );
+	}
+
+	/**
+	 * Refunds stop after the hourly cap, so a failing provider sees a bounded
+	 * number of requests.
+	 */
+	public function test_refunds_are_capped_per_hour(): void {
+		update_user_meta( 7, 'ai_feedback_reviews', array( 100, 200 ) );
+		update_user_meta( 7, 'ai_feedback_refunds', array_fill( 0, Review_Service::MAX_REFUNDS_PER_HOUR, time() ) );
+
+		$this->assertFalse( $this->service->refund_rate_limit( 7 ) );
+		$this->assertSame( array( 100, 200 ), get_user_meta( 7, 'ai_feedback_reviews', true ) );
+	}
+
+	/**
+	 * Refunds older than an hour do not count toward the cap.
+	 */
+	public function test_old_refunds_do_not_count(): void {
+		update_user_meta( 7, 'ai_feedback_reviews', array( 100, 200 ) );
+		update_user_meta( 7, 'ai_feedback_refunds', array_fill( 0, Review_Service::MAX_REFUNDS_PER_HOUR, time() - 2 * HOUR_IN_SECONDS ) );
+
+		$this->assertTrue( $this->service->refund_rate_limit( 7 ) );
+		$this->assertCount( 1, get_user_meta( 7, 'ai_feedback_refunds', true ) );
 	}
 
 	/**
 	 * Refunding without earlier reviews does nothing.
 	 */
 	public function test_refund_rate_limit_without_reviews(): void {
-		$this->service->refund_rate_limit( 7 );
+		$this->assertFalse( $this->service->refund_rate_limit( 7 ) );
 
 		$this->assertSame( '', get_user_meta( 7, 'ai_feedback_reviews', true ) );
 	}
