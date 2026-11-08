@@ -151,7 +151,8 @@ class Review_Controller extends WP_REST_Controller {
 
 		if ( $is_chunked && $chunk_index > 0 ) {
 			// Follow-up chunks belong to a review that already passed the rate limit.
-			$chunk_check = $this->review_chunks->validate( $user_id, $this->int_param( $post_id ), $review_id, $chunk_index, $chunk_total );
+			// Claim the chunk before the AI call so it cannot be replayed.
+			$chunk_check = $this->review_chunks->claim( $user_id, $this->int_param( $post_id ), $review_id, $chunk_index, $chunk_total );
 			if ( is_wp_error( $chunk_check ) ) {
 				Logger::debug( sprintf( 'Error: Invalid review chunk %d of %d', $chunk_index + 1, $chunk_total ) );
 				return $chunk_check;
@@ -209,11 +210,14 @@ class Review_Controller extends WP_REST_Controller {
 
 		if ( is_wp_error( $result ) ) {
 			Logger::debug( sprintf( 'Error: Review failed - %s', $result->get_error_message() ) );
+			if ( $is_chunked && $chunk_index > 0 ) {
+				$this->review_chunks->release( $user_id );
+			}
 			return $result;
 		}
 
 		if ( $is_chunked ) {
-			$this->review_chunks->advance( $user_id, $chunk_index );
+			$this->review_chunks->complete( $user_id, $chunk_index );
 			$result['chunk'] = array(
 				'index' => $chunk_index,
 				'total' => $chunk_total,

@@ -50,6 +50,37 @@ class Review_Chunks {
 	const TRANSIENT_PREFIX = 'ai_feedback_chunked_review_';
 
 	/**
+	 * Lock option prefix, suffixed with the user ID.
+	 *
+	 * @var string
+	 */
+	const LOCK_PREFIX = 'ai_feedback_chunk_lock_';
+
+	/**
+	 * Seconds after which a session lock is treated as abandoned.
+	 *
+	 * @var int
+	 */
+	const LOCK_TTL = 30;
+
+	/**
+	 * Seconds after which an in-flight chunk is treated as abandoned.
+	 *
+	 * Longer than the AI request timeout and retry backoff, so a slow
+	 * chunk is not claimed twice.
+	 *
+	 * @var int
+	 */
+	const IN_FLIGHT_TTL = 5 * MINUTE_IN_SECONDS;
+
+	/**
+	 * Failed chunks allowed per session before it ends.
+	 *
+	 * @var int
+	 */
+	const MAX_RETRIES = 2;
+
+	/**
 	 * Get the number of blocks reviewed per request.
 	 *
 	 * @return int Chunk size between 1 and MAX_BLOCKS.
@@ -130,20 +161,28 @@ class Review_Chunks {
 	}
 
 	/**
-	 * Check that a follow-up chunk belongs to the user's active session.
+	 * Claim a follow-up chunk before it is sent to the AI.
 	 *
 	 * Chunks must arrive in order, for the same post and review, from the
-	 * user who started the session.
+	 * user who started the session. The claim marks the chunk as in flight
+	 * under a lock, so a replayed or concurrent request for the same chunk
+	 * is rejected instead of skipping the rate limit for another AI call.
+	 * Follow with complete() on success or release() on failure.
 	 *
 	 * @param  int    $user_id   User ID.
 	 * @param  int    $post_id   Post being reviewed.
 	 * @param  string $review_id Review ID returned for the first chunk.
 	 * @param  int    $index     Zero-based chunk index.
 	 * @param  int    $total     Number of chunks.
-	 * @return true|WP_Error True when the chunk is valid, or error.
+	 * @return true|WP_Error True when the chunk was claimed, or error.
 	 */
-	public function validate( int $user_id, int $post_id, string $review_id, int $index, int $total ): bool|WP_Error {
-		$session = get_transient( self::TRANSIENT_PREFIX . $user_id );
+	public function claim( int $user_id, int $post_id, string $review_id, int $index, int $total ): bool|WP_Error {
+		if ( ! $this->acquire_lock( $user_id ) ) {
+			return $this->in_progress_error();
+		}
+
+		$key     = self::TRANSIENT_PREFIX . $user_id;
+		$session = get_transient( $key );
 
 		if (
 			$index < 1 ||
@@ -153,6 +192,7 @@ class Review_Chunks {
 			( $session['total'] ?? 0 ) !== $total ||
 			( $session['next'] ?? 0 ) !== $index
 		) {
+			$this->release_lock( $user_id );
 			return new WP_Error(
 				'invalid_review_chunk',
 				__( 'This review chunk does not match an active review. Please start the review again.', 'ai-feedback' ),
@@ -160,34 +200,168 @@ class Review_Chunks {
 			);
 		}
 
+		$in_flight = is_int( $session['in_flight'] ?? null ) ? $session['in_flight'] : 0;
+		if ( $in_flight > time() - self::IN_FLIGHT_TTL ) {
+			$this->release_lock( $user_id );
+			return $this->in_progress_error();
+		}
+
+		$session['in_flight'] = time();
+		set_transient( $key, $session, self::SESSION_TTL );
+		$this->release_lock( $user_id );
+
 		return true;
 	}
 
 	/**
-	 * Mark a validated chunk as reviewed.
+	 * Mark a claimed chunk as reviewed and move on to the next one.
 	 *
-	 * Called after the chunk succeeds, so a failed chunk can be retried.
 	 * The session ends after the last chunk.
 	 *
 	 * @param  int $user_id User ID.
 	 * @param  int $index   Zero-based chunk index that finished.
 	 * @return void
 	 */
-	public function advance( int $user_id, int $index ): void {
+	public function complete( int $user_id, int $index ): void {
+		$this->update_session(
+			$user_id,
+			static function ( array $session ) use ( $index ): ?array {
+				$total = is_int( $session['total'] ?? null ) ? $session['total'] : 0;
+				if ( $index + 1 >= $total ) {
+					return null;
+				}
+
+				$session['next']      = $index + 1;
+				$session['in_flight'] = 0;
+				return $session;
+			}
+		);
+	}
+
+	/**
+	 * Give back a claimed chunk after the review failed, so it can be retried.
+	 *
+	 * Each session allows MAX_RETRIES failed chunks before it ends and the
+	 * user has to start a new review, which counts against the rate limit.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return void
+	 */
+	public function release( int $user_id ): void {
+		$this->update_session(
+			$user_id,
+			static function ( array $session ): ?array {
+				$retries = ( is_int( $session['retries'] ?? null ) ? $session['retries'] : 0 ) + 1;
+				if ( $retries > self::MAX_RETRIES ) {
+					return null;
+				}
+
+				$session['retries']   = $retries;
+				$session['in_flight'] = 0;
+				return $session;
+			}
+		);
+	}
+
+	/**
+	 * Change the user's session under the lock.
+	 *
+	 * @param  int      $user_id User ID.
+	 * @param  callable $change  Receives the session and returns the new one, or null to end it.
+	 * @return void
+	 */
+	private function update_session( int $user_id, callable $change ): void {
+		if ( ! $this->acquire_lock( $user_id ) ) {
+			// Leave the session to expire on its own rather than race another request.
+			return;
+		}
+
 		$key     = self::TRANSIENT_PREFIX . $user_id;
 		$session = get_transient( $key );
 
-		if ( ! is_array( $session ) ) {
-			return;
+		if ( is_array( $session ) ) {
+			$updated = $change( $session );
+			if ( is_array( $updated ) ) {
+				set_transient( $key, $updated, self::SESSION_TTL );
+			} else {
+				delete_transient( $key );
+			}
 		}
 
-		$total = is_int( $session['total'] ?? null ) ? $session['total'] : 0;
-		if ( $index + 1 >= $total ) {
-			delete_transient( $key );
-			return;
+		$this->release_lock( $user_id );
+	}
+
+	/**
+	 * Error for a chunk that another request is already reviewing.
+	 *
+	 * @return WP_Error Error with status 409.
+	 */
+	private function in_progress_error(): WP_Error {
+		return new WP_Error(
+			'review_chunk_in_progress',
+			__( 'This part of the review is already in progress.', 'ai-feedback' ),
+			array( 'status' => 409 )
+		);
+	}
+
+	/**
+	 * Take the user's session lock.
+	 *
+	 * Uses an INSERT IGNORE on the options table, like WP_Upgrader::create_lock(),
+	 * because add_option() checks and inserts in separate queries. A lock
+	 * older than LOCK_TTL is treated as abandoned.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return bool True when the lock was acquired.
+	 */
+	protected function acquire_lock( int $user_id ): bool {
+		/**
+		 * WordPress database object.
+		 *
+		 * @var \wpdb $wpdb
+		 */
+		global $wpdb;
+
+		$name = self::LOCK_PREFIX . $user_id;
+
+		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+			$insert = $wpdb->prepare( "INSERT IGNORE INTO %i ( `option_name`, `option_value`, `autoload` ) VALUES (%s, %s, 'off') /* LOCK */", $wpdb->options, $name, (string) time() );
+			if ( null === $insert ) {
+				return false;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic lock, must hit the database; prepared above.
+			if ( $wpdb->query( $insert ) ) {
+				return true;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Read the lock without a stale option cache.
+			$locked_at = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, $name ) );
+			if ( is_numeric( $locked_at ) && (int) $locked_at > time() - self::LOCK_TTL ) {
+				return false;
+			}
+
+			$this->release_lock( $user_id );
 		}
 
-		$session['next'] = $index + 1;
-		set_transient( $key, $session, self::SESSION_TTL );
+		return false;
+	}
+
+	/**
+	 * Release the user's session lock.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return void
+	 */
+	protected function release_lock( int $user_id ): void {
+		/**
+		 * WordPress database object.
+		 *
+		 * @var \wpdb $wpdb
+		 */
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
+		$wpdb->delete( $wpdb->options, array( 'option_name' => self::LOCK_PREFIX . $user_id ) );
 	}
 }

@@ -43,7 +43,7 @@ Documents with more blocks than the chunk size (`chunk_size` from `GET /settings
 2. Later parts send that `review_id` and must arrive in order. They do not count against the rate limit.
 3. The last part sends `previous_summaries`, so its `summary_text` covers the whole document.
 
-Each response includes `chunk: { index, total }`. A failed part can be retried; a part that does not match the active review returns `409 invalid_review_chunk`.
+Each response includes `chunk: { index, total }`. Each later part is claimed under a lock before the AI call, so a replayed or concurrent request for the same part returns `409 review_chunk_in_progress`, and a part that does not match the active review returns `409 invalid_review_chunk`. A failed part can be retried, up to two failures per review.
 
 ```mermaid
 sequenceDiagram

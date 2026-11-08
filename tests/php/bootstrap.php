@@ -342,6 +342,43 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 
+if ( ! class_exists( 'Test_WPDB' ) ) {
+	/**
+	 * Minimal wpdb stand-in that supports the INSERT IGNORE lock pattern,
+	 * backed by $GLOBALS['test_options'].
+	 */
+	class Test_WPDB {
+		public $options = 'wp_options';
+
+		public function prepare( $query, ...$args ) {
+			return array( 'query' => $query, 'args' => $args );
+		}
+
+		public function query( $prepared ) {
+			// args[0] is the table name for the %i placeholder.
+			$name = $prepared['args'][1];
+			if ( str_contains( $prepared['query'], 'INSERT IGNORE' ) ) {
+				if ( isset( $GLOBALS['test_options'][ $name ] ) ) {
+					return 0;
+				}
+				$GLOBALS['test_options'][ $name ] = $prepared['args'][2];
+				return 1;
+			}
+			return false;
+		}
+
+		public function get_var( $prepared ) {
+			return $GLOBALS['test_options'][ $prepared['args'][1] ] ?? null;
+		}
+
+		public function delete( $table, $where ) {
+			unset( $GLOBALS['test_options'][ $where['option_name'] ] );
+			return 1;
+		}
+	}
+	$GLOBALS['wpdb'] = new Test_WPDB();
+}
+
 if ( ! function_exists( 'rest_url' ) ) {
 	function rest_url( $path = '' ) {
 		return 'http://example.test/wp-json/' . ltrim( $path, '/' );

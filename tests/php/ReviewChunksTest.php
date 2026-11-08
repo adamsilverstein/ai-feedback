@@ -28,6 +28,7 @@ class ReviewChunksTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		$GLOBALS['test_transients'] = array();
+		$GLOBALS['test_options']    = array();
 		$this->chunks               = new Review_Chunks();
 	}
 
@@ -47,7 +48,7 @@ class ReviewChunksTest extends TestCase {
 
 		$this->assertIsString( $review_id );
 		$this->assertMatchesRegularExpression( '/^[0-9a-f-]{36}$/', $review_id );
-		$this->assertTrue( $this->chunks->validate( 1, 10, $review_id, 1, 3 ) );
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
 	}
 
 	/**
@@ -82,26 +83,86 @@ class ReviewChunksTest extends TestCase {
 	public function test_chunks_advance_in_order(): void {
 		$review_id = $this->chunks->start( 1, 10, 3 );
 
-		$this->assertTrue( $this->chunks->validate( 1, 10, $review_id, 1, 3 ) );
-		$this->assertWPError( $this->chunks->validate( 1, 10, $review_id, 2, 3 ) );
+		$this->assertWPError( $this->chunks->claim( 1, 10, $review_id, 2, 3 ) );
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+		$this->chunks->complete( 1, 1 );
 
-		$this->chunks->advance( 1, 1 );
-		$this->assertWPError( $this->chunks->validate( 1, 10, $review_id, 1, 3 ) );
-		$this->assertTrue( $this->chunks->validate( 1, 10, $review_id, 2, 3 ) );
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 2, 3 ) );
+		$this->chunks->complete( 1, 2 );
 
-		$this->chunks->advance( 1, 2 );
-		$this->assertWPError( $this->chunks->validate( 1, 10, $review_id, 2, 3 ) );
+		$this->assertWPError( $this->chunks->claim( 1, 10, $review_id, 2, 3 ) );
 		$this->assertArrayNotHasKey( Review_Chunks::TRANSIENT_PREFIX . '1', $GLOBALS['test_transients'] );
 	}
 
 	/**
-	 * A failed chunk can be retried because the session only advances on success.
+	 * A chunk that is in flight cannot be claimed again, so replays and
+	 * concurrent requests cannot skip the rate limit for extra AI calls.
 	 */
-	public function test_failed_chunk_can_be_retried(): void {
-		$review_id = $this->chunks->start( 1, 10, 2 );
+	public function test_replayed_chunk_is_rejected_while_in_flight(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
 
-		$this->assertTrue( $this->chunks->validate( 1, 10, $review_id, 1, 2 ) );
-		$this->assertTrue( $this->chunks->validate( 1, 10, $review_id, 1, 2 ) );
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+
+		$replay = $this->chunks->claim( 1, 10, $review_id, 1, 3 );
+		$this->assertWPError( $replay );
+		$this->assertSame( 'review_chunk_in_progress', $replay->get_error_code() );
+	}
+
+	/**
+	 * A completed chunk cannot be replayed.
+	 */
+	public function test_completed_chunk_cannot_be_replayed(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
+
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+		$this->chunks->complete( 1, 1 );
+
+		$replay = $this->chunks->claim( 1, 10, $review_id, 1, 3 );
+		$this->assertWPError( $replay );
+		$this->assertSame( 'invalid_review_chunk', $replay->get_error_code() );
+	}
+
+	/**
+	 * A claim is refused while another request holds the session lock.
+	 */
+	public function test_claim_refused_while_locked(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
+		$GLOBALS['test_options'][ Review_Chunks::LOCK_PREFIX . '1' ] = (string) time();
+
+		$result = $this->chunks->claim( 1, 10, $review_id, 1, 3 );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'review_chunk_in_progress', $result->get_error_code() );
+	}
+
+	/**
+	 * An abandoned lock is taken over and released after the claim.
+	 */
+	public function test_stale_lock_is_taken_over(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
+		$GLOBALS['test_options'][ Review_Chunks::LOCK_PREFIX . '1' ] = (string) ( time() - Review_Chunks::LOCK_TTL - 1 );
+
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+		$this->assertArrayNotHasKey( Review_Chunks::LOCK_PREFIX . '1', $GLOBALS['test_options'] );
+	}
+
+	/**
+	 * A failed chunk can be retried a limited number of times.
+	 */
+	public function test_failed_chunk_retries_are_capped(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
+
+		for ( $i = 0; $i < Review_Chunks::MAX_RETRIES; $i++ ) {
+			$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+			$this->chunks->release( 1 );
+		}
+
+		$this->assertTrue( $this->chunks->claim( 1, 10, $review_id, 1, 3 ) );
+		$this->chunks->release( 1 );
+
+		$result = $this->chunks->claim( 1, 10, $review_id, 1, 3 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid_review_chunk', $result->get_error_code() );
 	}
 
 	/**
@@ -115,11 +176,11 @@ class ReviewChunksTest extends TestCase {
 	 * @param int    $index     Chunk index.
 	 * @param int    $total     Chunk total.
 	 */
-	public function test_validate_rejects_mismatched_chunks( int $user_id, int $post_id, string $review_id, int $index, int $total ): void {
+	public function test_claim_rejects_mismatched_chunks( int $user_id, int $post_id, string $review_id, int $index, int $total ): void {
 		$session_id = $this->chunks->start( 1, 10, 3 );
 		$review_id  = 'valid' === $review_id ? $session_id : $review_id;
 
-		$result = $this->chunks->validate( $user_id, $post_id, $review_id, $index, $total );
+		$result = $this->chunks->claim( $user_id, $post_id, $review_id, $index, $total );
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'invalid_review_chunk', $result->get_error_code() );
@@ -148,8 +209,8 @@ class ReviewChunksTest extends TestCase {
 		$first  = $this->chunks->start( 1, 10, 3 );
 		$second = $this->chunks->start( 1, 10, 3 );
 
-		$this->assertWPError( $this->chunks->validate( 1, 10, $first, 1, 3 ) );
-		$this->assertTrue( $this->chunks->validate( 1, 10, $second, 1, 3 ) );
+		$this->assertWPError( $this->chunks->claim( 1, 10, $first, 1, 3 ) );
+		$this->assertTrue( $this->chunks->claim( 1, 10, $second, 1, 3 ) );
 	}
 
 	/**
