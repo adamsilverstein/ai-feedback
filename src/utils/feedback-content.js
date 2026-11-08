@@ -13,7 +13,7 @@
  * @return {{title: string, feedback: string, suggestion: string}} Display text.
  */
 export function getFeedbackContent(item = {}) {
-	if (item.title || item.feedback) {
+	if (item.title || item.feedback || item.suggestion) {
 		return {
 			title: item.title || '',
 			feedback: item.feedback || '',
@@ -26,27 +26,45 @@ export function getFeedbackContent(item = {}) {
 		return { title: '', feedback: '', suggestion: '' };
 	}
 
-	const container = document.createElement('div');
-	container.innerHTML = raw;
+	// DOMParser documents are inert: no scripts run and no images load.
+	const doc = new window.DOMParser().parseFromString(raw, 'text/html');
+	const container = doc.body;
 
 	container
 		.querySelectorAll('.ai-feedback-badge')
 		.forEach((badge) => badge.remove());
 
-	const strong = container.querySelector('strong');
-	const title = strong ? strong.textContent.trim() : '';
-	strong?.remove();
-
-	let feedback = container.textContent.trim();
-	let suggestion = '';
-
-	const suggestionLabel = container.querySelector('em');
-	if (suggestionLabel) {
-		const label = suggestionLabel.textContent;
-		const [before, ...after] = feedback.split(label);
-		feedback = before.trim();
-		suggestion = after.join(label).trim();
+	// The title is the leading <strong>.
+	const first = container.firstElementChild;
+	const title =
+		first?.tagName === 'STRONG' && container.firstChild === first
+			? first.textContent.trim()
+			: '';
+	if (title) {
+		first.remove();
 	}
+
+	// The suggestion follows a top-level <em> label ending in a colon.
+	const label = Array.from(container.children).find(
+		(element) =>
+			element.tagName === 'EM' && element.textContent.trim().endsWith(':')
+	);
+
+	let suggestion = '';
+	if (label) {
+		const parts = [];
+		let node = label.nextSibling;
+		while (node) {
+			parts.push(node.textContent);
+			const next = node.nextSibling;
+			node.remove();
+			node = next;
+		}
+		label.remove();
+		suggestion = parts.join('').trim();
+	}
+
+	const feedback = container.textContent.trim();
 
 	return { title, feedback, suggestion };
 }

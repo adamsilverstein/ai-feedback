@@ -215,10 +215,12 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 								))}
 						</ul>
 					</div>
-
-					<FeedbackItemActions item={item} title={title} />
 				</CardBody>
 			)}
+
+			<CardBody className="ai-feedback-group-actions">
+				<FeedbackItemActions item={item} title={title} />
+			</CardBody>
 		</Card>
 	);
 }

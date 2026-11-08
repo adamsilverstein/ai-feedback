@@ -43,6 +43,27 @@ describe('getFeedbackContent', () => {
 		});
 	});
 
+	it('keeps inline emphasis in the feedback body', () => {
+		const raw =
+			'<strong>Title</strong>\n\nThis is <em>really</em> <strong>long</strong>.\n\n' +
+			'<em>Suggestion:</em> Cut it.';
+
+		expect(getFeedbackContent({ content: { raw } })).toEqual({
+			title: 'Title',
+			feedback: 'This is really long.',
+			suggestion: 'Cut it.',
+		});
+	});
+
+	it('uses stored fields when only a suggestion is set', () => {
+		expect(
+			getFeedbackContent({
+				suggestion: 'Trim it.',
+				content: { raw: '<strong>Other</strong>' },
+			})
+		).toEqual({ title: '', feedback: '', suggestion: 'Trim it.' });
+	});
+
 	it('returns empty strings for an empty item', () => {
 		expect(getFeedbackContent({})).toEqual({
 			title: '',
