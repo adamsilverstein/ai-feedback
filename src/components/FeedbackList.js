@@ -8,67 +8,12 @@ import { __ } from '@wordpress/i18n';
 import { useMemo, useState } from '@wordpress/element';
 import { SelectControl } from '@wordpress/components';
 import FeedbackItem from './FeedbackItem';
-
-const SORT_PRIORITY = 'priority';
-const SORT_DOCUMENT = 'document';
-const SORT_CATEGORY = 'category';
-
-/**
- * Best-effort document position for an item, handling both single and grouped
- * shapes (groups expose `block_indexes` instead of `block_index`).
- *
- * @param {Object} item Feedback item.
- * @return {number} Position used for ordering.
- */
-function getDocumentPosition(item) {
-	if (typeof item.block_index === 'number') {
-		return item.block_index;
-	}
-	if (Array.isArray(item.block_indexes) && item.block_indexes.length > 0) {
-		return Math.min(...item.block_indexes);
-	}
-	return Number.MAX_SAFE_INTEGER;
-}
-
-/**
- * Sort feedback items by the requested order. Returns a new array.
- *
- * @param {Array}  items  Feedback items.
- * @param {string} sortBy Sort key.
- * @return {Array} Sorted feedback items.
- */
-function sortFeedback(items, sortBy) {
-	const sorted = [...items];
-	switch (sortBy) {
-		case SORT_DOCUMENT:
-			sorted.sort(
-				(a, b) => getDocumentPosition(a) - getDocumentPosition(b)
-			);
-			break;
-		case SORT_CATEGORY:
-			sorted.sort((a, b) => {
-				const ca = a.category || '';
-				const cb = b.category || '';
-				if (ca !== cb) {
-					return ca.localeCompare(cb);
-				}
-				return (b.priority || 0) - (a.priority || 0);
-			});
-			break;
-		case SORT_PRIORITY:
-		default:
-			sorted.sort((a, b) => {
-				const pa = a.priority || 0;
-				const pb = b.priority || 0;
-				if (pa !== pb) {
-					return pb - pa;
-				}
-				return getDocumentPosition(a) - getDocumentPosition(b);
-			});
-			break;
-	}
-	return sorted;
-}
+import {
+	SORT_CATEGORY,
+	SORT_DOCUMENT,
+	SORT_PRIORITY,
+	sortFeedback,
+} from '../utils/priority';
 
 /**
  * Feedback list component.
@@ -111,6 +56,7 @@ export default function FeedbackList({ feedbackItems }) {
 					]}
 					onChange={setSortBy}
 					__nextHasNoMarginBottom
+					__next40pxDefaultSize
 				/>
 			</div>
 			<div

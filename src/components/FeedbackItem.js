@@ -9,6 +9,7 @@ import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
 import { dispatch } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { getPriorityLevel } from '../utils/priority';
 
 /**
  * Navigate to a specific block in the editor.
@@ -49,48 +50,26 @@ function getSeverityBadge(severity) {
 }
 
 /**
- * Score thresholds — kept in sync with PRIORITY_*_THRESHOLD in
- * includes/class-response-parser.php so PHP and JS bucket scores identically.
- */
-const PRIORITY_HIGH_THRESHOLD = 100;
-const PRIORITY_MEDIUM_THRESHOLD = 50;
-
-/**
- * Bucket a numeric priority score into 'high' | 'medium' | 'low'.
- *
- * @param {number} score Priority score.
- * @return {string} Priority level.
- */
-export function getPriorityLevel(score) {
-	if (typeof score !== 'number' || Number.isNaN(score)) {
-		return 'low';
-	}
-	if (score >= PRIORITY_HIGH_THRESHOLD) {
-		return 'high';
-	}
-	if (score >= PRIORITY_MEDIUM_THRESHOLD) {
-		return 'medium';
-	}
-	return 'low';
-}
-
-/**
  * Priority indicator badge.
  *
  * @param {Object} props          Component props.
  * @param {number} props.priority Priority score.
- * @return {Element|null} Badge element or null when no score is available.
+ * @return {Element|null} Badge element, or null for low or missing scores.
  */
-function PriorityBadge({ priority }) {
+export function PriorityBadge({ priority }) {
 	if (typeof priority !== 'number') {
 		return null;
 	}
 
+	// Low priority is implied, so only high and medium get a badge.
 	const level = getPriorityLevel(priority);
+	if (level === 'low') {
+		return null;
+	}
+
 	const labels = {
 		high: __('High priority', 'ai-feedback'),
 		medium: __('Medium priority', 'ai-feedback'),
-		low: __('Low priority', 'ai-feedback'),
 	};
 
 	return (
@@ -100,7 +79,7 @@ function PriorityBadge({ priority }) {
 			aria-label={labels[level]}
 			title={labels[level]}
 		>
-			{level === 'high' ? '!' : ''}
+			{level === 'high' ? '!' : '•'}
 		</span>
 	);
 }
