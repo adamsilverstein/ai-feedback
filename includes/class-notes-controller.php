@@ -277,11 +277,16 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
+		$thread = $this->notes_manager->sync_thread_status( is_numeric( $note_id ) ? (int) $note_id : 0, true );
+
 		return rest_ensure_response(
 			array(
-				'success'     => true,
-				'note_id'     => $note_id,
-				'is_resolved' => true,
+				'success'         => true,
+				'note_id'         => $note_id,
+				'is_resolved'     => true,
+				'thread_id'       => $thread['thread_id'],
+				'thread_resolved' => $thread['thread_resolved'],
+				'thread_changed'  => $thread['thread_changed'],
 			)
 		);
 	}
@@ -315,11 +320,16 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
+		$thread = $this->notes_manager->sync_thread_status( is_numeric( $note_id ) ? (int) $note_id : 0, false );
+
 		return rest_ensure_response(
 			array(
-				'success'     => true,
-				'note_id'     => $note_id,
-				'is_resolved' => false,
+				'success'         => true,
+				'note_id'         => $note_id,
+				'is_resolved'     => false,
+				'thread_id'       => $thread['thread_id'],
+				'thread_resolved' => $thread['thread_resolved'],
+				'thread_changed'  => $thread['thread_changed'],
 			)
 		);
 	}

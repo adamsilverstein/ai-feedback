@@ -179,11 +179,25 @@ export default function reducer(state = initialState, action) {
 				...state,
 				lastReview: {
 					...state.lastReview,
-					notes: state.lastReview.notes.map((note) =>
-						note.id === action.noteId
-							? { ...note, is_resolved: action.isResolved }
-							: note
-					),
+					notes: state.lastReview.notes.map((note) => {
+						let updated = note;
+						if (note.id === action.noteId) {
+							updated = {
+								...updated,
+								is_resolved: action.isResolved,
+							};
+						}
+						// Mirror the Notes panel thread status on its top-level note.
+						if (action.threadId && note.id === action.threadId) {
+							updated = {
+								...updated,
+								status: action.threadResolved
+									? 'approved'
+									: 'hold',
+							};
+						}
+						return updated;
+					}),
 				},
 			};
 

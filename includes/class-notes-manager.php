@@ -453,7 +453,159 @@ class Notes_Manager {
 	 * @return bool Success.
 	 */
 	public function unresolve_note( int $note_id ): bool {
+		// delete_comment_meta() returns false when there is nothing to delete.
+		if ( ! $this->is_note_resolved( $note_id ) ) {
+			return true;
+		}
+
 		return delete_comment_meta( $note_id, 'ai_feedback_resolved' );
+	}
+
+	/**
+	 * Get the top-level note of the thread a note belongs to.
+	 *
+	 * Feedback for one block shares a thread: the first item is the
+	 * top-level note and the rest are replies to it.
+	 *
+	 * @param  int $note_id Note ID.
+	 * @return int Thread (top-level note) ID, or 0 if the note doesn't exist.
+	 */
+	public function get_thread_id( int $note_id ): int {
+		$note = get_comment( $note_id );
+
+		if ( ! $note instanceof \WP_Comment ) {
+			return 0;
+		}
+
+		$parent = (int) $note->comment_parent;
+
+		return $parent > 0 ? $parent : (int) $note->comment_ID;
+	}
+
+	/**
+	 * Check whether every AI feedback note in a thread is dismissed.
+	 *
+	 * Replies written by people don't count.
+	 *
+	 * @param  int $thread_id Thread (top-level note) ID.
+	 * @return bool True if all AI notes in the thread are resolved.
+	 */
+	public function is_ai_feedback_in_thread_resolved( int $thread_id ): bool {
+		$replies = get_comments(
+			array(
+				'type'   => 'note',
+				'status' => 'all',
+				'parent' => $thread_id,
+			)
+		);
+
+		$note_ids = array( $thread_id );
+		if ( is_array( $replies ) ) {
+			foreach ( $replies as $reply ) {
+				if ( $reply instanceof \WP_Comment ) {
+					$note_ids[] = (int) $reply->comment_ID;
+				}
+			}
+		}
+
+		foreach ( $note_ids as $note_id ) {
+			if ( get_comment_meta( $note_id, 'ai_feedback', true ) && ! $this->is_note_resolved( $note_id ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check whether a thread is resolved in the editor's Notes panel.
+	 *
+	 * Core marks a resolved thread by approving its top-level note.
+	 *
+	 * @param  int $thread_id Thread (top-level note) ID.
+	 * @return bool True if resolved.
+	 */
+	public function is_thread_resolved( int $thread_id ): bool {
+		$thread = get_comment( $thread_id );
+
+		return $thread instanceof \WP_Comment && '1' === (string) $thread->comment_approved;
+	}
+
+	/**
+	 * Resolve or reopen a thread the way the editor's Notes panel does.
+	 *
+	 * Sets the top-level note's status and adds an empty reply carrying
+	 * `_wp_note_status`, which the Notes panel shows as "resolved"/"reopened".
+	 *
+	 * @param  int  $thread_id Thread (top-level note) ID.
+	 * @param  bool $resolved  True to resolve, false to reopen.
+	 * @return bool True if the thread status changed.
+	 */
+	public function set_thread_resolved( int $thread_id, bool $resolved ): bool {
+		$thread = get_comment( $thread_id );
+
+		if ( ! $thread instanceof \WP_Comment || $this->is_thread_resolved( $thread_id ) === $resolved ) {
+			return false;
+		}
+
+		if ( ! wp_set_comment_status( $thread_id, $resolved ? 'approve' : 'hold' ) ) {
+			return false;
+		}
+
+		$user = wp_get_current_user();
+
+		wp_insert_comment(
+			array(
+				'comment_post_ID'  => (int) $thread->comment_post_ID,
+				'comment_type'     => 'note',
+				'comment_content'  => '',
+				'comment_approved' => $resolved ? '1' : '0',
+				'comment_parent'   => $thread_id,
+				'user_id'          => $user->ID,
+				'comment_author'   => $user->display_name,
+				'comment_meta'     => array(
+					'_wp_note_status' => $resolved ? 'resolved' : 'reopen',
+				),
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Keep a note's thread in step with its dismissed AI feedback.
+	 *
+	 * Resolves the thread once the last AI feedback item in it is dismissed,
+	 * and reopens it when an item is restored. Dismissing never reopens a
+	 * thread someone resolved by hand.
+	 *
+	 * @param  int  $note_id   Note that was just dismissed or restored.
+	 * @param  bool $dismissed True if the note was dismissed, false if restored.
+	 * @return array{thread_id: int, thread_resolved: bool, thread_changed: bool} Thread state.
+	 */
+	public function sync_thread_status( int $note_id, bool $dismissed ): array {
+		$thread_id = $this->get_thread_id( $note_id );
+
+		if ( 0 === $thread_id ) {
+			return array(
+				'thread_id'       => 0,
+				'thread_resolved' => false,
+				'thread_changed'  => false,
+			);
+		}
+
+		$changed = false;
+		if ( ! $dismissed ) {
+			$changed = $this->set_thread_resolved( $thread_id, false );
+		} elseif ( $this->is_ai_feedback_in_thread_resolved( $thread_id ) ) {
+			$changed = $this->set_thread_resolved( $thread_id, true );
+		}
+
+		return array(
+			'thread_id'       => $thread_id,
+			'thread_resolved' => $this->is_thread_resolved( $thread_id ),
+			'thread_changed'  => $changed,
+		);
 	}
 
 	/**

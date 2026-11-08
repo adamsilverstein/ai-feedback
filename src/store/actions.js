@@ -8,6 +8,7 @@ import {
 } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
+import { refreshCoreNotes } from '../utils/refresh-core-notes';
 
 /**
  * Fetch settings from the server.
@@ -343,25 +344,32 @@ export function* startReview({
 /**
  * Mark a feedback note as dismissed (resolved) or restore it.
  *
- * Uses the plugin's resolve endpoints, which only flag the note for AI
- * Feedback. The note's thread in the editor's Notes panel is left as is.
+ * The server resolves the note's thread in the Notes panel once its last AI
+ * feedback item is dismissed, and reopens it when an item is restored. When
+ * that happens, refetch notes so the Notes panel shows the new state.
  *
  * @param {number}  noteId     Note ID.
  * @param {boolean} isResolved Whether the note should be resolved.
  * @return {Object} Action object.
  */
 export function* setNoteResolved(noteId, isResolved) {
-	yield apiFetch({
+	const response = yield apiFetch({
 		path: `/ai-feedback/v1/notes/${noteId}/${
 			isResolved ? 'resolve' : 'unresolve'
 		}`,
 		method: 'POST',
 	});
 
+	if (response?.thread_changed) {
+		refreshCoreNotes();
+	}
+
 	return {
 		type: TYPES.SET_NOTE_RESOLVED,
 		noteId,
 		isResolved,
+		threadId: response?.thread_id || null,
+		threadResolved: !!response?.thread_resolved,
 	};
 }
 
