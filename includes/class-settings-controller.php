@@ -88,14 +88,33 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response Status response.
 	 */
 	public function get_status(): \WP_REST_Response {
-		$ai_client_available = class_exists( 'WordPress\AiClient\AiClient' );
-
 		$status = array(
-			'ai_client_available' => $ai_client_available,
-			'settings_url'        => admin_url( 'options-general.php?page=wp-ai-client' ),
+			'ai_client_available'  => function_exists( 'wp_ai_client_prompt' ),
+			'connector_configured' => $this->has_configured_ai_provider(),
+			'settings_url'         => admin_url( 'options-general.php?page=connectors' ),
 		);
 
 		return rest_ensure_response( $status );
+	}
+
+	/**
+	 * Whether a configured AI provider can handle text generation.
+	 *
+	 * Core registers connectors for its built-in providers whether or not
+	 * they have credentials, so connector registration alone is not enough.
+	 *
+	 * @return bool True when at least one provider supports text generation.
+	 */
+	protected function has_configured_ai_provider(): bool {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+			return false;
+		}
+
+		try {
+			return wp_ai_client_prompt()->is_supported_for_text_generation();
+		} catch ( \Throwable $e ) {
+			return false;
+		}
 	}
 
 	/**
