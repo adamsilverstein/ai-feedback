@@ -68,6 +68,7 @@
 
 .ai-feedback-analytics-columns {
 	display: flex;
+	overflow-x: auto;
 	gap: 2px;
 	align-items: flex-end;
 	height: 120px;
@@ -75,7 +76,7 @@
 }
 
 .ai-feedback-analytics-column {
-	flex: 1;
+	flex: 1 0 3px;
 	min-height: 1px;
 	background: var(--wp-admin-theme-color, #3858e9);
 	border-radius: 2px 2px 0 0;

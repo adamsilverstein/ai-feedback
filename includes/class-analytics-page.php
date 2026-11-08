@@ -88,7 +88,7 @@ class Analytics_Page {
 		wp_enqueue_script(
 			'ai-feedback-analytics',
 			plugins_url( 'build/analytics.js', $plugin_file ),
-			array_filter( $dependencies, 'is_string' ),
+			array_values( array_filter( $dependencies, 'is_string' ) ),
 			$version,
 			true
 		);

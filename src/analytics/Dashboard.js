@@ -178,6 +178,8 @@ export default function Dashboard() {
 	useEffect(() => {
 		let active = true;
 		setError(null);
+		// Clear old numbers so the CSV can't export the previous period.
+		setData(null);
 		apiFetch({
 			path: addQueryArgs('/ai-feedback/v1/analytics', { period }),
 		})
