@@ -221,7 +221,7 @@ class Review_Service {
 		if ( is_wp_error( $note_result ) ) {
 			Logger::debug( sprintf( 'Note creation failed: %s', $note_result->get_error_message() ) );
 			// Still return the feedback data, but include error.
-			return array(
+			$result = array(
 				'review_id'     => $review_id,
 				'post_id'       => $post_id,
 				'model'         => $model,
@@ -234,6 +234,10 @@ class Review_Service {
 				'note_count'    => count( $feedback_items ),
 				'notes_error'   => $note_result->get_error_message(),
 			);
+
+			$this->fire_review_completed( $post_id, $result );
+
+			return $result;
 		}
 
 		// Extract note_ids and block_mapping from result.
@@ -247,7 +251,7 @@ class Review_Service {
 		Logger::debug( sprintf( 'Created %d notes with %d block mappings', count( $note_ids ), count( $block_mapping ) ) );
 
 		// Build response with note IDs and block mapping.
-		return array(
+		$result = array(
 			'review_id'     => $review_id,
 			'post_id'       => $post_id,
 			'model'         => $model,
@@ -259,6 +263,26 @@ class Review_Service {
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
 		);
+
+		$this->fire_review_completed( $post_id, $result );
+
+		return $result;
+	}
+
+	/**
+	 * Announce a completed review so history and other listeners can record it.
+	 *
+	 * @param int                  $post_id Post ID.
+	 * @param array<string, mixed> $result  Review result returned to the client.
+	 */
+	protected function fire_review_completed( int $post_id, array $result ): void {
+		/**
+		 * Fires after a review completes and its notes are created.
+		 *
+		 * @param int   $post_id Post ID.
+		 * @param array $result  Review result returned to the client.
+		 */
+		do_action( 'ai_feedback_review_completed', $post_id, $result );
 	}
 
 	/**
