@@ -228,6 +228,9 @@ class Response_Parser {
 	 * position bonus for early blocks. The score is bucketed by clients into
 	 * high / medium / low using PRIORITY_*_THRESHOLD constants.
 	 *
+	 * Blocks without a known `block_name` still add PRIORITY_BLOCK_DEFAULT, so
+	 * the score always includes a block-type weight.
+	 *
 	 * @param  array $item Validated feedback item. Expected keys: `severity`,
 	 *                     `category`, optional `block_name`, optional `block_index`.
 	 * @return int Priority score (higher means more important).
@@ -255,9 +258,9 @@ class Response_Parser {
 	/**
 	 * Sort feedback items by priority score, highest first.
 	 *
-	 * Items without a `priority` key are treated as zero. Items with the same
-	 * priority preserve their relative order (PHP `usort` is not stable, so
-	 * ties fall back to `block_index` then to original ordering).
+	 * Items without a `priority` key are treated as zero. Ties are broken by
+	 * `block_index` so equal-priority items follow document order; `usort` is
+	 * stable on PHP 8+, so remaining ties keep their original order.
 	 *
 	 * @param  array $feedback Feedback items, each expected to have an integer `priority`.
 	 * @return array Feedback items sorted by descending priority.

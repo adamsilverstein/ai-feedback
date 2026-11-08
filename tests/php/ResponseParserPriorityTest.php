@@ -91,7 +91,7 @@ class ResponseParserPriorityTest extends TestCase {
 			)
 		);
 
-		// Default block weight of 5, no severity/category contribution, no position bonus.
+		// Only the default block weight applies: no severity, category, or position bonus.
 		$this->assertSame( Response_Parser::PRIORITY_BLOCK_DEFAULT, $score );
 	}
 
