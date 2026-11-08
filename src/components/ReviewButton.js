@@ -1,12 +1,12 @@
 /**
  * Review Button Component
  */
-import { Button } from '@wordpress/components';
+import { Button, ProgressBar } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as noticesStore } from '@wordpress/notices';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { extractBlockData } from '../utils/block-utils';
 
@@ -49,6 +49,8 @@ export default function ReviewButton() {
 		focusAreas,
 		targetTone,
 		feedbackLocale,
+		chunkSize,
+		reviewProgress,
 	} = useSelect(
 		(select) => ({
 			postId: select(editorStore).getCurrentPostId(),
@@ -60,6 +62,8 @@ export default function ReviewButton() {
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
+			chunkSize: select(STORE_NAME).getChunkSize(),
+			reviewProgress: select(STORE_NAME).getReviewProgress(),
 		}),
 		[]
 	);
@@ -94,6 +98,7 @@ export default function ReviewButton() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				chunkSize,
 			});
 		} catch (error) {
 			// Error is already in the store
@@ -122,11 +127,31 @@ export default function ReviewButton() {
 					{__('Save your post first to enable review', 'ai-feedback')}
 				</p>
 			)}
-			{isReviewing && (
+			{isReviewing && !reviewProgress && (
 				<>
 					<IndeterminateProgressBar />
 					<p className="description">
 						{__('AI is analyzing your content…', 'ai-feedback')}
+					</p>
+				</>
+			)}
+			{isReviewing && reviewProgress && (
+				<>
+					<ProgressBar
+						className="ai-feedback-chunk-progress"
+						value={
+							((reviewProgress.current - 1) /
+								reviewProgress.total) *
+							100
+						}
+					/>
+					<p className="description">
+						{sprintf(
+							/* translators: 1: current part number, 2: total number of parts. */
+							__('Reviewing part %1$d of %2$d…', 'ai-feedback'),
+							reviewProgress.current,
+							reviewProgress.total
+						)}
 					</p>
 				</>
 			)}

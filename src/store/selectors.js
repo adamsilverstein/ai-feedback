@@ -194,3 +194,23 @@ export function hasFetchedPreviousReview(state) {
 export function hasPreviousReview(state) {
 	return state.lastReview !== null;
 }
+
+/**
+ * Get progress of a review split into several requests.
+ *
+ * @param {Object} state Store state.
+ * @return {Object|null} `{ current, total }`, or null for a single-request review.
+ */
+export function getReviewProgress(state) {
+	return state.reviewProgress;
+}
+
+/**
+ * Get the number of blocks reviewed per request.
+ *
+ * @param {Object} state Store state.
+ * @return {number} Chunk size.
+ */
+export function getChunkSize(state) {
+	return state.settings.chunkSize;
+}
