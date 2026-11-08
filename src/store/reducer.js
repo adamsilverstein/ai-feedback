@@ -243,6 +243,41 @@ export default function reducer(state = initialState, action) {
 				},
 			};
 
+		case TYPES.CLEAR_ERROR:
+			return {
+				...state,
+				error: null,
+			};
+
+		case TYPES.SET_LOADING_SETTINGS:
+			return {
+				...state,
+				isLoadingSettings: action.isLoading,
+			};
+
+		case TYPES.FETCHING_PREVIOUS_REVIEW:
+			return {
+				...state,
+				isLoadingPreviousReview: true,
+			};
+
+		case TYPES.RECEIVE_PREVIOUS_REVIEW:
+			// Only update lastReview if we don't already have one from the current session.
+			// This prevents overwriting a fresh review with stale data.
+			if (state.lastReview && !state.lastReview.is_persisted) {
+				return {
+					...state,
+					isLoadingPreviousReview: false,
+					hasFetchedPreviousReview: true,
+				};
+			}
+			return {
+				...state,
+				isLoadingPreviousReview: false,
+				hasFetchedPreviousReview: true,
+				lastReview: action.review,
+			};
+
 		default:
 			return state;
 	}
