@@ -50,15 +50,17 @@ class NotesThreadResolutionTest extends TestCase {
 	/**
 	 * Create a note in the fake store.
 	 *
-	 * @param  int  $parent Parent note ID.
-	 * @param  bool $is_ai  Whether the note is AI feedback.
+	 * @param  int    $parent  Parent note ID.
+	 * @param  bool   $is_ai   Whether the note is AI feedback.
+	 * @param  int    $post_id Post ID.
+	 * @param  string $type    Comment type.
 	 * @return int Note ID.
 	 */
-	private function add_note( int $parent = 0, bool $is_ai = true ): int {
+	private function add_note( int $parent = 0, bool $is_ai = true, int $post_id = 10, string $type = 'note' ): int {
 		$id = wp_insert_comment(
 			array(
-				'comment_post_ID' => 10,
-				'comment_type'    => 'note',
+				'comment_post_ID' => $post_id,
+				'comment_type'    => $type,
 				'comment_parent'  => $parent,
 				'comment_meta'    => $is_ai ? array( 'ai_feedback' => '1' ) : array(),
 			)
@@ -239,5 +241,62 @@ class NotesThreadResolutionTest extends TestCase {
 		$result = ( new Notes_Controller() )->update_note_permissions_check( $this->request_for( 999 ) );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
+	}
+
+	/**
+	 * A parent on another post is not treated as the thread.
+	 */
+	public function test_parent_on_another_post_is_not_a_thread(): void {
+		$other = $this->add_note( 0, true, 99 );
+		$note  = $this->add_note( $other );
+
+		$this->manager->resolve_note( $note );
+		$result = $this->manager->sync_thread_status( $note, true );
+
+		$this->assertSame( 0, $result['thread_id'] );
+		$this->assertFalse( $this->manager->is_thread_resolved( $other ) );
+	}
+
+	/**
+	 * A parent that isn't a note is not treated as the thread.
+	 */
+	public function test_parent_that_is_not_a_note_is_not_a_thread(): void {
+		$comment = $this->add_note( 0, false, 10, 'comment' );
+		$note    = $this->add_note( $comment );
+
+		$this->manager->resolve_note( $note );
+		$result = $this->manager->sync_thread_status( $note, true );
+
+		$this->assertSame( 0, $result['thread_id'] );
+		$this->assertFalse( $this->manager->is_thread_resolved( $comment ) );
+		$this->assertFalse( $this->manager->set_thread_resolved( $comment, true ) );
+		$this->assertFalse( $this->manager->is_thread_resolved( $comment ) );
+	}
+
+	/**
+	 * Users who can't edit the thread's post can't change the thread.
+	 */
+	public function test_user_without_edit_rights_cannot_change_thread(): void {
+		$thread = $this->add_note();
+
+		$GLOBALS['test_current_user_can'] = static fn( string $cap, ...$args ): bool => 'edit_post' !== $cap;
+
+		$this->manager->resolve_note( $thread );
+		$result = $this->manager->sync_thread_status( $thread, true );
+
+		$this->assertSame( 0, $result['thread_id'] );
+		$this->assertFalse( $this->manager->set_thread_resolved( $thread, true ) );
+		$this->assertFalse( $this->manager->is_thread_resolved( $thread ) );
+	}
+
+	/**
+	 * Replies can't be resolved as if they were threads.
+	 */
+	public function test_reply_cannot_be_resolved_as_thread(): void {
+		$thread = $this->add_note();
+		$reply  = $this->add_note( $thread );
+
+		$this->assertFalse( $this->manager->set_thread_resolved( $reply, true ) );
+		$this->assertFalse( $this->manager->is_thread_resolved( $reply ) );
 	}
 }
