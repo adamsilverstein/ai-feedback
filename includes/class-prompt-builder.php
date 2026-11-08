@@ -89,7 +89,8 @@ class Prompt_Builder {
 		$prompt           .= '      "severity": "suggestion|important|critical",' . "\n";
 		$prompt           .= '      "title": "Brief title (max 50 chars)",' . "\n";
 		$prompt           .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
-		$prompt           .= '      "suggestion": "Specific action to take (max 200 chars, optional)"' . "\n";
+		$prompt           .= '      "suggestion": "Specific action to take (max 200 chars, optional)",' . "\n";
+		$prompt           .= '      "quick_fix": { "find": "exact text copied from the block", "replace": "replacement text" }' . "\n";
 		$prompt           .= "    }\n";
 		$prompt           .= "  ]\n";
 		$prompt           .= "}\n\n";
@@ -105,9 +106,23 @@ class Prompt_Builder {
 		$prompt .= "IMPORTANT:\n";
 		$prompt .= '- The "block_id" must exactly match one of the block IDs provided in the document' . "\n";
 		$prompt .= "- Return ONLY valid JSON, no additional text or explanation\n";
-		$prompt .= "- If no feedback is needed for a block, don't include it in the array";
+		$prompt .= "- If no feedback is needed for a block, don't include it in the array\n";
+		$prompt .= $this->get_quick_fix_instruction();
 
 		return $prompt;
+	}
+
+	/**
+	 * Get the instruction describing the optional quick_fix field.
+	 *
+	 * @return string Quick fix instruction.
+	 */
+	private function get_quick_fix_instruction(): string {
+		$instruction  = '- "quick_fix" is optional. Include it only for a simple, mechanical text change inside one block, such as replacing a word or phrase, fixing a typo, or deleting filler words. Never for rewrites or structural changes' . "\n";
+		$instruction .= '- "find" must be copied exactly, character for character, from that block\'s content, and long enough to appear only once in the block (max 200 chars)' . "\n";
+		$instruction .= '- "replace" is the text that takes its place (max 200 chars). Use an empty string to delete the text. To insert text, include a nearby phrase in "find" and the phrase plus the new text in "replace"';
+
+		return $instruction;
 	}
 
 	/**

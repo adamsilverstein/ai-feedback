@@ -249,6 +249,10 @@ class Notes_Manager {
 			$meta['feedback_suggestion'] = $feedback_item['suggestion'];
 		}
 
+		if ( ! empty( $feedback_item['quick_fix'] ) && is_array( $feedback_item['quick_fix'] ) ) {
+			$meta['feedback_quick_fix'] = wp_json_encode( $feedback_item['quick_fix'] );
+		}
+
 		// Add block ID (clientId) if available.
 		// Note: clientId is ephemeral and changes on each editor load.
 		if ( ! empty( $feedback_item['block_id'] ) ) {
@@ -578,10 +582,11 @@ class Notes_Manager {
 	 * Get the stored feedback text fields for a note.
 	 *
 	 * Notes created before these fields were stored return empty strings; the
-	 * sidebar falls back to the note content for those.
+	 * sidebar falls back to the note content for those. `quick_fix` is null
+	 * when the note has none.
 	 *
 	 * @param  int $note_id Note ID.
-	 * @return array{title: string, feedback: string, suggestion: string} Feedback fields.
+	 * @return array<string, string|array{find: string, replace: string}|null> Feedback fields.
 	 */
 	private function get_feedback_fields( int $note_id ): array {
 		$fields = array(
@@ -596,7 +601,32 @@ class Notes_Manager {
 			$values[ $field ] = is_string( $value ) ? $value : '';
 		}
 
+		$values['quick_fix'] = $this->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
+
 		return $values;
+	}
+
+	/**
+	 * Decode a stored quick fix.
+	 *
+	 * @param  mixed $stored Stored meta value (JSON string).
+	 * @return array{find: string, replace: string}|null Quick fix, or null if none.
+	 */
+	public function decode_quick_fix( $stored ): ?array {
+		if ( ! is_string( $stored ) || '' === $stored ) {
+			return null;
+		}
+
+		$decoded = json_decode( $stored, true );
+
+		if ( ! is_array( $decoded ) || ! is_string( $decoded['find'] ?? null ) || ! is_string( $decoded['replace'] ?? null ) ) {
+			return null;
+		}
+
+		return array(
+			'find'    => $decoded['find'],
+			'replace' => $decoded['replace'],
+		);
 	}
 
 	/**

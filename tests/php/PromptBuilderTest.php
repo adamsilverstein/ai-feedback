@@ -404,4 +404,22 @@ class PromptBuilderTest extends TestCase {
 
 		$this->assertStringNotContainsString( 'REFERENCE EXAMPLES:', $prompt );
 	}
+
+	/**
+	 * Test the prompt describes the optional quick_fix field.
+	 */
+	public function test_prompt_describes_quick_fix(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'test-1',
+				'name'     => 'core/paragraph',
+				'content'  => 'Test content.',
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringContainsString( '"quick_fix": { "find":', $prompt );
+		$this->assertStringContainsString( 'copied exactly', $prompt );
+	}
 }

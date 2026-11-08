@@ -33,7 +33,14 @@ class Response_Parser {
 	/**
 	 * Optional fields for each feedback item.
 	 */
-	public const OPTIONAL_FEEDBACK_FIELDS = array( 'suggestion' );
+	public const OPTIONAL_FEEDBACK_FIELDS = array( 'suggestion', 'quick_fix' );
+
+	/**
+	 * Maximum length of a quick fix's find and replace text.
+	 *
+	 * @var int
+	 */
+	public const MAX_QUICK_FIX_LENGTH = 200;
 
 	/**
 	 * Maximum character lengths for feedback fields.
@@ -74,8 +81,9 @@ class Response_Parser {
 				$valid_block_ids[ $block['clientId'] ] = true;
 				// Store block info for enriching feedback items.
 				$block_info[ $block['clientId'] ] = array(
-					'name'  => $block['name'] ?? '',
-					'index' => $index,
+					'name'    => $block['name'] ?? '',
+					'index'   => $index,
+					'content' => is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '',
 				);
 				Logger::debug(
 					sprintf(
@@ -293,7 +301,62 @@ class Response_Parser {
 			$validated['suggestion'] = $this->sanitize_feedback( $item['suggestion'] );
 		}
 
+		// Optional quick fix, kept only when it applies cleanly to the block.
+		if ( isset( $item['quick_fix'] ) ) {
+			$info          = is_string( $block_id ) ? ( $block_info[ $block_id ] ?? null ) : null;
+			$block_content = is_array( $info ) && is_string( $info['content'] ?? null ) ? $info['content'] : '';
+			$quick_fix     = $this->validate_quick_fix( $item['quick_fix'], $block_content );
+			if ( null !== $quick_fix ) {
+				$validated['quick_fix'] = $quick_fix;
+			}
+		}
+
 		return $validated;
+	}
+
+	/**
+	 * Validate a quick fix against the block it targets.
+	 *
+	 * A quick fix is a plain text find/replace. It is dropped unless `find`
+	 * appears exactly once in the block's text, so applying it is unambiguous.
+	 *
+	 * @param  mixed  $quick_fix     Quick fix from the AI response.
+	 * @param  string $block_content Plain text content of the target block.
+	 * @return array{find: string, replace: string}|null Sanitized quick fix, or null if unusable.
+	 */
+	public function validate_quick_fix( $quick_fix, string $block_content ): ?array {
+		if ( ! is_array( $quick_fix ) ) {
+			return null;
+		}
+
+		$find    = $quick_fix['find'] ?? null;
+		$replace = $quick_fix['replace'] ?? '';
+
+		if ( ! is_string( $find ) || ! is_string( $replace ) ) {
+			return null;
+		}
+
+		// Plain text only; markup can't be matched against the block's text.
+		$find    = wp_strip_all_tags( $find );
+		$replace = wp_strip_all_tags( $replace );
+
+		if ( '' === trim( $find ) || $find === $replace ) {
+			return null;
+		}
+
+		if ( mb_strlen( $find ) > self::MAX_QUICK_FIX_LENGTH || mb_strlen( $replace ) > self::MAX_QUICK_FIX_LENGTH ) {
+			return null;
+		}
+
+		if ( 1 !== substr_count( $block_content, $find ) ) {
+			Logger::debug( 'Quick fix text not found exactly once in block, dropping it' );
+			return null;
+		}
+
+		return array(
+			'find'    => $find,
+			'replace' => $replace,
+		);
 	}
 
 	/**
@@ -563,6 +626,19 @@ class Response_Parser {
 			}
 		}
 
+		// Validate optional quick_fix field type.
+		if ( isset( $item['quick_fix'] ) && ! is_array( $item['quick_fix'] ) ) {
+			$errors->add(
+				'invalid_type',
+				sprintf(
+				/* translators: %d: item index */
+					__( 'Field "quick_fix" in feedback item %d must be an object.', 'ai-feedback' ),
+					$index
+				),
+				array( 'path' => $path . '.quick_fix' )
+			);
+		}
+
 		// Validate optional suggestion field type.
 		if ( isset( $item['suggestion'] ) && ! is_string( $item['suggestion'] ) ) {
 			$errors->add(
@@ -666,6 +742,8 @@ class Response_Parser {
 		// Mark items that became groups and update their titles.
 		foreach ( $groups as &$group ) {
 			if ( $group['count'] > 1 ) {
+				// A quick fix targets one block, so it can't apply to a group.
+				unset( $group['quick_fix'] );
 				$group['is_group'] = true;
 				$group['title']    = sprintf(
 					/* translators: 1: original title, 2: occurrence count */
