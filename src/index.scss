@@ -208,42 +208,27 @@ $ai-feedback-text-muted: #595959;
 	}
 }
 
-/* Indeterminate Progress Bar */
-.ai-feedback-progress-container {
-	margin: 12px 0;
-	padding: 0;
-}
+/* Staged review progress */
+.ai-feedback-review-progress {
+	margin: 12px 0 0;
 
-.ai-feedback-progress-bar {
-	width: 100%;
-	height: 4px;
-	background-color: #e0e0e0;
-	border-radius: 2px;
-	overflow: hidden;
-	position: relative;
-}
-
-.ai-feedback-progress-indicator {
-	position: absolute;
-	width: 40%;
-	height: 100%;
-	background: linear-gradient(90deg, #0073aa, #005a87, #0073aa);
-	border-radius: 2px;
-	animation: ai-feedback-progress-animation 1.5s ease-in-out infinite;
-}
-
-@keyframes ai-feedback-progress-animation {
-
-	0% {
-		left: -40%;
+	.ai-feedback-review-progress-bar {
+		width: 100%;
 	}
 
-	50% {
-		left: 100%;
+	.ai-feedback-review-progress-label {
+		margin: 8px 0 0;
+		font-size: 13px;
+		text-align: center;
 	}
 
-	100% {
-		left: -40%;
+	.ai-feedback-review-progress-step {
+		font-weight: 600;
+	}
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	.ai-feedback-review-progress-elapsed {
+		margin-top: 4px;
 	}
 }
 
