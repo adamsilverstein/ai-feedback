@@ -76,7 +76,8 @@ class ReplyServiceCallAiTest extends TestCase {
 		$this->assertSame( 'Prompt', $calls['prompt'] );
 		$this->assertSame( 'System', $calls['using_system_instruction'] );
 		$this->assertSame( array( 'model-a' ), $calls['using_model_preference'] );
-		$this->assertSame( 400, $calls['using_max_tokens'] );
+		$this->assertSame( Reply_Service::AI_MAX_TOKENS, $calls['using_max_tokens'] );
+		$this->assertSame( Reply_Service::AI_TEMPERATURE, $calls['using_temperature'] );
 	}
 
 	/**

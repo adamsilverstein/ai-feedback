@@ -316,4 +316,16 @@ class ReplyStatusControllerTest extends TestCase {
 	public function test_threads_permissions_allow_post_editor(): void {
 		$this->assertTrue( $this->controller->get_threads_permissions_check( $this->threads_request() ) );
 	}
+
+	/**
+	 * Comments that are not notes are treated as missing.
+	 */
+	public function test_permissions_check_returns_404_for_non_note_comment(): void {
+		$GLOBALS['test_comments'][200]->comment_type = 'comment';
+
+		$result = $this->controller->get_status_permissions_check( $this->request( 200 ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_comment_invalid_id', $result->get_error_code() );
+	}
 }

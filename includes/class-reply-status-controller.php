@@ -193,7 +193,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	 */
 	public function get_status_permissions_check( WP_REST_Request $request ): bool|WP_Error {
 		$comment = $this->get_reply_comment( $request );
-		if ( ! $comment ) {
+		if ( ! $comment || 'note' !== $comment->comment_type ) {
 			return new WP_Error(
 				'rest_comment_invalid_id',
 				__( 'Invalid reply ID.', 'ai-feedback' ),

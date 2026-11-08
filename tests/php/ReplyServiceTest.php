@@ -408,4 +408,44 @@ class ReplyServiceTest extends TestCase {
 		$this->assertStringContainsString( sprintf( 'Entry-%02d.', $total ), $prompt );
 		$this->assertLessThan( strpos( $prompt, sprintf( 'Entry-%02d.', $total ) ), strpos( $prompt, 'Entry-06.' ) );
 	}
+
+	/**
+	 * An empty AI response is an error, not an empty note.
+	 */
+	public function test_empty_ai_reply_returns_wp_error_and_skips_persistence(): void {
+		$this->seed_parent_and_reply();
+		$notes   = new Reply_Service_Fake_Notes_Manager();
+		$service = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+
+		$service->canned_response = "  \n ";
+		$result                   = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ai_empty_reply', $result->get_error_code() );
+		$this->assertSame( array(), $notes->last_reply );
+	}
+
+	/**
+	 * A throw during generation still records a terminal failed status.
+	 */
+	public function test_on_reply_received_records_failed_status_when_generation_throws(): void {
+		$this->seed_parent_and_reply();
+
+		$service = new class( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() ) extends Reply_Service {
+			protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
+				throw new \RuntimeException( 'Provider exploded' );
+			}
+		};
+
+		$service->on_reply_received( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame(
+			'failed',
+			$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ]
+		);
+		$this->assertStringNotContainsString(
+			'Provider exploded',
+			$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ]
+		);
+	}
 }
