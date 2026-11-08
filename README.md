@@ -111,7 +111,7 @@ define( 'GOOGLE_API_KEY',    'your-api-key-here' );
 
 The plugin sets these defaults on activation:
 
-- **Default Model**: Claude Sonnet 5.5
+- **Default Model**: Claude Sonnet 4
 - **Focus Areas**: Content, Tone, Flow
 - **Target Tone**: Professional
 

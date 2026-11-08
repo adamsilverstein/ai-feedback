@@ -163,7 +163,7 @@ class Review_Service {
 		$system_instruction = $this->prompt_builder->get_system_instruction( $is_continuation );
 
 		// Get AI model.
-		$model = $options['model'] ?? AI_FEEDBACK_DEFAULT_MODEL;
+		$model = $options['model'] ?? 'claude-sonnet-4-20250514';
 
 		Logger::debug( sprintf( 'Calling AI model: %s', $model ) );
 

@@ -7,7 +7,7 @@
  */
 export const initialState = {
 	settings: {
-		defaultModel: 'claude-sonnet-5-5',
+		defaultModel: 'claude-sonnet-4',
 		defaultFocusAreas: ['content', 'tone', 'flow'],
 		defaultTone: 'professional',
 		feedbackLocale: 'auto',

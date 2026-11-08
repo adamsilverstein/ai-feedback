@@ -226,7 +226,7 @@ class Review_Controller extends WP_REST_Controller {
 			'model'             => array(
 				'required'          => false,
 				'type'              => 'string',
-				'default'           => AI_FEEDBACK_DEFAULT_MODEL,
+				'default'           => 'claude-sonnet-4-20250514',
 				'sanitize_callback' => 'sanitize_text_field',
 			),
 			'focus_areas'       => array(

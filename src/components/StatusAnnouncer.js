@@ -28,10 +28,9 @@ export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
 	useEffect(() => {
 		const prevState = previousStateRef.current;
 
-		// Announce error
+		// Errors are announced by the error notice. Announcing them here as
+		// well meant the notice's speak() overwrote this one.
 		if (error && !prevState.hasError) {
-			/* translators: %s: error message */
-			speak(sprintf(__('Error: %s', 'ai-feedback'), error.message));
 			prevState.hasError = true;
 			prevState.isReviewing = false;
 			prevState.reviewCompleted = false;

@@ -17,10 +17,6 @@ require_once $includes_dir . 'class-notes-manager.php';
 require_once $includes_dir . 'class-review-service.php';
 
 // Define WordPress constants needed for testing.
-if ( ! defined( 'AI_FEEDBACK_DEFAULT_MODEL' ) ) {
-	define( 'AI_FEEDBACK_DEFAULT_MODEL', 'claude-sonnet-5-5' );
-}
-
 if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
@@ -323,16 +319,6 @@ if ( ! function_exists( 'set_transient' ) ) {
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( $key ) {
 		return $GLOBALS['test_transients'][ $key ] ?? false;
-	}
-}
-
-if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
-	define( 'HOUR_IN_SECONDS', 3600 );
-}
-
-if ( ! function_exists( 'wp_list_pluck' ) ) {
-	function wp_list_pluck( $input_list, $field ) {
-		return array_column( $input_list, $field );
 	}
 }
 
