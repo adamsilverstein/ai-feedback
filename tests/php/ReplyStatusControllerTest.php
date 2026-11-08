@@ -198,4 +198,16 @@ class ReplyStatusControllerTest extends TestCase {
 			array_keys( $schema['properties'] )
 		);
 	}
+
+	/**
+	 * Comments that are not notes are treated as missing.
+	 */
+	public function test_permissions_check_returns_404_for_non_note_comment(): void {
+		$GLOBALS['test_comments'][200]->comment_type = 'comment';
+
+		$result = $this->controller->get_status_permissions_check( $this->request( 200 ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_comment_invalid_id', $result->get_error_code() );
+	}
 }
