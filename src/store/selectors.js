@@ -113,13 +113,29 @@ export function getLastReview(state) {
 }
 
 /**
- * Get review history.
+ * Get the current post's review history, newest first.
+ *
+ * Resolved from the server on first access.
  *
  * @param {Object} state Store state.
- * @return {Array} Array of review objects.
+ * @return {Array} History entries.
  */
 export function getReviewHistory(state) {
 	return state.reviewHistory;
+}
+
+/**
+ * Get a past review with its notes.
+ *
+ * Resolved from the server on first access.
+ *
+ * @param {Object} state    Store state.
+ * @param {number} postId   Post ID.
+ * @param {string} reviewId Review ID.
+ * @return {Object|null|undefined} Review, null if not found, undefined while loading.
+ */
+export function getHistoryReview(state, postId, reviewId) {
+	return state.historyReviews[reviewId];
 }
 
 /**

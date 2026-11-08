@@ -2,7 +2,7 @@
  * WordPress data store for AI Feedback.
  */
 import { createReduxStore, register, select } from '@wordpress/data';
-import { controls } from '@wordpress/data-controls';
+import { apiFetch, controls } from '@wordpress/data-controls';
 import { store as editorStore } from '@wordpress/editor';
 import * as selectors from './selectors';
 import * as actions from './actions';
@@ -58,6 +58,33 @@ const storeConfig = {
 			// Use the generator action to fetch.
 			const result = yield* actions.fetchPreviousReview(postId);
 			return result;
+		},
+
+		*getReviewHistory() {
+			const postId = select(editorStore).getCurrentPostId();
+			if (!postId) {
+				return actions.receiveReviewHistory([]);
+			}
+
+			try {
+				const response = yield apiFetch({
+					path: `/ai-feedback/v1/history/post/${postId}`,
+				});
+				return actions.receiveReviewHistory(response.history || []);
+			} catch (error) {
+				return actions.receiveReviewHistory([]);
+			}
+		},
+
+		*getHistoryReview(postId, reviewId) {
+			try {
+				const review = yield apiFetch({
+					path: `/ai-feedback/v1/history/post/${postId}/review/${reviewId}`,
+				});
+				return actions.receiveHistoryReview(reviewId, review);
+			} catch (error) {
+				return actions.receiveHistoryReview(reviewId, null);
+			}
 		},
 	},
 };

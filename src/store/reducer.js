@@ -19,6 +19,7 @@ export const initialState = {
 	isReviewing: false,
 	lastReview: null,
 	reviewHistory: [],
+	historyReviews: {},
 	error: null,
 	isLoadingSettings: false,
 	isLoadingPreviousReview: false,
@@ -44,7 +45,48 @@ export const TYPES = {
 	UPDATE_BLOCK_NOTES: 'UPDATE_BLOCK_NOTES',
 	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
+	RECEIVE_REVIEW_HISTORY: 'RECEIVE_REVIEW_HISTORY',
+	RECEIVE_HISTORY_REVIEW: 'RECEIVE_HISTORY_REVIEW',
 };
+
+/**
+ * Maximum history entries kept, matching Review_History::MAX_ENTRIES.
+ */
+export const MAX_HISTORY_ENTRIES = 10;
+
+/**
+ * Reduce a review response to a history entry.
+ *
+ * @param {Object} review Review response from the API.
+ * @return {Object} History entry.
+ */
+export function toHistoryEntry(review) {
+	return {
+		review_id: review.review_id,
+		timestamp: review.timestamp,
+		model: review.model,
+		note_count: review.note_count ?? 0,
+		summary_text: review.summary_text || '',
+		summary: {
+			by_severity: review.summary?.by_severity || {},
+			by_category: review.summary?.by_category || {},
+		},
+	};
+}
+
+/**
+ * Add an entry to the front of the history, newest first and capped.
+ *
+ * @param {Array}  history History entries, newest first.
+ * @param {Object} entry   Entry to add.
+ * @return {Array} New history.
+ */
+function prependHistory(history, entry) {
+	return [
+		entry,
+		...history.filter((item) => item.review_id !== entry.review_id),
+	].slice(0, MAX_HISTORY_ENTRIES);
+}
 
 /**
  * Reducer function.
@@ -117,7 +159,10 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: false,
 				lastReview: action.review,
-				reviewHistory: [action.review, ...state.reviewHistory],
+				reviewHistory: prependHistory(
+					state.reviewHistory,
+					toHistoryEntry(action.review)
+				),
 			};
 
 		case TYPES.REVIEW_ERROR:
@@ -130,7 +175,28 @@ export default function reducer(state = initialState, action) {
 		case TYPES.ADD_TO_HISTORY:
 			return {
 				...state,
-				reviewHistory: [action.review, ...state.reviewHistory],
+				reviewHistory: prependHistory(
+					state.reviewHistory,
+					toHistoryEntry(action.review)
+				),
+			};
+
+		case TYPES.RECEIVE_REVIEW_HISTORY:
+			return {
+				...state,
+				reviewHistory: (action.history || []).slice(
+					0,
+					MAX_HISTORY_ENTRIES
+				),
+			};
+
+		case TYPES.RECEIVE_HISTORY_REVIEW:
+			return {
+				...state,
+				historyReviews: {
+					...state.historyReviews,
+					[action.reviewId]: action.review,
+				},
 			};
 
 		case TYPES.CLEAR_ERROR:

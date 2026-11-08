@@ -15,6 +15,7 @@ import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+import ReviewHistory from './ReviewHistory';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
@@ -241,6 +242,8 @@ export default function AIFeedbackPanel() {
 					)}
 				</>
 			)}
+
+			<ReviewHistory />
 		</div>
 	);
 }

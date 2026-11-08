@@ -681,3 +681,57 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: 3px;
 	}
 }
+
+/* Review history panel. */
+.ai-feedback-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ai-feedback-history-item {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid #ddd;
+
+	&:last-child {
+		border-bottom: 0;
+	}
+
+
+}
+
+.ai-feedback-history-view {
+	align-self: flex-start;
+}
+
+.ai-feedback-history-change,
+.ai-feedback-history-model {
+	color: #757575;
+	font-size: 12px;
+}
+
+.ai-feedback-history-notes {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ai-feedback-history-note {
+	padding: 12px 0;
+	border-top: 1px solid #ddd;
+}
+
+.ai-feedback-history-date {
+	font-weight: 600;
+}
+
+.ai-feedback-history-resolved {
+	color: #007017;
+	font-size: 12px;
+}
