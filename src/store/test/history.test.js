@@ -118,3 +118,22 @@ describe('review history store', () => {
 		expect(getHistoryReview(state, 7, 'a')).toBeUndefined();
 	});
 });
+
+describe('reducer keeps unrelated cases', () => {
+	it('clears errors', () => {
+		const state = reducer(
+			{ ...initialState, error: { code: 'x' } },
+			{ type: TYPES.CLEAR_ERROR }
+		);
+		expect(state.error).toBeNull();
+	});
+
+	it('receives the previous review', () => {
+		const state = reducer(initialState, {
+			type: TYPES.RECEIVE_PREVIOUS_REVIEW,
+			review: { review_id: 'p' },
+		});
+		expect(state.lastReview.review_id).toBe('p');
+		expect(state.hasFetchedPreviousReview).toBe(true);
+	});
+});
