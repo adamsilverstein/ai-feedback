@@ -11,6 +11,8 @@ const {
 
 const REST_NAMESPACE = '/ai-feedback/v1';
 
+const restRouteMatchers = new Map();
+
 /**
  * Build a Playwright URL matcher for a plugin REST route.
  *
@@ -21,14 +23,18 @@ const REST_NAMESPACE = '/ai-feedback/v1';
  * @return {Function} URL predicate.
  */
 function restRoute(route) {
-	const expected = REST_NAMESPACE + route;
-	return (url) => {
-		const restRouteParam = url.searchParams.get('rest_route');
-		if (restRouteParam !== null) {
-			return restRouteParam === expected;
-		}
-		return url.pathname.endsWith('/wp-json' + expected);
-	};
+	// Reuse one matcher per route so page.unroute() can find the handler.
+	if (!restRouteMatchers.has(route)) {
+		const expected = REST_NAMESPACE + route;
+		restRouteMatchers.set(route, (url) => {
+			const restRouteParam = url.searchParams.get('rest_route');
+			if (restRouteParam !== null) {
+				return restRouteParam === expected;
+			}
+			return url.pathname.endsWith('/wp-json' + expected);
+		});
+	}
+	return restRouteMatchers.get(route);
 }
 
 /**
@@ -288,15 +294,15 @@ class AIFeedbackUtils {
 	 * @return {Promise<import('@playwright/test').Response|null>} Review response, or null when the request failed at the network level.
 	 */
 	async runReview() {
-		const responsePromise = this.page
-			.waitForResponse(
-				(response) =>
-					restRoute('/review')(new URL(response.url())) &&
-					response.request().method() === 'POST'
-			)
-			.catch(() => null);
+		const requestPromise = this.page.waitForRequest(
+			(request) =>
+				request.method() === 'POST' &&
+				restRoute('/review')(new URL(request.url()))
+		);
 		await this.getReviewButton().click();
-		const response = await responsePromise;
+		const request = await requestPromise;
+		// Resolves to null when the request fails at the network level.
+		const response = await request.response();
 		await expect(this.getReviewButton()).not.toHaveClass(/is-busy/);
 		return response;
 	}
