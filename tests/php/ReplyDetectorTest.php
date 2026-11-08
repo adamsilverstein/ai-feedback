@@ -32,6 +32,7 @@ class ReplyDetectorTest extends TestCase {
 
 		$GLOBALS['test_comment_meta']     = array();
 		$GLOBALS['test_dispatched_calls'] = array();
+		$GLOBALS['test_comments']         = array();
 
 		if ( ! function_exists( 'AI_Feedback\\Tests\\__register_mocks' ) ) {
 			require_once __DIR__ . '/reply-detector-mocks.php';
@@ -42,7 +43,7 @@ class ReplyDetectorTest extends TestCase {
 	 * Clean up globals after each test.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_dispatched_calls'] );
+		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_dispatched_calls'], $GLOBALS['test_comments'] );
 		parent::tearDown();
 	}
 
@@ -123,7 +124,7 @@ class ReplyDetectorTest extends TestCase {
 	}
 
 	/**
-	 * A non-block-comment reply (e.g. a regular post comment) is ignored.
+	 * A non-note reply (e.g. a regular post comment) is ignored.
 	 */
 	public function test_non_note_is_ignored(): void {
 		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
@@ -214,6 +215,55 @@ class ReplyDetectorTest extends TestCase {
 		);
 
 		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * A reply to the AI's own reply is routed to the thread's root note.
+	 */
+	public function test_reply_to_ai_reply_routes_to_thread_root(): void {
+		// 100 is the root AI note; 150 is an AI reply under it.
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+		$GLOBALS['test_comment_meta'][150] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+		$GLOBALS['test_comments'][100]     = (object) array( 'comment_parent' => 0 );
+		$GLOBALS['test_comments'][150]     = (object) array( 'comment_parent' => '100' );
+
+		$reply = (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => 150,
+			'comment_post_ID' => 42,
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertSame( array( 200, 100, 42, 'abc-123' ), $GLOBALS['test_dispatched_calls'][0]['args'] );
+	}
+
+	/**
+	 * Spam and trashed notes never trigger an AI reply.
+	 */
+	public function test_spam_or_trashed_reply_is_ignored(): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+
+		foreach ( array( 'spam', 'trash' ) as $approved ) {
+			$reply = (object) array(
+				'comment_type'     => 'note',
+				'comment_parent'   => 100,
+				'comment_post_ID'  => 42,
+				'comment_approved' => $approved,
+			);
+			$this->detector->maybe_dispatch_reply( 200, $reply );
+		}
 
 		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
 	}

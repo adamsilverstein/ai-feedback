@@ -29,6 +29,16 @@ class Reply_Service {
 	public const AI_HTTP_TIMEOUT = 45;
 
 	/**
+	 * Sampling temperature for replies. Slightly above reviews for a conversational tone.
+	 */
+	public const AI_TEMPERATURE = 0.4;
+
+	/**
+	 * Token cap for replies, enough for the requested 2-3 sentences.
+	 */
+	public const AI_MAX_TOKENS = 400;
+
+	/**
 	 * Maximum number of prior thread replies sent to the AI as context.
 	 */
 	public const MAX_THREAD_ENTRIES = 20;
@@ -131,6 +141,11 @@ class Reply_Service {
 		if ( is_wp_error( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI call failed: ' . $ai_text->get_error_message() );
 			return $ai_text;
+		}
+
+		if ( '' === trim( $ai_text ) ) {
+			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
+			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'ai-feedback' ) );
 		}
 
 		$feedback_item = array(
@@ -260,8 +275,8 @@ class Reply_Service {
 			return wp_ai_client_prompt( $prompt )
 				->using_system_instruction( $system_instruction )
 				->using_model_preference( $model )
-				->using_temperature( 0.4 )
-				->using_max_tokens( 400 )
+				->using_temperature( self::AI_TEMPERATURE )
+				->using_max_tokens( self::AI_MAX_TOKENS )
 				->generate_text();
 		} catch ( \Throwable $e ) {
 			// Core converts SDK exceptions to WP_Error; this catches anything else.
