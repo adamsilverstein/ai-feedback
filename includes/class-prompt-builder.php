@@ -65,6 +65,7 @@ class Prompt_Builder {
 		// Construct the full prompt.
 		$prompt            = 'Please review the following document and provide actionable editorial feedback.' . "\n\n";
 		$prompt           .= 'DOCUMENT TITLE: ' . $options['post_title'] . "\n\n";
+		$prompt           .= $this->build_chunk_instructions( $options );
 		$prompt           .= "DOCUMENT BLOCKS:\n" . $document_blocks . "\n\n";
 		$prompt           .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
 		$prompt           .= "TARGET TONE:\n" . $tone_guidance;
@@ -108,6 +109,47 @@ class Prompt_Builder {
 		$prompt .= "- If no feedback is needed for a block, don't include it in the array";
 
 		return $prompt;
+	}
+
+	/**
+	 * Build instructions for one part of a document reviewed in chunks.
+	 *
+	 * The last chunk also receives the summaries of earlier chunks so its
+	 * summary can cover the whole document without an extra AI request.
+	 *
+	 * @param  array<mixed> $options Review options, with optional `chunk` and `previous_summaries`.
+	 * @return string Chunk instructions, or an empty string for a single-request review.
+	 */
+	private function build_chunk_instructions( array $options ): string {
+		$position = Review_Chunks::get_position( $options );
+		$index    = $position['index'];
+		$total    = $position['total'];
+
+		if ( $total < 2 ) {
+			return '';
+		}
+
+		$instructions  = "DOCUMENT PART:\n";
+		$instructions .= sprintf(
+			"- This is part %d of %d of a longer document. Only the blocks in this part are shown.\n",
+			$index + 1,
+			$total
+		);
+		$instructions .= "- Only give feedback on the blocks shown. Do not flag content as missing because it may appear in another part.\n";
+
+		$previous = array_values( array_filter( (array) ( $options['previous_summaries'] ?? array() ), 'is_string' ) );
+
+		if ( $index + 1 === $total && ! empty( $previous ) ) {
+			$instructions .= "- This is the final part. Write the summary as an assessment of the WHOLE document, combining the summaries of earlier parts below with your review of this part.\n";
+			$instructions .= "\nSUMMARIES OF EARLIER PARTS:\n";
+			foreach ( $previous as $number => $summary ) {
+				$instructions .= sprintf( "Part %d: %s\n", $number + 1, wp_strip_all_tags( $summary ) );
+			}
+		} else {
+			$instructions .= "- Write the summary about this part only.\n";
+		}
+
+		return $instructions . "\n";
 	}
 
 	/**

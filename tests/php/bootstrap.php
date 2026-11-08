@@ -15,8 +15,12 @@ require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-response-parser.php';
 require_once $includes_dir . 'class-notes-manager.php';
 require_once $includes_dir . 'class-review-service.php';
+require_once $includes_dir . 'class-review-chunks.php';
 
 // Define WordPress constants needed for testing.
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
 if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
@@ -319,6 +323,22 @@ if ( ! function_exists( 'set_transient' ) ) {
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( $key ) {
 		return $GLOBALS['test_transients'][ $key ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) {
+		unset( $GLOBALS['test_transients'][ $key ] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4() {
+		$bytes    = random_bytes( 16 );
+		$bytes[6] = chr( ord( $bytes[6] ) & 0x0f | 0x40 );
+		$bytes[8] = chr( ord( $bytes[8] ) & 0x3f | 0x80 );
+		return vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $bytes ), 4 ) );
 	}
 }
 
