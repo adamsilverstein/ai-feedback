@@ -82,6 +82,12 @@ class Response_Parser {
 	public const PRIORITY_BLOCK_DEFAULT = 5;
 
 	/**
+	 * Position bonus for the first block, reduced by PRIORITY_POSITION_STEP per block.
+	 */
+	public const PRIORITY_POSITION_MAX  = 25;
+	public const PRIORITY_POSITION_STEP = 5;
+
+	/**
 	 * Score thresholds clients use to bucket priorities into high / medium / low.
 	 */
 	public const PRIORITY_HIGH_THRESHOLD   = 100;
@@ -244,9 +250,9 @@ class Response_Parser {
 		$score += self::PRIORITY_CATEGORY_WEIGHTS[ $category ] ?? 0;
 		$score += self::PRIORITY_BLOCK_WEIGHTS[ $block_name ] ?? self::PRIORITY_BLOCK_DEFAULT;
 
-		// First five blocks get a decreasing bonus (25, 20, 15, 10, 5, then 0).
+		// Early blocks get a decreasing bonus (25, 20, 15, 10, 5, then 0).
 		if ( isset( $item['block_index'] ) && is_int( $item['block_index'] ) ) {
-			$score += max( 0, 25 - ( $item['block_index'] * 5 ) );
+			$score += max( 0, self::PRIORITY_POSITION_MAX - ( $item['block_index'] * self::PRIORITY_POSITION_STEP ) );
 		}
 
 		return $score;
@@ -263,23 +269,36 @@ class Response_Parser {
 	 * @return array<int, array<string, mixed>> Feedback items sorted by descending priority.
 	 */
 	public function sort_by_priority( array $feedback ): array {
-		$int_or = static function ( mixed $value, int $fallback ): int {
-			return is_int( $value ) ? $value : $fallback;
-		};
-
 		usort(
 			$feedback,
-			static function ( array $a, array $b ) use ( $int_or ): int {
-				$pa = $int_or( $a['priority'] ?? null, 0 );
-				$pb = $int_or( $b['priority'] ?? null, 0 );
+			static function ( array $a, array $b ): int {
+				$pa = is_int( $a['priority'] ?? null ) ? $a['priority'] : 0;
+				$pb = is_int( $b['priority'] ?? null ) ? $b['priority'] : 0;
 				if ( $pa !== $pb ) {
 					return $pb <=> $pa;
 				}
-				return $int_or( $a['block_index'] ?? null, PHP_INT_MAX ) <=> $int_or( $b['block_index'] ?? null, PHP_INT_MAX );
+				return self::get_document_position( $a ) <=> self::get_document_position( $b );
 			}
 		);
 
 		return $feedback;
+	}
+
+	/**
+	 * Document position of a feedback item, used to break priority ties.
+	 *
+	 * Groups use their earliest member block, matching getDocumentPosition()
+	 * in src/utils/priority.js.
+	 *
+	 * @param  array<string, mixed> $item Feedback item.
+	 * @return int Block index, or PHP_INT_MAX when unknown.
+	 */
+	private static function get_document_position( array $item ): int {
+		$indexes = is_array( $item['block_indexes'] ?? null ) ? array_filter( $item['block_indexes'], 'is_int' ) : array();
+		if ( ! empty( $indexes ) ) {
+			return min( $indexes );
+		}
+		return is_int( $item['block_index'] ?? null ) ? $item['block_index'] : PHP_INT_MAX;
 	}
 
 	/**

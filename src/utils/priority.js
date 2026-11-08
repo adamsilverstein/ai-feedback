@@ -48,18 +48,21 @@ export function getPriorityLevel(score) {
 }
 
 /**
- * Document position for an item. Groups expose `block_indexes` instead of
- * `block_index`.
+ * Document position for an item. Groups use their earliest member block,
+ * matching Response_Parser::get_document_position().
  *
  * @param {Object} item Feedback item.
  * @return {number} Position used for ordering.
  */
 export function getDocumentPosition(item) {
+	const indexes = Array.isArray(item.block_indexes)
+		? item.block_indexes.filter((index) => typeof index === 'number')
+		: [];
+	if (indexes.length > 0) {
+		return Math.min(...indexes);
+	}
 	if (typeof item.block_index === 'number') {
 		return item.block_index;
-	}
-	if (Array.isArray(item.block_indexes) && item.block_indexes.length > 0) {
-		return Math.min(...item.block_indexes);
 	}
 	return Number.MAX_SAFE_INTEGER;
 }

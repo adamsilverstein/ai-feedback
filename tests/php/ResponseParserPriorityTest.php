@@ -100,9 +100,18 @@ class ResponseParserPriorityTest extends TestCase {
 	 */
 	public function test_sort_by_priority_orders_descending(): void {
 		$items = array(
-			array( 'priority' => 30, 'block_id' => 'low' ),
-			array( 'priority' => 130, 'block_id' => 'high' ),
-			array( 'priority' => 70, 'block_id' => 'mid' ),
+			array(
+				'priority' => 30,
+				'block_id' => 'low',
+			),
+			array(
+				'priority' => 130,
+				'block_id' => 'high',
+			),
+			array(
+				'priority' => 70,
+				'block_id' => 'mid',
+			),
 		);
 
 		$sorted = $this->parser->sort_by_priority( $items );
@@ -116,9 +125,21 @@ class ResponseParserPriorityTest extends TestCase {
 	 */
 	public function test_sort_by_priority_breaks_ties_by_block_index(): void {
 		$items = array(
-			array( 'priority' => 50, 'block_index' => 3, 'block_id' => 'b3' ),
-			array( 'priority' => 50, 'block_index' => 1, 'block_id' => 'b1' ),
-			array( 'priority' => 50, 'block_index' => 2, 'block_id' => 'b2' ),
+			array(
+				'priority'    => 50,
+				'block_index' => 3,
+				'block_id'    => 'b3',
+			),
+			array(
+				'priority'    => 50,
+				'block_index' => 1,
+				'block_id'    => 'b1',
+			),
+			array(
+				'priority'    => 50,
+				'block_index' => 2,
+				'block_id'    => 'b2',
+			),
 		);
 
 		$sorted = $this->parser->sort_by_priority( $items );
@@ -132,7 +153,10 @@ class ResponseParserPriorityTest extends TestCase {
 	public function test_sort_by_priority_treats_missing_as_zero(): void {
 		$items = array(
 			array( 'block_id' => 'no_priority' ),
-			array( 'priority' => 1, 'block_id' => 'low_priority' ),
+			array(
+				'priority' => 1,
+				'block_id' => 'low_priority',
+			),
 		);
 
 		$sorted = $this->parser->sort_by_priority( $items );
@@ -178,8 +202,14 @@ class ResponseParserPriorityTest extends TestCase {
 	 */
 	public function test_parse_feedback_sorts_critical_first(): void {
 		$blocks = array(
-			array( 'clientId' => 'block-1', 'name' => 'core/paragraph' ),
-			array( 'clientId' => 'block-2', 'name' => 'core/heading' ),
+			array(
+				'clientId' => 'block-1',
+				'name'     => 'core/paragraph',
+			),
+			array(
+				'clientId' => 'block-2',
+				'name'     => 'core/heading',
+			),
 		);
 
 		$response = (string) wp_json_encode(
@@ -215,5 +245,47 @@ class ResponseParserPriorityTest extends TestCase {
 		$priorities = array_column( $feedback, 'priority' );
 		$this->assertCount( 2, $priorities );
 		$this->assertGreaterThan( $priorities[1], $priorities[0] );
+	}
+
+	/**
+	 * Groups break priority ties on their earliest member block, even when
+	 * the first member (whose block_index the group keeps) is later in the post.
+	 */
+	public function test_sort_by_priority_uses_earliest_group_member(): void {
+		$items = array(
+			array(
+				'priority'    => 50,
+				'block_index' => 3,
+				'block_id'    => 'single',
+			),
+			array(
+				'priority'      => 50,
+				'block_index'   => 6,
+				'block_indexes' => array( 6, 1 ),
+				'block_id'      => 'group',
+			),
+		);
+
+		$sorted = $this->parser->sort_by_priority( $items );
+
+		$this->assertSame( array( 'group', 'single' ), array_column( $sorted, 'block_id' ) );
+	}
+
+	/**
+	 * Pin how severities land in the client buckets so a weight change that
+	 * moves them shows up here.
+	 */
+	public function test_severity_floors_map_to_expected_buckets(): void {
+		$lowest = array(
+			'category'    => 'unknown',
+			'block_name'  => 'core/unknown',
+			'block_index' => 100,
+		);
+
+		$critical  = $this->parser->calculate_priority( $lowest + array( 'severity' => 'critical' ) );
+		$important = $this->parser->calculate_priority( $lowest + array( 'severity' => 'important' ) );
+
+		$this->assertGreaterThanOrEqual( Response_Parser::PRIORITY_HIGH_THRESHOLD, $critical, 'Critical items are always high priority.' );
+		$this->assertGreaterThanOrEqual( Response_Parser::PRIORITY_MEDIUM_THRESHOLD, $important, 'Important items are at least medium priority.' );
 	}
 }
