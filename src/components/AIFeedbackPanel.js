@@ -8,6 +8,8 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
+import { getConnectorsUrl } from '../utils/connectors-url';
+import { getErrorKind } from '../utils/error-kind';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -19,43 +21,29 @@ import WelcomeModal from './WelcomeModal';
 import SkipLinks from './SkipLinks';
 
 /**
- * Settings page URL.
- */
-const SETTINGS_PAGE_URL = '/wp-admin/admin.php?page=ai-feedback-settings';
-
-/**
  * Get action button for specific error types.
  *
  * @param {Object} error Error object with code, message, and data.
  * @return {Element|null} Action button or null.
  */
 function getErrorAction(error) {
-	// Check if error is related to API credits or billing.
-	// Note: We use string matching on error messages because the PHP AI Client
-	// wraps all AI provider errors under the same 'ai_request_failed' code.
-	// Credit/billing errors from providers (Anthropic, OpenAI) typically include
-	// these keywords in a stable format.
-	if (
-		error.code === 'ai_request_failed' &&
-		typeof error.message === 'string' &&
-		(error.message.toLowerCase().includes('credit') ||
-			error.message.toLowerCase().includes('billing'))
-	) {
+	const kind = getErrorKind(error);
+
+	if (kind === 'credentials') {
 		return (
 			<Button
 				variant="link"
-				href={SETTINGS_PAGE_URL}
+				href={getConnectorsUrl()}
 				target="_blank"
 				rel="noopener noreferrer"
 				className="ai-feedback-error-action"
 			>
-				{__('Go to Settings', 'ai-feedback')}
+				{__('Open Connectors Settings', 'ai-feedback')}
 			</Button>
 		);
 	}
 
-	// Check for rate limit errors
-	if (error.code === 'rate_limit_exceeded') {
+	if (kind === 'rate_limit') {
 		return (
 			<p className="ai-feedback-error-help">
 				{__(
