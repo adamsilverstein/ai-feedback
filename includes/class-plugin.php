@@ -104,7 +104,7 @@ class Plugin {
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
 		add_action( 'ai_feedback_after_review', array( Analytics::class, 'track_review' ), 10, 2 );
-		add_action( 'deleted_user', array( Analytics::class, 'forget_user' ) );
+		add_action( 'deleted_user', array( Analytics::class, 'on_deleted_user' ) );
 		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
 		Analytics_Page::init();

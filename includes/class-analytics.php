@@ -91,9 +91,18 @@ class Analytics {
 	}
 
 	/**
-	 * Remove a user's counts.
+	 * Drop a deleted user's counts.
 	 *
-	 * Hooked to `deleted_user`, and used by the personal data eraser.
+	 * Hooked to `deleted_user`.
+	 *
+	 * @param int $user_id Deleted user ID.
+	 */
+	public static function on_deleted_user( int $user_id ): void {
+		self::forget_user( $user_id );
+	}
+
+	/**
+	 * Remove a user's counts.
 	 *
 	 * @param  int $user_id User ID.
 	 * @return int Number of days the user's counts were removed from.
