@@ -4,8 +4,13 @@
 import reducer, { initialState, TYPES } from '../reducer';
 import { getUnresolvedNotesCount } from '../selectors';
 import { setNoteResolved } from '../actions';
+import { refreshCoreNotes } from '../../utils/refresh-core-notes';
 
 jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+
+jest.mock('../../utils/refresh-core-notes', () => ({
+	refreshCoreNotes: jest.fn(),
+}));
 
 const stateWithNotes = {
 	...initialState,
@@ -58,6 +63,60 @@ describe('setNoteResolved', () => {
 			type: TYPES.SET_NOTE_RESOLVED,
 			noteId: 5,
 			isResolved,
+			threadId: null,
+			threadResolved: false,
 		});
 	});
+
+	it('refreshes core notes when the thread status changed', () => {
+		refreshCoreNotes.mockClear();
+		const generator = setNoteResolved(5, true);
+		generator.next();
+
+		expect(
+			generator.next({
+				success: true,
+				thread_id: 3,
+				thread_resolved: true,
+				thread_changed: true,
+			}).value
+		).toEqual({
+			type: TYPES.SET_NOTE_RESOLVED,
+			noteId: 5,
+			isResolved: true,
+			threadId: 3,
+			threadResolved: true,
+		});
+		expect(refreshCoreNotes).toHaveBeenCalled();
+	});
+
+	it('leaves core notes alone when the thread is unchanged', () => {
+		refreshCoreNotes.mockClear();
+		const generator = setNoteResolved(5, true);
+		generator.next();
+		generator.next({ success: true, thread_id: 3, thread_changed: false });
+
+		expect(refreshCoreNotes).not.toHaveBeenCalled();
+	});
+});
+
+describe('SET_NOTE_RESOLVED thread status', () => {
+	it.each([
+		[true, 'approved'],
+		[false, 'hold'],
+	])(
+		'mirrors a %s thread status on the top-level note',
+		(threadResolved, status) => {
+			const state = reducer(stateWithNotes, {
+				type: TYPES.SET_NOTE_RESOLVED,
+				noteId: 2,
+				isResolved: threadResolved,
+				threadId: 1,
+				threadResolved,
+			});
+
+			expect(state.lastReview.notes[0].status).toBe(status);
+			expect(state.lastReview.notes[1].status).toBeUndefined();
+		}
+	);
 });
