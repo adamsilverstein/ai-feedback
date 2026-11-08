@@ -122,7 +122,7 @@ export default function AIFeedbackPanel() {
 				targetTone,
 				locale: feedbackLocale,
 			});
-		} catch (reviewError) {
+		} catch {
 			// Error is already in the store, no additional action needed
 		}
 	};

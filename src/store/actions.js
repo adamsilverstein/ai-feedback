@@ -284,7 +284,7 @@ export function* startReview({
 					'getNotes',
 					[postId]
 				);
-			} catch (e) {
+			} catch {
 				// Fallback to core comments invalidation if specific store isn't available.
 				try {
 					const queryArgs = {
@@ -301,7 +301,7 @@ export function* startReview({
 						'getEntityRecords',
 						['root', 'comment', queryArgs]
 					);
-				} catch (e2) {
+				} catch {
 					// Ignore errors if stores aren't initialized yet.
 				}
 			}
