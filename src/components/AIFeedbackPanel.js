@@ -15,6 +15,7 @@ import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+import ExportReview from './ExportReview';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
@@ -235,6 +236,9 @@ export default function AIFeedbackPanel() {
 						>
 							{/* ID used by skip links for keyboard navigation */}
 							<div id="ai-feedback-results">
+								<div className="ai-feedback-export-row">
+									<ExportReview review={lastReview} />
+								</div>
 								<ReviewSummary review={lastReview} />
 							</div>
 						</PanelBody>

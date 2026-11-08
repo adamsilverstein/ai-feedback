@@ -681,3 +681,9 @@ $ai-feedback-text-muted: #595959;
 		outline-offset: 3px;
 	}
 }
+
+/* Review export menu. */
+.ai-feedback-export-row {
+	display: flex;
+	justify-content: flex-end;
+}
