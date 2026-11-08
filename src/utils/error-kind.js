@@ -14,7 +14,7 @@ const CREDENTIAL_PHRASES = ['credit', 'billing', 'api key', 'quota'];
  * rather than on a specific code.
  *
  * @param {Object} error Error object with code, message, and data.
- * @return {'credentials'|'rate_limit'|null} Error kind, or null when unknown.
+ * @return {'credentials'|'rate_limit'|'unavailable'|null} Error kind, or null when unknown.
  */
 export function getErrorKind(error) {
 	const status = Number(error?.data?.status);
@@ -26,6 +26,10 @@ export function getErrorKind(error) {
 		CREDENTIAL_PHRASES.some((phrase) => message.includes(phrase))
 	) {
 		return 'credentials';
+	}
+
+	if (error?.code === 'ai_service_unavailable') {
+		return 'unavailable';
 	}
 
 	if (error?.code === 'rate_limit_exceeded' || status === 429) {

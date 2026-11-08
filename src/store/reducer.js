@@ -17,6 +17,7 @@ export const initialState = {
 	availableTones: [],
 	availableLocales: [],
 	isReviewing: false,
+	unavailableRetries: 0,
 	lastReview: null,
 	reviewHistory: [],
 	error: null,
@@ -110,12 +111,17 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: true,
 				error: null,
+				// A review the user starts resets the automatic retry count.
+				unavailableRetries: action.isRetry
+					? state.unavailableRetries
+					: 0,
 			};
 
 		case TYPES.REVIEW_SUCCESS:
 			return {
 				...state,
 				isReviewing: false,
+				unavailableRetries: 0,
 				lastReview: action.review,
 				reviewHistory: [action.review, ...state.reviewHistory],
 			};
@@ -125,6 +131,10 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: false,
 				error: action.error,
+				unavailableRetries:
+					action.error?.code === 'ai_service_unavailable'
+						? state.unavailableRetries + 1
+						: 0,
 			};
 
 		case TYPES.ADD_TO_HISTORY:

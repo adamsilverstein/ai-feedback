@@ -42,6 +42,14 @@ describe('getErrorKind', () => {
 			},
 			null,
 		],
+		[
+			{
+				code: 'ai_service_unavailable',
+				message: 'The AI service is temporarily unavailable.',
+				data: { status: 503, retry_after: 30 },
+			},
+			'unavailable',
+		],
 		[{}, null],
 	])('classifies %j as %s', (error, kind) => {
 		expect(getErrorKind(error)).toBe(kind);

@@ -19,15 +19,28 @@ import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
 import SkipLinks from './SkipLinks';
+import ServiceUnavailableAction from './ServiceUnavailableAction';
 
 /**
  * Get action button for specific error types.
  *
- * @param {Object} error Error object with code, message, and data.
+ * @param {Object}   error   Error object with code, message, and data.
+ * @param {number}   retries Consecutive failures because the AI service was unavailable.
+ * @param {Function} onRetry Starts the review again.
  * @return {Element|null} Action button or null.
  */
-function getErrorAction(error) {
+function getErrorAction(error, retries, onRetry) {
 	const kind = getErrorKind(error);
+
+	if (kind === 'unavailable') {
+		return (
+			<ServiceUnavailableAction
+				error={error}
+				retries={retries}
+				onRetry={onRetry}
+			/>
+		);
+	}
 
 	if (kind === 'credentials') {
 		return (
@@ -76,6 +89,7 @@ export default function AIFeedbackPanel() {
 		feedbackLocale,
 		postTitle,
 		availableModels,
+		unavailableRetries,
 	} = useSelect(
 		(select) => ({
 			error: select(STORE_NAME).getError(),
@@ -90,6 +104,7 @@ export default function AIFeedbackPanel() {
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
+			unavailableRetries: select(STORE_NAME).getUnavailableRetries(),
 		}),
 		[]
 	);
@@ -103,9 +118,12 @@ export default function AIFeedbackPanel() {
 	const canReview = isSaved && hasContent;
 
 	/**
-	 * Handle starting a review from empty state.
+	 * Handle starting a review from empty state or a retry.
+	 *
+	 * @param {Object}  options         Options.
+	 * @param {boolean} options.isRetry Whether this retries a review that failed because the AI service was unavailable.
 	 */
-	const handleStartReview = async () => {
+	const handleStartReview = async ({ isRetry = false } = {}) => {
 		if (!canReview) {
 			return;
 		}
@@ -121,6 +139,7 @@ export default function AIFeedbackPanel() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				isRetry,
 			});
 		} catch (reviewError) {
 			// Error is already in the store, no additional action needed
@@ -175,7 +194,9 @@ export default function AIFeedbackPanel() {
 								{__('Error code:', 'ai-feedback')} {error.code}
 							</div>
 						)}
-						{getErrorAction(error)}
+						{getErrorAction(error, unavailableRetries, () =>
+							handleStartReview({ isRetry: true })
+						)}
 					</div>
 				</Notice>
 			)}
@@ -185,7 +206,7 @@ export default function AIFeedbackPanel() {
 			    once at a time and always wraps the actionable button. */}
 			{!lastReview && !isReviewing ? (
 				<EmptyState
-					onStartReview={handleStartReview}
+					onStartReview={() => handleStartReview()}
 					canReview={canReview}
 					hasContent={hasContent}
 					isSaved={isSaved}
