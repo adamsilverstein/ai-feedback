@@ -29,7 +29,7 @@ class NotesManagerPriorityTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		parent::setUp();
-		$this->manager                 = new Notes_Manager();
+		$this->manager                = new Notes_Manager();
 		$GLOBALS['test_comment_meta'] = array();
 	}
 
