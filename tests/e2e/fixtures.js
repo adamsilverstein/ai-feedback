@@ -9,6 +9,50 @@ const {
 	RequestUtils,
 } = require('@wordpress/e2e-test-utils-playwright');
 
+const REST_NAMESPACE = '/ai-feedback/v1';
+
+/**
+ * Build a Playwright URL matcher for a plugin REST route.
+ *
+ * Works with both pretty permalinks (`/wp-json/...`) and the plain
+ * `?rest_route=...` form wp-env uses by default.
+ *
+ * @param {string} route Route relative to the plugin namespace, e.g. '/review'.
+ * @return {Function} URL predicate.
+ */
+function restRoute(route) {
+	const expected = REST_NAMESPACE + route;
+	return (url) => {
+		const restRouteParam = url.searchParams.get('rest_route');
+		if (restRouteParam !== null) {
+			return restRouteParam === expected;
+		}
+		return url.pathname.endsWith('/wp-json' + expected);
+	};
+}
+
+/**
+ * Build a review response shaped like the plugin's REST response.
+ *
+ * @param {Object} overrides Fields to override.
+ * @return {Object} Review response.
+ */
+function buildReviewResponse(overrides = {}) {
+	return {
+		review_id: 'e2e-review',
+		post_id: 1,
+		model: 'claude-sonnet-4',
+		notes: [],
+		note_ids: [],
+		block_mapping: {},
+		summary: { by_severity: {}, by_category: {} },
+		summary_text: '',
+		note_count: 0,
+		timestamp: new Date().toISOString(),
+		...overrides,
+	};
+}
+
 /**
  * AI Feedback custom utilities.
  */
@@ -33,34 +77,12 @@ class AIFeedbackUtils {
 		// The custom panel inside the sidebar
 		const customPanel = this.page.locator('.ai-feedback-panel');
 
-		// Check if sidebar is already open
-		const isOpen = await customPanel.isVisible().catch(() => false);
-
-		if (!isOpen) {
-			// First, check if the plugin is pinned to the toolbar
-			const pinnedButton = topBar.getByRole('button', {
-				name: 'AI Feedback',
-			});
-			const isPinnedVisible = await pinnedButton
-				.isVisible()
-				.catch(() => false);
-
-			if (isPinnedVisible) {
-				await pinnedButton.click();
-			} else {
-				// Not pinned, use the Options (three dots) menu
-				const optionsButton = topBar.getByRole('button', {
-					name: 'Options',
-					exact: true,
-				});
-
-				await optionsButton.click();
-
-				// Wait for the menu to appear and click the AI Feedback item
-				await this.page
-					.getByRole('menuitemcheckbox', { name: 'AI Feedback' })
-					.click();
-			}
+		// The sidebar is pinned to the top bar by default. Wait for the
+		// toggle so a freshly loaded editor is not mistaken for a closed one.
+		const toggle = topBar.getByRole('button', { name: 'AI Feedback' });
+		await toggle.waitFor({ state: 'visible' });
+		if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
+			await toggle.click();
 		}
 
 		// Wait for the custom panel to be visible
@@ -154,31 +176,6 @@ class AIFeedbackUtils {
 	}
 
 	/**
-	 * Toggle a focus area checkbox.
-	 *
-	 * @param {string}  label   - Label of the focus area (e.g., 'Content Quality').
-	 * @param {boolean} checked - Whether to check or uncheck.
-	 */
-	async toggleFocusArea(label, checked) {
-		const checkbox = this.page.getByLabel(label, { exact: true });
-		if (checked) {
-			await checkbox.check();
-		} else {
-			await checkbox.uncheck();
-		}
-	}
-
-	/**
-	 * Select a target tone.
-	 *
-	 * @param {string} toneId - Tone ID to select (e.g., 'academic').
-	 */
-	async selectTone(toneId) {
-		const toneSelect = this.page.getByLabel('Target Tone');
-		await toneSelect.selectOption(toneId);
-	}
-
-	/**
 	 * Expand Review Settings panel if collapsed.
 	 */
 	async expandReviewSettings() {
@@ -216,21 +213,36 @@ class AIFeedbackUtils {
 	}
 
 	/**
+	 * Locate the primary review button, in either the empty state or the
+	 * Review Document panel.
+	 *
+	 * @return {import('@playwright/test').Locator} Review button.
+	 */
+	getReviewButton() {
+		return this.page
+			.locator('.ai-feedback-panel button.is-primary')
+			.filter({ hasText: /Review(ing)?/i })
+			.first();
+	}
+
+	/**
 	 * Mock the review API with a custom response.
 	 *
-	 * @param {Object} response - Custom response object.
+	 * @param {Object} response      - Review response; merged over a default review.
+	 * @param {Object} options       - Options object.
+	 * @param {number} options.delay - Milliseconds to wait before responding.
 	 */
-	async mockReviewAPI(response) {
-		await this.page.route(
-			'**/wp-json/ai-feedback/v1/review',
-			async (route) => {
-				await route.fulfill({
-					status: 200,
-					contentType: 'application/json',
-					body: JSON.stringify(response),
-				});
+	async mockReviewAPI(response, { delay = 0 } = {}) {
+		await this.page.route(restRoute('/review'), async (route) => {
+			if (delay) {
+				await new Promise((resolve) => setTimeout(resolve, delay));
 			}
-		);
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify(buildReviewResponse(response)),
+			});
+		});
 	}
 
 	/**
@@ -239,18 +251,54 @@ class AIFeedbackUtils {
 	 * @param {number} status  - HTTP status code.
 	 * @param {string} code    - Error code.
 	 * @param {string} message - Error message.
+	 * @param {Object} data    - Optional error data, e.g. `{ status: 402 }`.
 	 */
-	async mockReviewAPIError(status, code, message) {
-		await this.page.route(
-			'**/wp-json/ai-feedback/v1/review',
-			async (route) => {
-				await route.fulfill({
-					status,
-					contentType: 'application/json',
-					body: JSON.stringify({ code, message }),
-				});
-			}
-		);
+	async mockReviewAPIError(status, code, message, data = { status }) {
+		await this.page.route(restRoute('/review'), async (route) => {
+			await route.fulfill({
+				status,
+				contentType: 'application/json',
+				body: JSON.stringify({ code, message, data }),
+			});
+		});
+	}
+
+	/**
+	 * Route a plugin REST endpoint with a custom handler.
+	 *
+	 * @param {string}   route   - Route relative to the plugin namespace.
+	 * @param {Function} handler - Playwright route handler.
+	 */
+	async routeREST(route, handler) {
+		await this.page.route(restRoute(route), handler);
+	}
+
+	/**
+	 * Remove all handlers registered for a plugin REST endpoint.
+	 *
+	 * @param {string} route - Route relative to the plugin namespace.
+	 */
+	async unrouteREST(route) {
+		await this.page.unroute(restRoute(route));
+	}
+
+	/**
+	 * Click the review button and wait for the review request to finish.
+	 *
+	 * @return {Promise<import('@playwright/test').Response|null>} Review response, or null when the request failed at the network level.
+	 */
+	async runReview() {
+		const responsePromise = this.page
+			.waitForResponse(
+				(response) =>
+					restRoute('/review')(new URL(response.url())) &&
+					response.request().method() === 'POST'
+			)
+			.catch(() => null);
+		await this.getReviewButton().click();
+		const response = await responsePromise;
+		await expect(this.getReviewButton()).not.toHaveClass(/is-busy/);
+		return response;
 	}
 
 	/**
@@ -297,6 +345,21 @@ class AIFeedbackUtils {
  * Extend the base test with custom fixtures.
  */
 const test = base.extend({
+	// Route reviews through the plugin's mock AI response (see
+	// tests/mu-plugins/ai-feedback-e2e.php) so no real provider is called.
+	e2eMockMode: [
+		async ({ context }, use) => {
+			await context.addCookies([
+				{
+					name: 'ai_feedback_e2e',
+					value: '1',
+					url: process.env.WP_BASE_URL || 'http://localhost:8889',
+				},
+			]);
+			await use();
+		},
+		{ auto: true },
+	],
 	pageUtils: async ({ page }, use) => {
 		await use(new PageUtils({ page }));
 	},
@@ -321,4 +384,4 @@ const test = base.extend({
 	},
 });
 
-module.exports = { test, expect };
+module.exports = { test, expect, buildReviewResponse };
