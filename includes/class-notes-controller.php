@@ -376,6 +376,11 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
+		// Notes don't hold the AI summary; restore it from review history.
+		if ( empty( $review['summary_text'] ) && is_string( $review['review_id'] ?? null ) ) {
+			$review['summary_text'] = Review_History::get_summary_text( $post->ID, $review['review_id'] );
+		}
+
 		return rest_ensure_response(
 			array(
 				'has_review' => true,

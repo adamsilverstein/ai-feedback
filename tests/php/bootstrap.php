@@ -445,3 +445,9 @@ if ( ! function_exists( 'rest_authorization_required_code' ) ) {
 
 require_once $includes_dir . 'class-review-history.php';
 require_once $includes_dir . 'class-history-controller.php';
+
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	function sanitize_textarea_field( $str ) {
+		return trim( strip_tags( $str ) );
+	}
+}

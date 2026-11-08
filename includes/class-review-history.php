@@ -29,6 +29,13 @@ class Review_History {
 	const MAX_ENTRIES = 10;
 
 	/**
+	 * Maximum stored length of the AI summary, in characters.
+	 *
+	 * @var int
+	 */
+	const MAX_SUMMARY_LENGTH = 2000;
+
+	/**
 	 * Register the history meta for all post types.
 	 *
 	 * Exposed in the REST API for the `edit` context only, and read-only:
@@ -75,7 +82,10 @@ class Review_History {
 				'note_count'   => array( 'type' => 'integer' ),
 				'notes_failed' => array( 'type' => 'boolean' ),
 				'user_id'      => array( 'type' => 'integer' ),
-				'summary_text' => array( 'type' => 'string' ),
+				'summary_text' => array(
+					'type'      => 'string',
+					'maxLength' => self::MAX_SUMMARY_LENGTH,
+				),
 				'summary'      => array(
 					'type'                 => 'object',
 					'additionalProperties' => false,
@@ -159,12 +169,41 @@ class Review_History {
 			'note_count'   => is_numeric( $review['note_count'] ?? null ) ? (int) $review['note_count'] : 0,
 			'notes_failed' => ! empty( $review['notes_error'] ),
 			'user_id'      => get_current_user_id(),
-			'summary_text' => is_string( $review['summary_text'] ?? null ) ? $review['summary_text'] : '',
+			'summary_text' => self::sanitize_summary_text( $review['summary_text'] ?? '' ),
 			'summary'      => array(
 				'by_severity' => self::int_map( $summary['by_severity'] ?? array() ),
 				'by_category' => self::int_map( $summary['by_category'] ?? array() ),
 			),
 		);
+	}
+
+	/**
+	 * Get the stored AI summary for a review, or an empty string.
+	 *
+	 * Lets reviews rebuilt from notes after a reload keep their summary.
+	 *
+	 * @param  int    $post_id   Post ID.
+	 * @param  string $review_id Review ID.
+	 * @return string
+	 */
+	public static function get_summary_text( int $post_id, string $review_id ): string {
+		$entry = self::find( $post_id, $review_id );
+
+		return is_string( $entry['summary_text'] ?? null ) ? $entry['summary_text'] : '';
+	}
+
+	/**
+	 * Sanitize the AI summary as plain text and cap its length.
+	 *
+	 * @param  mixed $text Raw summary.
+	 * @return string
+	 */
+	public static function sanitize_summary_text( mixed $text ): string {
+		if ( ! is_string( $text ) ) {
+			return '';
+		}
+
+		return mb_substr( sanitize_textarea_field( $text ), 0, self::MAX_SUMMARY_LENGTH );
 	}
 
 	/**

@@ -400,7 +400,7 @@ X-WP-Nonce: {nonce}
 
 ### GET /history/post/{post_id}
 
-Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta. Requires `edit_post` on the post.
+Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. Requires `edit_post` on the post.
 
 #### Response
 
