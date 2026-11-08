@@ -749,10 +749,8 @@ See [TESTING.md](./docs/TESTING.md) for comprehensive testing documentation.
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| WordPress | 6.9+ | Notes API, Abilities API |
-| PHP | 8.0+ | Language features |
-| [WordPress AI Experiments plugin](https://wordpress.org/plugins/ai/) | Latest | AI settings management, API key configuration |
-| wordpress/php-ai-client | 0.3+ | AI provider abstraction |
+| WordPress | 7.0+ | Notes API, Abilities API, core AI Client, Connectors API |
+| PHP | 8.1+ | Language features |
 
 ### Development
 
