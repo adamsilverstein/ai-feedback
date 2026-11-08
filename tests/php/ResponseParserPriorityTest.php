@@ -107,9 +107,7 @@ class ResponseParserPriorityTest extends TestCase {
 
 		$sorted = $this->parser->sort_by_priority( $items );
 
-		$this->assertSame( 'high', $sorted[0]['block_id'] );
-		$this->assertSame( 'mid', $sorted[1]['block_id'] );
-		$this->assertSame( 'low', $sorted[2]['block_id'] );
+		$this->assertSame( array( 'high', 'mid', 'low' ), array_column( $sorted, 'block_id' ) );
 	}
 
 	/**
@@ -139,8 +137,7 @@ class ResponseParserPriorityTest extends TestCase {
 
 		$sorted = $this->parser->sort_by_priority( $items );
 
-		$this->assertSame( 'low_priority', $sorted[0]['block_id'] );
-		$this->assertSame( 'no_priority', $sorted[1]['block_id'] );
+		$this->assertSame( array( 'low_priority', 'no_priority' ), array_column( $sorted, 'block_id' ) );
 	}
 
 	/**
@@ -185,7 +182,7 @@ class ResponseParserPriorityTest extends TestCase {
 			array( 'clientId' => 'block-2', 'name' => 'core/heading' ),
 		);
 
-		$response = json_encode(
+		$response = (string) wp_json_encode(
 			array(
 				'summary'  => 'Looks fine.',
 				'feedback' => array(
@@ -210,13 +207,13 @@ class ResponseParserPriorityTest extends TestCase {
 		$parsed = $this->parser->parse_feedback( $response, $blocks );
 
 		$this->assertIsArray( $parsed );
-		$this->assertCount( 2, $parsed['feedback'] );
-		$this->assertSame( 'critical', $parsed['feedback'][0]['severity'] );
-		$this->assertSame( 'block-2', $parsed['feedback'][0]['block_id'] );
-		$this->assertArrayHasKey( 'priority', $parsed['feedback'][0] );
-		$this->assertGreaterThan(
-			$parsed['feedback'][1]['priority'],
-			$parsed['feedback'][0]['priority']
-		);
+		$feedback = $parsed['feedback'];
+		$this->assertIsArray( $feedback );
+		$this->assertSame( array( 'critical', 'suggestion' ), array_column( $feedback, 'severity' ) );
+		$this->assertSame( array( 'block-2', 'block-1' ), array_column( $feedback, 'block_id' ) );
+
+		$priorities = array_column( $feedback, 'priority' );
+		$this->assertCount( 2, $priorities );
+		$this->assertGreaterThan( $priorities[1], $priorities[0] );
 	}
 }

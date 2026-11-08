@@ -231,21 +231,18 @@ class Response_Parser {
 	 * Blocks without a known `block_name` still add PRIORITY_BLOCK_DEFAULT, so
 	 * the score always includes a block-type weight.
 	 *
-	 * @param  array $item Validated feedback item. Expected keys: `severity`,
-	 *                     `category`, optional `block_name`, optional `block_index`.
+	 * @param  array<string, mixed> $item Validated feedback item. Expected keys: `severity`,
+	 *                                    `category`, optional `block_name`, optional `block_index`.
 	 * @return int Priority score (higher means more important).
 	 */
 	public function calculate_priority( array $item ): int {
-		$score = 0;
+		$severity   = is_string( $item['severity'] ?? null ) ? $item['severity'] : '';
+		$category   = is_string( $item['category'] ?? null ) ? $item['category'] : '';
+		$block_name = is_string( $item['block_name'] ?? null ) ? $item['block_name'] : '';
 
-		$severity = $item['severity'] ?? '';
-		$score   += self::PRIORITY_SEVERITY_WEIGHTS[ $severity ] ?? 0;
-
-		$category = $item['category'] ?? '';
-		$score   += self::PRIORITY_CATEGORY_WEIGHTS[ $category ] ?? 0;
-
-		$block_name = $item['block_name'] ?? '';
-		$score     += self::PRIORITY_BLOCK_WEIGHTS[ $block_name ] ?? self::PRIORITY_BLOCK_DEFAULT;
+		$score  = self::PRIORITY_SEVERITY_WEIGHTS[ $severity ] ?? 0;
+		$score += self::PRIORITY_CATEGORY_WEIGHTS[ $category ] ?? 0;
+		$score += self::PRIORITY_BLOCK_WEIGHTS[ $block_name ] ?? self::PRIORITY_BLOCK_DEFAULT;
 
 		// First five blocks get a decreasing bonus (25, 20, 15, 10, 5, then 0).
 		if ( isset( $item['block_index'] ) && is_int( $item['block_index'] ) ) {
@@ -262,21 +259,23 @@ class Response_Parser {
 	 * `block_index` so equal-priority items follow document order; `usort` is
 	 * stable on PHP 8+, so remaining ties keep their original order.
 	 *
-	 * @param  array $feedback Feedback items, each expected to have an integer `priority`.
-	 * @return array Feedback items sorted by descending priority.
+	 * @param  array<int, array<string, mixed>> $feedback Feedback items, each expected to have an integer `priority`.
+	 * @return array<int, array<string, mixed>> Feedback items sorted by descending priority.
 	 */
 	public function sort_by_priority( array $feedback ): array {
+		$int_or = static function ( mixed $value, int $fallback ): int {
+			return is_int( $value ) ? $value : $fallback;
+		};
+
 		usort(
 			$feedback,
-			static function ( array $a, array $b ): int {
-				$pa = $a['priority'] ?? 0;
-				$pb = $b['priority'] ?? 0;
+			static function ( array $a, array $b ) use ( $int_or ): int {
+				$pa = $int_or( $a['priority'] ?? null, 0 );
+				$pb = $int_or( $b['priority'] ?? null, 0 );
 				if ( $pa !== $pb ) {
-					return $pb - $pa;
+					return $pb <=> $pa;
 				}
-				$ia = $a['block_index'] ?? PHP_INT_MAX;
-				$ib = $b['block_index'] ?? PHP_INT_MAX;
-				return $ia - $ib;
+				return $int_or( $a['block_index'] ?? null, PHP_INT_MAX ) <=> $int_or( $b['block_index'] ?? null, PHP_INT_MAX );
 			}
 		);
 
@@ -329,7 +328,7 @@ class Response_Parser {
 	 * @param  mixed $item            Feedback item data.
 	 * @param  array $valid_block_ids Map of valid block IDs.
 	 * @param  array $block_info      Map of block IDs to their info (name, index).
-	 * @return array|null Array of validated and sanitized fields on success, `null` if the item is invalid.
+	 * @return array<string, mixed>|null Array of validated and sanitized fields on success, `null` if the item is invalid.
 	 */
 	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
 		// Must be an array.
@@ -725,8 +724,8 @@ class Response_Parser {
 	 * Groups feedback items with the same category and similar titles together.
 	 * This helps users identify patterns and fix similar issues more efficiently.
 	 *
-	 * @param  array $feedback Parsed feedback items.
-	 * @return array Grouped feedback items with is_group, count, and block_ids fields.
+	 * @param  array<int, array<string, mixed>> $feedback Parsed feedback items.
+	 * @return array<int, array<string, mixed>> Grouped feedback items with is_group, count, and block_ids fields.
 	 */
 	public function group_similar_feedback( array $feedback ): array {
 		if ( empty( $feedback ) ) {

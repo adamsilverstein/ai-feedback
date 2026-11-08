@@ -235,6 +235,10 @@ class Notes_Manager {
 			'block_index'       => $feedback_item['block_index'] ?? null,
 		);
 
+		if ( isset( $feedback_item['priority'] ) && is_int( $feedback_item['priority'] ) ) {
+			$meta['feedback_priority'] = $feedback_item['priority'];
+		}
+
 		// Add block ID (clientId) if available.
 		// Note: clientId is ephemeral and changes on each editor load.
 		if ( ! empty( $feedback_item['block_id'] ) ) {
@@ -339,6 +343,18 @@ class Notes_Manager {
 	}
 
 	/**
+	 * Read a numeric comment meta value as an integer.
+	 *
+	 * @param  int    $comment_id Comment ID.
+	 * @param  string $key        Meta key.
+	 * @return int|null Integer value, or null when the meta is missing or not numeric.
+	 */
+	private function get_int_meta( int $comment_id, string $key ): ?int {
+		$value = get_comment_meta( $comment_id, $key, true );
+		return is_numeric( $value ) ? (int) $value : null;
+	}
+
+	/**
 	 * Format notes for API response.
 	 *
 	 * @param  array $comments Array of comment objects.
@@ -388,9 +404,10 @@ class Notes_Manager {
 				'type'        => $comment->comment_type,
 				'status'      => ( '1' === $comment->comment_approved ) ? 'approved' : 'hold',
 				'block_id'    => get_comment_meta( $comment->comment_ID, 'block_id', true ),
-				'block_index' => get_comment_meta( $comment->comment_ID, 'block_index', true ),
+				'block_index' => $this->get_int_meta( (int) $comment->comment_ID, 'block_index' ),
 				'category'    => get_comment_meta( $comment->comment_ID, 'feedback_category', true ),
 				'severity'    => get_comment_meta( $comment->comment_ID, 'feedback_severity', true ),
+				'priority'    => $this->get_int_meta( (int) $comment->comment_ID, 'feedback_priority' ),
 				'review_id'   => get_comment_meta( $comment->comment_ID, 'review_id', true ),
 				'ai_model'    => get_comment_meta( $comment->comment_ID, 'ai_model', true ),
 				'created_at'  => $comment->comment_date,
