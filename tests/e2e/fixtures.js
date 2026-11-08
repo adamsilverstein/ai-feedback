@@ -366,6 +366,19 @@ const test = base.extend({
 		},
 		{ auto: true },
 	],
+	// The welcome or setup modal opens after an async status check, so it
+	// can cover the sidebar at any point. Mark it as seen up front.
+	skipWelcomeModal: [
+		async ({ page }, use) => {
+			await page.addInitScript(() => {
+				try {
+					window.localStorage.setItem('ai-feedback-welcomed', 'true');
+				} catch {}
+			});
+			await use();
+		},
+		{ auto: true },
+	],
 	pageUtils: async ({ page }, use) => {
 		await use(new PageUtils({ page }));
 	},

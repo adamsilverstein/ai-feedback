@@ -98,6 +98,8 @@ No test ever calls a real AI provider. The `e2eMockMode` auto fixture sets an `a
 - defining `AI_FEEDBACK_MOCK_MODE`, so reviews run through the real REST, parsing and notes code with the plugin's built-in mock AI response
 - clearing the per-user review rate limit, so the suite can run more than 10 reviews an hour
 
+The `skipWelcomeModal` auto fixture also marks the welcome modal as seen in `localStorage`, since it opens after an async status check and can otherwise cover the sidebar mid-test.
+
 Requests without the cookie, such as manual testing in the same wp-env site, are not affected. Use `mockReviewAPI()` or `mockReviewAPIError()` when a test needs a specific response or error.
 
 ### Running Against Another Port

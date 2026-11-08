@@ -35,8 +35,8 @@ test.describe('AI Feedback Sidebar', () => {
 		await expect(page.locator('.ai-feedback-panel')).toBeHidden();
 		await expect(toolbarButton).toHaveAttribute('aria-pressed', 'false');
 
-		// Reopening remounts the panel, which can show the setup modal again.
-		await aiFeedback.openSidebar();
+		await toolbarButton.click();
+		await expect(page.locator('.ai-feedback-panel')).toBeVisible();
 		await expect(toolbarButton).toHaveAttribute('aria-pressed', 'true');
 
 		await page
