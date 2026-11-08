@@ -282,7 +282,7 @@ class Review_Service {
 		 * @param int   $post_id Post ID.
 		 * @param array $result  Review result returned to the client.
 		 */
-		do_action( 'ai_feedback_review_completed', $post_id, $result );
+		do_action( 'ai_feedback_after_review', $post_id, $result );
 	}
 
 	/**

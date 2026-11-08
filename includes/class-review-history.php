@@ -90,7 +90,7 @@ class Review_History {
 	/**
 	 * Record a completed review.
 	 *
-	 * Hooked to `ai_feedback_review_completed`.
+	 * Hooked to `ai_feedback_after_review`.
 	 *
 	 * @param int                  $post_id Post ID.
 	 * @param array<string, mixed> $review  Review result returned by Review_Service.

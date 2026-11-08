@@ -95,7 +95,7 @@ class Plugin {
 	private function init_hooks(): void {
 		add_action( 'init', array( Review_History::class, 'register_meta' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
-		add_action( 'ai_feedback_review_completed', array( Review_History::class, 'record' ), 10, 2 );
+		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
 		// Add custom avatar for AI Feedback comments/notes.
