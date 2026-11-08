@@ -467,19 +467,32 @@ class Notes_Manager {
 	 * Feedback for one block shares a thread: the first item is the
 	 * top-level note and the rest are replies to it.
 	 *
+	 * The parent ID comes from stored data, so it is only trusted when it is a
+	 * note on the same post that the current user can edit.
+	 *
 	 * @param  int $note_id Note ID.
-	 * @return int Thread (top-level note) ID, or 0 if the note doesn't exist.
+	 * @return int Thread (top-level note) ID, or 0 if there is no valid thread.
 	 */
 	public function get_thread_id( int $note_id ): int {
 		$note = get_comment( $note_id );
 
-		if ( ! $note instanceof \WP_Comment ) {
+		if ( ! $note instanceof \WP_Comment || 'note' !== $note->comment_type ) {
 			return 0;
 		}
 
 		$parent = (int) $note->comment_parent;
+		$thread = $parent > 0 ? get_comment( $parent ) : $note;
 
-		return $parent > 0 ? $parent : (int) $note->comment_ID;
+		if (
+			! $thread instanceof \WP_Comment
+			|| 'note' !== $thread->comment_type
+			|| (int) $thread->comment_post_ID !== (int) $note->comment_post_ID
+			|| ! current_user_can( 'edit_post', (int) $thread->comment_post_ID )
+		) {
+			return 0;
+		}
+
+		return (int) $thread->comment_ID;
 	}
 
 	/**
@@ -536,6 +549,8 @@ class Notes_Manager {
 	 *
 	 * Sets the top-level note's status and adds an empty reply carrying
 	 * `_wp_note_status`, which the Notes panel shows as "resolved"/"reopened".
+	 * Does nothing unless the ID is a top-level note on a post the current
+	 * user can edit.
 	 *
 	 * @param  int  $thread_id Thread (top-level note) ID.
 	 * @param  bool $resolved  True to resolve, false to reopen.
@@ -544,7 +559,13 @@ class Notes_Manager {
 	public function set_thread_resolved( int $thread_id, bool $resolved ): bool {
 		$thread = get_comment( $thread_id );
 
-		if ( ! $thread instanceof \WP_Comment || $this->is_thread_resolved( $thread_id ) === $resolved ) {
+		if (
+			! $thread instanceof \WP_Comment
+			|| 'note' !== $thread->comment_type
+			|| (int) $thread->comment_parent > 0
+			|| ! current_user_can( 'edit_post', (int) $thread->comment_post_ID )
+			|| $this->is_thread_resolved( $thread_id ) === $resolved
+		) {
 			return false;
 		}
 
