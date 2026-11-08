@@ -200,10 +200,16 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 								))}
 						</ul>
 					</div>
+				</CardBody>
+			)}
 
+			{/* Outside the collapsible body so a pending reply is polled and
+			    announced even while the group is collapsed. */}
+			{(thread?.replies?.length > 0 || thread?.pending_reply_id) && (
+				<CardBody>
 					<FeedbackReplies
-						replies={thread?.replies ?? []}
-						pendingReplyId={thread?.pending_reply_id ?? null}
+						replies={thread.replies ?? []}
+						pendingReplyId={thread.pending_reply_id ?? null}
 						onReplyComplete={onReplyComplete}
 					/>
 				</CardBody>

@@ -42,7 +42,7 @@ export default function FeedbackReplies({
 			onReplyComplete?.();
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [hasPendingSlot, status]);
+	}, [pendingReplyId, hasPendingSlot, status]);
 
 	// Announce AI replies that arrive after the thread first rendered.
 	const announcedRef = useRef(null);
