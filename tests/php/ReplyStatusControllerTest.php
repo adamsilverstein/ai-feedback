@@ -36,13 +36,33 @@ class ReplyStatusControllerTest extends TestCase {
 		$this->controller                 = new Reply_Status_Controller();
 		$GLOBALS['test_comment_meta']     = array();
 		$GLOBALS['test_current_user_can'] = true;
+		$GLOBALS['test_comments']         = array(
+			200 => new \WP_Comment(
+				array(
+					'comment_ID'      => '200',
+					'comment_post_ID' => '42',
+				)
+			),
+		);
+	}
+
+	/**
+	 * Build a status request for a reply ID.
+	 *
+	 * @param int $id Reply comment ID.
+	 * @return \WP_REST_Request
+	 */
+	private function request( int $id ): \WP_REST_Request {
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', $id );
+		return $request;
 	}
 
 	/**
 	 * Clean up globals.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_current_user_can'] );
+		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_current_user_can'], $GLOBALS['test_comments'] );
 		parent::tearDown();
 	}
 
@@ -50,7 +70,7 @@ class ReplyStatusControllerTest extends TestCase {
 	 * Unknown status (no meta) returns 'unknown'.
 	 */
 	public function test_status_returns_unknown_when_no_meta(): void {
-		$response = $this->controller->get_status( new \WP_REST_Request( array( 'id' => 200 ) ) );
+		$response = $this->controller->get_status( $this->request( 200 ) );
 
 		$data = $response->get_data();
 		$this->assertSame( 200, $response->get_status() );
@@ -67,7 +87,7 @@ class ReplyStatusControllerTest extends TestCase {
 		);
 
 		$data = $this->controller
-			->get_status( new \WP_REST_Request( array( 'id' => 200 ) ) )
+			->get_status( $this->request( 200 ) )
 			->get_data();
 
 		$this->assertSame( 'pending', $data['status'] );
@@ -81,11 +101,11 @@ class ReplyStatusControllerTest extends TestCase {
 	public function test_status_complete_includes_ai_reply_comment_id(): void {
 		$GLOBALS['test_comment_meta'][200] = array(
 			Reply_Cron_Dispatcher::STATUS_META_KEY => 'complete',
-			'ai_feedback_reply_comment_id'         => 555,
+			Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY => 555,
 		);
 
 		$data = $this->controller
-			->get_status( new \WP_REST_Request( array( 'id' => 200 ) ) )
+			->get_status( $this->request( 200 ) )
 			->get_data();
 
 		$this->assertSame( 'complete', $data['status'] );
@@ -98,11 +118,11 @@ class ReplyStatusControllerTest extends TestCase {
 	public function test_status_failed_includes_error(): void {
 		$GLOBALS['test_comment_meta'][200] = array(
 			Reply_Cron_Dispatcher::STATUS_META_KEY => 'failed',
-			'ai_feedback_reply_error'              => 'AI request timed out.',
+			Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY => 'AI request timed out.',
 		);
 
 		$data = $this->controller
-			->get_status( new \WP_REST_Request( array( 'id' => 200 ) ) )
+			->get_status( $this->request( 200 ) )
 			->get_data();
 
 		$this->assertSame( 'failed', $data['status'] );
@@ -110,14 +130,72 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
-	 * Permission check rejects users lacking edit_posts.
+	 * Complete status without a stored reply ID is reported as failed.
+	 */
+	public function test_status_complete_without_reply_id_reports_failed(): void {
+		$GLOBALS['test_comment_meta'][200] = array(
+			Reply_Cron_Dispatcher::STATUS_META_KEY => 'complete',
+		);
+
+		$data = $this->controller->get_status( $this->request( 200 ) )->get_data();
+
+		$this->assertSame( 'failed', $data['status'] );
+		$this->assertArrayNotHasKey( 'ai_reply_comment_id', $data );
+		$this->assertNotEmpty( $data['error'] );
+	}
+
+	/**
+	 * Unexpected stored status values are reported as unknown.
+	 */
+	public function test_unexpected_status_value_reports_unknown(): void {
+		$GLOBALS['test_comment_meta'][200] = array(
+			Reply_Cron_Dispatcher::STATUS_META_KEY => 'bogus',
+		);
+
+		$data = $this->controller->get_status( $this->request( 200 ) )->get_data();
+
+		$this->assertSame( 'unknown', $data['status'] );
+	}
+
+	/**
+	 * Permission check rejects users who cannot edit the reply's post.
 	 */
 	public function test_permissions_check_denies_unauthorized_user(): void {
 		$GLOBALS['test_current_user_can'] = false;
 
-		$result = $this->controller->get_status_permissions_check();
+		$result = $this->controller->get_status_permissions_check( $this->request( 200 ) );
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
+	}
+
+	/**
+	 * A nonexistent reply ID returns a 404 instead of 'unknown'.
+	 */
+	public function test_permissions_check_returns_404_for_missing_comment(): void {
+		$result = $this->controller->get_status_permissions_check( $this->request( 12345 ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_comment_invalid_id', $result->get_error_code() );
+		$this->assertSame( array( 'status' => 404 ), $result->get_error_data() );
+	}
+
+	/**
+	 * Authorized users pass the permission check.
+	 */
+	public function test_permissions_check_allows_post_editor(): void {
+		$this->assertTrue( $this->controller->get_status_permissions_check( $this->request( 200 ) ) );
+	}
+
+	/**
+	 * The schema lists every response field.
+	 */
+	public function test_item_schema_lists_response_fields(): void {
+		$schema = $this->controller->get_item_schema();
+
+		$this->assertSame(
+			array( 'reply_id', 'status', 'ai_reply_comment_id', 'error' ),
+			array_keys( $schema['properties'] )
+		);
 	}
 }

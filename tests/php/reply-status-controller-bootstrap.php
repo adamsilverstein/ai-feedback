@@ -1,42 +1,52 @@
 <?php
 /**
- * Global-namespace bootstrap for Reply_Status_Controller tests.
+ * Global-namespace stubs for Reply_Status_Controller tests.
  *
- * The controller `use`s root-namespace WP_REST_* classes; the PHPUnit
- * bootstrap already defines WP_REST_Controller, WP_REST_Server, and
- * WP_REST_Response, but not WP_REST_Request. Declare a minimal
- * stand-in here so `$request['id']` works the way the controller uses it.
+ * The PHPUnit bootstrap provides WP_REST_Request, WP_REST_Response and
+ * WP_Error; these add the comment and REST helpers the controller needs.
  *
  * @package AI_Feedback\Tests
  */
 
+// phpcs:disable
+
 namespace {
 
-	if ( ! class_exists( 'WP_REST_Request' ) ) {
+	if ( ! class_exists( 'WP_Comment' ) ) {
 		/**
-		 * Minimal WP_REST_Request stand-in used by controller tests.
-		 *
-		 * Only models the ArrayAccess surface (`$request['id']`) that the
-		 * controller reads.
+		 * Minimal WP_Comment stand-in.
 		 */
-		class WP_REST_Request implements \ArrayAccess {
-			private array $data;
+		class WP_Comment {
+			public $comment_ID      = '0';
+			public $comment_post_ID = '0';
+			public $comment_parent  = '0';
+			public $comment_type    = 'note';
+			public $comment_content = '';
+			public $comment_author  = '';
 
-			public function __construct( array $data = array() ) {
-				$this->data = $data;
+			public function __construct( $comment = null ) {
+				foreach ( (array) $comment as $key => $value ) {
+					$this->$key = $value;
+				}
 			}
-			public function offsetExists( $offset ): bool {
-				return isset( $this->data[ $offset ] );
-			}
-			public function offsetGet( $offset ): mixed {
-				return $this->data[ $offset ] ?? null;
-			}
-			public function offsetSet( $offset, $value ): void {
-				$this->data[ $offset ] = $value;
-			}
-			public function offsetUnset( $offset ): void {
-				unset( $this->data[ $offset ] );
-			}
+		}
+	}
+
+	if ( ! function_exists( 'get_comment' ) ) {
+		function get_comment( $id ) {
+			return $GLOBALS['test_comments'][ $id ] ?? null;
+		}
+	}
+
+	if ( ! function_exists( 'absint' ) ) {
+		function absint( $maybeint ) {
+			return abs( (int) $maybeint );
+		}
+	}
+
+	if ( ! function_exists( 'rest_authorization_required_code' ) ) {
+		function rest_authorization_required_code() {
+			return 403;
 		}
 	}
 }
