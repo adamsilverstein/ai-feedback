@@ -38,7 +38,12 @@ const item = {
 function renderItem(
 	props,
 	setNoteResolved = jest.fn(),
-	{ blocks = {}, appliedFixes = {}, updateBlockAttributes = jest.fn() } = {}
+	{
+		blocks = {},
+		appliedFixes = {},
+		updateBlockAttributes = jest.fn(),
+		blockType = { attributes: { content: { type: 'rich-text' } } },
+	} = {}
 ) {
 	const registry = createRegistry();
 	registry.register(noticesStore);
@@ -56,24 +61,38 @@ function renderItem(
 		},
 	});
 	registry.registerStore('core/block-editor', {
-		reducer: (state = {}) => state,
+		reducer: (state = blocks, action) => {
+			if (action.type !== 'UPDATE_BLOCK_ATTRIBUTES') {
+				return state;
+			}
+			const block = state[action.clientId];
+			return {
+				...state,
+				[action.clientId]: {
+					...block,
+					attributes: { ...block.attributes, ...action.attributes },
+				},
+			};
+		},
 		actions: {
 			selectBlock: () => ({ type: 'NOOP' }),
-			updateBlockAttributes: (...args) => {
-				updateBlockAttributes(...args);
-				return { type: 'NOOP' };
+			updateBlockAttributes: (clientId, attributes) => {
+				updateBlockAttributes(clientId, attributes);
+				return {
+					type: 'UPDATE_BLOCK_ATTRIBUTES',
+					clientId,
+					attributes,
+				};
 			},
 		},
 		selectors: {
-			getBlock: (state, clientId) => blocks[clientId] ?? null,
+			getBlock: (state, clientId) => state[clientId] ?? null,
 		},
 	});
 	registry.registerStore('core/blocks', {
 		reducer: (state = {}) => state,
 		selectors: {
-			getBlockType: () => ({
-				attributes: { content: { type: 'rich-text' } },
-			}),
+			getBlockType: () => blockType,
 		},
 	});
 
@@ -199,6 +218,56 @@ describe('FeedbackItem quick fixes', () => {
 			content: 'The sentence <em>is passive</em> here.',
 		});
 		expect(setNoteResolved).toHaveBeenLastCalledWith(7, false);
+	});
+
+	it('refuses to undo over later edits', async () => {
+		const updateBlockAttributes = jest.fn();
+		const registry = renderItem(fixItem, jest.fn(), {
+			blocks,
+			updateBlockAttributes,
+		});
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+
+		// The user keeps typing in the block.
+		await act(async () => {
+			registry
+				.dispatch('core/block-editor')
+				.updateBlockAttributes('block-1', { content: 'Edited later.' });
+		});
+
+		const notice = registry
+			.select(noticesStore)
+			.getNotices()
+			.find(({ content }) => content === 'Fix applied.');
+		await act(async () => {
+			notice.actions[0].onClick();
+		});
+
+		expect(updateBlockAttributes).toHaveBeenLastCalledWith('block-1', {
+			content: 'Edited later.',
+		});
+		expect(
+			registry
+				.select(noticesStore)
+				.getNotices()
+				.some(({ content }) => content.includes('has changed'))
+		).toBe(true);
+	});
+
+	it('hides the fix for blocks without rich text content', () => {
+		renderItem(fixItem, jest.fn(), {
+			blocks: {
+				'block-1': { name: 'core/image', attributes: { url: 'x' } },
+			},
+			blockType: { attributes: { url: { type: 'string' } } },
+		});
+
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
 	});
 
 	it('shows a preview before applying', async () => {

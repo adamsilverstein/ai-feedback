@@ -317,8 +317,9 @@ class Response_Parser {
 	/**
 	 * Validate a quick fix against the block it targets.
 	 *
-	 * A quick fix is a plain text find/replace. It is dropped unless `find`
-	 * appears exactly once in the block's text, so applying it is unambiguous.
+	 * A quick fix is a plain text find/replace. It is dropped if it contains
+	 * markup, or unless `find` appears exactly once in the block's text, so
+	 * applying it is unambiguous.
 	 *
 	 * @param  mixed  $quick_fix     Quick fix from the AI response.
 	 * @param  string $block_content Plain text content of the target block.
@@ -337,8 +338,11 @@ class Response_Parser {
 		}
 
 		// Plain text only; markup can't be matched against the block's text.
-		$find    = wp_strip_all_tags( $find );
-		$replace = wp_strip_all_tags( $replace );
+		// Reject rather than strip, since stripping also trims whitespace that
+		// may be part of the intended edit.
+		if ( str_contains( $find, '<' ) || str_contains( $replace, '<' ) ) {
+			return null;
+		}
 
 		if ( '' === trim( $find ) || $find === $replace ) {
 			return null;
@@ -348,7 +352,7 @@ class Response_Parser {
 			return null;
 		}
 
-		if ( 1 !== substr_count( $block_content, $find ) ) {
+		if ( 1 !== $this->count_quick_fix_matches( $find, $block_content ) ) {
 			Logger::debug( 'Quick fix text not found exactly once in block, dropping it' );
 			return null;
 		}
@@ -357,6 +361,33 @@ class Response_Parser {
 			'find'    => $find,
 			'replace' => $replace,
 		);
+	}
+
+	/**
+	 * Count matches of a quick fix's text in block content.
+	 *
+	 * Text that starts or ends with a letter or digit only matches at a word
+	 * boundary there, so "cat" doesn't match inside "concatenate". The editor
+	 * uses the same rule (src/utils/quick-fix.js).
+	 *
+	 * @param  string $find    Text to find.
+	 * @param  string $content Block content.
+	 * @return int Number of matches.
+	 */
+	private function count_quick_fix_matches( string $find, string $content ): int {
+		$pattern = preg_quote( $find, '/' );
+
+		if ( preg_match( '/^[\p{L}\p{N}]/u', $find ) ) {
+			$pattern = '(?<![\p{L}\p{N}])' . $pattern;
+		}
+
+		if ( preg_match( '/[\p{L}\p{N}]$/u', $find ) ) {
+			$pattern .= '(?![\p{L}\p{N}])';
+		}
+
+		$count = preg_match_all( '/' . $pattern . '/u', $content );
+
+		return false === $count ? 0 : $count;
 	}
 
 	/**

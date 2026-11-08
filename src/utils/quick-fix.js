@@ -46,6 +46,44 @@ function toHtml(value) {
 }
 
 /**
+ * Escape a string for use in a regular expression.
+ *
+ * @param {string} text Text to escape.
+ * @return {string} Escaped text.
+ */
+function escapeRegExp(text) {
+	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Find every match of a quick fix's text.
+ *
+ * Text that starts or ends with a letter or digit only matches at a word
+ * boundary there, the same rule the server uses (Response_Parser).
+ *
+ * @param {string} text Plain text to search.
+ * @param {string} find Text to find.
+ * @return {number[]} Start offsets of each match.
+ */
+export function findMatches(text, find) {
+	if (!find) {
+		return [];
+	}
+
+	let pattern = escapeRegExp(find);
+	if (/^[\p{L}\p{N}]/u.test(find)) {
+		pattern = '(?<![\\p{L}\\p{N}])' + pattern;
+	}
+	if (/[\p{L}\p{N}]$/u.test(find)) {
+		pattern += '(?![\\p{L}\\p{N}])';
+	}
+
+	return Array.from(text.matchAll(new RegExp(pattern, 'gu')), (match) => {
+		return match.index;
+	});
+}
+
+/**
  * Locate the fix's text in rich text content.
  *
  * @param {Object} value Rich text value.
@@ -53,16 +91,8 @@ function toHtml(value) {
  * @return {number} Start offset, or -1 unless the text appears exactly once.
  */
 function findUniqueOffset(value, fix) {
-	if (!fix?.find) {
-		return -1;
-	}
-
-	const start = value.text.indexOf(fix.find);
-	if (start === -1 || value.text.indexOf(fix.find, start + 1) !== -1) {
-		return -1;
-	}
-
-	return start;
+	const matches = findMatches(value.text, fix?.find);
+	return matches.length === 1 ? matches[0] : -1;
 }
 
 /**

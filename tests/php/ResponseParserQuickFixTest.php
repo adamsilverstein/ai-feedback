@@ -38,7 +38,7 @@ class ResponseParserQuickFixTest extends TestCase {
 	 */
 	public static function quick_fix_provider(): array {
 		return array(
-			'valid replacement'       => array(
+			'valid replacement'        => array(
 				array(
 					'find'    => 'utilize',
 					'replace' => 'use',
@@ -48,7 +48,7 @@ class ResponseParserQuickFixTest extends TestCase {
 					'replace' => 'use',
 				),
 			),
-			'deletion'                => array(
+			'deletion'                 => array(
 				array(
 					'find'    => 'very ',
 					'replace' => '',
@@ -58,60 +58,84 @@ class ResponseParserQuickFixTest extends TestCase {
 					'replace' => '',
 				),
 			),
-			'missing replace deletes' => array(
+			'missing replace deletes'  => array(
 				array( 'find' => 'very ' ),
 				array(
 					'find'    => 'very ',
 					'replace' => '',
 				),
 			),
-			'strips markup'           => array(
+			'rejects markup'           => array(
 				array(
 					'find'    => '<b>utilize</b>',
 					'replace' => '<i>use</i>',
 				),
+				null,
+			),
+			'keeps edge whitespace'    => array(
 				array(
-					'find'    => 'utilize',
-					'replace' => 'use',
+					'find'    => ' very',
+					'replace' => '',
+				),
+				array(
+					'find'    => ' very',
+					'replace' => '',
 				),
 			),
-			'not an array'            => array( 'utilize => use', null ),
-			'empty find'              => array(
+			'whole words only'         => array(
+				array(
+					'find'    => 'hop',
+					'replace' => 'store',
+				),
+				null,
+			),
+			'word next to punctuation' => array(
+				array(
+					'find'    => 'shop',
+					'replace' => 'store',
+				),
+				array(
+					'find'    => 'shop',
+					'replace' => 'store',
+				),
+			),
+			'not an array'             => array( 'utilize => use', null ),
+			'empty find'               => array(
 				array(
 					'find'    => '  ',
 					'replace' => 'x',
 				),
 				null,
 			),
-			'no change'               => array(
+			'no change'                => array(
 				array(
 					'find'    => 'use',
 					'replace' => 'use',
 				),
 				null,
 			),
-			'text not in block'       => array(
+			'text not in block'        => array(
 				array(
 					'find'    => 'leverage',
 					'replace' => 'use',
 				),
 				null,
 			),
-			'ambiguous match'         => array(
+			'ambiguous match'          => array(
 				array(
 					'find'    => 'the',
 					'replace' => 'a',
 				),
 				null,
 			),
-			'non-string find'         => array(
+			'non-string find'          => array(
 				array(
 					'find'    => 42,
 					'replace' => 'x',
 				),
 				null,
 			),
-			'too long'                => array(
+			'too long'                 => array(
 				array(
 					'find'    => 'utilize',
 					'replace' => str_repeat( 'x', 201 ),

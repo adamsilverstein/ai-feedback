@@ -7,6 +7,7 @@ import { RichTextData } from '@wordpress/rich-text';
  * Internal dependencies
  */
 import {
+	findMatches,
 	applyFixToContent,
 	getFixPreview,
 	getRichTextAttributeKey,
@@ -99,5 +100,18 @@ describe('applyFixToContent formatting', () => {
 				}
 			)
 		).toBe('Go <a href="https://example.com">there</a>.');
+	});
+});
+
+describe('findMatches', () => {
+	it.each([
+		['whole words only', 'the cat sat in concatenate', 'cat', [4]],
+		['punctuation edges', 'Hello, world.', 'world.', [7]],
+		['leading space', 'very very good', ' very', [4]],
+		['unicode letters', 'café cafés', 'café', [0]],
+		['regex characters', 'a (b) c', '(b)', [2]],
+		['no find', 'text', '', []],
+	])('handles %s', (_label, text, find, expected) => {
+		expect(findMatches(text, find)).toEqual(expected);
 	});
 });

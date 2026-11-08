@@ -4,7 +4,7 @@
  * Preview and apply an AI quick fix (a plain text find/replace) to a block.
  */
 import { Button, Modal } from '@wordpress/components';
-import { useDispatch, useSelect } from '@wordpress/data';
+import { useDispatch, useRegistry, useSelect } from '@wordpress/data';
 import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { store as blockEditorStore } from '@wordpress/block-editor';
@@ -66,11 +66,19 @@ export default function QuickFix({ item }) {
 		[item.block_id]
 	);
 
+	const registry = useRegistry();
 	const { updateBlockAttributes } = useDispatch(blockEditorStore);
 	const { setNoteResolved, setFixApplied } = useDispatch(STORE_NAME);
-	const { createSuccessNotice } = useDispatch(noticesStore);
+	const { createSuccessNotice, createWarningNotice } =
+		useDispatch(noticesStore);
 
-	const preview = attributeKey ? getFixPreview(content, fix) : null;
+	// Blocks without rich text content (eg. a list or quote, whose text lives
+	// in inner blocks) can't take a quick fix here.
+	if (!attributeKey) {
+		return null;
+	}
+
+	const preview = getFixPreview(content, fix);
 	const canApply = !!preview;
 
 	const setResolved = async (resolved) => {
@@ -103,6 +111,21 @@ export default function QuickFix({ item }) {
 				{
 					label: __('Undo', 'ai-feedback'),
 					onClick: () => {
+						// Don't overwrite edits made after the fix.
+						const current = registry
+							.select(blockEditorStore)
+							.getBlock(item.block_id)?.attributes[attributeKey];
+						if (String(current) !== String(updated)) {
+							createWarningNotice(
+								__(
+									'The block has changed since the fix was applied. Use the editor’s Undo instead.',
+									'ai-feedback'
+								),
+								{ type: 'snackbar' }
+							);
+							return;
+						}
+
 						updateBlockAttributes(item.block_id, {
 							[attributeKey]: previous,
 						});
