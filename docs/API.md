@@ -30,6 +30,32 @@ X-WP-Nonce: {nonce}
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
+| `chunk_index` | integer | No | Zero-based part number when a large document is reviewed in parts (default: `0`) |
+| `chunk_total` | integer | No | Number of parts in the review (default: `1`) |
+| `review_id` | string | No | Review ID returned for part 0, required for later parts |
+| `previous_summaries` | array | No | Summary text of earlier parts, sent with the last part |
+
+**Chunked reviews:**
+
+Documents with more blocks than the chunk size (`chunk_size` from `GET /settings`, default 20) are reviewed in several requests, each holding at most `chunk_size` blocks. The editor does this automatically:
+
+1. Part 0 is checked against the rate limit and returns a `review_id`.
+2. Later parts send that `review_id` and must arrive in order. They do not count against the rate limit.
+3. The last part sends `previous_summaries`, so its `summary_text` covers the whole document.
+
+Each response includes `chunk: { index, total }`. A failed part can be retried; a part that does not match the active review returns `409 invalid_review_chunk`.
+
+```mermaid
+sequenceDiagram
+    participant Editor
+    participant API as POST /review
+    Editor->>API: blocks 1-20, chunk 0 of 3
+    API-->>Editor: notes, review_id
+    Editor->>API: blocks 21-40, chunk 1 of 3, review_id
+    API-->>Editor: notes
+    Editor->>API: blocks 41-50, chunk 2 of 3, review_id, previous_summaries
+    API-->>Editor: notes, whole-document summary_text
+```
 
 **Example Request:**
 
@@ -552,6 +578,16 @@ function AIFeedbackPanel() {
 ## PHP Hooks
 
 ### Filters
+
+#### `ai_feedback_chunk_size`
+
+Set how many blocks are sent to the AI per review request (default 20, clamped to 1-100). Smaller chunks keep each request short on hosts with tight timeouts.
+
+```php
+add_filter( 'ai_feedback_chunk_size', function( int $size ): int {
+    return 10;
+} );
+```
 
 #### `ai_feedback_system_instruction`
 
