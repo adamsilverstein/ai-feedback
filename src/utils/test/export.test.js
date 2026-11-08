@@ -54,6 +54,29 @@ describe('normalizeFeedbackItem', () => {
 		});
 	});
 
+	it('keeps inline emphasis inside the feedback', () => {
+		const item = normalizeFeedbackItem({
+			content: {
+				raw:
+					'<strong>Pacing</strong>\n\nConsider <em>shorter</em> sentences and <strong>fewer</strong> asides.\n\n' +
+					'<em>Suggestion:</em> Split the <em>second</em> paragraph.',
+			},
+		});
+		expect(item.title).toBe('Pacing');
+		expect(item.feedback).toBe(
+			'Consider shorter sentences and fewer asides.'
+		);
+		expect(item.suggestion).toBe('Split the second paragraph.');
+	});
+
+	it('does not take a bold word as the title when there is none', () => {
+		const item = normalizeFeedbackItem({
+			content: { raw: 'Use <strong>active</strong> voice.' },
+		});
+		expect(item.title).toBe('');
+		expect(item.feedback).toBe('Use active voice.');
+	});
+
 	it('passes raw feedback items through', () => {
 		expect(normalizeFeedbackItem(review.notes[1]).title).toBe(
 			'Long sentence'
@@ -89,6 +112,27 @@ describe('generateMarkdownReport', () => {
 		expect(md).not.toContain('### Important');
 	});
 
+	it('marks resolved items and keeps multi-line suggestions quoted', () => {
+		const md = generateMarkdownReport(
+			{
+				...review,
+				notes: [
+					{
+						title: 'T',
+						feedback: 'F',
+						suggestion: 'line one\nline two',
+						category: 'tone',
+						severity: 'important',
+						is_resolved: true,
+					},
+				],
+			},
+			'P'
+		);
+		expect(md).toContain('**Category:** tone (resolved)');
+		expect(md).toContain('> **Suggestion:** line one\n> line two');
+	});
+
 	it('handles reviews with no feedback', () => {
 		const md = generateMarkdownReport({ ...review, notes: [] }, 'P');
 		expect(md).toContain('_No issues found._');
@@ -116,6 +160,12 @@ describe('generateJSON', () => {
 });
 
 describe('getExportFilename', () => {
+	it('strips unsafe characters', () => {
+		expect(
+			getExportFilename({ review_id: '../x/y', timestamp: '' }, 'json')
+		).toBe('ai-feedback-xy.json');
+	});
+
 	it('includes the date and short review ID', () => {
 		expect(getExportFilename(review, 'md')).toBe(
 			'ai-feedback-2026-11-08-550e8400.md'

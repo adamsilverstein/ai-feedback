@@ -41,7 +41,7 @@ export default function ExportReview({ review }) {
 				type: 'snackbar',
 				id: NOTICE_ID,
 			});
-		} catch (error) {
+		} catch {
 			createErrorNotice(
 				__(
 					'Could not copy to the clipboard. Try downloading instead.',

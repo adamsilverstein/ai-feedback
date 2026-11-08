@@ -62,23 +62,36 @@ export function normalizeFeedbackItem(item) {
 
 	const raw = item.content?.raw ?? item.content?.rendered ?? '';
 	const doc = new window.DOMParser().parseFromString(raw, 'text/html');
-	doc.querySelectorAll('.ai-feedback-badge').forEach((el) => el.remove());
+	const body = doc.body;
+	body.querySelectorAll('.ai-feedback-badge').forEach((el) => el.remove());
 
-	const strong = doc.querySelector('strong');
-	const title = strong ? strong.textContent.trim() : '';
-	if (strong) {
-		strong.remove();
+	// The title is a <strong> only when it opens the note.
+	let title = '';
+	const first = Array.from(body.childNodes).find(
+		(node) => node.nodeType !== 3 || node.textContent.trim() !== ''
+	);
+	if (first && first.nodeName === 'STRONG') {
+		title = first.textContent.trim();
+		first.remove();
 	}
 
+	// The suggestion follows a top-level <em> holding the label, so inline
+	// emphasis inside the feedback is left alone.
+	const label = __('Suggestion:', 'ai-feedback');
+	const marker = Array.from(body.children).find(
+		(el) => el.nodeName === 'EM' && el.textContent.trim() === label
+	);
+
+	let feedbackHtml = body.innerHTML;
 	let suggestion = '';
-	const em = doc.querySelector('em');
-	const html = doc.body.innerHTML;
-	let feedbackHtml = html;
-	if (em) {
-		const marker = em.outerHTML;
-		const index = html.indexOf(marker);
-		feedbackHtml = html.slice(0, index);
-		suggestion = htmlToText(html.slice(index + marker.length));
+	if (marker) {
+		const after = doc.createElement('div');
+		while (marker.nextSibling) {
+			after.appendChild(marker.nextSibling);
+		}
+		marker.remove();
+		feedbackHtml = body.innerHTML;
+		suggestion = htmlToText(after.innerHTML);
 	}
 
 	return {
@@ -123,7 +136,11 @@ export function getReviewItems(review) {
  * @return {string} Markdown.
  */
 function formatMarkdownItem(item) {
-	let md = `#### ${item.title || __('Feedback', 'ai-feedback')}\n\n`;
+	const title = (item.title || __('Feedback', 'ai-feedback')).replace(
+		/\s+/g,
+		' '
+	);
+	let md = `#### ${title}\n\n`;
 	if (item.category) {
 		md += `**${__('Category:', 'ai-feedback')}** ${item.category}`;
 		md += item.isResolved ? ` (${__('resolved', 'ai-feedback')})` : '';
@@ -133,7 +150,8 @@ function formatMarkdownItem(item) {
 		md += `${item.feedback}\n\n`;
 	}
 	if (item.suggestion) {
-		md += `> **${__('Suggestion:', 'ai-feedback')}** ${item.suggestion}\n\n`;
+		const quoted = item.suggestion.replace(/\r?\n/g, '\n> ');
+		md += `> **${__('Suggestion:', 'ai-feedback')}** ${quoted}\n\n`;
 	}
 	return md;
 }
@@ -270,8 +288,12 @@ export function generateJSON(review, postTitle) {
  * @return {string} Filename.
  */
 export function getExportFilename(review, extension) {
-	const id = (review.review_id || 'review').slice(0, 8);
-	const date = (review.timestamp || '').slice(0, 10);
+	const id = String(review?.review_id || 'review')
+		.replace(/[^a-z0-9-]/gi, '')
+		.slice(0, 8);
+	const date = String(review?.timestamp || '')
+		.slice(0, 10)
+		.replace(/[^0-9-]/g, '');
 	return (
 		['ai-feedback', date, id].filter(Boolean).join('-') + `.${extension}`
 	);
