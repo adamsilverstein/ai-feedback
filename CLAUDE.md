@@ -1,6 +1,6 @@
 # AI Feedback Plugin
 
-AI-powered editorial feedback for WordPress Gutenberg using the Notes feature (WP 6.9+).
+AI-powered editorial feedback for WordPress Gutenberg using the WordPress 7.0 core AI Client, Connectors API, and Notes feature.
 
 ## Workflow
 
@@ -69,7 +69,7 @@ ai-feedback/
 
 ## Key Concepts
 
-### Notes (WordPress 6.9+)
+### Notes (WordPress 7.0+)
 
 Notes are block-level comments stored in `wp_comments` with `comment_type = 'note'`. The plugin creates notes when AI generates feedback:
 
@@ -83,17 +83,19 @@ wp_insert_comment( [
 ] );
 ```
 
-### PHP AI Client
+### Core AI Client (WordPress 7.0)
 
-Uses `wordpress/php-ai-client` for provider-agnostic AI communication:
+Uses the core `wp_ai_client_prompt()` builder for provider-agnostic AI communication. Credentials come from the Connectors API (Settings → Connectors), so the plugin never handles API keys directly:
 
 ```php
-use WordPress\AiClient\AiClient;
+$response = wp_ai_client_prompt( $prompt )
+    ->using_system_instruction( $system_prompt )
+    ->using_temperature( 0.3 )
+    ->generate_text();
 
-$response = AiClient::prompt( $prompt )
-    ->usingSystemInstruction( $system_prompt )
-    ->usingTemperature( 0.3 )
-    ->generateText();
+if ( is_wp_error( $response ) ) {
+    return $response;
+}
 ```
 
 ### Data Flow
@@ -124,7 +126,7 @@ Edit `class-prompt-builder.php`. Consider:
 
 ## Dependencies
 
-**Runtime:** WordPress 6.9+, PHP 8.1+, [AI Experiments plugin](https://wordpress.org/plugins/ai/)
+**Runtime:** WordPress 7.0+, PHP 8.1+ (the core AI Client and Connectors API are bundled in WordPress 7.0)
 
 **Development:** Node 18+, Composer 2+, Docker (for wp-env)
 

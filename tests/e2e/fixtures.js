@@ -103,12 +103,13 @@ class AIFeedbackUtils {
 				.catch(() => false);
 			if (isWelcomeModalVisible) {
 				// Try "Get Started" first (normal modal), then "Close" (setup required modal)
-				const getStartedButton = this.page.getByRole('button', {
+				const getStartedButton = welcomeModal.getByRole('button', {
 					name: 'Get Started',
 				});
-				const closeButton = this.page.getByRole('button', {
-					name: 'Close',
-				});
+				// The modal header also has a "Close" button; either one dismisses.
+				const closeButton = welcomeModal
+					.getByRole('button', { name: 'Close', exact: true })
+					.last();
 
 				const hasGetStarted = await getStartedButton
 					.isVisible()
