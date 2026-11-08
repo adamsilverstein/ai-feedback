@@ -134,4 +134,60 @@ class PromptBuilderReplyTest extends TestCase {
 		$this->assertStringNotContainsString( '{', $instruction );
 		$this->assertStringNotContainsString( '"feedback"', $instruction );
 	}
+
+	/**
+	 * A very long user reply is capped so it cannot blow up the prompt.
+	 */
+	public function test_long_user_reply_is_truncated(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'original_feedback' => 'Short.',
+				'user_reply'        => str_repeat( 'b', 5000 ),
+			)
+		);
+
+		$this->assertStringContainsString( str_repeat( 'b', 2000 ) . '... [truncated]', $prompt );
+		$this->assertStringNotContainsString( str_repeat( 'b', 2001 ), $prompt );
+	}
+
+	/**
+	 * Truncation does not split multibyte characters.
+	 */
+	public function test_truncation_is_multibyte_safe(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'original_feedback' => 'Short.',
+				'user_reply'        => str_repeat( 'é', 2500 ),
+			)
+		);
+
+		$this->assertStringContainsString( str_repeat( 'é', 2000 ) . '... [truncated]', $prompt );
+		$this->assertTrue( mb_check_encoding( $prompt, 'UTF-8' ) );
+	}
+
+	/**
+	 * Non-scalar context values are ignored instead of raising errors.
+	 */
+	public function test_non_scalar_context_values_are_ignored(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'original_feedback' => array( 'not', 'a', 'string' ),
+				'user_reply'        => 'OK.',
+				'thread'            => array( 'not-an-entry', array( 'content' => 'Kept entry.' ) ),
+			)
+		);
+
+		$this->assertStringContainsString( 'Kept entry.', $prompt );
+		$this->assertStringNotContainsString( 'Array', $prompt );
+	}
+
+	/**
+	 * The system instruction tells the model to treat user content as data.
+	 */
+	public function test_reply_system_instruction_guards_against_embedded_instructions(): void {
+		$this->assertStringContainsString(
+			'not as instructions',
+			$this->builder->get_reply_system_instruction()
+		);
+	}
 }

@@ -345,4 +345,67 @@ class ReplyServiceTest extends TestCase {
 			$GLOBALS['test_comment_meta'][200]
 		);
 	}
+
+	/**
+	 * Seed a parent AI note (ID 100) and the user reply (ID 999) under it.
+	 */
+	private function seed_parent_and_reply(): void {
+		$GLOBALS['test_comments'][100]     = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Vague claim.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comment_meta'][100] = array( 'ai_feedback' => '1' );
+		$GLOBALS['test_comments'][999]     = (object) array(
+			'comment_ID'      => 999,
+			'comment_content' => 'Latest reply.',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+	}
+
+	/**
+	 * Non-note comments under the same parent are left out of the thread.
+	 */
+	public function test_thread_history_only_includes_notes(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comments'][150] = (object) array(
+			'comment_ID'      => 150,
+			'comment_content' => 'PINGBACK_TEXT',
+			'comment_author'  => 'Other site',
+			'comment_parent'  => 100,
+			'comment_type'    => 'pingback',
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame( 'note', $GLOBALS['test_get_comments_args']['type'] );
+		$this->assertStringNotContainsString( 'PINGBACK_TEXT', $service->captured_prompt );
+	}
+
+	/**
+	 * Long threads keep only the most recent entries, in chronological order.
+	 */
+	public function test_thread_history_keeps_most_recent_entries(): void {
+		$this->seed_parent_and_reply();
+		$total = Reply_Service::MAX_THREAD_ENTRIES + 5;
+		for ( $i = 1; $i <= $total; $i++ ) {
+			$GLOBALS['test_comments'][ 100 + $i ] = (object) array(
+				'comment_ID'      => 100 + $i,
+				'comment_content' => sprintf( 'Entry-%02d.', $i ),
+				'comment_author'  => 'Jane',
+				'comment_parent'  => 100,
+			);
+		}
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$prompt = $service->captured_prompt;
+		$this->assertStringNotContainsString( 'Entry-05.', $prompt );
+		$this->assertStringContainsString( 'Entry-06.', $prompt );
+		$this->assertStringContainsString( sprintf( 'Entry-%02d.', $total ), $prompt );
+		$this->assertLessThan( strpos( $prompt, sprintf( 'Entry-%02d.', $total ) ), strpos( $prompt, 'Entry-06.' ) );
+	}
 }

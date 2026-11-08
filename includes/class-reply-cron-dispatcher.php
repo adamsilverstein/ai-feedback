@@ -35,6 +35,16 @@ class Reply_Cron_Dispatcher {
 	public const STATUS_META_KEY = 'ai_feedback_reply_status';
 
 	/**
+	 * Comment meta key holding the generated AI reply's comment ID.
+	 */
+	public const REPLY_COMMENT_ID_META_KEY = 'ai_feedback_reply_comment_id';
+
+	/**
+	 * Comment meta key holding the error message when generation failed.
+	 */
+	public const REPLY_ERROR_META_KEY = 'ai_feedback_reply_error';
+
+	/**
 	 * Register hooks.
 	 */
 	public function register(): void {
@@ -60,8 +70,8 @@ class Reply_Cron_Dispatcher {
 	 * @param string $block_id   Block ID from the parent note.
 	 */
 	public function schedule_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
-		$existing_status = (string) get_comment_meta( $comment_id, self::STATUS_META_KEY, true );
-		if ( '' !== $existing_status ) {
+		$existing_status = get_comment_meta( $comment_id, self::STATUS_META_KEY, true );
+		if ( '' !== $existing_status && false !== $existing_status ) {
 			return;
 		}
 

@@ -9,6 +9,10 @@ module.exports = {
 	},
 	overrides: [
 		{
+			files: ['src/**/test/*.js'],
+			extends: ['plugin:@wordpress/eslint-plugin/test-unit'],
+		},
+		{
 			files: ['tests/e2e/**/*.js'],
 			rules: {
 				'import/no-extraneous-dependencies': 'off',

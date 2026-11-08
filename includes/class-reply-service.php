@@ -11,8 +11,6 @@
 namespace AI_Feedback;
 
 use WP_Error;
-use WordPress\AiClient\AiClient;
-use WordPress\AiClient\Providers\Http\DTO\RequestOptions;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -22,6 +20,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Reply Service class.
  */
 class Reply_Service {
+
+	/**
+	 * HTTP timeout in seconds for reply generation.
+	 *
+	 * Replies are short, so this stays below the review timeout.
+	 */
+	public const AI_HTTP_TIMEOUT = 45;
+
+	/**
+	 * Maximum number of prior thread replies sent to the AI as context.
+	 */
+	public const MAX_THREAD_ENTRIES = 20;
 
 	/**
 	 * Prompt builder instance.
@@ -76,34 +86,25 @@ class Reply_Service {
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
 		$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
 
-		if ( is_wp_error( $result ) ) {
-			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
-			update_comment_meta(
-				$comment_id,
-				'ai_feedback_reply_error',
-				sanitize_text_field( $result->get_error_message() )
-			);
-			return;
+		// A non-positive ID means persistence silently failed. Marking that
+		// 'complete' would leave the frontend waiting on a reply that does not exist.
+		if ( ! is_wp_error( $result ) && $result <= 0 ) {
+			$result = new WP_Error( 'reply_not_saved', __( 'The AI reply could not be saved.', 'ai-feedback' ) );
 		}
 
-		$reply_id = (int) $result;
-
-		// A non-error, non-positive return from handle_reply means persistence
-		// silently failed (e.g. wp_insert_comment returned 0 or false). Marking
-		// it 'complete' would leave the frontend polling indefinitely on a
-		// non-existent reply, so route it through the failed branch instead.
-		if ( $reply_id <= 0 ) {
+		if ( is_wp_error( $result ) ) {
+			Logger::debug( sprintf( 'Reply_Service: reply %d failed: %s', $comment_id, $result->get_error_code() ) );
 			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
 			update_comment_meta(
 				$comment_id,
-				'ai_feedback_reply_error',
-				__( 'Reply persistence returned no comment ID.', 'ai-feedback' )
+				Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY,
+				mb_substr( sanitize_text_field( $result->get_error_message() ), 0, 300 )
 			);
 			return;
 		}
 
 		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'complete' );
-		update_comment_meta( $comment_id, 'ai_feedback_reply_comment_id', $reply_id );
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY, $result );
 	}
 
 	/**
@@ -115,7 +116,7 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 * @return int|WP_Error New AI reply comment ID on success, WP_Error on failure.
 	 */
-	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ) {
+	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ): int|WP_Error {
 		$context = $this->build_context( $comment_id, $parent_id, $post_id );
 		if ( is_wp_error( $context ) ) {
 			Logger::debug( 'Reply_Service: failed to build context: ' . $context->get_error_message() );
@@ -124,7 +125,7 @@ class Reply_Service {
 
 		$prompt             = $this->prompt_builder->build_reply_prompt( $context );
 		$system_instruction = $this->prompt_builder->get_reply_system_instruction();
-		$model              = (string) get_option( 'ai_feedback_default_model', 'claude-sonnet-4' );
+		$model              = self::option_string( 'ai_feedback_default_model', 'claude-sonnet-4' );
 
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
@@ -151,61 +152,89 @@ class Reply_Service {
 	 *
 	 * @param  int $comment_id Reply comment ID.
 	 * @param  int $parent_id  Parent (original AI note) comment ID.
-	 * @param  int $post_id    Post ID — used to scope the siblings query.
-	 * @return array|WP_Error Context array for Prompt_Builder::build_reply_prompt(), or error.
+	 * @param  int $post_id    Post ID - used to scope the siblings query.
+	 * @return array<string, mixed>|WP_Error Context for Prompt_Builder::build_reply_prompt(), or error.
 	 */
-	private function build_context( int $comment_id, int $parent_id, int $post_id ) {
+	private function build_context( int $comment_id, int $parent_id, int $post_id ): array|WP_Error {
 		$reply = get_comment( $comment_id );
-		if ( ! $reply ) {
+		if ( ! is_object( $reply ) ) {
 			return new WP_Error( 'reply_not_found', 'Reply comment not found.' );
 		}
 
 		$parent = get_comment( $parent_id );
-		if ( ! $parent ) {
+		if ( ! is_object( $parent ) ) {
 			return new WP_Error( 'parent_not_found', 'Parent note not found.' );
 		}
 
-		// Fetch all siblings of the reply (chronological). The new reply is
-		// already persisted at this point, so it will be included — drop it
-		// from the thread history to avoid echoing the user back to themselves.
+		// Fetch the most recent siblings, newest first, then restore
+		// chronological order. The new reply is already persisted, so fetch one
+		// extra and drop it to avoid echoing the user back to themselves.
 		$siblings = get_comments(
 			array(
 				'parent'  => $parent_id,
 				'post_id' => $post_id,
 				'type'    => 'note',
 				'status'  => 'all',
-				'orderby' => 'comment_date',
-				'order'   => 'ASC',
+				'orderby' => array(
+					'comment_date' => 'DESC',
+					'comment_ID'   => 'DESC',
+				),
+				'number'  => self::MAX_THREAD_ENTRIES + 1,
 			)
 		);
 
 		$thread = array();
-		foreach ( $siblings as $sibling ) {
-			if ( (int) $sibling->comment_ID === $comment_id ) {
+		foreach ( is_array( $siblings ) ? array_reverse( $siblings ) : array() as $sibling ) {
+			if ( ! is_object( $sibling ) || (int) $sibling->comment_ID === $comment_id ) {
 				continue;
 			}
 			$thread[] = array(
-				'author'  => (string) $sibling->comment_author,
-				'content' => (string) $sibling->comment_content,
+				'author'  => $sibling->comment_author,
+				'content' => $sibling->comment_content,
 				'is_ai'   => (bool) get_comment_meta( (int) $sibling->comment_ID, 'ai_feedback', true ),
 			);
 		}
+		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
 
 		return array(
 			'block_content'     => '', // Future enhancement: derive from post_content.
-			'block_type'        => (string) get_comment_meta( $parent_id, 'block_name', true ),
-			'original_feedback' => (string) $parent->comment_content,
-			'original_category' => (string) get_comment_meta( $parent_id, 'feedback_category', true ),
-			'original_severity' => (string) get_comment_meta( $parent_id, 'feedback_severity', true ),
+			'block_type'        => self::meta_string( $parent_id, 'block_name' ),
+			'original_feedback' => $parent->comment_content,
+			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
+			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
 			'thread'            => $thread,
-			'user_reply'        => (string) $reply->comment_content,
-			'target_tone'       => (string) get_option( 'ai_feedback_default_tone', 'professional' ),
-			'locale'            => (string) get_option( 'ai_feedback_feedback_locale', get_locale() ),
+			'user_reply'        => $reply->comment_content,
+			'target_tone'       => self::option_string( 'ai_feedback_default_tone', 'professional' ),
+			'locale'            => self::option_string( 'ai_feedback_feedback_locale', get_locale() ),
 		);
 	}
 
 	/**
-	 * Call the AI client to generate the reply text.
+	 * Read a string comment meta value.
+	 *
+	 * @param int    $comment_id Comment ID.
+	 * @param string $key        Meta key.
+	 * @return string Meta value, or '' when missing or not a string.
+	 */
+	private static function meta_string( int $comment_id, string $key ): string {
+		$value = get_comment_meta( $comment_id, $key, true );
+		return is_string( $value ) ? $value : '';
+	}
+
+	/**
+	 * Read a string option value.
+	 *
+	 * @param string $name          Option name.
+	 * @param string $default_value Value used when the option is missing or not a string.
+	 * @return string
+	 */
+	private static function option_string( string $name, string $default_value ): string {
+		$value = get_option( $name, $default_value );
+		return is_string( $value ) && '' !== $value ? $value : $default_value;
+	}
+
+	/**
+	 * Call the WordPress 7.0 core AI Client to generate the reply text.
 	 *
 	 * Protected so tests can subclass and override.
 	 *
@@ -214,34 +243,35 @@ class Reply_Service {
 	 * @param  string $model              Model preference.
 	 * @return string|WP_Error AI reply text or error.
 	 */
-	protected function call_ai( string $prompt, string $system_instruction, string $model ) {
-		if ( ! class_exists( AiClient::class ) ) {
+	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
-				__( 'PHP AI Client library is not installed.', 'ai-feedback' )
+				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'ai-feedback' )
 			);
 		}
 
-		try {
-			$options = new RequestOptions();
-			$options->setTimeout( 45.0 );
+		$timeout_filter = static function (): int {
+			return self::AI_HTTP_TIMEOUT;
+		};
+		add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );
 
-			return AiClient::prompt( $prompt )
-				->usingSystemInstruction( $system_instruction )
-				->usingModelPreference( $model )
-				->usingTemperature( 0.4 )
-				->usingMaxTokens( 400 )
-				->usingRequestOptions( $options )
-				->generateText();
-		} catch ( \Exception $e ) {
+		try {
+			return wp_ai_client_prompt( $prompt )
+				->using_system_instruction( $system_instruction )
+				->using_model_preference( $model )
+				->using_temperature( 0.4 )
+				->using_max_tokens( 400 )
+				->generate_text();
+		} catch ( \Throwable $e ) {
+			// Core converts SDK exceptions to WP_Error; this catches anything else.
+			Logger::debug( sprintf( 'Reply_Service: AI request threw %s: %s', get_class( $e ), $e->getMessage() ) );
 			return new WP_Error(
 				'ai_request_failed',
-				sprintf(
-					/* translators: %s: error message */
-					__( 'AI reply request failed: %s', 'ai-feedback' ),
-					$e->getMessage()
-				)
+				__( 'The AI reply request failed unexpectedly. Please try again.', 'ai-feedback' )
 			);
+		} finally {
+			remove_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );
 		}
 	}
 }

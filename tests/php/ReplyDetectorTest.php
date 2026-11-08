@@ -178,4 +178,43 @@ class ReplyDetectorTest extends TestCase {
 		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
 	}
 
+	/**
+	 * WP_Comment stores IDs as numeric strings; those must still dispatch ints.
+	 */
+	public function test_numeric_string_ids_dispatch_ints(): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+
+		$reply = (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => '100',
+			'comment_post_ID' => '42',
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertSame( array( 200, 100, 42, 'abc-123' ), $GLOBALS['test_dispatched_calls'][0]['args'] );
+	}
+
+	/**
+	 * A non-string block_id meta value is treated as missing.
+	 */
+	public function test_non_string_block_id_is_ignored(): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => array( 'abc-123' ),
+		);
+
+		$reply = (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => 100,
+			'comment_post_ID' => 42,
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
 }
