@@ -219,6 +219,22 @@ class AIFeedbackUtils {
 	}
 
 	/**
+	 * Run an action that changes a setting and wait for the settings save.
+	 *
+	 * @param {Function} action - Action that changes a setting.
+	 */
+	async saveSetting(action) {
+		const saved = this.page.waitForResponse(
+			(response) =>
+				restRoute('/settings')(new URL(response.url())) &&
+				response.request().method() === 'POST' &&
+				response.ok()
+		);
+		await action();
+		await saved;
+	}
+
+	/**
 	 * Locate the primary review button, in either the empty state or the
 	 * Review Document panel.
 	 *
@@ -303,6 +319,7 @@ class AIFeedbackUtils {
 		const request = await requestPromise;
 		// Resolves to null when the request fails at the network level.
 		const response = await request.response();
+		// The response has arrived, so the busy state is already set or done.
 		await expect(this.getReviewButton()).not.toHaveClass(/is-busy/);
 		return response;
 	}
@@ -354,13 +371,9 @@ const test = base.extend({
 	// Route reviews through the plugin's mock AI response (see
 	// tests/mu-plugins/ai-feedback-e2e.php) so no real provider is called.
 	e2eMockMode: [
-		async ({ context }, use) => {
+		async ({ context, baseURL }, use) => {
 			await context.addCookies([
-				{
-					name: 'ai_feedback_e2e',
-					value: '1',
-					url: process.env.WP_BASE_URL || 'http://localhost:8889',
-				},
+				{ name: 'ai_feedback_e2e', value: '1', url: baseURL },
 			]);
 			await use();
 		},
@@ -373,7 +386,9 @@ const test = base.extend({
 			await page.addInitScript(() => {
 				try {
 					window.localStorage.setItem('ai-feedback-welcomed', 'true');
-				} catch {}
+				} catch {
+					// Storage can be unavailable; the modal is then dismissed in openSidebar().
+				}
 			});
 			await use();
 		},
