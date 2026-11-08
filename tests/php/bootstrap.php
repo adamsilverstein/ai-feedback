@@ -28,6 +28,12 @@ if ( ! function_exists( 'get_locale' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $value, $flags = 0, $depth = 512 ) {
+		return json_encode( $value, $flags, $depth );
+	}
+}
+
 if ( ! function_exists( 'apply_filters' ) ) {
 	function apply_filters( $_hook_name, $value, ...$args ) {
 		return $value;
