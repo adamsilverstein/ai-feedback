@@ -14,6 +14,7 @@ use AI_Feedback\Reply_Cron_Dispatcher;
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-cron-dispatcher.php';
 require_once __DIR__ . '/reply-cron-mocks.php';
 require_once __DIR__ . '/reply-status-controller-bootstrap.php';
+require_once __DIR__ . '/reply-service-mocks.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-status-controller.php';
 
 /**
@@ -197,5 +198,122 @@ class ReplyStatusControllerTest extends TestCase {
 			array( 'reply_id', 'status', 'ai_reply_comment_id', 'error' ),
 			array_keys( $schema['properties'] )
 		);
+	}
+
+	/**
+	 * Seed an AI note (300) with a user reply (301), an AI reply (302) and a
+	 * second user reply (303).
+	 *
+	 * @param string $latest_status Status meta of the newest user reply.
+	 */
+	private function seed_thread( string $latest_status ): void {
+		$base = array(
+			'comment_post_ID' => '42',
+			'comment_type'    => 'note',
+		);
+
+		$GLOBALS['test_comments'][300]     = new \WP_Comment( $base + array( 'comment_ID' => '300' ) );
+		$GLOBALS['test_comment_meta'][300] = array( 'ai_feedback' => '1' );
+
+		$GLOBALS['test_comments'][301]     = new \WP_Comment(
+			$base + array(
+				'comment_ID'      => '301',
+				'comment_parent'  => '300',
+				'comment_author'  => 'Jane',
+				'comment_content' => '<p>Which stat?</p>',
+			)
+		);
+		$GLOBALS['test_comment_meta'][301] = array( Reply_Cron_Dispatcher::STATUS_META_KEY => 'complete' );
+
+		$GLOBALS['test_comments'][302]     = new \WP_Comment(
+			$base + array(
+				'comment_ID'      => '302',
+				'comment_parent'  => '300',
+				'comment_author'  => 'AI Feedback',
+				'comment_content' => "The 40% growth claim.\n\n",
+			)
+		);
+		$GLOBALS['test_comment_meta'][302] = array( 'ai_feedback' => '1' );
+
+		$GLOBALS['test_comments'][303]     = new \WP_Comment(
+			$base + array(
+				'comment_ID'      => '303',
+				'comment_parent'  => '300',
+				'comment_author'  => 'Jane',
+				'comment_content' => 'Thanks, fixed.',
+			)
+		);
+		$GLOBALS['test_comment_meta'][303] = array( Reply_Cron_Dispatcher::STATUS_META_KEY => $latest_status );
+	}
+
+	/**
+	 * Build a threads request for a post.
+	 *
+	 * @param int $post Post ID.
+	 * @return \WP_REST_Request
+	 */
+	private function threads_request( int $post = 42 ): \WP_REST_Request {
+		$request = new \WP_REST_Request();
+		$request->set_param( 'post', $post );
+		return $request;
+	}
+
+	/**
+	 * Threads list replies oldest first as plain text and flag AI replies.
+	 */
+	public function test_threads_list_replies_in_order_as_plain_text(): void {
+		$this->seed_thread( 'complete' );
+
+		$data   = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$thread = ( (array) $data['threads'] )[300];
+
+		$this->assertSame( array( 300 ), array_keys( (array) $data['threads'] ) );
+		$this->assertSame( array( 301, 302, 303 ), array_column( $thread['replies'], 'id' ) );
+		$this->assertSame( 'Which stat?', $thread['replies'][0]['content'] );
+		$this->assertSame( 'The 40% growth claim.', $thread['replies'][1]['content'] );
+		$this->assertSame( array( false, true, false ), array_column( $thread['replies'], 'is_ai' ) );
+		$this->assertNull( $thread['pending_reply_id'] );
+	}
+
+	/**
+	 * The newest user reply awaiting an AI response is exposed for polling.
+	 */
+	public function test_threads_expose_pending_reply_id(): void {
+		$this->seed_thread( 'pending' );
+
+		$data = $this->controller->get_threads( $this->threads_request() )->get_data();
+
+		$this->assertSame( 303, ( (array) $data['threads'] )[300]['pending_reply_id'] );
+	}
+
+	/**
+	 * Replies under notes that AI Feedback did not create are left out.
+	 */
+	public function test_threads_skip_non_ai_notes(): void {
+		$this->seed_thread( 'complete' );
+		$GLOBALS['test_comment_meta'][300] = array();
+
+		$data = $this->controller->get_threads( $this->threads_request() )->get_data();
+
+		$this->assertSame( array(), (array) $data['threads'] );
+	}
+
+	/**
+	 * Users who cannot edit the post cannot read its threads.
+	 */
+	public function test_threads_permissions_reject_unauthorized_user(): void {
+		$GLOBALS['test_current_user_can'] = false;
+
+		$result = $this->controller->get_threads_permissions_check( $this->threads_request() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
+	}
+
+	/**
+	 * Post editors can read the post's threads.
+	 */
+	public function test_threads_permissions_allow_post_editor(): void {
+		$this->assertTrue( $this->controller->get_threads_permissions_check( $this->threads_request() ) );
 	}
 }
