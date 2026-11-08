@@ -3,6 +3,24 @@
  */
 
 /**
+ * Strip markup from a string.
+ *
+ * @param {string|undefined} html HTML or plain text.
+ * @return {string} Plain text.
+ */
+function toPlainText(html) {
+	if (!html) {
+		return '';
+	}
+	if (!/[<&]/.test(html)) {
+		return html;
+	}
+	return new window.DOMParser()
+		.parseFromString(html, 'text/html')
+		.body.textContent.trim();
+}
+
+/**
  * Get the title, feedback and suggestion for a feedback item.
  *
  * New notes carry these as fields. Notes saved before that only have HTML
@@ -14,10 +32,12 @@
  */
 export function getFeedbackContent(item = {}) {
 	if (item.title || item.feedback || item.suggestion) {
+		// Stored text may carry the few tags the parser allows (strong, em,
+		// code, br); the sidebar shows plain text.
 		return {
-			title: item.title || '',
-			feedback: item.feedback || '',
-			suggestion: item.suggestion || '',
+			title: toPlainText(item.title),
+			feedback: toPlainText(item.feedback),
+			suggestion: toPlainText(item.suggestion),
 		};
 	}
 

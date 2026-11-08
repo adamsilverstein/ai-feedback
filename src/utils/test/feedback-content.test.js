@@ -19,6 +19,19 @@ describe('getFeedbackContent', () => {
 		});
 	});
 
+	it('strips markup from stored fields', () => {
+		expect(
+			getFeedbackContent({
+				title: 'Wordy',
+				feedback: 'This is <em>too</em> long &amp; slow.',
+			})
+		).toEqual({
+			title: 'Wordy',
+			feedback: 'This is too long & slow.',
+			suggestion: '',
+		});
+	});
+
 	it('falls back to parsing older note content', () => {
 		const raw =
 			'<strong>Wordy phrase</strong>\n\nThis could be shorter.\n\n' +
