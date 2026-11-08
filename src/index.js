@@ -8,6 +8,7 @@ import { commentAuthorAvatar as icon } from '@wordpress/icons';
 
 import './store';
 import AIFeedbackPanel from './components/AIFeedbackPanel';
+import KeyboardShortcuts from './components/KeyboardShortcuts';
 import './index.scss';
 
 /**
@@ -17,6 +18,7 @@ registerPlugin('ai-feedback', {
 	render: () => {
 		return (
 			<>
+				<KeyboardShortcuts />
 				<PluginSidebarMoreMenuItem
 					target="ai-feedback-sidebar"
 					icon={icon}
