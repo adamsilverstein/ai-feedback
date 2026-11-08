@@ -8,6 +8,12 @@ import { useEffect, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { getReviewStages, getStageProgress } from '../store/review-stages';
 
+/** How often the bar and elapsed time update, in milliseconds. */
+const TICK_MS = 1000;
+
+/** Short reviews don't need a timer; show it after this many seconds. */
+const SHOW_ELAPSED_AFTER_SECONDS = 5;
+
 /**
  * Review Progress component.
  *
@@ -25,26 +31,31 @@ export default function ReviewProgress({ stageKey }) {
 
 	// Mounted when the review starts, so mount time is the review's start.
 	const [reviewStartedAt] = useState(() => Date.now());
-	const [stageStartedAt, setStageStartedAt] = useState(reviewStartedAt);
+	const [stageStart, setStageStart] = useState(() => ({
+		key: stageKey,
+		at: reviewStartedAt,
+	}));
 	const [now, setNow] = useState(reviewStartedAt);
 
 	useEffect(() => {
-		const interval = setInterval(() => setNow(Date.now()), 1000);
+		const interval = setInterval(() => setNow(Date.now()), TICK_MS);
 		return () => clearInterval(interval);
 	}, []);
 
-	useEffect(() => {
-		const stageStart = Date.now();
-		setStageStartedAt(stageStart);
-		setNow(stageStart);
-	}, [stageKey]);
+	// Note when each step starts. Until that is recorded, treat the new
+	// step as just started so the bar never jumps ahead.
+	if (stageStart.key !== stageKey) {
+		setStageStart({ key: stageKey, at: now });
+	}
+	const stageElapsed =
+		stageStart.key === stageKey ? Math.max(0, now - stageStart.at) : 0;
 
 	if (!stage) {
 		return null;
 	}
 
 	// The bar eases within the current step; the counter shows total time.
-	const progress = Math.round(getStageProgress(stage, now - stageStartedAt));
+	const progress = Math.round(getStageProgress(stage, stageElapsed));
 	const elapsedSeconds = Math.floor((now - reviewStartedAt) / 1000);
 
 	const stepText = sprintf(
@@ -73,7 +84,7 @@ export default function ReviewProgress({ stageKey }) {
 				</span>{' '}
 				{stage.label}
 			</p>
-			{elapsedSeconds >= 5 && (
+			{elapsedSeconds >= SHOW_ELAPSED_AFTER_SECONDS && (
 				<p
 					className="ai-feedback-review-progress-elapsed description"
 					aria-hidden="true"
