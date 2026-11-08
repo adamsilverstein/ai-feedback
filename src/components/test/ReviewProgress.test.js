@@ -53,6 +53,23 @@ describe('ReviewProgress', () => {
 		expect(screen.getByText('10s elapsed')).toBeInTheDocument();
 	});
 
+	it('keeps counting total time across stage changes', () => {
+		const { rerender } = render(
+			<ReviewProgress stageKey={STAGE_PREPARING} />
+		);
+
+		act(() => {
+			jest.advanceTimersByTime(3000);
+		});
+		rerender(<ReviewProgress stageKey={STAGE_ANALYZING} />);
+		act(() => {
+			jest.advanceTimersByTime(4000);
+		});
+
+		expect(screen.getByText('7s elapsed')).toBeInTheDocument();
+		expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
+	});
+
 	it('renders nothing for an unknown stage', () => {
 		const { container } = render(<ReviewProgress stageKey={null} />);
 

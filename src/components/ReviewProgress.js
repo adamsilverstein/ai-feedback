@@ -23,25 +23,29 @@ export default function ReviewProgress({ stageKey }) {
 	const stageIndex = stages.findIndex((stage) => stage.key === stageKey);
 	const stage = stages[stageIndex];
 
-	const [elapsedMs, setElapsedMs] = useState(0);
+	// Mounted when the review starts, so mount time is the review's start.
+	const [reviewStartedAt] = useState(() => Date.now());
+	const [stageStartedAt, setStageStartedAt] = useState(reviewStartedAt);
+	const [now, setNow] = useState(reviewStartedAt);
 
 	useEffect(() => {
-		const startedAt = Date.now();
-		setElapsedMs(0);
-
-		const interval = setInterval(() => {
-			setElapsedMs(Date.now() - startedAt);
-		}, 1000);
-
+		const interval = setInterval(() => setNow(Date.now()), 1000);
 		return () => clearInterval(interval);
+	}, []);
+
+	useEffect(() => {
+		const stageStart = Date.now();
+		setStageStartedAt(stageStart);
+		setNow(stageStart);
 	}, [stageKey]);
 
 	if (!stage) {
 		return null;
 	}
 
-	const progress = Math.round(getStageProgress(stage, elapsedMs));
-	const elapsedSeconds = Math.floor(elapsedMs / 1000);
+	// The bar eases within the current step; the counter shows total time.
+	const progress = Math.round(getStageProgress(stage, now - stageStartedAt));
+	const elapsedSeconds = Math.floor((now - reviewStartedAt) / 1000);
 
 	const stepText = sprintf(
 		/* translators: 1: current step number, 2: total number of steps */
@@ -56,9 +60,14 @@ export default function ReviewProgress({ stageKey }) {
 				className="ai-feedback-review-progress-bar"
 				value={progress}
 				aria-label={__('Review progress', 'ai-feedback')}
-				aria-valuetext={`${stepText}: ${stage.label}`}
+				aria-valuetext={sprintf(
+					/* translators: 1: "Step 1 of 3", 2: description of the step */
+					__('%1$s: %2$s', 'ai-feedback'),
+					stepText,
+					stage.label
+				)}
 			/>
-			<p className="ai-feedback-review-progress-label">
+			<p className="ai-feedback-review-progress-label" role="status">
 				<span className="ai-feedback-review-progress-step">
 					{stepText}
 				</span>{' '}

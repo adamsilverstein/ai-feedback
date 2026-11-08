@@ -142,4 +142,45 @@ describe('startReview stage transitions', () => {
 		// eslint-disable-next-line no-console
 		console.log.mockRestore();
 	});
+
+	it('ends with REVIEW_ERROR when the review request fails', () => {
+		jest.spyOn(console, 'log').mockImplementation(() => {});
+		jest.spyOn(console, 'error').mockImplementation(() => {});
+
+		const generator = startReview({
+			postId: 1,
+			title: 'Title',
+			blocks: [{ clientId: 'abc', name: 'core/paragraph', content: 'x' }],
+		});
+
+		let step = generator.next();
+		while (!step.done) {
+			const yielded = step.value;
+			if (yielded?.request?.path === '/ai-feedback/v1/review') {
+				step = generator.throw({ code: 'boom', message: 'Failed' });
+				continue;
+			}
+			step = generator.next(
+				yielded?.request?.path?.includes('feedback-history')
+					? { has_history: false, notes: [], total: 0 }
+					: undefined
+			);
+		}
+
+		expect(step.value).toEqual({
+			type: TYPES.REVIEW_ERROR,
+			error: { code: 'boom', message: 'Failed', data: null },
+		});
+
+		// The reducer clears the stage on that action.
+		let state = reducer(initialState, { type: TYPES.START_REVIEW });
+		state = reducer(state, setReviewStage(STAGE_ANALYZING));
+		state = reducer(state, step.value);
+		expect(getReviewStage(state)).toBeNull();
+
+		// eslint-disable-next-line no-console
+		console.log.mockRestore();
+		// eslint-disable-next-line no-console
+		console.error.mockRestore();
+	});
 });
