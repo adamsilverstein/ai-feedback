@@ -120,6 +120,30 @@ class ReviewHistoryTest extends TestCase {
 	}
 
 	/**
+	 * The AI summary is stored as capped plain text.
+	 */
+	public function test_build_entry_sanitizes_and_caps_summary_text(): void {
+		$review                 = $this->review( 'aaa-1' );
+		$review['summary_text'] = '<b>Bold</b> ' . str_repeat( 'x', Review_History::MAX_SUMMARY_LENGTH );
+
+		$text = Review_History::build_entry( $review )['summary_text'];
+
+		$this->assertStringStartsWith( 'Bold x', $text );
+		$this->assertSame( Review_History::MAX_SUMMARY_LENGTH, mb_strlen( $text ) );
+	}
+
+	/**
+	 * The stored summary can be looked up for a reloaded review.
+	 */
+	public function test_get_summary_text(): void {
+		Review_History::record( 42, $this->review( 'aaa-1' ) );
+
+		$this->assertSame( 'Solid draft.', Review_History::get_summary_text( 42, 'aaa-1' ) );
+		$this->assertSame( '', Review_History::get_summary_text( 42, 'missing' ) );
+		$this->assertSame( '', Review_History::get_summary_text( 7, 'aaa-1' ) );
+	}
+
+	/**
 	 * Recording appends entries to post meta.
 	 */
 	public function test_record_appends_entry(): void {
