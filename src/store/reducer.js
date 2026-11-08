@@ -44,6 +44,7 @@ export const TYPES = {
 	UPDATE_BLOCK_NOTES: 'UPDATE_BLOCK_NOTES',
 	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
+	SET_NOTE_RESOLVED: 'SET_NOTE_RESOLVED',
 };
 
 /**
@@ -166,6 +167,22 @@ export default function reducer(state = initialState, action) {
 				isLoadingPreviousReview: false,
 				hasFetchedPreviousReview: true,
 				lastReview: action.review,
+			};
+
+		case TYPES.SET_NOTE_RESOLVED:
+			if (!state.lastReview?.notes) {
+				return state;
+			}
+			return {
+				...state,
+				lastReview: {
+					...state.lastReview,
+					notes: state.lastReview.notes.map((note) =>
+						note.id === action.noteId
+							? { ...note, is_resolved: action.isResolved }
+							: note
+					),
+				},
 			};
 
 		default:

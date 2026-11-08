@@ -341,6 +341,31 @@ export function* startReview({
 }
 
 /**
+ * Mark a feedback note as dismissed (resolved) or restore it.
+ *
+ * Uses the plugin's resolve endpoints, which only flag the note for AI
+ * Feedback. The note's thread in the editor's Notes panel is left as is.
+ *
+ * @param {number}  noteId     Note ID.
+ * @param {boolean} isResolved Whether the note should be resolved.
+ * @return {Object} Action object.
+ */
+export function* setNoteResolved(noteId, isResolved) {
+	yield apiFetch({
+		path: `/ai-feedback/v1/notes/${noteId}/${
+			isResolved ? 'resolve' : 'unresolve'
+		}`,
+		method: 'POST',
+	});
+
+	return {
+		type: TYPES.SET_NOTE_RESOLVED,
+		noteId,
+		isResolved,
+	};
+}
+
+/**
  * Update block metadata with note IDs.
  * This is a control that dispatches to the block editor store.
  *

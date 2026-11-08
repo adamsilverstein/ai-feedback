@@ -152,7 +152,7 @@ export function getUnresolvedNotesCount(state) {
 	if (!state.lastReview || !state.lastReview.notes) {
 		return 0;
 	}
-	return state.lastReview.notes.filter((note) => !note.resolved).length;
+	return state.lastReview.notes.filter((note) => !note.is_resolved).length;
 }
 
 /**
