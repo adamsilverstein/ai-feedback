@@ -8,6 +8,7 @@ import {
 } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
+import { STAGE_ANALYZING, STAGE_ATTACHING } from './review-stages';
 
 /**
  * Fetch settings from the server.
@@ -140,6 +141,8 @@ export function* startReview({
 			feedbackCount: existingFeedback.length,
 		});
 
+		yield setReviewStage(STAGE_ANALYZING);
+
 		const response = yield apiFetch({
 			path: '/ai-feedback/v1/review',
 			method: 'POST',
@@ -173,6 +176,8 @@ export function* startReview({
 		// Debug: Log full response for inspection
 		// eslint-disable-next-line no-console
 		console.log('[AI-Feedback] Full response:', response);
+
+		yield setReviewStage(STAGE_ATTACHING);
 
 		// Update block metadata with note IDs if block_mapping is present
 		if (
@@ -338,6 +343,19 @@ export function* startReview({
 			},
 		};
 	}
+}
+
+/**
+ * Set the current review stage.
+ *
+ * @param {string} stage Stage key from review-stages.js.
+ * @return {Object} Action object.
+ */
+export function setReviewStage(stage) {
+	return {
+		type: TYPES.SET_REVIEW_STAGE,
+		stage,
+	};
 }
 
 /**
