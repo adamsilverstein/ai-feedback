@@ -18,6 +18,7 @@ import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import WelcomeModal from './WelcomeModal';
+import TipNotice from './TipNotice';
 import SkipLinks from './SkipLinks';
 
 /**
@@ -233,6 +234,7 @@ export default function AIFeedbackPanel() {
 							title={__('Last Review', 'ai-feedback')}
 							initialOpen={true}
 						>
+							{!isReviewing && <TipNotice />}
 							{/* ID used by skip links for keyboard navigation */}
 							<div id="ai-feedback-results">
 								<ReviewSummary review={lastReview} />

@@ -7,7 +7,9 @@ import {
 	select as registrySelect,
 } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as preferencesStore } from '@wordpress/preferences';
 import { TYPES } from './reducer';
+import { PREFERENCES_SCOPE, PREFERENCE_KEYS } from '../tips';
 
 /**
  * Fetch settings from the server.
@@ -319,6 +321,18 @@ export function* startReview({
 		// eslint-disable-next-line no-console
 		console.log(
 			'[AI-Feedback] Dispatching REVIEW_SUCCESS with review data'
+		);
+
+		// Completed reviews unlock progressive tips.
+		const reviewCount =
+			registrySelect(preferencesStore).get(
+				PREFERENCES_SCOPE,
+				PREFERENCE_KEYS.reviewCount
+			) || 0;
+		registryDispatch(preferencesStore).set(
+			PREFERENCES_SCOPE,
+			PREFERENCE_KEYS.reviewCount,
+			reviewCount + 1
 		);
 
 		return {
