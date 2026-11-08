@@ -47,7 +47,8 @@
 		"@wordpress/i18n": "^6.9.0",
 		"@wordpress/icons": "^11.3.0",
 		"@wordpress/notices": "^5.36.0",
-		"@wordpress/plugins": "^7.36.0"
+		"@wordpress/plugins": "^7.36.0",
+		"@wordpress/rich-text": "^7.37.0"
 	},
 	"devDependencies": {
 		"@axe-core/playwright": "^4.11.0",
