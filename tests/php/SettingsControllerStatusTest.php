@@ -17,16 +17,16 @@ use AI_Feedback\Settings_Controller;
 class TestableSettingsController extends Settings_Controller {
 
 	/**
-	 * Override flag: when true, has_ai_provider_connector() returns true.
+	 * Override flag: when true, has_configured_ai_provider() returns true.
 	 *
 	 * @var bool
 	 */
 	public bool $force_has_ai_provider = false;
 
 	/**
-	 * Override flag: when true, has_ai_provider_connector() returns the value
+	 * Override flag: when true, has_configured_ai_provider() returns the value
 	 * of $force_has_ai_provider; otherwise it falls through to the parent
-	 * implementation which checks function_exists('wp_get_connectors').
+	 * implementation which checks function_exists('wp_ai_client_prompt').
 	 *
 	 * @var bool
 	 */
@@ -37,11 +37,11 @@ class TestableSettingsController extends Settings_Controller {
 	 *
 	 * @return bool Connector availability per test fixture.
 	 */
-	protected function has_ai_provider_connector(): bool {
+	protected function has_configured_ai_provider(): bool {
 		if ( $this->override_active ) {
 			return $this->force_has_ai_provider;
 		}
-		return parent::has_ai_provider_connector();
+		return parent::has_configured_ai_provider();
 	}
 }
 
@@ -49,14 +49,14 @@ class TestableSettingsController extends Settings_Controller {
  * Test cases for the connector_configured branch of get_status().
  *
  * The three states tested correspond to:
- *   1. wp_get_connectors() unavailable / no AI providers (returns false).
- *   2. AI provider connector registered (returns true).
+ *   1. AI Client unavailable / no configured provider (returns false).
+ *   2. configured provider supports text generation (returns true).
  *   3. Settings URL is always emitted regardless of connector state.
  */
 class SettingsControllerStatusTest extends TestCase {
 
 	/**
-	 * connector_configured is false when has_ai_provider_connector() returns false.
+	 * connector_configured is false when has_configured_ai_provider() returns false.
 	 */
 	public function test_connector_configured_false_when_no_provider(): void {
 		$controller                       = new TestableSettingsController();
@@ -70,7 +70,7 @@ class SettingsControllerStatusTest extends TestCase {
 	}
 
 	/**
-	 * connector_configured is true when at least one AI provider is registered.
+	 * connector_configured is true when a configured provider supports text generation.
 	 */
 	public function test_connector_configured_true_when_provider_present(): void {
 		$controller                       = new TestableSettingsController();
@@ -96,12 +96,12 @@ class SettingsControllerStatusTest extends TestCase {
 	}
 
 	/**
-	 * Real has_ai_provider_connector() returns false when wp_get_connectors() is missing.
+	 * Real has_configured_ai_provider() returns false when wp_ai_client_prompt() is missing.
 	 *
-	 * The bootstrap does not define wp_get_connectors(), so this exercises the
+	 * The bootstrap does not define wp_ai_client_prompt(), so this exercises the
 	 * function-missing branch directly.
 	 */
-	public function test_has_ai_provider_connector_returns_false_without_connectors_api(): void {
+	public function test_has_configured_ai_provider_returns_false_without_ai_client(): void {
 		$controller                  = new TestableSettingsController();
 		$controller->override_active = false;
 
