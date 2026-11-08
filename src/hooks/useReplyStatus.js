@@ -3,15 +3,25 @@
  *
  * Polls /ai-feedback/v1/replies/{id}/status for a given user reply comment
  * and returns its current processing state. Polling stops once the server
- * reports a terminal state (`complete` or `failed`) or the component unmounts.
- *
- * Terminal statuses are cached so re-renders don't spawn new polls.
+ * reports a terminal state (`complete` or `failed`), when it gives up, or
+ * when the component unmounts.
  */
 import { useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { __ } from '@wordpress/i18n';
 
 export const POLL_INTERVAL_MS = 2000;
+
+/**
+ * Longest wait between polls. The interval doubles up to this while pending.
+ */
+export const MAX_POLL_INTERVAL_MS = 15000;
+
+/**
+ * How long to wait on a pending reply before giving up. Covers a cron worker
+ * that died without recording a result.
+ */
+export const MAX_PENDING_MS = 10 * 60 * 1000;
 
 /**
  * How many `unknown` responses to tolerate before giving up. A detected reply
@@ -21,43 +31,49 @@ export const POLL_INTERVAL_MS = 2000;
 export const MAX_UNKNOWN_POLLS = 5;
 
 /**
+ * Build the state for a reply that is still being generated.
+ *
+ * @param {number|null} id Reply ID.
+ * @return {Object} State.
+ */
+function initialState(id) {
+	return {
+		id,
+		status: id ? 'pending' : 'idle',
+		aiReplyCommentId: null,
+		error: null,
+	};
+}
+
+/**
  * @param {number|null} replyId User reply comment ID to poll for, or null/0 to disable.
  * @return {{status: string, aiReplyCommentId: number | null, error: string | null}}
  *         Current reply status. `status` is one of `idle | pending | complete | failed | unknown`.
  */
 export default function useReplyStatus(replyId) {
-	const [state, setState] = useState(() => ({
-		status: replyId ? 'pending' : 'idle',
-		aiReplyCommentId: null,
-		error: null,
-	}));
+	const [state, setState] = useState(() => initialState(replyId));
 
 	// Track an active timer so unmount/deps change can cancel it cleanly.
 	const timeoutRef = useRef(null);
 
 	useEffect(() => {
+		setState(initialState(replyId));
 		if (!replyId) {
-			setState({ status: 'idle', aiReplyCommentId: null, error: null });
 			return undefined;
 		}
 
-		// Show the pending state synchronously so the spinner is visible
-		// before the first poll returns (otherwise there is a ~2s blank gap).
-		setState((prev) =>
-			prev.status === 'pending' && prev.aiReplyCommentId === null
-				? prev
-				: { status: 'pending', aiReplyCommentId: null, error: null }
-		);
-
 		let cancelled = false;
 		let unknownPolls = 0;
+		let interval = POLL_INTERVAL_MS;
+		const startedAt = Date.now();
 
-		const clearPendingTimer = () => {
-			if (timeoutRef.current) {
-				clearTimeout(timeoutRef.current);
-				timeoutRef.current = null;
-			}
-		};
+		const fail = (error) =>
+			setState({
+				id: replyId,
+				status: 'failed',
+				aiReplyCommentId: null,
+				error,
+			});
 
 		const poll = async () => {
 			try {
@@ -71,6 +87,7 @@ export default function useReplyStatus(replyId) {
 				}
 
 				const next = {
+					id: replyId,
 					status: response?.status || 'unknown',
 					aiReplyCommentId: response?.ai_reply_comment_id ?? null,
 					error: response?.error ?? null,
@@ -79,38 +96,47 @@ export default function useReplyStatus(replyId) {
 				if (next.status === 'unknown') {
 					unknownPolls++;
 					if (unknownPolls >= MAX_UNKNOWN_POLLS) {
-						setState({
-							status: 'failed',
-							aiReplyCommentId: null,
-							error: __(
+						fail(
+							__(
 								'No AI reply was scheduled for this comment.',
 								'ai-feedback'
-							),
-						});
+							)
+						);
 						return;
 					}
+				}
+
+				if (
+					next.status === 'pending' &&
+					Date.now() - startedAt >= MAX_PENDING_MS
+				) {
+					fail(
+						__(
+							'The AI reply is taking longer than expected.',
+							'ai-feedback'
+						)
+					);
+					return;
 				}
 
 				setState(next);
 
 				// Keep polling only while the server reports in-flight work.
 				if (next.status === 'pending' || next.status === 'unknown') {
-					timeoutRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+					timeoutRef.current = setTimeout(poll, interval);
+					interval = Math.min(interval * 2, MAX_POLL_INTERVAL_MS);
 				}
 			} catch (err) {
 				if (cancelled) {
 					return;
 				}
-				setState({
-					status: 'failed',
-					aiReplyCommentId: null,
-					error:
-						err?.message ||
+				fail(
+					err?.message ||
 						__(
 							'Could not check the AI reply status.',
 							'ai-feedback'
-						),
-				});
+						)
+				);
 			}
 		};
 
@@ -118,9 +144,17 @@ export default function useReplyStatus(replyId) {
 
 		return () => {
 			cancelled = true;
-			clearPendingTimer();
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+				timeoutRef.current = null;
+			}
 		};
 	}, [replyId]);
 
-	return state;
+	// Until the effect resets state for a new ID, report the new ID as pending
+	// rather than leaking the previous reply's result for a render.
+	const current = state.id === replyId ? state : initialState(replyId);
+	const { status, aiReplyCommentId, error } = current;
+
+	return { status, aiReplyCommentId, error };
 }

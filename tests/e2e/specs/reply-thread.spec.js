@@ -147,7 +147,7 @@ test.describe('Reply thread', () => {
 
 		const aiReply = thread.locator('.ai-feedback-reply-ai');
 		await expect(aiReply).toContainText(AI_REPLY.content, {
-			timeout: 10000,
+			timeout: 20000,
 		});
 		await expect(aiReply).toContainText('AI Feedback');
 		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
