@@ -22,6 +22,7 @@ import { store as noticesStore } from '@wordpress/notices';
 import FeedbackItem from '../FeedbackItem';
 
 jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+jest.mock('@wordpress/blocks', () => ({ store: 'core/blocks' }));
 jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 const item = {
@@ -34,7 +35,11 @@ const item = {
 	is_resolved: false,
 };
 
-function renderItem(props, setNoteResolved = jest.fn()) {
+function renderItem(
+	props,
+	setNoteResolved = jest.fn(),
+	{ blocks = {}, appliedFixes = {}, updateBlockAttributes = jest.fn() } = {}
+) {
 	const registry = createRegistry();
 	registry.register(noticesStore);
 	registry.registerStore('ai-feedback/store', {
@@ -44,13 +49,32 @@ function renderItem(props, setNoteResolved = jest.fn()) {
 				setNoteResolved(...args);
 				return { type: 'NOOP' };
 			},
+			setFixApplied: () => ({ type: 'NOOP' }),
 		},
-		selectors: {},
+		selectors: {
+			isFixApplied: (state, noteId) => !!appliedFixes[noteId],
+		},
 	});
 	registry.registerStore('core/block-editor', {
 		reducer: (state = {}) => state,
-		actions: { selectBlock: () => ({ type: 'NOOP' }) },
-		selectors: {},
+		actions: {
+			selectBlock: () => ({ type: 'NOOP' }),
+			updateBlockAttributes: (...args) => {
+				updateBlockAttributes(...args);
+				return { type: 'NOOP' };
+			},
+		},
+		selectors: {
+			getBlock: (state, clientId) => blocks[clientId] ?? null,
+		},
+	});
+	registry.registerStore('core/blocks', {
+		reducer: (state = {}) => state,
+		selectors: {
+			getBlockType: () => ({
+				attributes: { content: { type: 'rich-text' } },
+			}),
+		},
 	});
 
 	render(
@@ -128,6 +152,92 @@ describe('FeedbackItem quick actions', () => {
 
 		expect(
 			screen.queryByRole('button', { name: /Dismiss/ })
+		).not.toBeInTheDocument();
+	});
+});
+
+describe('FeedbackItem quick fixes', () => {
+	const fixItem = {
+		...item,
+		quick_fix: { find: 'is passive', replace: 'reads actively' },
+	};
+	const blocks = {
+		'block-1': {
+			name: 'core/paragraph',
+			attributes: { content: 'The sentence <em>is passive</em> here.' },
+		},
+	};
+
+	it('describes the fix and applies it with undo', async () => {
+		const updateBlockAttributes = jest.fn();
+		const setNoteResolved = jest.fn();
+		const registry = renderItem(fixItem, setNoteResolved, {
+			blocks,
+			updateBlockAttributes,
+		});
+
+		expect(
+			screen.getByText('Replace “is passive” with “reads actively”')
+		).toBeInTheDocument();
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+
+		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'The sentence <em>reads actively</em> here.',
+		});
+		expect(setNoteResolved).toHaveBeenCalledWith(7, true);
+
+		const [notice] = registry.select(noticesStore).getNotices();
+		expect(notice.content).toBe('Fix applied.');
+
+		await act(async () => {
+			notice.actions[0].onClick();
+		});
+		expect(updateBlockAttributes).toHaveBeenLastCalledWith('block-1', {
+			content: 'The sentence <em>is passive</em> here.',
+		});
+		expect(setNoteResolved).toHaveBeenLastCalledWith(7, false);
+	});
+
+	it('shows a preview before applying', async () => {
+		renderItem(fixItem, jest.fn(), { blocks });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+		const dialog = screen.getByRole('dialog', { name: 'Preview fix' });
+		expect(dialog.querySelector('del')).toHaveTextContent('is passive');
+		expect(dialog.querySelector('ins')).toHaveTextContent('reads actively');
+	});
+
+	it('disables the fix when the block text has changed', () => {
+		renderItem(fixItem, jest.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: { content: 'Rewritten already.' },
+				},
+			},
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply fix' })
+		).toHaveAttribute('aria-disabled', 'true');
+		expect(
+			screen.getByText(/this fix can no longer be applied/)
+		).toBeInTheDocument();
+	});
+
+	it('labels applied fixes', () => {
+		renderItem({ ...fixItem, is_resolved: true }, jest.fn(), {
+			blocks,
+			appliedFixes: { 7: true },
+		});
+
+		expect(screen.getByText('Fix applied')).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
 		).not.toBeInTheDocument();
 	});
 });

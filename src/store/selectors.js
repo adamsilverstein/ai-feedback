@@ -194,3 +194,14 @@ export function hasFetchedPreviousReview(state) {
 export function hasPreviousReview(state) {
 	return state.lastReview !== null;
 }
+
+/**
+ * Whether a note's quick fix was applied in this session.
+ *
+ * @param {Object} state  Store state.
+ * @param {number} noteId Note ID.
+ * @return {boolean} True if the fix was applied.
+ */
+export function isFixApplied(state, noteId) {
+	return !!state.appliedFixes?.[noteId];
+}

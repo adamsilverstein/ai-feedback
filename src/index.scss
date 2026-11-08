@@ -527,6 +527,47 @@ $ai-feedback-text-muted: #595959;
 	margin-top: 4px;
 }
 
+/* Quick fixes */
+.ai-feedback-quick-fix {
+	margin: 0 0 8px;
+
+	.ai-feedback-quick-fix-summary {
+		margin: 0 0 8px;
+		font-size: 13px;
+	}
+
+	/* stylelint-disable-next-line no-descending-specificity */
+	.ai-feedback-quick-fix-unavailable {
+		margin: 0 0 8px;
+		text-align: left;
+	}
+}
+
+.ai-feedback-quick-fix-modal {
+	max-width: 480px;
+
+	.ai-feedback-quick-fix-diff {
+		line-height: 1.6;
+
+		del {
+			background: #fcf0f1;
+			color: #8a2424;
+		}
+
+		ins {
+			background: #edfaef;
+			color: #005c12;
+			text-decoration: none;
+		}
+	}
+
+	.ai-feedback-quick-fix-modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+	}
+}
+
 /* Dismissed feedback items */
 .ai-feedback-item.is-dismissed,
 .ai-feedback-group.is-dismissed {

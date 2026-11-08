@@ -23,6 +23,7 @@ export const initialState = {
 	isLoadingSettings: false,
 	isLoadingPreviousReview: false,
 	hasFetchedPreviousReview: false,
+	appliedFixes: {},
 };
 
 /**
@@ -45,6 +46,7 @@ export const TYPES = {
 	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
 	SET_NOTE_RESOLVED: 'SET_NOTE_RESOLVED',
+	SET_FIX_APPLIED: 'SET_FIX_APPLIED',
 };
 
 /**
@@ -184,6 +186,16 @@ export default function reducer(state = initialState, action) {
 					),
 				},
 			};
+
+		case TYPES.SET_FIX_APPLIED: {
+			const appliedFixes = { ...state.appliedFixes };
+			if (action.isApplied) {
+				appliedFixes[action.noteId] = true;
+			} else {
+				delete appliedFixes[action.noteId];
+			}
+			return { ...state, appliedFixes };
+		}
 
 		default:
 			return state;

@@ -7,10 +7,11 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
-import { dispatch } from '@wordpress/data';
+import { dispatch, useSelect } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { getFeedbackContent } from '../utils/feedback-content';
 import FeedbackItemActions from './FeedbackItemActions';
+import { STORE_NAME } from '../store';
 
 /**
  * Navigate to a specific block in the editor.
@@ -76,6 +77,10 @@ function getSeverityLabel(severity) {
 function SingleFeedbackItem({ item, onNavigate }) {
 	const { title, feedback, suggestion } = getFeedbackContent(item);
 	const isDismissed = !!item.is_resolved;
+	const isFixApplied = useSelect(
+		(select) => select(STORE_NAME).isFixApplied(item.id),
+		[item.id]
+	);
 
 	return (
 		<Card
@@ -99,7 +104,9 @@ function SingleFeedbackItem({ item, onNavigate }) {
 					<strong className="feedback-title">{title}</strong>
 					{isDismissed && (
 						<span className="feedback-dismissed-label">
-							{__('Dismissed', 'ai-feedback')}
+							{isFixApplied
+								? __('Fix applied', 'ai-feedback')
+								: __('Dismissed', 'ai-feedback')}
 						</span>
 					)}
 				</div>
