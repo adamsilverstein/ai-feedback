@@ -150,7 +150,7 @@ test.describe('Notes Creation', () => {
 		await aiFeedback.mockReviewAPI({
 			review_id: 'test-review-id',
 			post_id: 1,
-			model: 'claude-sonnet-4-20250514',
+			model: 'claude-sonnet-5-5',
 			notes: [],
 			note_ids: [],
 			block_mapping: {},
