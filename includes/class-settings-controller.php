@@ -118,8 +118,11 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Get the saved default model, falling back to the plugin default when
-	 * the saved model is no longer offered (such as a retired model ID).
+	 * Get the saved default model, falling back when it is no longer offered
+	 * (such as a retired model ID).
+	 *
+	 * The fallback is the plugin default, or the first offered model when a
+	 * filter removed the plugin default from the list.
 	 *
 	 * @return string Model ID.
 	 */
@@ -127,11 +130,16 @@ class Settings_Controller extends WP_REST_Controller {
 		$model     = get_option( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL );
 		$available = wp_list_pluck( $this->get_available_models(), 'id' );
 
-		if ( ! is_string( $model ) || ! in_array( $model, $available, true ) ) {
+		if ( is_string( $model ) && in_array( $model, $available, true ) ) {
+			return $model;
+		}
+
+		if ( in_array( AI_FEEDBACK_DEFAULT_MODEL, $available, true ) || empty( $available ) ) {
 			return AI_FEEDBACK_DEFAULT_MODEL;
 		}
 
-		return $model;
+		$first = reset( $available );
+		return is_string( $first ) ? $first : AI_FEEDBACK_DEFAULT_MODEL;
 	}
 
 	/**
