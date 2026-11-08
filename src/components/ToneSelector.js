@@ -44,10 +44,10 @@ export default function ToneSelector() {
 	);
 
 	const { updateSettings } = useDispatch(STORE_NAME);
-	const [draftTone, setDraftTone] = useState(targetTone);
+	const [draftTone, setDraftTone] = useState(targetTone ?? '');
 
 	useEffect(() => {
-		setDraftTone(targetTone);
+		setDraftTone(targetTone ?? '');
 	}, [targetTone]);
 
 	if (!availableTones || availableTones.length === 0) {
@@ -60,9 +60,16 @@ export default function ToneSelector() {
 	}));
 
 	const handleChange = (value) => {
+		const previous = draftTone;
 		setDraftTone(value);
-		updateSettings({
-			default_tone: value,
+		// Revert the optimistic change if saving fails; the store surfaces
+		// the error notice.
+		Promise.resolve(
+			updateSettings({
+				default_tone: value,
+			})
+		).catch(() => {
+			setDraftTone((current) => (current === value ? previous : current));
 		});
 	};
 

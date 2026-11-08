@@ -150,4 +150,39 @@ describe('ToneSelector', () => {
 			screen.getByText(/research and educational content/i)
 		).toBeInTheDocument();
 	});
+
+	it.each([
+		['academic', /research and educational content/i],
+		['friendly', /community and customer content/i],
+	])('displays contextual help text for %s tone', (tone, help) => {
+		setupMocks(tone);
+		render(<ToneSelector />);
+
+		expect(screen.getByText(help)).toBeInTheDocument();
+	});
+
+	it('reverts the draft when saving fails', async () => {
+		setupMocks('professional');
+		mockUpdateSettings.mockRejectedValueOnce(new Error('nope'));
+		render(<ToneSelector />);
+
+		await userEvent.selectOptions(
+			screen.getByLabelText('Target Tone'),
+			'casual'
+		);
+
+		expect(screen.getByLabelText('Target Tone')).toHaveValue(
+			'professional'
+		);
+	});
+
+	it('resyncs when the stored tone changes externally', () => {
+		setupMocks('professional');
+		const { rerender } = render(<ToneSelector />);
+
+		setupMocks('friendly');
+		rerender(<ToneSelector />);
+
+		expect(screen.getByLabelText('Target Tone')).toHaveValue('friendly');
+	});
 });

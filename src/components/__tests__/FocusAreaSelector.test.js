@@ -15,13 +15,14 @@ jest.mock('@wordpress/data', () => ({
 
 jest.mock('@wordpress/components', () => ({
 	// eslint-disable-next-line jsx-a11y/label-has-associated-control
-	CheckboxControl: ({ label, checked, onChange, help }) => (
+	CheckboxControl: ({ label, checked, onChange, help, disabled }) => (
 		<label htmlFor={`cb-${label}`}>
 			{label}
 			<input
 				id={`cb-${label}`}
 				type="checkbox"
 				checked={checked}
+				disabled={disabled}
 				onChange={(e) => onChange(e.target.checked)}
 				aria-label={label}
 			/>
@@ -144,10 +145,8 @@ describe('FocusAreaSelector', () => {
 	});
 
 	it('accumulates consecutive toggles even when store state has not yet updated', async () => {
-		// Regression: previously, rapid clicks each recomputed from the stale
-		// `focusAreas` closure, so later clicks would overwrite earlier ones
-		// instead of building on them. The functional setState form must
-		// accumulate updates against the latest draft.
+		// Regression: rapid clicks must build on the latest draft rather
+		// than on the store value, which has not caught up yet.
 		setupMocks(['content']);
 		render(<FocusAreaSelector />);
 
@@ -161,5 +160,37 @@ describe('FocusAreaSelector', () => {
 		expect(mockUpdateSettings).toHaveBeenNthCalledWith(2, {
 			default_focus_areas: ['content', 'tone', 'flow'],
 		});
+	});
+
+	it('keeps at least one focus area selected', () => {
+		setupMocks(['content']);
+		render(<FocusAreaSelector />);
+
+		const only = screen.getByLabelText('Content Quality');
+		expect(only).toBeChecked();
+		expect(only).toBeDisabled();
+		expect(screen.getByLabelText('Tone & Voice')).toBeEnabled();
+		expect(mockUpdateSettings).not.toHaveBeenCalled();
+	});
+
+	it('reverts the draft when saving fails', async () => {
+		setupMocks(['content']);
+		mockUpdateSettings.mockRejectedValueOnce(new Error('nope'));
+		render(<FocusAreaSelector />);
+
+		await userEvent.click(screen.getByLabelText('Tone & Voice'));
+
+		expect(screen.getByLabelText('Tone & Voice')).not.toBeChecked();
+	});
+
+	it('resyncs when the stored focus areas change externally', () => {
+		setupMocks(['content']);
+		const { rerender } = render(<FocusAreaSelector />);
+
+		setupMocks(['design']);
+		rerender(<FocusAreaSelector />);
+
+		expect(screen.getByLabelText('Content Quality')).not.toBeChecked();
+		expect(screen.getByLabelText('Design & Formatting')).toBeChecked();
 	});
 });

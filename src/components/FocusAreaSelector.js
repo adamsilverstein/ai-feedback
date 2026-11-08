@@ -3,7 +3,7 @@
  */
 import { CheckboxControl } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 
@@ -47,19 +47,43 @@ export default function FocusAreaSelector() {
 	const selectedAreas = Array.isArray(focusAreas) ? focusAreas : [];
 	const [draftAreas, setDraftAreas] = useState(selectedAreas);
 
+	// Latest draft, read by handleChange so toggles that land in the same
+	// render batch build on each other instead of on a stale closure.
+	const draftRef = useRef(selectedAreas);
+
 	useEffect(() => {
-		setDraftAreas(Array.isArray(focusAreas) ? focusAreas : []);
+		const synced = Array.isArray(focusAreas) ? focusAreas : [];
+		draftRef.current = synced;
+		setDraftAreas(synced);
 	}, [focusAreas]);
 
-	const handleChange = (areaId, checked) => {
-		const base = Array.isArray(draftAreas) ? draftAreas : [];
-		const updated = checked
-			? Array.from(new Set([...base, areaId]))
-			: base.filter((id) => id !== areaId);
+	const setDraft = (areas) => {
+		draftRef.current = areas;
+		setDraftAreas(areas);
+	};
 
-		setDraftAreas(updated);
-		updateSettings({
-			default_focus_areas: updated,
+	const handleChange = (areaId, checked) => {
+		const previous = draftRef.current;
+		const updated = checked
+			? Array.from(new Set([...previous, areaId]))
+			: previous.filter((id) => id !== areaId);
+
+		// A review needs at least one focus area.
+		if (updated.length === 0) {
+			return;
+		}
+
+		setDraft(updated);
+		// Revert the optimistic change if saving fails; the store surfaces
+		// the error notice.
+		Promise.resolve(
+			updateSettings({
+				default_focus_areas: updated,
+			})
+		).catch(() => {
+			if (draftRef.current === updated) {
+				setDraft(previous);
+			}
 		});
 	};
 
@@ -72,7 +96,7 @@ export default function FocusAreaSelector() {
 			<legend>{__('Focus Areas', 'ai-feedback')}</legend>
 			<p className="description">
 				{__(
-					'Select which aspects of your content to review.',
+					'Select which aspects of your content to review. At least one is required.',
 					'ai-feedback'
 				)}
 			</p>
@@ -81,6 +105,9 @@ export default function FocusAreaSelector() {
 					key={area.id}
 					label={area.label}
 					checked={draftAreas.includes(area.id)}
+					disabled={
+						draftAreas.length === 1 && draftAreas.includes(area.id)
+					}
 					onChange={(checked) => handleChange(area.id, checked)}
 					help={FOCUS_AREA_HELP[area.id] || area.description}
 				/>
