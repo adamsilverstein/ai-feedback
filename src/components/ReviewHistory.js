@@ -5,7 +5,7 @@
  * feedback changed between drafts.
  */
 import { PanelBody, Button, Modal, Spinner } from '@wordpress/components';
-import { useSelect } from '@wordpress/data';
+import { useDispatch, useSelect } from '@wordpress/data';
 import { useState, RawHTML } from '@wordpress/element';
 import { store as editorStore } from '@wordpress/editor';
 import { __, sprintf } from '@wordpress/i18n';
@@ -100,14 +100,26 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 				<p>{__('Could not load this review.', 'ai-feedback')}</p>
 			)}
 
-			{!isLoading && review && notes.length === 0 && (
+			{entry.notes_failed && (
 				<p className="description">
 					{__(
-						'The notes from this review are no longer available.',
+						'Notes could not be created for this review.',
 						'ai-feedback'
 					)}
 				</p>
 			)}
+
+			{!isLoading &&
+				review &&
+				!entry.notes_failed &&
+				notes.length === 0 && (
+					<p className="description">
+						{__(
+							'The notes from this review are no longer available.',
+							'ai-feedback'
+						)}
+					</p>
+				)}
 
 			{notes.length > 0 && (
 				<ul className="ai-feedback-history-notes">
@@ -136,11 +148,20 @@ export default function ReviewHistory() {
 	const [openEntry, setOpenEntry] = useState(null);
 	const { history, postId } = useSelect(
 		(select) => ({
-			history: select(STORE_NAME).getReviewHistory(),
+			history: select(STORE_NAME).getReviewHistory(
+				select(editorStore).getCurrentPostId()
+			),
 			postId: select(editorStore).getCurrentPostId(),
 		}),
 		[]
 	);
+	const { invalidateResolution } = useDispatch(STORE_NAME);
+
+	const openReview = (entry) => {
+		// Refetch so notes resolved or deleted since the last view show up.
+		invalidateResolution('getHistoryReview', [postId, entry.review_id]);
+		setOpenEntry(entry);
+	};
 
 	if (!history || history.length === 0) {
 		return null;
@@ -194,7 +215,7 @@ export default function ReviewHistory() {
 								variant="secondary"
 								size="small"
 								className="ai-feedback-history-view"
-								onClick={() => setOpenEntry(entry)}
+								onClick={() => openReview(entry)}
 								aria-label={sprintf(
 									/* translators: %s: review date */
 									__('View review from %s', 'ai-feedback'),

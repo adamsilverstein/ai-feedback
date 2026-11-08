@@ -60,19 +60,23 @@ const storeConfig = {
 			return result;
 		},
 
-		*getReviewHistory() {
-			const postId = select(editorStore).getCurrentPostId();
+		*getReviewHistory(postId) {
 			if (!postId) {
-				return actions.receiveReviewHistory([]);
+				return;
 			}
 
 			try {
 				const response = yield apiFetch({
 					path: `/ai-feedback/v1/history/post/${postId}`,
 				});
-				return actions.receiveReviewHistory(response.history || []);
+				return actions.receiveReviewHistory(
+					postId,
+					response.history || []
+				);
 			} catch (error) {
-				return actions.receiveReviewHistory([]);
+				// eslint-disable-next-line no-console
+				console.error('[AI-Feedback] Failed to fetch history:', error);
+				return actions.receiveReviewHistory(postId, []);
 			}
 		},
 
@@ -81,9 +85,11 @@ const storeConfig = {
 				const review = yield apiFetch({
 					path: `/ai-feedback/v1/history/post/${postId}/review/${reviewId}`,
 				});
-				return actions.receiveHistoryReview(reviewId, review);
+				return actions.receiveHistoryReview(postId, reviewId, review);
 			} catch (error) {
-				return actions.receiveHistoryReview(reviewId, null);
+				// eslint-disable-next-line no-console
+				console.error('[AI-Feedback] Failed to fetch review:', error);
+				return actions.receiveHistoryReview(postId, reviewId, null);
 			}
 		},
 	},

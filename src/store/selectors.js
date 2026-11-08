@@ -1,6 +1,7 @@
 /**
  * Store selectors.
  */
+import { historyReviewKey } from './reducer';
 
 /**
  * Get settings.
@@ -112,16 +113,19 @@ export function getLastReview(state) {
 	return state.lastReview;
 }
 
+const EMPTY_HISTORY = [];
+
 /**
- * Get the current post's review history, newest first.
+ * Get a post's review history, newest first.
  *
  * Resolved from the server on first access.
  *
- * @param {Object} state Store state.
+ * @param {Object} state  Store state.
+ * @param {number} postId Post ID.
  * @return {Array} History entries.
  */
-export function getReviewHistory(state) {
-	return state.reviewHistory;
+export function getReviewHistory(state, postId) {
+	return state.reviewHistories[postId] || EMPTY_HISTORY;
 }
 
 /**
@@ -135,7 +139,7 @@ export function getReviewHistory(state) {
  * @return {Object|null|undefined} Review, null if not found, undefined while loading.
  */
 export function getHistoryReview(state, postId, reviewId) {
-	return state.historyReviews[reviewId];
+	return state.historyReviews[historyReviewKey(postId, reviewId)];
 }
 
 /**

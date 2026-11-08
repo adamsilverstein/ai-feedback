@@ -73,6 +73,7 @@ class Review_History {
 				'timestamp'    => array( 'type' => 'string' ),
 				'model'        => array( 'type' => 'string' ),
 				'note_count'   => array( 'type' => 'integer' ),
+				'notes_failed' => array( 'type' => 'boolean' ),
 				'user_id'      => array( 'type' => 'integer' ),
 				'summary_text' => array( 'type' => 'string' ),
 				'summary'      => array(
@@ -101,6 +102,8 @@ class Review_History {
 			return;
 		}
 
+		// Read-modify-write: two reviews finishing at the same instant on one
+		// post could drop an entry. Acceptable for a short display history.
 		$history   = self::get( $post_id );
 		$history[] = $entry;
 		$history   = array_slice( $history, -self::MAX_ENTRIES );
@@ -144,7 +147,7 @@ class Review_History {
 	 * Reduce a full review result to the fields kept in history.
 	 *
 	 * @param  array<string, mixed> $review Review result.
-	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, user_id: int, summary_text: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}}
+	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}}
 	 */
 	public static function build_entry( array $review ): array {
 		$summary = is_array( $review['summary'] ?? null ) ? $review['summary'] : array();
@@ -154,6 +157,7 @@ class Review_History {
 			'timestamp'    => is_string( $review['timestamp'] ?? null ) ? $review['timestamp'] : '',
 			'model'        => is_string( $review['model'] ?? null ) ? $review['model'] : '',
 			'note_count'   => is_numeric( $review['note_count'] ?? null ) ? (int) $review['note_count'] : 0,
+			'notes_failed' => ! empty( $review['notes_error'] ),
 			'user_id'      => get_current_user_id(),
 			'summary_text' => is_string( $review['summary_text'] ?? null ) ? $review['summary_text'] : '',
 			'summary'      => array(

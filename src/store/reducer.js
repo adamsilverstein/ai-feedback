@@ -18,7 +18,7 @@ export const initialState = {
 	availableLocales: [],
 	isReviewing: false,
 	lastReview: null,
-	reviewHistory: [],
+	reviewHistories: {},
 	historyReviews: {},
 	error: null,
 	isLoadingSettings: false,
@@ -66,6 +66,7 @@ export function toHistoryEntry(review) {
 		timestamp: review.timestamp,
 		model: review.model,
 		note_count: review.note_count ?? 0,
+		notes_failed: !!review.notes_error,
 		summary_text: review.summary_text || '',
 		summary: {
 			by_severity: review.summary?.by_severity || {},
@@ -75,17 +76,54 @@ export function toHistoryEntry(review) {
 }
 
 /**
- * Add an entry to the front of the history, newest first and capped.
+ * Merge history entries, newest first, without duplicates and capped.
  *
- * @param {Array}  history History entries, newest first.
- * @param {Object} entry   Entry to add.
- * @return {Array} New history.
+ * @param {Array} entries Entries in priority order; the first copy of a review wins.
+ * @return {Array} Merged history.
  */
-function prependHistory(history, entry) {
-	return [
-		entry,
-		...history.filter((item) => item.review_id !== entry.review_id),
-	].slice(0, MAX_HISTORY_ENTRIES);
+export function mergeHistory(entries) {
+	const seen = new Set();
+	return entries
+		.filter((entry) => {
+			if (!entry?.review_id || seen.has(entry.review_id)) {
+				return false;
+			}
+			seen.add(entry.review_id);
+			return true;
+		})
+		.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+		.slice(0, MAX_HISTORY_ENTRIES);
+}
+
+/**
+ * Add a review to its post's history.
+ *
+ * @param {Object} histories History entries keyed by post ID.
+ * @param {Object} review    Review response.
+ * @return {Object} New histories.
+ */
+function addReviewToHistories(histories, review) {
+	if (!review?.post_id) {
+		return histories;
+	}
+	return {
+		...histories,
+		[review.post_id]: mergeHistory([
+			toHistoryEntry(review),
+			...(histories[review.post_id] || []),
+		]),
+	};
+}
+
+/**
+ * Cache key for a past review.
+ *
+ * @param {number} postId   Post ID.
+ * @param {string} reviewId Review ID.
+ * @return {string} Key.
+ */
+export function historyReviewKey(postId, reviewId) {
+	return `${postId}:${reviewId}`;
 }
 
 /**
@@ -159,9 +197,9 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: false,
 				lastReview: action.review,
-				reviewHistory: prependHistory(
-					state.reviewHistory,
-					toHistoryEntry(action.review)
+				reviewHistories: addReviewToHistories(
+					state.reviewHistories,
+					action.review
 				),
 			};
 
@@ -175,19 +213,24 @@ export default function reducer(state = initialState, action) {
 		case TYPES.ADD_TO_HISTORY:
 			return {
 				...state,
-				reviewHistory: prependHistory(
-					state.reviewHistory,
-					toHistoryEntry(action.review)
+				reviewHistories: addReviewToHistories(
+					state.reviewHistories,
+					action.review
 				),
 			};
 
 		case TYPES.RECEIVE_REVIEW_HISTORY:
+			// Keep entries added this session in case they finished before
+			// the fetch returned.
 			return {
 				...state,
-				reviewHistory: (action.history || []).slice(
-					0,
-					MAX_HISTORY_ENTRIES
-				),
+				reviewHistories: {
+					...state.reviewHistories,
+					[action.postId]: mergeHistory([
+						...(state.reviewHistories[action.postId] || []),
+						...(action.history || []),
+					]),
+				},
 			};
 
 		case TYPES.RECEIVE_HISTORY_REVIEW:
@@ -195,43 +238,9 @@ export default function reducer(state = initialState, action) {
 				...state,
 				historyReviews: {
 					...state.historyReviews,
-					[action.reviewId]: action.review,
+					[historyReviewKey(action.postId, action.reviewId)]:
+						action.review,
 				},
-			};
-
-		case TYPES.CLEAR_ERROR:
-			return {
-				...state,
-				error: null,
-			};
-
-		case TYPES.SET_LOADING_SETTINGS:
-			return {
-				...state,
-				isLoadingSettings: action.isLoading,
-			};
-
-		case TYPES.FETCHING_PREVIOUS_REVIEW:
-			return {
-				...state,
-				isLoadingPreviousReview: true,
-			};
-
-		case TYPES.RECEIVE_PREVIOUS_REVIEW:
-			// Only update lastReview if we don't already have one from the current session.
-			// This prevents overwriting a fresh review with stale data.
-			if (state.lastReview && !state.lastReview.is_persisted) {
-				return {
-					...state,
-					isLoadingPreviousReview: false,
-					hasFetchedPreviousReview: true,
-				};
-			}
-			return {
-				...state,
-				isLoadingPreviousReview: false,
-				hasFetchedPreviousReview: true,
-				lastReview: action.review,
 			};
 
 		default:

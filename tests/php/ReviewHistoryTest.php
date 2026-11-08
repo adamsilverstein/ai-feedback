@@ -93,6 +93,7 @@ class ReviewHistoryTest extends TestCase {
 				'timestamp'    => '2026-11-08 10:00:00',
 				'model'        => 'test-model',
 				'note_count'   => 2,
+				'notes_failed' => false,
 				'user_id'      => 7,
 				'summary_text' => 'Solid draft.',
 				'summary'      => array(
@@ -106,6 +107,16 @@ class ReviewHistoryTest extends TestCase {
 			),
 			$entry
 		);
+	}
+
+	/**
+	 * Reviews whose notes could not be created are flagged.
+	 */
+	public function test_build_entry_flags_notes_error(): void {
+		$review                = $this->review( 'aaa-1' );
+		$review['notes_error'] = 'Failed';
+
+		$this->assertTrue( Review_History::build_entry( $review )['notes_failed'] );
 	}
 
 	/**
@@ -220,6 +231,21 @@ class ReviewHistoryTest extends TestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $response );
 		$this->assertSame( 404, $response->get_error_data()['status'] );
+	}
+
+	/**
+	 * A review from another post's history is not served for this post.
+	 */
+	public function test_controller_review_from_other_post_is_404(): void {
+		Review_History::record( 99, $this->review( 'aaa-1' ) );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'post_id', 42 );
+		$request->set_param( 'review_id', 'aaa-1' );
+
+		$response = ( new History_Controller( new StubNotesManager() ) )->get_history_review( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $response );
 	}
 
 	/**
