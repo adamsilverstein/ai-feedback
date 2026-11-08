@@ -86,34 +86,25 @@ class Reply_Service {
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
 		$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
 
-		if ( is_wp_error( $result ) ) {
-			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
-			update_comment_meta(
-				$comment_id,
-				'ai_feedback_reply_error',
-				sanitize_text_field( $result->get_error_message() )
-			);
-			return;
+		// A non-positive ID means persistence silently failed. Marking that
+		// 'complete' would leave the frontend waiting on a reply that does not exist.
+		if ( ! is_wp_error( $result ) && $result <= 0 ) {
+			$result = new WP_Error( 'reply_not_saved', __( 'The AI reply could not be saved.', 'ai-feedback' ) );
 		}
 
-		$reply_id = (int) $result;
-
-		// A non-error, non-positive return from handle_reply means persistence
-		// silently failed (e.g. wp_insert_comment returned 0 or false). Marking
-		// it 'complete' would leave the frontend polling indefinitely on a
-		// non-existent reply, so route it through the failed branch instead.
-		if ( $reply_id <= 0 ) {
+		if ( is_wp_error( $result ) ) {
+			Logger::debug( sprintf( 'Reply_Service: reply %d failed: %s', $comment_id, $result->get_error_code() ) );
 			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
 			update_comment_meta(
 				$comment_id,
-				'ai_feedback_reply_error',
-				__( 'Reply persistence returned no comment ID.', 'ai-feedback' )
+				Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY,
+				mb_substr( sanitize_text_field( $result->get_error_message() ), 0, 300 )
 			);
 			return;
 		}
 
 		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'complete' );
-		update_comment_meta( $comment_id, 'ai_feedback_reply_comment_id', $reply_id );
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY, $result );
 	}
 
 	/**
