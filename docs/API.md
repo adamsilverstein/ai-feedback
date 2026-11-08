@@ -167,6 +167,51 @@ X-WP-Nonce: {nonce}
 
 ---
 
+### GET /replies/{id}/status
+
+Poll the state of an AI reply. When a user replies to an AI Feedback note, the plugin marks the reply `pending` and schedules a single `ai_feedback_generate_reply` WP-Cron event. The cron handler generates the AI response, saves it as a child note, and records the result on the user's reply.
+
+#### Request
+
+```http
+GET /wp-json/ai-feedback/v1/replies/{id}/status
+X-WP-Nonce: {nonce}
+```
+
+`{id}` is the user's reply comment ID. The current user must be able to edit the post the reply belongs to.
+
+#### Response
+
+**Success (200 OK):**
+
+```json
+{
+  "reply_id": 789,
+  "status": "complete",
+  "ai_reply_comment_id": 790
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `reply_id` | integer | The user's reply comment ID |
+| `status` | string | `pending`, `complete`, `failed`, or `unknown` (no reply was scheduled for this comment) |
+| `ai_reply_comment_id` | integer | The generated AI reply note. Present when `complete` |
+| `error` | string | Why generation failed. Present when `failed` |
+
+The response field is `ai_reply_comment_id`, while the comment meta that stores it is `ai_feedback_reply_comment_id`.
+
+**Errors:**
+
+| Status | Code | Description |
+|--------|------|-------------|
+| 403 | `rest_forbidden` | User cannot edit the reply's post |
+| 404 | `rest_comment_invalid_id` | No comment with that ID |
+
+> **Note:** WP-Cron runs on page requests, so on low-traffic sites a reply can stay `pending` until the next visit. For reliable timing, disable `WP_CRON` and run `wp cron event run --due-now` from a system cron every minute.
+
+---
+
 ### GET /settings
 
 Retrieve current AI Feedback settings.
