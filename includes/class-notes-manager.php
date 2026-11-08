@@ -235,6 +235,20 @@ class Notes_Manager {
 			'block_index'       => $feedback_item['block_index'] ?? null,
 		);
 
+		// Store the feedback text separately so the sidebar can show it without
+		// parsing the note's HTML content.
+		if ( ! empty( $feedback_item['title'] ) ) {
+			$meta['feedback_title'] = $feedback_item['title'];
+		}
+
+		if ( ! empty( $feedback_item['feedback'] ) ) {
+			$meta['feedback_text'] = $feedback_item['feedback'];
+		}
+
+		if ( ! empty( $feedback_item['suggestion'] ) ) {
+			$meta['feedback_suggestion'] = $feedback_item['suggestion'];
+		}
+
 		// Add block ID (clientId) if available.
 		// Note: clientId is ephemeral and changes on each editor load.
 		if ( ! empty( $feedback_item['block_id'] ) ) {
@@ -397,6 +411,8 @@ class Notes_Manager {
 				'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
 			);
 
+			$note += $this->get_feedback_fields( $note['id'] );
+
 			// Add grouping information if available.
 			if ( $is_group ) {
 				$note['is_group']       = true;
@@ -418,6 +434,11 @@ class Notes_Manager {
 	 * @return bool Success.
 	 */
 	public function resolve_note( int $note_id ): bool {
+		// update_comment_meta() returns false when the value is unchanged.
+		if ( $this->is_note_resolved( $note_id ) ) {
+			return true;
+		}
+
 		return (bool) update_comment_meta( $note_id, 'ai_feedback_resolved', true );
 	}
 
@@ -526,7 +547,7 @@ class Notes_Manager {
 	private function format_single_note( object $comment ): array {
 		$is_ai = (bool) get_comment_meta( $comment->comment_ID, 'ai_feedback', true );
 
-		return array(
+		$note = array(
 			'id'          => (int) $comment->comment_ID,
 			'post'        => (int) $comment->comment_post_ID,
 			'parent'      => (int) $comment->comment_parent,
@@ -549,6 +570,33 @@ class Notes_Manager {
 			'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
 			'is_ai'       => $is_ai,
 		);
+
+		return $note + $this->get_feedback_fields( $note['id'] );
+	}
+
+	/**
+	 * Get the stored feedback text fields for a note.
+	 *
+	 * Notes created before these fields were stored return empty strings; the
+	 * sidebar falls back to the note content for those.
+	 *
+	 * @param  int $note_id Note ID.
+	 * @return array{title: string, feedback: string, suggestion: string} Feedback fields.
+	 */
+	private function get_feedback_fields( int $note_id ): array {
+		$fields = array(
+			'title'      => 'feedback_title',
+			'feedback'   => 'feedback_text',
+			'suggestion' => 'feedback_suggestion',
+		);
+
+		$values = array();
+		foreach ( $fields as $field => $meta_key ) {
+			$value            = get_comment_meta( $note_id, $meta_key, true );
+			$values[ $field ] = is_string( $value ) ? $value : '';
+		}
+
+		return $values;
 	}
 
 	/**
