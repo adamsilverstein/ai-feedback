@@ -9,8 +9,16 @@
  */
 import { useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { __ } from '@wordpress/i18n';
 
-const POLL_INTERVAL_MS = 2000;
+export const POLL_INTERVAL_MS = 2000;
+
+/**
+ * How many `unknown` responses to tolerate before giving up. A detected reply
+ * is marked pending as soon as it is saved, so a lasting `unknown` means no
+ * AI reply was ever scheduled.
+ */
+export const MAX_UNKNOWN_POLLS = 5;
 
 /**
  * @param {number|null} replyId User reply comment ID to poll for, or null/0 to disable.
@@ -42,6 +50,7 @@ export default function useReplyStatus(replyId) {
 		);
 
 		let cancelled = false;
+		let unknownPolls = 0;
 
 		const clearPendingTimer = () => {
 			if (timeoutRef.current) {
@@ -62,10 +71,25 @@ export default function useReplyStatus(replyId) {
 				}
 
 				const next = {
-					status: response.status || 'unknown',
-					aiReplyCommentId: response.ai_reply_comment_id || null,
-					error: response.error || null,
+					status: response?.status || 'unknown',
+					aiReplyCommentId: response?.ai_reply_comment_id ?? null,
+					error: response?.error ?? null,
 				};
+
+				if (next.status === 'unknown') {
+					unknownPolls++;
+					if (unknownPolls >= MAX_UNKNOWN_POLLS) {
+						setState({
+							status: 'failed',
+							aiReplyCommentId: null,
+							error: __(
+								'No AI reply was scheduled for this comment.',
+								'ai-feedback'
+							),
+						});
+						return;
+					}
+				}
 
 				setState(next);
 
@@ -80,7 +104,12 @@ export default function useReplyStatus(replyId) {
 				setState({
 					status: 'failed',
 					aiReplyCommentId: null,
-					error: err?.message || 'Poll request failed.',
+					error:
+						err?.message ||
+						__(
+							'Could not check the AI reply status.',
+							'ai-feedback'
+						),
 				});
 			}
 		};

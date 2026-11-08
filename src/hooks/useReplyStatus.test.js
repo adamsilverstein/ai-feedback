@@ -8,7 +8,10 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 const mockApiFetch = jest.fn();
 jest.mock('@wordpress/api-fetch', () => (args) => mockApiFetch(args));
 
-import useReplyStatus from './useReplyStatus';
+import useReplyStatus, {
+	MAX_UNKNOWN_POLLS,
+	POLL_INTERVAL_MS,
+} from './useReplyStatus';
 
 describe('useReplyStatus', () => {
 	beforeEach(() => {
@@ -89,6 +92,30 @@ describe('useReplyStatus', () => {
 		});
 
 		expect(mockApiFetch).toHaveBeenCalledTimes(1);
+
+		jest.useRealTimers();
+	});
+
+	it('gives up with a failed status after repeated unknown responses', async () => {
+		jest.useFakeTimers();
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'unknown' });
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		for (let i = 0; i < MAX_UNKNOWN_POLLS; i++) {
+			await act(async () => {
+				await Promise.resolve();
+				jest.advanceTimersByTime(POLL_INTERVAL_MS);
+			});
+		}
+
+		await waitFor(() => expect(result.current.status).toBe('failed'));
+		expect(mockApiFetch).toHaveBeenCalledTimes(MAX_UNKNOWN_POLLS);
+
+		act(() => {
+			jest.advanceTimersByTime(POLL_INTERVAL_MS * 5);
+		});
+		expect(mockApiFetch).toHaveBeenCalledTimes(MAX_UNKNOWN_POLLS);
 
 		jest.useRealTimers();
 	});
