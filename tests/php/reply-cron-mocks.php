@@ -86,9 +86,14 @@ namespace {
 
 	if ( ! function_exists( 'add_action' ) ) {
 		/**
-		 * No-op add_action — unit tests invoke methods directly rather than via the hook.
+		 * add_action mock that records registrations in $GLOBALS['test_added_actions'].
 		 */
 		function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+			$GLOBALS['test_added_actions'][] = array(
+				'hook'          => $hook,
+				'callback'      => $callback,
+				'accepted_args' => $accepted_args,
+			);
 			return true;
 		}
 	}

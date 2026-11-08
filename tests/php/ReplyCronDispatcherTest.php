@@ -100,4 +100,34 @@ class ReplyCronDispatcherTest extends TestCase {
 		// And status stays empty because we short-circuited before update_comment_meta.
 		$this->assertArrayNotHasKey( 200, $GLOBALS['test_comment_meta'] );
 	}
+
+	/**
+	 * The detector action schedules cron, and the AI call only runs from cron.
+	 *
+	 * Reply_Service must not listen on the detector action, otherwise the AI
+	 * call would run synchronously inside the user's comment insert.
+	 */
+	public function test_ai_generation_runs_from_cron_not_the_detector_action(): void {
+		require_once dirname( __DIR__, 2 ) . '/includes/class-reply-detector.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/class-reply-service.php';
+
+		$GLOBALS['test_added_actions'] = array();
+		$this->dispatcher->register();
+		( new \AI_Feedback\Reply_Service() )->register();
+
+		$listeners = array();
+		foreach ( $GLOBALS['test_added_actions'] as $action ) {
+			$listeners[ $action['hook'] ][] = get_class( $action['callback'][0] );
+		}
+		unset( $GLOBALS['test_added_actions'] );
+
+		$this->assertSame(
+			array( Reply_Cron_Dispatcher::class ),
+			$listeners[ \AI_Feedback\Reply_Detector::ACTION_REPLY_RECEIVED ]
+		);
+		$this->assertSame(
+			array( \AI_Feedback\Reply_Service::class ),
+			$listeners[ Reply_Cron_Dispatcher::CRON_HOOK ]
+		);
+	}
 }
