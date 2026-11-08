@@ -237,7 +237,7 @@ test.describe('Error Handling', () => {
 						code: 'ai_service_unavailable',
 						message:
 							'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.',
-						data: { status: 503, retry_after: 1 },
+						data: { status: 503, retry_after: 3 },
 					}),
 				});
 				return;
@@ -262,11 +262,17 @@ test.describe('Error Handling', () => {
 			});
 		});
 
-		await aiFeedback.startReviewAndWait();
+		// Click directly: waiting for the button to settle could outlast the
+		// retry delay and miss the notice.
+		await page
+			.locator('.ai-feedback-panel button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
+			.click();
 
 		const panel = page.locator('.ai-feedback-panel');
 		await expect(
-			panel.getByText('Retrying automatically in 1 second.')
+			panel.getByText('Retrying automatically in 3 seconds.')
 		).toBeVisible();
 		await expect(
 			panel.getByRole('button', { name: 'Retry now' })
