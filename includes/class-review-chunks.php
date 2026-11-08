@@ -264,6 +264,21 @@ class Review_Chunks {
 	}
 
 	/**
+	 * End the user's session, such as when the first chunk fails.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return void
+	 */
+	public function end( int $user_id ): void {
+		$this->update_session(
+			$user_id,
+			static function (): ?array {
+				return null;
+			}
+		);
+	}
+
+	/**
 	 * Change the user's session under the lock.
 	 *
 	 * @param  int      $user_id User ID.
@@ -271,8 +286,15 @@ class Review_Chunks {
 	 * @return void
 	 */
 	private function update_session( int $user_id, callable $change ): void {
-		if ( ! $this->acquire_lock( $user_id ) ) {
+		$locked = $this->acquire_lock( $user_id );
+		if ( ! $locked ) {
+			// Another request holds the lock for a quick read-modify-write; wait briefly once.
+			usleep( 200000 );
+			$locked = $this->acquire_lock( $user_id );
+		}
+		if ( ! $locked ) {
 			// Leave the session to expire on its own rather than race another request.
+			Logger::debug( sprintf( 'Could not lock chunked review session for user %d', $user_id ) );
 			return;
 		}
 
@@ -337,11 +359,20 @@ class Review_Chunks {
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Read the lock without a stale option cache.
 			$locked_at = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, $name ) );
-			if ( is_numeric( $locked_at ) && (int) $locked_at > time() - self::LOCK_TTL ) {
+			if ( ! is_numeric( $locked_at ) || (int) $locked_at > time() - self::LOCK_TTL ) {
 				return false;
 			}
 
-			$this->release_lock( $user_id );
+			// Delete only the stale lock we saw, so two requests taking over the
+			// same stale lock can't both win: the second delete matches nothing.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
+			$wpdb->delete(
+				$wpdb->options,
+				array(
+					'option_name'  => $name,
+					'option_value' => $locked_at,
+				)
+			);
 		}
 
 		return false;

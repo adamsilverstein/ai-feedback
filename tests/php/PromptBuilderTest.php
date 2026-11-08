@@ -435,7 +435,7 @@ class PromptBuilderTest extends TestCase {
 
 		$this->assertStringContainsString( 'This is part 2 of 3', $prompt );
 		$this->assertStringContainsString( 'Write the summary about this part only.', $prompt );
-		$this->assertStringNotContainsString( 'SUMMARIES OF EARLIER PARTS:', $prompt );
+		$this->assertStringNotContainsString( 'SUMMARIES OF EARLIER PARTS', $prompt );
 	}
 
 	/**

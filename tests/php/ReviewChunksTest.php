@@ -203,6 +203,19 @@ class ReviewChunksTest extends TestCase {
 	}
 
 	/**
+	 * Ending a session, as after a failed first chunk, rejects later chunks.
+	 */
+	public function test_end_rejects_later_chunks(): void {
+		$review_id = $this->chunks->start( 1, 10, 3 );
+
+		$this->chunks->end( 1 );
+
+		$result = $this->chunks->claim( 1, 10, $review_id, 1, 3 );
+		$this->assertWPError( $result );
+		$this->assertSame( 'invalid_review_chunk', $result->get_error_code() );
+	}
+
+	/**
 	 * Starting a new review replaces an unfinished one.
 	 */
 	public function test_start_replaces_unfinished_session(): void {

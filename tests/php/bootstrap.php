@@ -372,7 +372,14 @@ if ( ! class_exists( 'Test_WPDB' ) ) {
 		}
 
 		public function delete( $table, $where ) {
-			unset( $GLOBALS['test_options'][ $where['option_name'] ] );
+			$name = $where['option_name'];
+			if ( ! isset( $GLOBALS['test_options'][ $name ] ) ) {
+				return 0;
+			}
+			if ( isset( $where['option_value'] ) && (string) $GLOBALS['test_options'][ $name ] !== (string) $where['option_value'] ) {
+				return 0;
+			}
+			unset( $GLOBALS['test_options'][ $name ] );
 			return 1;
 		}
 	}

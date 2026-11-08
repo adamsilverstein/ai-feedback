@@ -133,10 +133,15 @@ class Review_Controller extends WP_REST_Controller {
 
 		$is_chunked = $chunk_total > 1;
 
-		if ( $is_chunked && count( $blocks ) > Review_Chunks::get_chunk_size() ) {
+		// Every part but the last must be full, so a review can't be split into
+		// many tiny parts to buy extra AI calls with one rate limit slot.
+		$block_count = count( $blocks );
+		$chunk_size  = Review_Chunks::get_chunk_size();
+		$is_last     = $chunk_index + 1 >= $chunk_total;
+		if ( $is_chunked && ( $block_count > $chunk_size || ( ! $is_last && $block_count !== $chunk_size ) ) ) {
 			return new WP_Error(
-				'chunk_too_large',
-				__( 'This review chunk has more blocks than allowed.', 'ai-feedback' ),
+				'invalid_chunk_size',
+				__( 'This review chunk has the wrong number of blocks.', 'ai-feedback' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -212,6 +217,9 @@ class Review_Controller extends WP_REST_Controller {
 			Logger::debug( sprintf( 'Error: Review failed - %s', $result->get_error_message() ) );
 			if ( $is_chunked && $chunk_index > 0 ) {
 				$this->review_chunks->release( $user_id );
+			} elseif ( $is_chunked ) {
+				// Without a first part there is no review to continue.
+				$this->review_chunks->end( $user_id );
 			}
 			return $result;
 		}
