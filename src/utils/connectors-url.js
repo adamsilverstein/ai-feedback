@@ -10,11 +10,18 @@
  *
  * @return {string} Connectors admin URL.
  */
+let hasWarned = false;
+
 export function getConnectorsUrl() {
 	const localized = window.aiFeedbackData?.connectorsUrl;
 	if (localized) {
 		return localized;
 	}
+
+	if (hasWarned) {
+		return '/wp-admin/options-general.php?page=connectors';
+	}
+	hasWarned = true;
 
 	// eslint-disable-next-line no-console
 	console.warn(

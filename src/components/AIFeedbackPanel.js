@@ -9,6 +9,7 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 import { getConnectorsUrl } from '../utils/connectors-url';
+import { getErrorKind } from '../utils/error-kind';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -26,15 +27,9 @@ import SkipLinks from './SkipLinks';
  * @return {Element|null} Action button or null.
  */
 function getErrorAction(error) {
-	// Credit/billing errors typically surface via the core AI Client wrapper
-	// using the generic ai_request_failed code; match on keywords so users get
-	// a direct link to the Connectors screen where credentials are managed.
-	if (
-		error.code === 'ai_request_failed' &&
-		typeof error.message === 'string' &&
-		(error.message.toLowerCase().includes('credit') ||
-			error.message.toLowerCase().includes('billing'))
-	) {
+	const kind = getErrorKind(error);
+
+	if (kind === 'credentials') {
 		return (
 			<Button
 				variant="link"
@@ -48,8 +43,7 @@ function getErrorAction(error) {
 		);
 	}
 
-	// Check for rate limit errors
-	if (error.code === 'rate_limit_exceeded') {
+	if (kind === 'rate_limit') {
 		return (
 			<p className="ai-feedback-error-help">
 				{__(
