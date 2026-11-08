@@ -50,7 +50,7 @@ Before using AI Feedback, configure an AI provider:
 
 = What AI providers are supported? =
 
-Any provider registered with the WordPress 7.0 core AI Client. Out of the box this includes Anthropic, OpenAI, and Google. Additional providers can be added by their respective AI provider plugins.
+Any text generation provider connected through the WordPress 7.0 core AI Client. Settings → Connectors lists Anthropic, OpenAI, and Google, and installs each provider's plugin when you set it up. Other providers can be added with their own AI provider plugins.
 
 = Where do I configure my API key? =
 

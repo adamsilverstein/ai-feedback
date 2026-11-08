@@ -31,7 +31,7 @@ WordPress 7.0 ships the AI Client and Connectors API in core, so AI Feedback no 
 
 Before using AI Feedback, configure an AI provider:
 1. Go to WordPress Admin → **Settings → Connectors**.
-2. Choose a provider (Anthropic, OpenAI, Google, etc.).
+2. Choose a provider (Anthropic, OpenAI, Google, etc.) and install its provider plugin if prompted.
 3. Provide an API key directly, or set the corresponding environment variable / PHP constant (e.g. `ANTHROPIC_API_KEY`). Environment variables and PHP constants take precedence over database-stored values.
 4. Save.
 
