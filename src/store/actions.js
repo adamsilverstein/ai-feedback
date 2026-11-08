@@ -7,6 +7,7 @@ import {
 	select as registrySelect,
 } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as preferencesStore } from '@wordpress/preferences';
 import { TYPES } from './reducer';
 import { STAGE_ANALYZING, STAGE_ATTACHING } from './review-stages';
 import {
@@ -15,6 +16,7 @@ import {
 	DEFAULT_CHUNK_SIZE,
 } from '../utils/chunk-review';
 import { refreshCoreNotes } from '../utils/refresh-core-notes';
+import { PREFERENCES_SCOPE, PREFERENCE_KEYS } from '../tips';
 
 /**
  * Fetch settings from the server.
@@ -350,6 +352,18 @@ export function* startReview({
 				};
 			}
 		}
+
+		// Completed reviews unlock progressive tips.
+		const reviewCount =
+			registrySelect(preferencesStore).get(
+				PREFERENCES_SCOPE,
+				PREFERENCE_KEYS.reviewCount
+			) || 0;
+		registryDispatch(preferencesStore).set(
+			PREFERENCES_SCOPE,
+			PREFERENCE_KEYS.reviewCount,
+			reviewCount + 1
+		);
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
