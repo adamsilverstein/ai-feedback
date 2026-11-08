@@ -546,28 +546,22 @@ npm run test:unit -- --watch
 
 ### Configuration
 
-`jest.config.js`:
+Unit tests run on [Vitest](https://vitest.dev/) through `wp-scripts test-unit-js`. `vitest.config.mjs` limits the run to files in `src/**/test/`:
 
 ```javascript
-module.exports = {
-    preset: '@wordpress/jest-preset-default',
-    testEnvironment: 'jsdom',
-    setupFilesAfterEnv: [ '<rootDir>/tests/js/setup.js' ],
-    testMatch: [ '<rootDir>/tests/js/**/*.test.js' ],
-    collectCoverageFrom: [
-        'src/**/*.js',
-        '!src/index.js',
-        '!**/node_modules/**',
-    ],
-    coverageThreshold: {
-        global: {
-            branches: 90,
-            functions: 90,
-            lines: 90,
-            statements: 90,
-        },
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig( {
+    test: {
+        include: [ 'src/**/test/*.test.js' ],
     },
-};
+} );
+```
+
+Import the test APIs from `vitest` in each test file:
+
+```javascript
+import { describe, expect, it, vi } from 'vitest';
 ```
 
 ### Test Setup
@@ -575,15 +569,15 @@ module.exports = {
 `tests/js/setup.js`:
 
 ```javascript
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import { registerStore } from '@wordpress/data';
 
 // Mock WordPress packages
-jest.mock( '@wordpress/api-fetch', () => jest.fn() );
-jest.mock( '@wordpress/data', () => ( {
-    ...jest.requireActual( '@wordpress/data' ),
-    useSelect: jest.fn(),
-    useDispatch: jest.fn(),
+vi.mock( '@wordpress/api-fetch', () => vi.fn() );
+vi.mock( '@wordpress/data', async () => ( {
+    ...( await vi.importActual( '@wordpress/data' ) ),
+    useSelect: vi.fn(),
+    useDispatch: vi.fn(),
 } ) );
 ```
 
@@ -597,13 +591,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useSelect, useDispatch } from '@wordpress/data';
 import ReviewButton from '../../../src/components/ReviewButton';
 
-jest.mock( '@wordpress/data' );
+vi.mock( '@wordpress/data' );
 
 describe( 'ReviewButton', () => {
-    const mockStartReview = jest.fn();
+    const mockStartReview = vi.fn();
 
     beforeEach( () => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
 
         useDispatch.mockReturnValue( {
             startReview: mockStartReview,
@@ -677,7 +671,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useSelect, useDispatch } from '@wordpress/data';
 import ModelSelector from '../../../src/components/ModelSelector';
 
-jest.mock( '@wordpress/data' );
+vi.mock( '@wordpress/data' );
 
 describe( 'ModelSelector', () => {
     const mockModels = [
@@ -685,10 +679,10 @@ describe( 'ModelSelector', () => {
         { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
     ];
 
-    const mockUpdateSettings = jest.fn();
+    const mockUpdateSettings = vi.fn();
 
     beforeEach( () => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
 
         useDispatch.mockReturnValue( {
             updateSettings: mockUpdateSettings,
