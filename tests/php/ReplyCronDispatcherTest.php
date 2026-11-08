@@ -41,7 +41,8 @@ class ReplyCronDispatcherTest extends TestCase {
 	protected function tearDown(): void {
 		unset(
 			$GLOBALS['test_comment_meta'],
-			$GLOBALS['test_scheduled_events']
+			$GLOBALS['test_scheduled_events'],
+			$GLOBALS['test_schedule_fails']
 		);
 		parent::tearDown();
 	}
@@ -129,5 +130,18 @@ class ReplyCronDispatcherTest extends TestCase {
 			array( \AI_Feedback\Reply_Service::class ),
 			$listeners[ Reply_Cron_Dispatcher::CRON_HOOK ]
 		);
+	}
+
+	/**
+	 * A failed schedule marks the reply failed instead of leaving it pending.
+	 */
+	public function test_schedule_failure_marks_reply_failed(): void {
+		$GLOBALS['test_schedule_fails'] = true;
+
+		$this->dispatcher->schedule_reply( 200, 100, 42, 'abc-123' );
+
+		$this->assertSame( 'failed', $GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::STATUS_META_KEY ] );
+		$this->assertNotEmpty( $GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ] );
+		$this->assertCount( 0, $GLOBALS['test_scheduled_events'] );
 	}
 }

@@ -81,7 +81,19 @@ class Reply_Cron_Dispatcher {
 			return;
 		}
 
+		// Mark pending before scheduling so a fast cron run cannot finish first
+		// and have its result overwritten.
 		update_comment_meta( $comment_id, self::STATUS_META_KEY, 'pending' );
-		wp_schedule_single_event( time(), self::CRON_HOOK, $args );
+
+		$scheduled = wp_schedule_single_event( time(), self::CRON_HOOK, $args, true );
+		if ( true !== $scheduled ) {
+			// Without an event nothing would ever move the reply out of pending.
+			update_comment_meta( $comment_id, self::STATUS_META_KEY, 'failed' );
+			update_comment_meta(
+				$comment_id,
+				self::REPLY_ERROR_META_KEY,
+				__( 'The AI reply could not be scheduled.', 'ai-feedback' )
+			);
+		}
 	}
 }

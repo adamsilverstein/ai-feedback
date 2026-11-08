@@ -94,7 +94,13 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 */
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
-		$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+		try {
+			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+		} catch ( \Throwable $e ) {
+			// Record a terminal state so the frontend stops waiting.
+			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
+			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'ai-feedback' ) );
+		}
 
 		// A non-positive ID means persistence silently failed. Marking that
 		// 'complete' would leave the frontend waiting on a reply that does not exist.

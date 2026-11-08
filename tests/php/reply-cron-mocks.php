@@ -72,9 +72,13 @@ namespace {
 		 * @param int    $timestamp
 		 * @param string $hook
 		 * @param array  $args
-		 * @return bool
+		 * @param bool   $wp_error
+		 * @return bool|WP_Error
 		 */
-		function wp_schedule_single_event( $timestamp, $hook, $args = array() ) {
+		function wp_schedule_single_event( $timestamp, $hook, $args = array(), $wp_error = false ) {
+			if ( ! empty( $GLOBALS['test_schedule_fails'] ) ) {
+				return $wp_error ? new WP_Error( 'schedule_event_false', 'Could not schedule.' ) : false;
+			}
 			$GLOBALS['test_scheduled_events'][] = array(
 				'timestamp' => (int) $timestamp,
 				'hook'      => $hook,
