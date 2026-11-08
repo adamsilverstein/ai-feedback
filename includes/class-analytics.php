@@ -64,12 +64,15 @@ class Analytics {
 			return;
 		}
 
+		// Read-modify-write: two reviews finishing at the same instant can
+		// lose one increment. Acceptable for usage stats.
 		$days = self::get_days();
 		$date = current_time( 'Y-m-d' );
 		$day  = $days[ $date ] ?? self::empty_day();
 
 		$summary  = is_array( $review['summary'] ?? null ) ? $review['summary'] : array();
-		$model    = is_string( $review['model'] ?? null ) && '' !== $review['model'] ? $review['model'] : 'unknown';
+		$model    = is_string( $review['model'] ?? null ) ? substr( sanitize_text_field( $review['model'] ), 0, 100 ) : '';
+		$model    = '' !== $model ? $model : 'unknown';
 		$feedback = is_numeric( $review['note_count'] ?? null ) ? (int) $review['note_count'] : 0;
 		$user_id  = (string) get_current_user_id();
 
@@ -85,6 +88,30 @@ class Analytics {
 		$days = array_slice( $days, -self::MAX_DAYS, null, true );
 
 		update_option( self::OPTION_KEY, $days, false );
+	}
+
+	/**
+	 * Remove a deleted user's counts.
+	 *
+	 * Hooked to `deleted_user`.
+	 *
+	 * @param int $user_id Deleted user ID.
+	 */
+	public static function forget_user( int $user_id ): void {
+		$days    = self::get_days();
+		$key     = (string) $user_id;
+		$changed = false;
+
+		foreach ( $days as $date => $day ) {
+			if ( isset( $day['users'][ $key ] ) ) {
+				unset( $days[ $date ]['users'][ $key ] );
+				$changed = true;
+			}
+		}
+
+		if ( $changed ) {
+			update_option( self::OPTION_KEY, $days, false );
+		}
 	}
 
 	/**
@@ -220,7 +247,8 @@ class Analytics {
 	 * @return list<string>
 	 */
 	private static function date_range( string $today, int $length ): array {
-		$end   = new \DateTimeImmutable( $today );
+		// $today is already site-local; UTC here is only for day arithmetic.
+		$end   = new \DateTimeImmutable( $today, new \DateTimeZone( 'UTC' ) );
 		$dates = array();
 		for ( $i = $length - 1; $i >= 0; $i-- ) {
 			$dates[] = $end->modify( "-{$i} days" )->format( 'Y-m-d' );
@@ -243,7 +271,7 @@ class Analytics {
 			$user  = get_userdata( (int) $user_id );
 			$top[] = array(
 				'user_id' => (int) $user_id,
-				'name'    => $user ? $user->display_name : __( 'Deleted user', 'ai-feedback' ),
+				'name'    => $user ? $user->display_name : __( 'Unknown user', 'ai-feedback' ),
 				'reviews' => $count,
 			);
 		}

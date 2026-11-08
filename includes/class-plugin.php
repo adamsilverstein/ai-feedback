@@ -104,6 +104,7 @@ class Plugin {
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
 		add_action( 'ai_feedback_after_review', array( Analytics::class, 'track_review' ), 10, 2 );
+		add_action( 'deleted_user', array( Analytics::class, 'forget_user' ) );
 		Analytics_Page::init();
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 

@@ -159,14 +159,36 @@ class AnalyticsTest extends TestCase {
 	}
 
 	/**
-	 * Deleted users still appear in top users.
+	 * Deleting a user removes their counts.
+	 */
+	public function test_forget_user_removes_counts(): void {
+		Analytics::track_review( 1, $this->review() );
+		Analytics::forget_user( 3 );
+
+		$days = Analytics::get_days();
+		$this->assertSame( array(), $days['2026-11-08']['users'] );
+		$this->assertSame( 1, $days['2026-11-08']['reviews'] );
+	}
+
+	/**
+	 * Long model names are trimmed before they become keys.
+	 */
+	public function test_track_review_caps_model_length(): void {
+		Analytics::track_review( 1, $this->review( str_repeat( 'm', 300 ) ) );
+
+		$models = array_keys( Analytics::get_days()['2026-11-08']['models'] );
+		$this->assertSame( 100, strlen( $models[0] ) );
+	}
+
+	/**
+	 * Users missing from the site still appear in top users.
 	 */
 	public function test_top_users_handles_deleted_users(): void {
 		$GLOBALS['test_current_user_id'] = 99;
 		Analytics::track_review( 1, $this->review() );
 
 		$summary = Analytics::get_summary( '7days' );
-		$this->assertSame( 'Deleted user', $summary['top_users'][0]['name'] );
+		$this->assertSame( 'Unknown user', $summary['top_users'][0]['name'] );
 	}
 
 	/**
