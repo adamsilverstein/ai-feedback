@@ -445,3 +445,21 @@ if ( ! function_exists( 'rest_authorization_required_code' ) ) {
 
 require_once $includes_dir . 'class-review-history.php';
 require_once $includes_dir . 'class-history-controller.php';
+
+// Analytics mocks.
+if ( ! function_exists( 'current_time' ) ) {
+	function current_time( $type, $gmt = 0 ) {
+		$now = $GLOBALS['test_now'] ?? time();
+		return 'mysql' === $type ? gmdate( 'Y-m-d H:i:s', $now ) : gmdate( $type, $now );
+	}
+}
+
+if ( ! function_exists( 'get_userdata' ) ) {
+	function get_userdata( $user_id ) {
+		$name = $GLOBALS['test_users'][ $user_id ] ?? null;
+		return null === $name ? false : (object) array( 'display_name' => $name );
+	}
+}
+
+require_once $includes_dir . 'class-analytics.php';
+require_once $includes_dir . 'class-analytics-controller.php';
