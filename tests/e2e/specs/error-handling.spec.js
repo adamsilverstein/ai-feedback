@@ -1,216 +1,168 @@
 /**
- * E2E tests for error handling.
+ * E2E tests for review error handling.
  */
 const { test, expect } = require('../fixtures');
 
 test.describe('Error Handling', () => {
-	test('displays error notice when API request fails', async ({
-		page,
-		editor,
-		aiFeedback,
-	}) => {
+	test.beforeEach(async ({ editor, aiFeedback }) => {
 		await aiFeedback.createAndSavePost(
-			{ title: 'Error Test Post', content: 'Content for error test.' },
+			{ title: 'Error Handling', content: 'Content to review.' },
 			{ editor }
 		);
-
 		await aiFeedback.openSidebar();
+	});
 
-		// Mock API failure
+	test('shows the message and code for a server error', async ({
+		page,
+		aiFeedback,
+	}) => {
 		await aiFeedback.mockReviewAPIError(
 			500,
 			'ai_request_failed',
-			'AI request failed: Internal server error'
+			'The AI provider is currently unavailable.'
 		);
+		await aiFeedback.runReview();
 
-		// Start review and wait for completion (it will return to normal state even on error)
-		await aiFeedback.startReviewAndWait();
-
-		// Verify error notice appears
-		await expect(
-			page.locator('.components-notice.is-error').first()
-		).toBeVisible({ timeout: 5000 });
+		const notice = page.locator('.ai-feedback-error-notice');
+		await expect(notice).toHaveClass(/is-error/);
+		await expect(notice).toContainText(
+			'The AI provider is currently unavailable.'
+		);
+		await expect(notice).toContainText('Error code: ai_request_failed');
+		// Unknown errors get no follow-up action.
+		await expect(notice.getByRole('link')).toHaveCount(0);
+		await expect(notice.locator('.ai-feedback-error-help')).toHaveCount(0);
 	});
 
-	test('error notice can be dismissed', async ({
+	test('asks the user to wait after a rate limit error', async ({
 		page,
-		editor,
 		aiFeedback,
 	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'Dismissable Error', content: 'Content.' },
-			{ editor }
-		);
-
-		await aiFeedback.openSidebar();
-
-		await aiFeedback.mockReviewAPIError(
-			500,
-			'unknown_error',
-			'Something went wrong'
-		);
-
-		// Start review and wait for completion
-		await aiFeedback.startReviewAndWait();
-
-		// Check if error notice appeared
-		const errorNotice = page.locator('.components-notice.is-error').first();
-		const noticeVisible = await errorNotice.isVisible().catch(() => false);
-
-		if (noticeVisible) {
-			// Try to find and click the dismiss button
-			// WordPress Notice component uses different selectors across versions
-			const dismissSelectors = [
-				errorNotice.getByRole('button', { name: /Dismiss/i }),
-				errorNotice.locator('button.components-notice__dismiss'),
-				errorNotice.locator('button[aria-label*="dismiss" i]'),
-			];
-
-			let dismissed = false;
-			for (const selector of dismissSelectors) {
-				const isVisible = await selector.isVisible().catch(() => false);
-				if (isVisible) {
-					await selector.click();
-					dismissed = true;
-					break;
-				}
-			}
-
-			if (dismissed) {
-				// Error should be hidden
-				await expect(errorNotice).not.toBeVisible();
-			} else {
-				// Dismiss button not found, but error notice appeared - test passes
-				expect(noticeVisible).toBe(true);
-			}
-		} else {
-			// Error notice should have appeared — fail explicitly
-			expect(noticeVisible).toBe(true);
-		}
-	});
-
-	test.skip('displays rate limit error with appropriate message', async ({
-		page,
-		editor,
-		aiFeedback,
-	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'Rate Limit Test', content: 'Content.' },
-			{ editor }
-		);
-
-		await aiFeedback.openSidebar();
-
 		await aiFeedback.mockReviewAPIError(
 			429,
 			'rate_limit_exceeded',
-			'You have reached the maximum number of reviews per hour.'
+			'You have reached the maximum number of reviews per hour (10). Please try again later.'
 		);
+		await aiFeedback.runReview();
 
-		await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.click();
-
-		// Verify error notice shows rate limit message (use locator to avoid a11y region duplication)
-		await expect(
-			page
-				.locator('.ai-feedback-error-notice')
-				.filter({ hasText: /rate_limit/i })
-		).toBeVisible({
-			timeout: 10000,
-		});
-		// The message from the mock should be displayed
-		await expect(
-			page.locator(
-				'.ai-feedback-error-notice:has-text("maximum number of reviews")'
-			)
-		).toBeVisible();
+		const notice = page.locator('.ai-feedback-error-notice');
+		await expect(notice).toContainText(
+			'maximum number of reviews per hour'
+		);
+		await expect(notice).toContainText('Error code: rate_limit_exceeded');
+		await expect(notice).toContainText(
+			'Please wait before making another request.'
+		);
 	});
 
-	test('displays billing/credit error with settings link', async ({
+	for (const { status, message } of [
+		{ status: 402, message: 'Insufficient credit balance' },
+		{ status: 401, message: 'Invalid API key provided' },
+	]) {
+		test(`links to Connectors settings for a ${status} provider error`, async ({
+			page,
+			aiFeedback,
+		}) => {
+			// Core AI Client errors carry the provider status in data.status.
+			await aiFeedback.mockReviewAPIError(
+				500,
+				'prompt_client_error',
+				message,
+				{ status }
+			);
+			await aiFeedback.runReview();
+
+			const notice = page.locator('.ai-feedback-error-notice');
+			await expect(notice).toContainText(message);
+
+			const link = notice.getByRole('link', {
+				name: 'Open Connectors Settings',
+			});
+			await expect(link).toBeVisible();
+			await expect(link).toHaveAttribute(
+				'href',
+				/options-general\.php\?page=connectors$/
+			);
+			await expect(link).toHaveAttribute('target', '_blank');
+		});
+	}
+
+	test('dismisses the error notice', async ({ page, aiFeedback }) => {
+		await aiFeedback.mockReviewAPIError(
+			500,
+			'server_error',
+			'Something went wrong'
+		);
+		await aiFeedback.runReview();
+
+		const notice = page.locator('.ai-feedback-error-notice');
+		await expect(notice).toBeVisible();
+
+		await notice.getByRole('button', { name: 'Close' }).click();
+		await expect(notice).toBeHidden();
+		await expect(aiFeedback.getReviewButton()).toBeEnabled();
+	});
+
+	for (const errorCode of ['failed', 'timedout']) {
+		test(`recovers from a network error (${errorCode})`, async ({
+			page,
+			aiFeedback,
+		}) => {
+			await aiFeedback.routeREST('/review', (route) =>
+				route.abort(errorCode)
+			);
+			const response = await aiFeedback.runReview();
+			expect(response).toBeNull();
+
+			const notice = page.locator('.ai-feedback-error-notice');
+			await expect(notice).toBeVisible();
+			await expect(
+				notice.locator('.ai-feedback-error-message')
+			).not.toBeEmpty();
+			await expect(aiFeedback.getReviewButton()).toBeEnabled();
+		});
+	}
+
+	test('can retry after an error', async ({ page, aiFeedback }) => {
+		await aiFeedback.mockReviewAPIError(
+			503,
+			'ai_request_failed',
+			'Temporary failure'
+		);
+		await aiFeedback.runReview();
+
+		const notice = page.locator('.ai-feedback-error-notice');
+		await expect(notice).toContainText('Temporary failure');
+
+		// Let the retry reach the mock AI backend.
+		await aiFeedback.unrouteREST('/review');
+		const response = await aiFeedback.runReview();
+		expect(response.ok()).toBe(true);
+
+		await expect(notice).toBeHidden();
+		await expect(page.locator('.ai-feedback-review-summary')).toContainText(
+			'1 feedback item'
+		);
+	});
+
+	test('keeps the previous review when a later review fails', async ({
 		page,
-		editor,
 		aiFeedback,
 	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'Billing Error Test', content: 'Content.' },
-			{ editor }
-		);
-
-		await aiFeedback.openSidebar();
+		await aiFeedback.runReview();
+		const summary = page.locator('.ai-feedback-review-summary');
+		await expect(summary).toContainText('1 feedback item');
 
 		await aiFeedback.mockReviewAPIError(
-			402,
+			500,
 			'ai_request_failed',
-			'AI request failed: Insufficient credit balance'
+			'Second review failed'
 		);
+		await aiFeedback.runReview();
 
-		// Start review and wait for completion
-		await aiFeedback.startReviewAndWait();
-
-		// Verify error notice appears with billing-related message
-		const errorNotice = page.locator('.components-notice.is-error').first();
-		await expect(errorNotice).toBeVisible({ timeout: 5000 });
-	});
-
-	test('handles network timeout gracefully', async ({
-		page,
-		editor,
-		aiFeedback,
-	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'Timeout Test', content: 'Content.' },
-			{ editor }
+		await expect(page.locator('.ai-feedback-error-notice')).toContainText(
+			'Second review failed'
 		);
-
-		await aiFeedback.openSidebar();
-
-		// Abort the request to simulate network failure
-		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
-			await route.abort('timedout');
-		});
-
-		await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.click();
-
-		// Should show some error state - button should return to normal
-		await expect(
-			page
-				.locator('button.is-primary')
-				.filter({ hasText: /Review( Document)?/i })
-				.first()
-		).toBeVisible({ timeout: 10000 });
-	});
-
-	test.skip('shows warning when reviewing empty content', async ({
-		admin,
-		page,
-		aiFeedback,
-	}) => {
-		// Don't add any content, just try to review
-		// Save as draft to get post ID
-		await admin.createNewPost({ title: 'Empty Post' });
-		await page.getByRole('button', { name: 'Save draft' }).click();
-		await page.waitForSelector('.editor-post-saved-state.is-saved');
-
-		await aiFeedback.openSidebar();
-
-		await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.click();
-
-		// Should show warning notice about no content (snackbar - use locator to avoid a11y region duplication)
-		await expect(
-			page.locator(
-				'.components-snackbar__content:has-text("No content blocks found to review")'
-			)
-		).toBeVisible({ timeout: 5000 });
+		await expect(summary).toContainText('1 feedback item');
 	});
 });
