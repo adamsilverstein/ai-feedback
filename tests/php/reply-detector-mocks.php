@@ -3,7 +3,7 @@
  * Mocks for Reply_Detector tests.
  *
  * Declared in the root namespace because Reply_Detector calls
- * unqualified WordPress functions (get_comment_meta, do_action), and
+ * unqualified WordPress functions (get_comment, get_comment_meta, do_action), and
  * PHP resolves those against the global namespace when not found in
  * the caller's namespace.
  *
@@ -33,6 +33,18 @@ namespace {
 			}
 
 			return $meta[ $key ] ?? '';
+		}
+	}
+
+	if ( ! function_exists( 'get_comment' ) ) {
+		/**
+		 * Minimal get_comment mock reading $GLOBALS['test_comments'][ $id ].
+		 *
+		 * @param int $id Comment ID.
+		 * @return object|null
+		 */
+		function get_comment( $id ) {
+			return $GLOBALS['test_comments'][ $id ] ?? null;
 		}
 	}
 
