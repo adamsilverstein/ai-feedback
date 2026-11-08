@@ -213,4 +213,68 @@ test.describe('Error Handling', () => {
 			)
 		).toBeVisible({ timeout: 5000 });
 	});
+
+	test('retries automatically when the AI service is unavailable', async ({
+		page,
+		editor,
+		aiFeedback,
+	}) => {
+		await aiFeedback.createAndSavePost(
+			{ title: 'Outage Test', content: 'Content for outage test.' },
+			{ editor }
+		);
+
+		await aiFeedback.openSidebar();
+
+		let calls = 0;
+		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
+			calls++;
+			if (calls === 1) {
+				await route.fulfill({
+					status: 503,
+					contentType: 'application/json',
+					body: JSON.stringify({
+						code: 'ai_service_unavailable',
+						message:
+							'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.',
+						data: { status: 503, retry_after: 1 },
+					}),
+				});
+				return;
+			}
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					review_id: 'retry-review-id',
+					notes: [],
+					note_ids: [],
+					block_mapping: {},
+					summary: {
+						total_notes: 0,
+						by_category: {},
+						by_severity: {},
+					},
+					summary_text: 'Recovered after retry.',
+					note_count: 0,
+					timestamp: new Date().toISOString(),
+				}),
+			});
+		});
+
+		await aiFeedback.startReviewAndWait();
+
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(
+			panel.getByText('Retrying automatically in 1 second.')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Retry now' })
+		).toBeVisible();
+
+		await expect(panel.getByText('Recovered after retry.')).toBeVisible({
+			timeout: 10000,
+		});
+		expect(calls).toBe(2);
+	});
 });
