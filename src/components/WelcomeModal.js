@@ -7,11 +7,30 @@
 import { Modal, Button, Icon, Notice } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { useState, useEffect } from '@wordpress/element';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { check, pencil, commentContent } from '@wordpress/icons';
 import apiFetch from '@wordpress/api-fetch';
+import { store as preferencesStore } from '@wordpress/preferences';
 import { getConnectorsUrl } from '../utils/connectors-url';
+import { PREFERENCES_SCOPE, PREFERENCE_KEYS } from '../tips';
 
-const STORAGE_KEY = 'ai-feedback-welcomed';
+// Welcome state lived in localStorage before moving to user preferences.
+const LEGACY_STORAGE_KEY = 'ai-feedback-welcomed';
+
+/**
+ * Read and clear the legacy localStorage welcome flag.
+ *
+ * @return {boolean} Whether the legacy flag was set.
+ */
+function consumeLegacyWelcomeFlag() {
+	try {
+		const welcomed = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+		window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+		return !!welcomed;
+	} catch {
+		return false;
+	}
+}
 
 /**
  * WelcomeModal component shown on first sidebar open.
@@ -24,16 +43,26 @@ export default function WelcomeModal() {
 	const [status, setStatus] = useState(null);
 	const [statusError, setStatusError] = useState(null);
 
+	const welcomeDismissed = useSelect(
+		(select) =>
+			select(preferencesStore).get(
+				PREFERENCES_SCOPE,
+				PREFERENCE_KEYS.welcomeDismissed
+			),
+		[]
+	);
+	const { set } = useDispatch(preferencesStore);
+
 	useEffect(() => {
-		// Check if already welcomed first.
-		try {
-			const welcomed = window.localStorage.getItem(STORAGE_KEY);
-			if (welcomed) {
-				setIsLoading(false);
-				return;
-			}
-		} catch {
-			// Ignore localStorage errors, continue with status check.
+		if (welcomeDismissed) {
+			setIsOpen(false);
+			setIsLoading(false);
+			return;
+		}
+
+		if (consumeLegacyWelcomeFlag()) {
+			set(PREFERENCES_SCOPE, PREFERENCE_KEYS.welcomeDismissed, true);
+			return;
 		}
 
 		// Check AI client + connector status before showing modal.
@@ -51,7 +80,7 @@ export default function WelcomeModal() {
 				setIsOpen(true);
 				setIsLoading(false);
 			});
-	}, []);
+	}, [welcomeDismissed, set]);
 
 	const aiClientAvailable = status?.ai_client_available === true;
 	const connectorConfigured = status?.connector_configured === true;
@@ -61,16 +90,7 @@ export default function WelcomeModal() {
 	const dismiss = () => {
 		// Only save welcomed state when the plugin is fully configured.
 		if (!setupRequired) {
-			try {
-				window.localStorage.setItem(STORAGE_KEY, 'true');
-			} catch (error) {
-				// Storage may be unavailable (e.g., private browsing, quota exceeded)
-				// eslint-disable-next-line no-console
-				console.warn(
-					'AI Feedback: Could not save welcome state',
-					error
-				);
-			}
+			set(PREFERENCES_SCOPE, PREFERENCE_KEYS.welcomeDismissed, true);
 		}
 		setIsOpen(false);
 	};
