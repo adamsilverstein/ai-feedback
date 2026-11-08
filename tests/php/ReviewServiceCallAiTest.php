@@ -91,7 +91,7 @@ class ReviewServiceCallAiTest extends TestCase {
 	}
 
 	/**
-	 * A throw from the client becomes an ai_request_failed WP_Error.
+	 * A throw from the client becomes a generic ai_request_failed WP_Error.
 	 */
 	public function test_converts_throwable_to_wp_error(): void {
 		$this->fake_ai_client( new \RuntimeException( 'Connection reset' ) );
@@ -100,11 +100,11 @@ class ReviewServiceCallAiTest extends TestCase {
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'ai_request_failed', $result->get_error_code() );
-		$this->assertSame( 'Connection reset', $result->get_error_message() );
+		$this->assertStringNotContainsString( 'Connection reset', $result->get_error_message() );
 	}
 
 	/**
-	 * The HTTP timeout filter is active during the call and removed after it.
+	 * Core's timeout filter is raised for the builder and removed after it.
 	 */
 	public function test_timeout_filter_is_scoped_to_the_call(): void {
 		$this->fake_ai_client( new \RuntimeException( 'Timed out' ) );
@@ -112,6 +112,6 @@ class ReviewServiceCallAiTest extends TestCase {
 		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
 
 		$this->assertSame( Review_Service::AI_HTTP_TIMEOUT, $GLOBALS['fake_ai_builder']->timeout_during_call );
-		$this->assertEmpty( $GLOBALS['fake_filters']['http_request_timeout'] ?? array() );
+		$this->assertEmpty( $GLOBALS['fake_filters']['wp_ai_client_default_request_timeout'] ?? array() );
 	}
 }

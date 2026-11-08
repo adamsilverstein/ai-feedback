@@ -20,9 +20,6 @@ class Fake_AI_Client_Prompt_Builder {
 	}
 
 	public function generate_text() {
-		$callbacks                 = $GLOBALS['fake_filters']['http_request_timeout'] ?? array();
-		$this->timeout_during_call = $callbacks ? (int) end( $callbacks )( 5 ) : null;
-
 		$result = $GLOBALS['fake_ai_result'];
 		if ( $result instanceof Throwable ) {
 			throw $result;
@@ -34,6 +31,9 @@ class Fake_AI_Client_Prompt_Builder {
 function wp_ai_client_prompt( $prompt = null ) {
 	$builder                    = new Fake_AI_Client_Prompt_Builder();
 	$builder->calls['prompt']   = $prompt;
+	// Core reads the timeout filter when the builder is created.
+	$callbacks                    = $GLOBALS['fake_filters']['wp_ai_client_default_request_timeout'] ?? array();
+	$builder->timeout_during_call = $callbacks ? (int) end( $callbacks )( 30.0 ) : null;
 	$GLOBALS['fake_ai_builder'] = $builder;
 	return $builder;
 }

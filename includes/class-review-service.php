@@ -19,11 +19,10 @@ class Review_Service {
 
 
 	/**
-	 * HTTP request timeout (seconds) applied while calling the AI Client.
+	 * Request timeout (seconds) for AI generation calls.
 	 *
-	 * Default WordPress HTTP timeout is 5 seconds, which is well below the
-	 * latency budget of an AI generation. Tunable via the
-	 * `ai_feedback_http_timeout` filter.
+	 * Core's AI Client defaults to 30 seconds, which a full-document review
+	 * can exceed. Tunable via the `ai_feedback_http_timeout` filter.
 	 *
 	 * @var int
 	 */
@@ -32,35 +31,43 @@ class Review_Service {
 	/**
 	 * Non-retryable error codes that should fail immediately without retry.
 	 *
-	 * Codes are matched against the WP_Error returned by
-	 * wp_ai_client_prompt()->generate_text(). The defaults cover both the
-	 * codes the plugin used historically and a broader set likely to surface
-	 * from core's HTTP transport / AI Client. Adopters can extend the list
-	 * via the `ai_feedback_non_retryable_errors` filter.
+	 * Includes the core AI Client codes for requests that fail the same way
+	 * every time. Rate limits (HTTP 429) are deliberately retried with
+	 * backoff. Extend via the `ai_feedback_non_retryable_errors` filter.
 	 *
-	 * @var array
+	 * @var string[]
 	 */
 	const NON_RETRYABLE_ERRORS = array(
 		'invalid_api_key',
 		'billing_error',
 		'rest_forbidden',
+		'prompt_invalid_argument',
+		'prompt_token_limit_reached',
+		'prompt_prevented',
 	);
 
 	/**
-	 * Substrings that indicate a permanent (non-retryable) failure when found
-	 * in an error message, regardless of the error code. This is a defensive
-	 * fallback for cases where the core AI Client reports auth/billing
-	 * failures under a generic code.
+	 * HTTP statuses, from the WP_Error data, that retrying cannot fix.
 	 *
-	 * @var array
+	 * @var int[]
+	 */
+	const NON_RETRYABLE_STATUSES = array( 400, 401, 402, 403, 404, 422 );
+
+	/**
+	 * Message phrases that mark a permanent auth or billing failure, for
+	 * providers that report one under a retryable status (such as a 429 for
+	 * an exhausted quota). Kept specific so transient errors still retry.
+	 *
+	 * @var string[]
 	 */
 	const NON_RETRYABLE_MESSAGE_KEYWORDS = array(
 		'invalid api key',
-		'unauthorized',
-		'authentication',
+		'invalid x-api-key',
+		'incorrect api key',
+		'credit balance',
+		'insufficient_quota',
+		'exceeded your current quota',
 		'billing',
-		'quota',
-		'insufficient',
 	);
 
 	/**
@@ -257,10 +264,7 @@ class Review_Service {
 	/**
 	 * Call AI service via the WordPress 7.0 core AI Client.
 	 *
-	 * Wraps the request with a scoped `http_request_timeout` filter so the
-	 * WordPress HTTP transport waits long enough for AI generation. The
-	 * filter is removed immediately after the call so it does not affect
-	 * other HTTP requests in the same pageload.
+	 * Raises core's AI request timeout for the duration of this call only.
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
@@ -284,7 +288,7 @@ class Review_Service {
 		$timeout_filter = static function () use ( $timeout ) {
 			return $timeout;
 		};
-		add_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
+		add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );
 
 		try {
 			// Lower temperature keeps feedback consistent. Max tokens covers large
@@ -296,12 +300,16 @@ class Review_Service {
 				->using_max_tokens( 8000 )
 				->generate_text();
 		} catch ( \Throwable $e ) {
-			// Defensive: the core AI Client should already convert SDK
-			// exceptions to WP_Error, but transport-level throws would
-			// otherwise propagate as a 500 with no useful body.
-			return new WP_Error( 'ai_request_failed', $e->getMessage() );
+			// Core converts SDK exceptions to WP_Error; this catches anything
+			// else so the REST response is not a bare 500.
+			Logger::debug( sprintf( 'AI request threw %s: %s', get_class( $e ), $e->getMessage() ) );
+			return new WP_Error(
+				'ai_request_failed',
+				__( 'The AI request failed unexpectedly. Please try again.', 'ai-feedback' ),
+				array( 'status' => 500 )
+			);
 		} finally {
-			remove_filter( 'http_request_timeout', $timeout_filter, PHP_INT_MAX );
+			remove_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );
 		}
 	}
 
@@ -387,9 +395,8 @@ class Review_Service {
 	/**
 	 * Whether a WP_Error returned by the AI Client should fail fast.
 	 *
-	 * Matches both error codes and error message keywords so that
-	 * permanently-failing requests (auth, billing, quota) bypass the retry
-	 * loop even when core wraps them under a generic code.
+	 * Checks the error code, then the HTTP status core attaches to the
+	 * error data, then message phrases for auth and billing failures.
 	 *
 	 * @param  WP_Error $error The error returned by the AI Client.
 	 * @return bool True when the request should not be retried.
@@ -406,6 +413,12 @@ class Review_Service {
 		);
 
 		if ( in_array( $error->get_error_code(), $codes, true ) ) {
+			return true;
+		}
+
+		$data   = $error->get_error_data();
+		$status = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
+		if ( in_array( $status, self::NON_RETRYABLE_STATUSES, true ) ) {
 			return true;
 		}
 
