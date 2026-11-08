@@ -432,7 +432,7 @@ Returns one history entry plus the notes that review created, as `notes`. Notes 
 
 Usage summary for the Settings > AI Feedback Analytics page. Requires `manage_options`.
 
-`period` is one of `7days`, `30days` (default), `90days` or `all`. Usage is stored as daily counts in the non-autoloaded `ai_feedback_analytics` option and kept for 365 days. Return `false` from the `ai_feedback_analytics_enabled` filter to stop recording. A user's counts are removed when the user is deleted. Data starts accumulating once the plugin version with analytics is active; earlier reviews are not backfilled.
+`period` is one of `7days`, `30days` (default), `90days` or `all`. Usage is stored as daily counts in the non-autoloaded `ai_feedback_analytics` option and kept for 365 days. Return `false` from the `ai_feedback_analytics_enabled` filter to stop recording. A user's counts are removed when the user is deleted, and are included in the core personal data export and eraser tools (Tools > Export/Erase Personal Data). Data starts accumulating once the plugin version with analytics is active; earlier reviews are not backfilled.
 
 `by_day` has one row per day for the fixed periods, including empty days. For `all` it only lists days with recorded reviews.
 

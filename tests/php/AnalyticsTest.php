@@ -25,6 +25,7 @@ class AnalyticsTest extends TestCase {
 		$GLOBALS['test_now']              = strtotime( '2026-11-08 12:00:00 UTC' );
 		$GLOBALS['test_current_user_id']  = 3;
 		$GLOBALS['test_current_user_can'] = true;
+		$GLOBALS['test_user_emails']      = array( 'ada@example.com' => 3 );
 		$GLOBALS['test_users']            = array(
 			3 => 'Ada',
 			4 => 'Grace',
@@ -168,6 +169,62 @@ class AnalyticsTest extends TestCase {
 		$days = Analytics::get_days();
 		$this->assertSame( array(), $days['2026-11-08']['users'] );
 		$this->assertSame( 1, $days['2026-11-08']['reviews'] );
+	}
+
+	/**
+	 * The exporter and eraser are registered under the option key.
+	 */
+	public function test_registers_privacy_callbacks(): void {
+		$exporters = Analytics::register_exporter( array() );
+		$erasers   = Analytics::register_eraser( array() );
+
+		$this->assertSame( array( Analytics::class, 'export_personal_data' ), $exporters[ Analytics::OPTION_KEY ]['callback'] );
+		$this->assertSame( array( Analytics::class, 'erase_personal_data' ), $erasers[ Analytics::OPTION_KEY ]['callback'] );
+	}
+
+	/**
+	 * The exporter lists the user's reviews per day.
+	 */
+	public function test_export_personal_data(): void {
+		Analytics::track_review( 1, $this->review() );
+		Analytics::track_review( 2, $this->review() );
+		$GLOBALS['test_current_user_id'] = 4;
+		Analytics::track_review( 3, $this->review() );
+
+		$export = Analytics::export_personal_data( 'ada@example.com' );
+
+		$this->assertTrue( $export['done'] );
+		$this->assertCount( 1, $export['data'] );
+		$this->assertSame( 'ai-feedback-usage-2026-11-08', $export['data'][0]['item_id'] );
+		$this->assertSame( '2', $export['data'][0]['data'][1]['value'] );
+	}
+
+	/**
+	 * Unknown emails export nothing.
+	 */
+	public function test_export_personal_data_unknown_email(): void {
+		Analytics::track_review( 1, $this->review() );
+
+		$this->assertSame( array(), Analytics::export_personal_data( 'nobody@example.com' )['data'] );
+	}
+
+	/**
+	 * The eraser removes the user's counts but keeps site totals.
+	 */
+	public function test_erase_personal_data(): void {
+		Analytics::track_review( 1, $this->review() );
+		$GLOBALS['test_current_user_id'] = 4;
+		Analytics::track_review( 2, $this->review() );
+
+		$result = Analytics::erase_personal_data( 'ada@example.com' );
+
+		$this->assertTrue( $result['items_removed'] );
+		$this->assertTrue( $result['done'] );
+		$day = Analytics::get_days()['2026-11-08'];
+		$this->assertSame( array( 4 => 1 ), $day['users'] );
+		$this->assertSame( 2, $day['reviews'] );
+
+		$this->assertFalse( Analytics::erase_personal_data( 'ada@example.com' )['items_removed'] );
 	}
 
 	/**

@@ -469,3 +469,10 @@ if ( ! function_exists( 'get_userdata' ) ) {
 
 require_once $includes_dir . 'class-analytics.php';
 require_once $includes_dir . 'class-analytics-controller.php';
+
+if ( ! function_exists( 'get_user_by' ) ) {
+	function get_user_by( $field, $value ) {
+		$id = $GLOBALS['test_user_emails'][ $value ] ?? null;
+		return null === $id ? false : (object) array( 'ID' => $id );
+	}
+}

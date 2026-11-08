@@ -91,27 +91,126 @@ class Analytics {
 	}
 
 	/**
-	 * Remove a deleted user's counts.
+	 * Remove a user's counts.
 	 *
-	 * Hooked to `deleted_user`.
+	 * Hooked to `deleted_user`, and used by the personal data eraser.
 	 *
-	 * @param int $user_id Deleted user ID.
+	 * @param  int $user_id User ID.
+	 * @return int Number of days the user's counts were removed from.
 	 */
-	public static function forget_user( int $user_id ): void {
+	public static function forget_user( int $user_id ): int {
 		$days    = self::get_days();
 		$key     = (string) $user_id;
-		$changed = false;
+		$removed = 0;
 
 		foreach ( $days as $date => $day ) {
 			if ( isset( $day['users'][ $key ] ) ) {
 				unset( $days[ $date ]['users'][ $key ] );
-				$changed = true;
+				++$removed;
 			}
 		}
 
-		if ( $changed ) {
+		if ( $removed > 0 ) {
 			update_option( self::OPTION_KEY, $days, false );
 		}
+
+		return $removed;
+	}
+
+	/**
+	 * Register the personal data exporter.
+	 *
+	 * @param  array<string, mixed> $exporters Registered exporters.
+	 * @return array<string, mixed>
+	 */
+	public static function register_exporter( array $exporters ): array {
+		$exporters[ self::OPTION_KEY ] = array(
+			'exporter_friendly_name' => __( 'AI Feedback usage', 'ai-feedback' ),
+			'callback'               => array( self::class, 'export_personal_data' ),
+		);
+
+		return $exporters;
+	}
+
+	/**
+	 * Register the personal data eraser.
+	 *
+	 * @param  array<string, mixed> $erasers Registered erasers.
+	 * @return array<string, mixed>
+	 */
+	public static function register_eraser( array $erasers ): array {
+		$erasers[ self::OPTION_KEY ] = array(
+			'eraser_friendly_name' => __( 'AI Feedback usage', 'ai-feedback' ),
+			'callback'             => array( self::class, 'erase_personal_data' ),
+		);
+
+		return $erasers;
+	}
+
+	/**
+	 * Export the number of reviews a user ran on each day.
+	 *
+	 * The data is small and bounded by MAX_DAYS, so it is returned in one
+	 * page and core's page argument is not needed.
+	 *
+	 * @param  string $email_address User email address.
+	 * @return array{data: list<array{group_id: string, group_label: string, item_id: string, data: list<array{name: string, value: string}>}>, done: bool}
+	 */
+	public static function export_personal_data( string $email_address ): array {
+		$user = get_user_by( 'email', $email_address );
+		if ( ! $user ) {
+			return array(
+				'data' => array(),
+				'done' => true,
+			);
+		}
+
+		$key   = (string) $user->ID;
+		$items = array();
+		foreach ( self::get_days() as $date => $day ) {
+			if ( empty( $day['users'][ $key ] ) ) {
+				continue;
+			}
+
+			$items[] = array(
+				'group_id'    => 'ai-feedback-usage',
+				'group_label' => __( 'AI Feedback usage', 'ai-feedback' ),
+				'item_id'     => 'ai-feedback-usage-' . $date,
+				'data'        => array(
+					array(
+						'name'  => __( 'Date', 'ai-feedback' ),
+						'value' => $date,
+					),
+					array(
+						'name'  => __( 'Reviews run', 'ai-feedback' ),
+						'value' => (string) $day['users'][ $key ],
+					),
+				),
+			);
+		}
+
+		return array(
+			'data' => $items,
+			'done' => true,
+		);
+	}
+
+	/**
+	 * Erase a user's review counts in one page. Site-wide totals are kept.
+	 *
+	 * @param  string $email_address User email address.
+	 * @return array{items_removed: bool, items_retained: bool, messages: list<string>, done: bool}
+	 */
+	public static function erase_personal_data( string $email_address ): array {
+		$user    = get_user_by( 'email', $email_address );
+		$removed = $user ? self::forget_user( $user->ID ) : 0;
+
+		return array(
+			'items_removed'  => $removed > 0,
+			'items_retained' => false,
+			'messages'       => array(),
+			'done'           => true,
+		);
 	}
 
 	/**
