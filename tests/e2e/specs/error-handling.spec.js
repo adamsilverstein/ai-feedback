@@ -227,7 +227,13 @@ test.describe('Error Handling', () => {
 		await aiFeedback.openSidebar();
 
 		let calls = 0;
-		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
+		// Match both pretty permalinks and the ?rest_route= form, plus any
+		// query args apiFetch adds.
+		const isReviewRequest = (url) =>
+			/\/ai-feedback\/v1\/review(?:$|[?&])/.test(
+				decodeURIComponent(url.toString())
+			);
+		await page.route(isReviewRequest, async (route) => {
 			calls++;
 			if (calls === 1) {
 				await route.fulfill({
