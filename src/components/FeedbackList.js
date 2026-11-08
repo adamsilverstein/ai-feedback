@@ -4,7 +4,10 @@
  * Displays a list of feedback items (grouped and individual).
  */
 import { __ } from '@wordpress/i18n';
+import { useSelect } from '@wordpress/data';
+import { store as editorStore } from '@wordpress/editor';
 import FeedbackItem from './FeedbackItem';
+import useReplyThreads from '../hooks/useReplyThreads';
 
 /**
  * Feedback list component.
@@ -14,6 +17,12 @@ import FeedbackItem from './FeedbackItem';
  * @return {Element|null} Feedback list component.
  */
 export default function FeedbackList({ feedbackItems }) {
+	const postId = useSelect(
+		(select) => select(editorStore).getCurrentPostId(),
+		[]
+	);
+	const { threads, onReplyComplete } = useReplyThreads(postId);
+
 	if (!feedbackItems || feedbackItems.length === 0) {
 		return null;
 	}
@@ -34,9 +43,14 @@ export default function FeedbackList({ feedbackItems }) {
 					(item.is_group ? item.block_ids?.[0] : item.block_id) ||
 					`item-${index}`;
 
+				// Continuation reviews can return replies; their thread is the parent's.
 				return (
 					<div key={key} role="listitem">
-						<FeedbackItem item={item} />
+						<FeedbackItem
+							item={item}
+							thread={threads[item.parent || item.id]}
+							onReplyComplete={onReplyComplete}
+						/>
 					</div>
 				);
 			})}
