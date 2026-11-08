@@ -186,10 +186,10 @@ test.describe('Review Workflow', () => {
 		await aiFeedback.runReview();
 
 		try {
-			await saveSetting(page, () =>
+			await aiFeedback.saveSetting(() =>
 				page.getByLabel('AI Model').selectOption('gpt-4o')
 			);
-			await saveSetting(page, () =>
+			await aiFeedback.saveSetting(() =>
 				page.getByLabel('Feedback Language').selectOption('fr_FR')
 			);
 
@@ -302,23 +302,4 @@ function getPostId(page) {
 	return page.evaluate(() =>
 		window.wp.data.select('core/editor').getCurrentPostId()
 	);
-}
-
-/**
- * Run an action that changes a setting and wait for the settings save.
- *
- * @param {import('@playwright/test').Page} page   Page.
- * @param {Function}                        action Action that changes a setting.
- */
-async function saveSetting(page, action) {
-	const saved = page.waitForResponse(
-		(response) =>
-			decodeURIComponent(response.url()).includes(
-				'/ai-feedback/v1/settings'
-			) &&
-			response.request().method() === 'POST' &&
-			response.ok()
-	);
-	await action();
-	await saved;
 }
