@@ -112,4 +112,43 @@ describe('ServiceUnavailableAction', () => {
 			screen.queryByRole('button', { name: 'Cancel automatic retry' })
 		).not.toBeInTheDocument();
 	});
+
+	it('caps a very long suggested delay', () => {
+		render(
+			<ServiceUnavailableAction
+				error={{ ...error, data: { retry_after: 999999 } }}
+				retries={1}
+				onRetry={jest.fn()}
+			/>
+		);
+
+		expect(
+			screen.getByText('Retrying automatically in 300 seconds.')
+		).toBeInTheDocument();
+	});
+
+	it('explains when the review cannot start', async () => {
+		const onRetry = jest.fn(() => false);
+		render(
+			<ServiceUnavailableAction
+				error={error}
+				retries={1}
+				onRetry={onRetry}
+			/>
+		);
+
+		await act(async () => {
+			jest.advanceTimersByTime(10000);
+		});
+
+		expect(onRetry).toHaveBeenCalledTimes(1);
+		expect(
+			screen.getByText(
+				'Add some content and save the post, then run the review again.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.queryByText('Retrying automatically in 10 seconds.')
+		).not.toBeInTheDocument();
+	});
 });

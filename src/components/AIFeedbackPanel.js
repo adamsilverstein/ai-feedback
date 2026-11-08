@@ -122,10 +122,11 @@ export default function AIFeedbackPanel() {
 	 *
 	 * @param {Object}  options         Options.
 	 * @param {boolean} options.isRetry Whether this retries a review that failed because the AI service was unavailable.
+	 * @return {Promise<boolean|undefined>} False when the review could not start.
 	 */
 	const handleStartReview = async ({ isRetry = false } = {}) => {
 		if (!canReview) {
-			return;
+			return false;
 		}
 
 		const blocks = extractBlockData(editorBlocks);

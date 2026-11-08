@@ -555,7 +555,7 @@ function AIFeedbackPanel() {
 
 #### `ai_feedback_retry_after`
 
-Set how many seconds the editor waits before retrying a review that failed because the AI service was unavailable (default 30, minimum 5). The editor retries automatically up to two times in a row, and always offers a "Retry now" button.
+Set how many seconds the editor waits before retrying a review that failed because the AI service was unavailable (default 30, clamped to 5-300). The editor retries automatically up to two times in a row while the AI Feedback panel is open, and always offers a "Retry now" button. Each user gets at most 10 rate limit refunds per hour for these failures, so a failing provider still sees a bounded number of requests.
 
 ```php
 add_filter( 'ai_feedback_retry_after', function( int $seconds, WP_Error $error ): int {
