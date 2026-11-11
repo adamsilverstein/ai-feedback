@@ -4,203 +4,304 @@
 const { test, expect } = require('../fixtures');
 const AxeBuilder = require('@axe-core/playwright').default;
 
+const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+
+/**
+ * Run axe against part of the page, limited to WCAG A and AA rules.
+ *
+ * @param {import('@playwright/test').Page} page     Page.
+ * @param {string}                          selector Region to scan.
+ * @return {Promise<Array>} Violations, reduced to rule ID and offending targets.
+ */
+async function scan(page, selector) {
+	const results = await new AxeBuilder({ page })
+		.include(selector)
+		.withTags(WCAG_TAGS)
+		.analyze();
+	return results.violations.map((violation) => ({
+		id: violation.id,
+		targets: violation.nodes.map((node) => node.target.join(' ')),
+	}));
+}
+
 test.describe('Accessibility', () => {
-	test.beforeEach(async ({ admin }) => {
-		await admin.createNewPost();
-	});
+	test.describe('axe scans', () => {
+		test('empty state has no violations', async ({
+			admin,
+			page,
+			aiFeedback,
+		}) => {
+			await admin.createNewPost();
+			await aiFeedback.openSidebar();
+			await expect(page.getByText('No reviews yet')).toBeVisible();
 
-	test('sidebar has no critical accessibility violations', async ({
-		page,
-		aiFeedback,
-	}) => {
-		await aiFeedback.openSidebar();
+			expect(await scan(page, '.ai-feedback-panel')).toEqual([]);
+		});
 
-		// Wait for sidebar to be fully loaded
-		await page.waitForSelector('.ai-feedback-panel');
-
-		// Run axe accessibility scan on sidebar
-		const accessibilityScanResults = await new AxeBuilder({ page })
-			.include('.ai-feedback-panel')
-			.analyze();
-
-		// Filter for critical and serious violations only
-		const criticalViolations = accessibilityScanResults.violations.filter(
-			(v) => v.impact === 'critical' || v.impact === 'serious'
-		);
-
-		expect(criticalViolations).toEqual([]);
-	});
-
-	test.skip('sidebar elements are keyboard navigable', async ({
-		page,
-		aiFeedback,
-	}) => {
-		await aiFeedback.openSidebar();
-
-		// Find any focusable element in the sidebar (model selector may not be present if no models configured)
-		const focusableElement = page
-			.locator('.ai-feedback-panel')
-			.locator('button, input, select, [tabindex="0"]')
-			.first();
-		await focusableElement.focus();
-		await expect(focusableElement).toBeFocused();
-
-		// Tab to next interactive element
-		await page.keyboard.press('Tab');
-
-		// Verify focus moved to another element
-		await expect(focusableElement).not.toBeFocused();
-	});
-
-	test.skip('focus areas can be toggled with keyboard', async ({
-		page,
-		aiFeedback,
-	}) => {
-		await aiFeedback.openSidebar();
-		await aiFeedback.expandReviewSettings();
-
-		// Find checkboxes in the settings panel
-		const checkboxLocator = page.locator(
-			'.ai-feedback-settings input[type="checkbox"]'
-		);
-		const checkboxCount = await checkboxLocator.count();
-
-		// Skip test if no checkboxes are available
-		if (checkboxCount === 0) {
-			test.skip();
-			return;
-		}
-
-		const checkbox = checkboxLocator.first();
-		await checkbox.focus();
-
-		// Get initial state
-		const initialChecked = await checkbox.isChecked();
-
-		// Toggle with Space
-		await page.keyboard.press('Space');
-
-		// State should change
-		await expect(checkbox).toBeChecked({ checked: !initialChecked });
-	});
-
-	test('model selector is keyboard accessible', async ({
-		page,
-		aiFeedback,
-	}) => {
-		await aiFeedback.openSidebar();
-
-		const modelSelect = page.getByLabel('AI Model');
-		const isVisible = await modelSelect.isVisible().catch(() => false);
-
-		// Skip if model selector is not available (no models configured)
-		if (!isVisible) {
-			test.skip();
-			return;
-		}
-
-		// Has accessible label
-		await expect(modelSelect).toBeVisible();
-
-		// Can be focused
-		await modelSelect.focus();
-		await expect(modelSelect).toBeFocused();
-
-		// Can interact with keyboard
-		await page.keyboard.press('ArrowDown');
-	});
-
-	test('review button has proper aria attributes when busy', async ({
-		page,
-		editor,
-		aiFeedback,
-	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'Loading State A11y', content: 'Content.' },
-			{ editor }
-		);
-
-		await aiFeedback.openSidebar();
-
-		// Delay response to observe loading state
-		await page.route('**/wp-json/ai-feedback/v1/review', async (route) => {
-			await new Promise((resolve) => setTimeout(resolve, 3000));
-			await route.fulfill({
-				status: 200,
-				contentType: 'application/json',
-				body: JSON.stringify({
-					review_id: 'test',
-					notes: [],
-					note_count: 0,
-				}),
+		test('settings and review results have no violations', async ({
+			page,
+			editor,
+			admin,
+			aiFeedback,
+		}) => {
+			await admin.createNewPost({ title: 'Axe Results' });
+			await editor.insertBlock({
+				name: 'core/paragraph',
+				attributes: { content: 'First paragraph.' },
 			});
+			await editor.insertBlock({
+				name: 'core/paragraph',
+				attributes: { content: 'Second paragraph.' },
+			});
+			await editor.saveDraft();
+			await aiFeedback.openSidebar();
+			await aiFeedback.runReview();
+			await expect(
+				page.locator('.ai-feedback-review-summary')
+			).toBeVisible();
+
+			expect(await scan(page, '.ai-feedback-panel')).toEqual([]);
 		});
 
-		await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.click();
+		test('error notice has no violations', async ({
+			page,
+			editor,
+			aiFeedback,
+		}) => {
+			await aiFeedback.createAndSavePost(
+				{ title: 'Axe Error', content: 'Content.' },
+				{ editor }
+			);
+			await aiFeedback.openSidebar();
+			await aiFeedback.mockReviewAPIError(
+				402,
+				'prompt_client_error',
+				'Insufficient credit balance'
+			);
+			await aiFeedback.runReview();
+			await expect(
+				page.locator('.ai-feedback-error-notice')
+			).toBeVisible();
 
-		// Button should indicate busy state via the is-busy class
-		await expect(page.locator('button.is-primary.is-busy')).toBeVisible();
-	});
-
-	test.skip('error notices have proper role for screen readers', async ({
-		page,
-		editor,
-		aiFeedback,
-	}) => {
-		await aiFeedback.createAndSavePost(
-			{ title: 'A11y Error Test', content: 'Content.' },
-			{ editor }
-		);
-
-		await aiFeedback.openSidebar();
-
-		// Mock API error
-		await aiFeedback.mockReviewAPIError(
-			500,
-			'test_error',
-			'Test error for accessibility'
-		);
-
-		await page
-			.locator('button.is-primary')
-			.filter({ hasText: /Review( Document)?/i })
-			.first()
-			.click();
-
-		// Error notice should be visible
-		const notice = page.locator('.components-notice.is-error');
-		await expect(notice).toBeVisible({ timeout: 10000 });
-
-		// Verify the notice has proper role for screen readers
-		await expect(notice).toHaveAttribute('role', 'alert');
-	});
-
-	test.skip('panels can be expanded with keyboard', async ({
-		page,
-		aiFeedback,
-	}) => {
-		await aiFeedback.openSidebar();
-
-		// Focus on Review Settings panel button
-		const reviewSettingsButton = page.getByRole('button', {
-			name: 'Review Settings',
+			expect(await scan(page, '.ai-feedback-panel')).toEqual([]);
 		});
-		await reviewSettingsButton.focus();
 
-		// Get current state
-		const isExpanded =
-			await reviewSettingsButton.getAttribute('aria-expanded');
+		test('setup modal has no violations', async ({
+			admin,
+			page,
+			aiFeedback,
+		}) => {
+			// Undo the fixture's "welcomed" flag so the modal opens.
+			await page.addInitScript(() => {
+				try {
+					window.localStorage.removeItem('ai-feedback-welcomed');
+				} catch {}
+			});
+			await admin.createNewPost();
+			await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
-		// Toggle with Enter key
-		await page.keyboard.press('Enter');
+			const modal = page.getByRole('dialog', {
+				name: /Welcome to AI Feedback|AI Feedback Setup Required/,
+			});
+			await expect(modal).toBeVisible();
 
-		// State should change
-		const newExpandedState =
-			await reviewSettingsButton.getAttribute('aria-expanded');
-		expect(newExpandedState).not.toBe(isExpanded);
+			expect(await scan(page, '.ai-feedback-welcome-modal')).toEqual([]);
+
+			await page.keyboard.press('Escape');
+			await expect(modal).toBeHidden();
+		});
+	});
+
+	test.describe('keyboard', () => {
+		test.beforeEach(async ({ editor, aiFeedback }) => {
+			await aiFeedback.createAndSavePost(
+				{ title: 'Keyboard', content: 'Content to review.' },
+				{ editor }
+			);
+			await aiFeedback.openSidebar();
+			await aiFeedback.runReview();
+		});
+
+		test('moves through the panel in a logical tab order', async ({
+			page,
+		}) => {
+			const panel = page.locator('.ai-feedback-panel');
+			const settingsToggle = panel
+				.locator('.components-panel__body-toggle')
+				.filter({ hasText: 'Review Settings' });
+			const reviewToggle = panel
+				.locator('.components-panel__body-toggle')
+				.filter({ hasText: 'Review Document' });
+
+			await settingsToggle.focus();
+			for (const target of [
+				panel.getByLabel('AI Model'),
+				panel.getByLabel('Feedback Language'),
+				reviewToggle,
+				panel.locator('#ai-feedback-review-button button'),
+			]) {
+				await page.keyboard.press('Tab');
+				await expect(target).toBeFocused();
+			}
+		});
+
+		test('toggles panels with Enter and Space', async ({ page }) => {
+			const toggle = page
+				.locator('.ai-feedback-panel .components-panel__body-toggle')
+				.filter({ hasText: 'Review Settings' });
+			await toggle.focus();
+
+			await page.keyboard.press('Enter');
+			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+			await expect(page.getByLabel('AI Model')).toBeHidden();
+
+			await page.keyboard.press('Space');
+			await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+			await expect(page.getByLabel('AI Model')).toBeVisible();
+		});
+
+		test('starts a review with the keyboard', async ({
+			page,
+			aiFeedback,
+		}) => {
+			const reviewRequest = page.waitForRequest(
+				(request) =>
+					request.method() === 'POST' &&
+					decodeURIComponent(request.url()).includes(
+						'/ai-feedback/v1/review'
+					)
+			);
+			await aiFeedback.getReviewButton().focus();
+			await page.keyboard.press('Enter');
+			await reviewRequest;
+			await expect(aiFeedback.getReviewButton()).not.toHaveClass(
+				/is-busy/
+			);
+		});
+
+		test('skip links move focus to their targets', async ({ page }) => {
+			const panel = page.locator('.ai-feedback-panel');
+			const skipLinks = panel.getByRole('navigation', {
+				name: 'Skip links',
+			});
+
+			const results = skipLinks.getByRole('link', {
+				name: 'Skip to review results',
+			});
+			await results.focus();
+			await expect(results).toBeFocused();
+			await page.keyboard.press('Enter');
+			await expect(panel.locator('#ai-feedback-results')).toBeFocused();
+
+			const items = skipLinks.getByRole('link', {
+				name: 'Skip to feedback items',
+			});
+			await items.focus();
+			await page.keyboard.press('Enter');
+			await expect(panel.locator('#ai-feedback-items')).toBeFocused();
+		});
+
+		test('form controls show a visible focus indicator', async ({
+			page,
+		}) => {
+			const panel = page.locator('.ai-feedback-panel');
+			await panel
+				.locator('.components-panel__body-toggle')
+				.filter({ hasText: 'Review Settings' })
+				.focus();
+			// Reach the select with Tab so :focus-visible applies.
+			await page.keyboard.press('Tab');
+
+			const modelSelect = panel.getByLabel('AI Model');
+			await expect(modelSelect).toBeFocused();
+
+			const hasIndicator = await modelSelect.evaluate((element) => {
+				// SelectControl draws its focus ring on a sibling backdrop.
+				const candidates = [
+					element,
+					...element.parentElement.querySelectorAll('*'),
+				];
+				return candidates.some((candidate) => {
+					const style = window.getComputedStyle(candidate);
+					const outline =
+						style.outlineStyle !== 'none' &&
+						parseFloat(style.outlineWidth) > 0;
+					return outline || style.boxShadow !== 'none';
+				});
+			});
+			expect(hasIndicator).toBe(true);
+		});
+	});
+
+	test.describe('screen reader feedback', () => {
+		test.beforeEach(async ({ editor, aiFeedback }) => {
+			await aiFeedback.createAndSavePost(
+				{ title: 'Announcements', content: 'Content to review.' },
+				{ editor }
+			);
+			await aiFeedback.openSidebar();
+		});
+
+		test('announces review progress and completion', async ({
+			page,
+			aiFeedback,
+		}) => {
+			let releaseReview;
+			const reviewHeld = new Promise((resolve) => {
+				releaseReview = resolve;
+			});
+			await aiFeedback.routeREST('/review', async (route) => {
+				await reviewHeld;
+				await route.continue();
+			});
+
+			const liveRegion = page.locator('#a11y-speak-polite');
+			await aiFeedback.getReviewButton().click();
+			await expect(liveRegion).toContainText(
+				'Review in progress. Please wait.'
+			);
+
+			const progress = page.getByRole('progressbar', {
+				name: 'Review progress',
+			});
+			await expect(progress).toHaveAttribute(
+				'aria-valuetext',
+				'Processing review'
+			);
+
+			releaseReview();
+			await expect(liveRegion).toContainText(
+				'Review complete. 1 notes created.'
+			);
+			await expect(
+				page.locator('.ai-feedback-review-summary').getByRole('status')
+			).toHaveText('1 feedback item');
+		});
+
+		test('announces errors', async ({ page, aiFeedback }) => {
+			// The panel and the Notice both speak; whichever runs last wins
+			// the live region, and both include the error message.
+			await aiFeedback.mockReviewAPIError(
+				500,
+				'ai_request_failed',
+				'Provider unavailable'
+			);
+			await aiFeedback.runReview();
+
+			await expect(
+				page.locator('.ai-feedback-error-notice')
+			).toBeVisible();
+			await expect
+				.poll(async () =>
+					(
+						await page
+							.locator(
+								'#a11y-speak-polite, #a11y-speak-assertive'
+							)
+							.allTextContents()
+					).join(' ')
+				)
+				.toContain('Provider unavailable');
+		});
 	});
 });
