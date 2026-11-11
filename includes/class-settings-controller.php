@@ -158,6 +158,7 @@ class Settings_Controller extends WP_REST_Controller {
 			'available_focus_areas' => $this->get_available_focus_areas(),
 			'available_tones'       => $this->get_available_tones(),
 			'available_locales'     => $this->get_available_locales(),
+			'chunk_size'            => Review_Chunks::get_chunk_size(),
 		);
 
 		return rest_ensure_response( $settings );

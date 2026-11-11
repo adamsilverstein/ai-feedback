@@ -404,4 +404,60 @@ class PromptBuilderTest extends TestCase {
 
 		$this->assertStringNotContainsString( 'REFERENCE EXAMPLES:', $prompt );
 	}
+
+	/**
+	 * Single-request reviews get no chunk instructions.
+	 */
+	public function test_no_chunk_instructions_for_single_request(): void {
+		$blocks = array( array( 'clientId' => 'a', 'name' => 'core/paragraph', 'content' => 'Hello.' ) );
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringNotContainsString( 'DOCUMENT PART:', $prompt );
+	}
+
+	/**
+	 * Earlier chunks are told to summarize their part only.
+	 */
+	public function test_chunk_instructions_for_middle_chunk(): void {
+		$blocks = array( array( 'clientId' => 'a', 'name' => 'core/paragraph', 'content' => 'Hello.' ) );
+
+		$prompt = $this->builder->build_review_prompt(
+			$blocks,
+			array(
+				'chunk'              => array(
+					'index' => 1,
+					'total' => 3,
+				),
+				'previous_summaries' => array( 'Ignored until the last part.' ),
+			)
+		);
+
+		$this->assertStringContainsString( 'This is part 2 of 3', $prompt );
+		$this->assertStringContainsString( 'Write the summary about this part only.', $prompt );
+		$this->assertStringNotContainsString( 'SUMMARIES OF EARLIER PARTS', $prompt );
+	}
+
+	/**
+	 * The last chunk combines earlier summaries into a whole-document summary.
+	 */
+	public function test_chunk_instructions_for_final_chunk(): void {
+		$blocks = array( array( 'clientId' => 'a', 'name' => 'core/paragraph', 'content' => 'Hello.' ) );
+
+		$prompt = $this->builder->build_review_prompt(
+			$blocks,
+			array(
+				'chunk'              => array(
+					'index' => 2,
+					'total' => 3,
+				),
+				'previous_summaries' => array( 'First part is clear.', '<b>Second</b> part rambles.' ),
+			)
+		);
+
+		$this->assertStringContainsString( 'This is part 3 of 3', $prompt );
+		$this->assertStringContainsString( 'assessment of the WHOLE document', $prompt );
+		$this->assertStringContainsString( 'Part 1: First part is clear.', $prompt );
+		$this->assertStringContainsString( 'Part 2: Second part rambles.', $prompt );
+	}
 }

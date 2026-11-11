@@ -15,12 +15,16 @@ require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-response-parser.php';
 require_once $includes_dir . 'class-notes-manager.php';
 require_once $includes_dir . 'class-review-service.php';
+require_once $includes_dir . 'class-review-chunks.php';
 
 // Define WordPress constants needed for testing.
 if ( ! defined( 'AI_FEEDBACK_DEFAULT_MODEL' ) ) {
 	define( 'AI_FEEDBACK_DEFAULT_MODEL', 'claude-sonnet-5-5' );
 }
 
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
 if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
@@ -353,6 +357,66 @@ if ( ! function_exists( 'update_user_meta' ) ) {
 		$GLOBALS['test_user_meta'][ $user_id ][ $key ] = $value;
 		return true;
 	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) {
+		unset( $GLOBALS['test_transients'][ $key ] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	function wp_generate_uuid4() {
+		$bytes    = random_bytes( 16 );
+		$bytes[6] = chr( ord( $bytes[6] ) & 0x0f | 0x40 );
+		$bytes[8] = chr( ord( $bytes[8] ) & 0x3f | 0x80 );
+		return vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $bytes ), 4 ) );
+	}
+}
+
+if ( ! class_exists( 'Test_WPDB' ) ) {
+	/**
+	 * Minimal wpdb stand-in that supports the INSERT IGNORE lock pattern,
+	 * backed by $GLOBALS['test_options'].
+	 */
+	class Test_WPDB {
+		public $options = 'wp_options';
+
+		public function prepare( $query, ...$args ) {
+			return array( 'query' => $query, 'args' => $args );
+		}
+
+		public function query( $prepared ) {
+			// args[0] is the table name for the %i placeholder.
+			$name = $prepared['args'][1];
+			if ( str_contains( $prepared['query'], 'INSERT IGNORE' ) ) {
+				if ( isset( $GLOBALS['test_options'][ $name ] ) ) {
+					return 0;
+				}
+				$GLOBALS['test_options'][ $name ] = $prepared['args'][2];
+				return 1;
+			}
+			return false;
+		}
+
+		public function get_var( $prepared ) {
+			return $GLOBALS['test_options'][ $prepared['args'][1] ] ?? null;
+		}
+
+		public function delete( $table, $where ) {
+			$name = $where['option_name'];
+			if ( ! isset( $GLOBALS['test_options'][ $name ] ) ) {
+				return 0;
+			}
+			if ( isset( $where['option_value'] ) && (string) $GLOBALS['test_options'][ $name ] !== (string) $where['option_value'] ) {
+				return 0;
+			}
+			unset( $GLOBALS['test_options'][ $name ] );
+			return 1;
+		}
+	}
+	$GLOBALS['wpdb'] = new Test_WPDB();
 }
 
 if ( ! function_exists( 'rest_url' ) ) {

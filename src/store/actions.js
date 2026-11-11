@@ -9,6 +9,11 @@ import {
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { TYPES } from './reducer';
 import { STAGE_ANALYZING, STAGE_ATTACHING } from './review-stages';
+import {
+	chunkBlocks,
+	mergeChunkResponses,
+	DEFAULT_CHUNK_SIZE,
+} from '../utils/chunk-review';
 
 /**
  * Fetch settings from the server.
@@ -83,7 +88,149 @@ export function* updateSettings(settings) {
 }
 
 /**
+ * Link blocks to their new notes and refresh the notes shown in the editor.
+ *
+ * @param {Object} response Review response with block_mapping and notes.
+ * @param {number} postId   Post ID.
+ */
+function applyReviewResponse(response, postId) {
+	if (
+		!response.block_mapping ||
+		Object.keys(response.block_mapping).length === 0
+	) {
+		// eslint-disable-next-line no-console
+		console.log('[AI-Feedback] No block_mapping in response or empty');
+		return;
+	}
+
+	// eslint-disable-next-line no-console
+	console.log(
+		'[AI-Feedback] Processing block_mapping:',
+		response.block_mapping
+	);
+
+	// Directly update block metadata using registry dispatch
+	// This stores the noteId in each block's metadata so WordPress can link blocks to notes
+	let updatedCount = 0;
+	let errorCount = 0;
+
+	Object.entries(response.block_mapping).forEach(([clientId, noteId]) => {
+		try {
+			// Get the current block to access existing metadata
+			const block = registrySelect(blockEditorStore).getBlock(clientId);
+
+			if (!block) {
+				// eslint-disable-next-line no-console
+				console.warn(
+					`[AI-Feedback] Block ${clientId} not found in editor`
+				);
+				errorCount++;
+				return;
+			}
+
+			// Get existing metadata or empty object
+			const existingMetadata = block.attributes?.metadata || {};
+
+			// eslint-disable-next-line no-console
+			console.log(
+				`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`,
+				{
+					existingMetadata,
+					blockName: block.name,
+				}
+			);
+
+			// Update block attributes with the noteId in metadata
+			registryDispatch(blockEditorStore).updateBlockAttributes(clientId, {
+				metadata: {
+					...existingMetadata,
+					noteId,
+				},
+			});
+
+			// eslint-disable-next-line no-console
+			console.log(
+				`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`
+			);
+			updatedCount++;
+		} catch (error) {
+			// eslint-disable-next-line no-console
+			console.error(
+				`[AI-Feedback] Could not update block ${clientId}:`,
+				error.message,
+				error
+			);
+			errorCount++;
+		}
+	});
+
+	// eslint-disable-next-line no-console
+	console.log(
+		`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`
+	);
+
+	// Invalidate core notes/comments resolution to force a refresh in the UI.
+	// This ensures the toolbar icon appears immediately without a page refresh.
+	try {
+		// Inject the notes directly into the core data store.
+		// We use 'root' kind and exact query params used by Gutenberg's useBlockComments.
+		if (response.notes && response.notes.length > 0) {
+			const queryArgs = {
+				post: postId,
+				type: 'note',
+				status: 'all',
+				per_page: -1,
+			};
+
+			registryDispatch('core').receiveEntityRecords(
+				'root',
+				'comment',
+				response.notes,
+				queryArgs,
+				true // invalidateCaches
+			);
+
+			// Also explicitly invalidate to be sure.
+			registryDispatch('core').invalidateResolution('getEntityRecords', [
+				'root',
+				'comment',
+				queryArgs,
+			]);
+		}
+
+		// Also try to invalidate core/notes if it exists.
+		registryDispatch('core/notes')?.invalidateResolution('getNotes', [
+			postId,
+		]);
+	} catch (e) {
+		// Fallback to core comments invalidation if specific store isn't available.
+		try {
+			const queryArgs = {
+				post: postId,
+				type: 'note',
+				status: 'all',
+				per_page: -1,
+			};
+			registryDispatch('core')?.invalidateResolution('getComments', {
+				post: postId,
+			});
+			registryDispatch('core')?.invalidateResolution('getEntityRecords', [
+				'root',
+				'comment',
+				queryArgs,
+			]);
+		} catch (e2) {
+			// Ignore errors if stores aren't initialized yet.
+		}
+	}
+}
+
+/**
  * Start a document review.
+ *
+ * Documents with more blocks than `chunkSize` are reviewed in several
+ * requests. Notes from each part are added to the editor as soon as that
+ * part finishes, and progress is tracked in the store.
  *
  * @param {Object}  options            Review options.
  * @param {number}  options.postId     Post ID to review.
@@ -93,6 +240,7 @@ export function* updateSettings(settings) {
  * @param {Array}   options.focusAreas Focus areas.
  * @param {string}  options.targetTone Target tone.
  * @param {string}  options.locale     Feedback locale.
+ * @param {number}  options.chunkSize  Blocks per review request.
  * @param {boolean} options.isRetry    Whether this retries a review that failed because the AI service was unavailable.
  * @return {Object} Action object.
  */
@@ -104,30 +252,27 @@ export function* startReview({
 	focusAreas,
 	targetTone,
 	locale,
+	chunkSize = DEFAULT_CHUNK_SIZE,
 	isRetry = false,
 }) {
+	const chunks = chunkBlocks(blocks, chunkSize);
+	const total = chunks.length;
+
 	// eslint-disable-next-line no-console
 	console.log('[AI-Feedback] Starting review', {
 		postId,
 		title,
 		blocksCount: blocks.length,
+		chunks: total,
 		model,
 		focusAreas,
 		targetTone,
 		locale,
 	});
 
-	// eslint-disable-next-line no-console
-	console.log(
-		'[AI-Feedback] Blocks being sent:',
-		blocks.map((b) => ({
-			clientId: b.clientId,
-			name: b.name,
-			contentLength: b.content?.length || 0,
-		}))
-	);
-
 	yield { type: TYPES.START_REVIEW, isRetry };
+
+	const responses = [];
 
 	try {
 		// Fetch existing feedback history for continuation reviews.
@@ -137,204 +282,92 @@ export function* startReview({
 			? feedbackHistory.notes
 			: [];
 
-		// eslint-disable-next-line no-console
-		console.log('[AI-Feedback] Existing feedback for continuation:', {
-			hasHistory: feedbackHistory.has_history,
-			feedbackCount: existingFeedback.length,
-		});
+		let reviewId = '';
 
-		yield setReviewStage(STAGE_ANALYZING);
+		for (let index = 0; index < total; index++) {
+			if (total > 1) {
+				yield {
+					type: TYPES.SET_REVIEW_PROGRESS,
+					progress: { current: index + 1, total },
+				};
+			}
 
-		const response = yield apiFetch({
-			path: '/ai-feedback/v1/review',
-			method: 'POST',
-			data: {
+			const data = {
 				post_id: postId,
 				title,
-				blocks,
+				blocks: chunks[index],
 				model,
 				focus_areas: focusAreas,
 				target_tone: targetTone,
 				locale,
 				existing_feedback: existingFeedback,
-			},
-		});
+			};
 
-		// eslint-disable-next-line no-console
-		console.log('[AI-Feedback] Review API response received:', {
-			reviewId: response.review_id,
-			postId: response.post_id,
-			model: response.model,
-			noteCount: response.note_count,
-			notesCount: response.notes?.length || 0,
-			noteIdsCount: response.note_ids?.length || 0,
-			blockMappingKeys: response.block_mapping
-				? Object.keys(response.block_mapping)
-				: [],
-			summaryText: response.summary_text?.substring(0, 100) + '...',
-			hasSummary: !!response.summary,
-		});
-
-		// Debug: Log full response for inspection
-		// eslint-disable-next-line no-console
-		console.log('[AI-Feedback] Full response:', response);
-
-		yield setReviewStage(STAGE_ATTACHING);
-
-		// Update block metadata with note IDs if block_mapping is present
-		if (
-			response.block_mapping &&
-			Object.keys(response.block_mapping).length > 0
-		) {
-			// eslint-disable-next-line no-console
-			console.log(
-				'[AI-Feedback] Processing block_mapping:',
-				response.block_mapping
-			);
-
-			// Directly update block metadata using registry dispatch
-			// This stores the noteId in each block's metadata so WordPress can link blocks to notes
-			let updatedCount = 0;
-			let errorCount = 0;
-
-			Object.entries(response.block_mapping).forEach(
-				([clientId, noteId]) => {
-					try {
-						// Get the current block to access existing metadata
-						const block =
-							registrySelect(blockEditorStore).getBlock(clientId);
-
-						if (!block) {
-							// eslint-disable-next-line no-console
-							console.warn(
-								`[AI-Feedback] Block ${clientId} not found in editor`
-							);
-							errorCount++;
-							return;
-						}
-
-						// Get existing metadata or empty object
-						const existingMetadata =
-							block.attributes?.metadata || {};
-
-						// eslint-disable-next-line no-console
-						console.log(
-							`[AI-Feedback] Updating block ${clientId} with noteId ${noteId}`,
-							{
-								existingMetadata,
-								blockName: block.name,
-							}
-						);
-
-						// Update block attributes with the noteId in metadata
-						registryDispatch(
-							blockEditorStore
-						).updateBlockAttributes(clientId, {
-							metadata: {
-								...existingMetadata,
-								noteId,
-							},
-						});
-
-						// eslint-disable-next-line no-console
-						console.log(
-							`[AI-Feedback] Successfully updated block ${clientId} with noteId ${noteId}`
-						);
-						updatedCount++;
-					} catch (error) {
-						// eslint-disable-next-line no-console
-						console.error(
-							`[AI-Feedback] Could not update block ${clientId}:`,
-							error.message,
-							error
-						);
-						errorCount++;
-					}
+			if (total > 1) {
+				data.chunk_index = index;
+				data.chunk_total = total;
+				if (reviewId) {
+					data.review_id = reviewId;
 				}
-			);
-
-			// eslint-disable-next-line no-console
-			console.log(
-				`[AI-Feedback] Block metadata update complete: ${updatedCount} updated, ${errorCount} errors`
-			);
-
-			// Invalidate core notes/comments resolution to force a refresh in the UI.
-			// This ensures the toolbar icon appears immediately without a page refresh.
-			try {
-				// Inject the notes directly into the core data store.
-				// We use 'root' kind and exact query params used by Gutenberg's useBlockComments.
-				if (response.notes && response.notes.length > 0) {
-					const queryArgs = {
-						post: postId,
-						type: 'note',
-						status: 'all',
-						per_page: -1,
-					};
-
-					registryDispatch('core').receiveEntityRecords(
-						'root',
-						'comment',
-						response.notes,
-						queryArgs,
-						true // invalidateCaches
-					);
-
-					// Also explicitly invalidate to be sure.
-					registryDispatch('core').invalidateResolution(
-						'getEntityRecords',
-						['root', 'comment', queryArgs]
-					);
-				}
-
-				// Also try to invalidate core/notes if it exists.
-				registryDispatch('core/notes')?.invalidateResolution(
-					'getNotes',
-					[postId]
-				);
-			} catch (e) {
-				// Fallback to core comments invalidation if specific store isn't available.
-				try {
-					const queryArgs = {
-						post: postId,
-						type: 'note',
-						status: 'all',
-						per_page: -1,
-					};
-					registryDispatch('core')?.invalidateResolution(
-						'getComments',
-						{ post: postId }
-					);
-					registryDispatch('core')?.invalidateResolution(
-						'getEntityRecords',
-						['root', 'comment', queryArgs]
-					);
-				} catch (e2) {
-					// Ignore errors if stores aren't initialized yet.
+				if (index === total - 1) {
+					data.previous_summaries = responses
+						.map((response) => response.summary_text)
+						.filter(Boolean);
 				}
 			}
 
-			// Also dispatch to our store for tracking
-			yield {
-				type: TYPES.UPDATE_BLOCK_NOTES,
-				blockMapping: response.block_mapping,
-			};
-		} else {
-			// eslint-disable-next-line no-console
-			console.log('[AI-Feedback] No block_mapping in response or empty');
-		}
+			yield setReviewStage(STAGE_ANALYZING);
 
-		// eslint-disable-next-line no-console
-		console.log(
-			'[AI-Feedback] Dispatching REVIEW_SUCCESS with review data'
-		);
+			const response = yield apiFetch({
+				path: '/ai-feedback/v1/review',
+				method: 'POST',
+				data,
+			});
+
+			// eslint-disable-next-line no-console
+			console.log('[AI-Feedback] Review API response received:', {
+				chunk: `${index + 1}/${total}`,
+				reviewId: response.review_id,
+				noteCount: response.note_count,
+			});
+
+			reviewId = response.review_id;
+			responses.push(response);
+
+			yield setReviewStage(STAGE_ATTACHING);
+
+			// Show this part's notes right away instead of waiting for
+			// the whole document.
+			applyReviewResponse(response, postId);
+			if (
+				response.block_mapping &&
+				Object.keys(response.block_mapping).length > 0
+			) {
+				yield {
+					type: TYPES.UPDATE_BLOCK_NOTES,
+					blockMapping: response.block_mapping,
+				};
+			}
+		}
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
-			review: response,
+			review: total > 1 ? mergeChunkResponses(responses) : responses[0],
 		};
 	} catch (error) {
 		// eslint-disable-next-line no-console
 		console.error('[AI-Feedback] Review failed:', error);
+
+		// Keep the notes from parts that finished before the failure.
+		if (responses.length > 0) {
+			yield {
+				type: TYPES.REVIEW_SUCCESS,
+				review: {
+					...mergeChunkResponses(responses),
+					is_partial: true,
+				},
+			};
+		}
 
 		return {
 			type: TYPES.REVIEW_ERROR,

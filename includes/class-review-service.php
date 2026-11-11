@@ -184,6 +184,12 @@ class Review_Service {
 		$existing_feedback = $options['existing_feedback'] ?? array();
 		$is_continuation   = ! empty( $existing_feedback );
 
+		$position = Review_Chunks::get_position( $options );
+		if ( $position['total'] > 1 && is_array( $existing_feedback ) && is_array( $blocks ) ) {
+			Logger::debug( sprintf( 'Reviewing chunk %d of %d', $position['index'] + 1, $position['total'] ) );
+			$existing_feedback = $this->filter_feedback_for_chunk( $existing_feedback, $blocks, 0 === $position['index'] );
+		}
+
 		if ( $is_continuation ) {
 			Logger::debug( sprintf( 'Continuation review with %d existing feedback items', count( $existing_feedback ) ) );
 		}
@@ -229,8 +235,8 @@ class Review_Service {
 		// Get statistical summary.
 		$stats_summary = $this->response_parser->get_feedback_summary( $feedback_items );
 
-		// Generate review ID.
-		$review_id = wp_generate_uuid4();
+		// Chunks of one review share the ID created for the first chunk.
+		$review_id = is_string( $options['review_id'] ?? null ) && '' !== $options['review_id'] ? $options['review_id'] : wp_generate_uuid4();
 
 		// Build review data.
 		$review_data = array(
@@ -290,6 +296,38 @@ class Review_Service {
 			'summary_text'  => $ai_summary,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
+		);
+	}
+
+	/**
+	 * Limit continuation feedback to the blocks in the current chunk.
+	 *
+	 * Document-level feedback, which has no block, goes with the first chunk.
+	 *
+	 * @param  array<mixed> $existing_feedback Feedback notes from earlier reviews.
+	 * @param  array<mixed> $blocks            Blocks in this chunk.
+	 * @param  bool         $is_first_chunk    Whether this is the first chunk.
+	 * @return list<mixed> Feedback relevant to this chunk.
+	 */
+	private function filter_feedback_for_chunk( array $existing_feedback, array $blocks, bool $is_first_chunk ): array {
+		$client_ids = array();
+		foreach ( $blocks as $block ) {
+			if ( is_array( $block ) && is_string( $block['clientId'] ?? null ) ) {
+				$client_ids[ $block['clientId'] ] = true;
+			}
+		}
+
+		return array_values(
+			array_filter(
+				$existing_feedback,
+				static function ( $note ) use ( $client_ids, $is_first_chunk ): bool {
+					$block_id = is_array( $note ) && is_string( $note['block_id'] ?? null ) ? $note['block_id'] : '';
+					if ( '' === $block_id ) {
+						return $is_first_chunk;
+					}
+					return isset( $client_ids[ $block_id ] );
+				}
+			)
 		);
 	}
 
