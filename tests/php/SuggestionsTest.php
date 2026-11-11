@@ -21,6 +21,7 @@ namespace {
 			public int $ID                   = 0;
 			public string $post_modified_gmt = '';
 			public string $post_content      = '';
+			public string $post_name         = '';
 
 			/**
 			 * @param array<string, int|string> $post Post fields.
@@ -33,9 +34,23 @@ namespace {
 		}
 	}
 
-	if ( ! function_exists( 'wp_get_post_autosave' ) ) {
-		function wp_get_post_autosave( int $post_id, int $user_id = 0 ): WP_Post|false {
-			return $GLOBALS['test_autosaves'][ $post_id ] ?? false;
+	if ( ! function_exists( 'wp_get_post_revisions' ) ) {
+		/**
+		 * @param array<string, mixed> $args Query arguments.
+		 * @return array<WP_Post>
+		 */
+		function wp_get_post_revisions( int $post_id, array $args = array() ): array {
+			$revisions = $GLOBALS['test_autosaves'][ $post_id ] ?? array();
+			return array_filter(
+				is_array( $revisions ) ? $revisions : array(),
+				static fn( $revision ): bool => $revision instanceof WP_Post
+			);
+		}
+	}
+
+	if ( ! function_exists( 'wp_is_post_autosave' ) ) {
+		function wp_is_post_autosave( WP_Post $post ): int|false {
+			return str_contains( $post->post_name, '-autosave-' ) ? 42 : false;
 		}
 	}
 
@@ -184,7 +199,26 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
-		 * Suggestions whose markers the saved post or autosave holds are kept.
+		 * Returns an autosave revision of post 42.
+		 *
+		 * @param string $modified_gmt Autosave date, GMT.
+		 * @param string $content      Autosave content.
+		 * @param int    $id           Revision ID.
+		 * @return \WP_Post Autosave.
+		 */
+		private function autosave( string $modified_gmt, string $content = '', int $id = 900 ): \WP_Post {
+			return new \WP_Post(
+				array(
+					'ID'                => $id,
+					'post_name'         => '42-autosave-v1',
+					'post_modified_gmt' => $modified_gmt,
+					'post_content'      => $content,
+				)
+			);
+		}
+
+		/**
+		 * Suggestions whose markers the saved post or any autosave holds are kept.
 		 */
 		public function test_saved_pending_ids_skip_anchored_suggestions(): void {
 			$this->set_post_modified( $this->ago( HOUR_IN_SECONDS ), $this->marker( 401 ) );
@@ -192,16 +226,20 @@ namespace AI_Feedback\Tests {
 			$this->add_suggestion( 402, $this->ago( 2 * HOUR_IN_SECONDS ) );
 			$this->add_suggestion( 403, $this->ago( 2 * HOUR_IN_SECONDS ) );
 
+			$this->add_suggestion( 404, $this->ago( 2 * HOUR_IN_SECONDS ) );
+
+			// Each editor autosaves separately; a plain revision doesn't count.
+			$revision                  = $this->autosave( $this->ago( 2 * HOUR_IN_SECONDS ), $this->marker( 404 ), 903 );
+			$revision->post_name       = '42-revision-v1';
 			$GLOBALS['test_autosaves'] = array(
-				42 => new \WP_Post(
-					array(
-						'post_modified_gmt' => $this->ago( 2 * HOUR_IN_SECONDS ),
-						'post_content'      => $this->marker( 402 ),
-					)
+				42 => array(
+					901 => $this->autosave( $this->ago( 2 * HOUR_IN_SECONDS ), '', 901 ),
+					902 => $this->autosave( $this->ago( 3 * HOUR_IN_SECONDS ), $this->marker( 402 ), 902 ),
+					903 => $revision,
 				),
 			);
 
-			$this->assertSame( array( 403 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+			$this->assertSame( array( 403, 404 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 		}
 
 		/**
@@ -222,12 +260,16 @@ namespace AI_Feedback\Tests {
 			$this->set_post_modified( $this->ago( HOUR_IN_SECONDS ) );
 			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 
+			// Any user's newer autosave counts, not only the latest one.
 			$GLOBALS['test_autosaves'] = array(
-				42 => new \WP_Post( array( 'post_modified_gmt' => $this->ago( 60 ) ) ),
+				42 => array(
+					902 => $this->autosave( $this->ago( 90 * MINUTE_IN_SECONDS ), '', 902 ),
+					901 => $this->autosave( $this->ago( 60 ), '', 901 ),
+				),
 			);
 			$this->assertSame( array(), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 
-			$GLOBALS['test_autosaves'][42]->post_modified_gmt = $this->ago( 90 * MINUTE_IN_SECONDS );
+			$GLOBALS['test_autosaves'][42][901]->post_modified_gmt = $this->ago( 80 * MINUTE_IN_SECONDS );
 			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 		}
 
