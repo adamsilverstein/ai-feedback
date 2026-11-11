@@ -55,6 +55,8 @@ export default function WelcomeModal() {
 
 	useEffect(() => {
 		if (welcomeDismissed) {
+			// Clear a stale legacy flag so it can't undo a later reset.
+			consumeLegacyWelcomeFlag();
 			setIsOpen(false);
 			setIsLoading(false);
 			return;
@@ -65,14 +67,22 @@ export default function WelcomeModal() {
 			return;
 		}
 
+		let ignore = false;
+
 		// Check AI client + connector status before showing modal.
 		apiFetch({ path: '/ai-feedback/v1/status' })
 			.then((response) => {
+				if (ignore) {
+					return;
+				}
 				setStatus(response);
 				setIsOpen(true);
 				setIsLoading(false);
 			})
 			.catch((error) => {
+				if (ignore) {
+					return;
+				}
 				setStatusError(
 					error.message ||
 						__('Failed to check AI client status', 'ai-feedback')
@@ -80,6 +90,11 @@ export default function WelcomeModal() {
 				setIsOpen(true);
 				setIsLoading(false);
 			});
+
+		// Dismissal can land before the status check returns.
+		return () => {
+			ignore = true;
+		};
 	}, [welcomeDismissed, set]);
 
 	const aiClientAvailable = status?.ai_client_available === true;
