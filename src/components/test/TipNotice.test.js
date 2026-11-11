@@ -155,6 +155,43 @@ describe('TipNotice', () => {
 		).not.toBeInTheDocument();
 	});
 
+	it('keeps earlier dismissals when dismissing a tip', () => {
+		const { registry } = renderTip({
+			reviewCount: 2,
+			dismissedTips: ['notes-on-blocks'],
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: /close/i }));
+		expect(
+			registry
+				.select(preferencesStore)
+				.get('ai-feedback', 'dismissedTips')
+		).toEqual(['notes-on-blocks', 'reply-to-notes']);
+	});
+
+	it.each([
+		['focus-areas', 3, { focusAreas: [{}, {}] }, /Focus Areas/],
+		['target-tone', 4, { tones: [{}] }, /Target Tone/],
+		['model-selection', 5, { models: [{}, {}] }, /Different AI models/],
+	])(
+		'shows the %s tip when the site offers it',
+		(id, reviewCount, features, text) => {
+			const { container } = renderTip({
+				reviewCount,
+				dismissedTips: [
+					'notes-on-blocks',
+					'reply-to-notes',
+					'focus-areas',
+					'target-tone',
+				].filter((tipId) => tipId !== id),
+				...features,
+			});
+			expect(
+				container.querySelector('.ai-feedback-tip')
+			).toHaveTextContent(text);
+		}
+	);
+
 	it('names the registered review shortcut in the keyboard tip', () => {
 		const dismissedTips = [
 			'notes-on-blocks',
