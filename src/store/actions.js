@@ -551,8 +551,12 @@ export function* fetchPreviousReview(postId) {
 			noteCount: response.review?.note_count,
 		});
 
+		// Covers pending suggestions from every review, not only this one.
+		removeOrphanedSuggestions(postId).catch(() => {
+			// Suggestions without markers stay; the next load retries.
+		});
+
 		if (response.has_review && response.review) {
-			removeOrphanedSuggestions(response.review.notes);
 			return {
 				type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 				review: response.review,

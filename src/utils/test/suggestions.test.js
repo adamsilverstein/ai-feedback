@@ -457,39 +457,58 @@ describe('suggestQuickFixes', () => {
 describe('removeOrphanedSuggestions', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		window.__experimentalSuggestionMode = true;
+		window.aiFeedbackData = { suggestions: true };
+		mocks.apiFetch.mockResolvedValue({ note_ids: [12, 13] });
 		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
 			savedRecord(record)
 		);
-	});
-
-	it('removes pending suggestions whose markers are gone', async () => {
 		mocks.postContent =
 			'<!-- wp:paragraph --><p><mark class="wp-suggestion-del" data-suggestion-id="12">x</mark></p><!-- /wp:paragraph -->';
+	});
 
-		await expect(
-			removeOrphanedSuggestions([
-				{ id: 12, suggestion_status: 'pending' },
-				{ id: 13, suggestion_status: 'pending' },
-				{ id: 14, suggestion_status: 'applied' },
-				{ id: 15 },
-			])
-		).resolves.toBe(1);
+	afterEach(() => {
+		delete window.__experimentalSuggestionMode;
+		delete window.aiFeedbackData;
+	});
 
+	it('removes saved pending suggestions whose markers are gone', async () => {
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(1);
+
+		expect(mocks.apiFetch).toHaveBeenCalledWith({
+			path: '/ai-feedback/v1/notes/post/42/saved-pending-suggestions',
+		});
 		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(1);
 		expect(mocks.saveEntityRecord.mock.calls[0][2]).toEqual({
 			id: 13,
 			meta: { _wp_suggestion: null, _wp_suggestion_status: null },
 		});
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(13, null);
 	});
 
-	it('waits for content to load', async () => {
-		mocks.postContent = '';
+	it('does nothing without Suggestion Mode', async () => {
+		delete window.__experimentalSuggestionMode;
 
-		await expect(
-			removeOrphanedSuggestions([
-				{ id: 13, suggestion_status: 'pending' },
-			])
-		).resolves.toBe(0);
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
+		expect(mocks.apiFetch).not.toHaveBeenCalled();
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('leaves suggestions the server does not list', async () => {
+		// Created after the last save, or a newer autosave exists.
+		mocks.apiFetch.mockResolvedValue({ note_ids: [] });
+
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		['empty', ''],
+		['whitespace only', ' \n'],
+	])('waits for content to load (%s)', async (label, content) => {
+		mocks.postContent = content;
+
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 });

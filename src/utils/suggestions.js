@@ -8,6 +8,7 @@
  * The note's `_wp_suggestion` payload and `_wp_suggestion_status` are written
  * through core-data, the same way Gutenberg's own suggester writes them.
  */
+import apiFetch from '@wordpress/api-fetch';
 import {
 	dispatch as dataDispatch,
 	select as dataSelect,
@@ -332,16 +333,23 @@ export async function suggestQuickFixes(notes) {
  * Turns pending suggestions whose markers are gone back into plain notes.
  *
  * Markers live in the post content, so they are lost if the editor reloads
- * before the post is saved.
+ * before the post is saved. The server lists only pending AI suggestions
+ * created before the last save, and none while a newer autosave exists, so
+ * markers held by another editor's unsaved content are left alone.
  *
- * @param {Object[]} notes Notes from a previous review.
+ * @param {number} postId Post ID.
  * @return {Promise<number>} Number of suggestions removed.
  */
-export async function removeOrphanedSuggestions(notes) {
-	const pending = (notes || []).filter(
-		(note) => note?.id && note.suggestion_status === 'pending'
-	);
-	if (pending.length === 0) {
+export async function removeOrphanedSuggestions(postId) {
+	if (!postId || !isSuggestionModeAvailable()) {
+		return 0;
+	}
+
+	const response = await apiFetch({
+		path: `/ai-feedback/v1/notes/post/${postId}/saved-pending-suggestions`,
+	});
+	const ids = response?.note_ids || [];
+	if (ids.length === 0) {
 		return 0;
 	}
 
@@ -350,11 +358,9 @@ export async function removeOrphanedSuggestions(notes) {
 	if (!html || !html.trim()) {
 		return 0;
 	}
-	const orphaned = pending.filter(
-		(note) => !hasSuggestionMarker(html, note.id)
-	);
+	const orphaned = ids.filter((id) => !hasSuggestionMarker(html, id));
 
-	await Promise.all(orphaned.map((note) => removeSuggestion(note.id)));
+	await Promise.all(orphaned.map((id) => removeSuggestion(id)));
 
 	return orphaned.length;
 }

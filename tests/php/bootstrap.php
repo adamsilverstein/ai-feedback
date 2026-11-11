@@ -510,6 +510,9 @@ if ( ! function_exists( 'get_post' ) ) {
 		if ( in_array( (int) $post_id, $GLOBALS['test_missing_posts'] ?? array(), true ) ) {
 			return null;
 		}
+		if ( isset( $GLOBALS['test_posts'][ (int) $post_id ] ) ) {
+			return $GLOBALS['test_posts'][ (int) $post_id ];
+		}
 		return (object) array( 'ID' => (int) $post_id );
 	}
 }

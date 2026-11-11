@@ -69,4 +69,61 @@ class Suggestions {
 		$status = get_comment_meta( $note_id, self::STATUS_META, true );
 		return is_string( $status ) && '' !== $status ? $status : 'pending';
 	}
+
+	/**
+	 * Lists pending AI suggestions whose markers the saved post should hold.
+	 *
+	 * Markers live in the post content, so a suggestion created after the
+	 * last save may only exist in another editor's unsaved content. Only
+	 * suggestions older than the last save are listed, and none while a
+	 * newer autosave exists, since restoring it brings markers back.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return list<int> Note IDs.
+	 */
+	public function get_saved_pending_ids( int $post_id ): array {
+		$post = get_post( $post_id );
+		if ( ! $post instanceof \WP_Post || ! self::is_available() ) {
+			return array();
+		}
+
+		$autosave = wp_get_post_autosave( $post_id );
+		if ( $autosave instanceof \WP_Post && $autosave->post_modified_gmt > $post->post_modified_gmt ) {
+			return array();
+		}
+
+		$notes = get_comments(
+			array(
+				'post_id'    => $post_id,
+				'type'       => 'note',
+				'status'     => 'all',
+				'parent'     => 0,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				'meta_query' => array(
+					'relation' => 'AND',
+					array(
+						'key'   => 'ai_feedback',
+						'value' => '1',
+					),
+					array(
+						'key'     => self::PAYLOAD_META,
+						'compare' => 'EXISTS',
+					),
+				),
+			)
+		);
+
+		$ids = array();
+		foreach ( is_array( $notes ) ? $notes : array() as $note ) {
+			if ( ! $note instanceof \WP_Comment ) {
+				continue;
+			}
+			$note_id = (int) $note->comment_ID;
+			if ( 'pending' === $this->get_status( $note_id ) && $post->post_modified_gmt > $note->comment_date_gmt ) {
+				$ids[] = $note_id;
+			}
+		}
+
+		return $ids;
+	}
 }
