@@ -306,14 +306,17 @@ class Reply_Service {
 	}
 
 	/**
-	 * Get a parsed block's plain text with whitespace collapsed.
+	 * Get a parsed block's plain text with entities decoded and whitespace collapsed.
+	 *
+	 * With the `u` flag, `\s` also matches the non-breaking spaces that
+	 * `&nbsp;` decodes to.
 	 *
 	 * @param array<mixed> $block Parsed block.
 	 * @return string Block text.
 	 */
 	private static function block_text( array $block ): string {
-		$text = preg_replace( '/\s+/u', ' ', wp_strip_all_tags( self::get_block_html( $block ) ) );
-		return trim( (string) $text );
+		$text = html_entity_decode( wp_strip_all_tags( self::get_block_html( $block ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/**

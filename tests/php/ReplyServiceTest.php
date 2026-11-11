@@ -553,6 +553,22 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Saved block HTML holds entities, which the AI would otherwise read as
+	 * literal text and might flag as typos.
+	 */
+	public function test_block_content_decodes_html_entities(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array( self::leaf_block( 'core/paragraph', '<p>Tom &amp; Jerry&nbsp;said &quot;hi&quot; &#8211; it&#039;s 5&nbsp;&nbsp;pm.</p>', 100 ) )
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Tom & Jerry said \"hi\" \u{2013} it's 5 pm.\n", $service->captured_prompt );
+	}
+
+	/**
 	 * When no block links to the note, the reply still goes out without block text.
 	 */
 	public function test_missing_linked_block_leaves_block_content_empty(): void {
