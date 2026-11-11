@@ -242,6 +242,15 @@ async function runCron(page, baseURL) {
 }
 
 test.describe('Reply loop', () => {
+	// Mock mode follows the e2e cookie, not the queued event. Drain any reply a
+	// failed test left scheduled, so a later cookie-less cron run does not
+	// send it to a real provider.
+	test.afterEach(async ({ page, baseURL }) => {
+		await page.request
+			.get(new URL('/wp-cron.php', baseURL).toString())
+			.catch(() => {});
+	});
+
 	test('replies to a note get an AI reply through WP-Cron', async ({
 		page,
 		editor,
