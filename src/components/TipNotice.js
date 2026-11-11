@@ -10,6 +10,11 @@ import { store as keyboardShortcutsStore } from '@wordpress/keyboard-shortcuts';
 import { store as preferencesStore } from '@wordpress/preferences';
 import { STORE_NAME } from '../store';
 import { PREFERENCES_SCOPE, PREFERENCE_KEYS, getActiveTip } from '../tips';
+import { navigateToBlock } from '../utils/navigate-to-block';
+import {
+	getAdjacentFeedbackBlock,
+	getFeedbackBlockIds,
+} from '../utils/feedback-navigation';
 
 const REVIEW_SHORTCUT = 'ai-feedback/review';
 const EMPTY_ARRAY = [];
@@ -23,12 +28,15 @@ export default function TipNotice() {
 	const { firstNoteClientId, ...tipsState } = useSelect((select) => {
 		const { get } = select(preferencesStore);
 		const aiFeedback = select(STORE_NAME);
-		const blockMapping = aiFeedback.getLastReview()?.block_mapping || {};
 		return {
-			firstNoteClientId:
-				Object.keys(blockMapping).find(
-					(clientId) => !!select(blockEditorStore).getBlock(clientId)
-				) || null,
+			// Topmost block with feedback in document order, matching the
+			// next feedback shortcut. Notes come back sorted by priority.
+			firstNoteClientId: getAdjacentFeedbackBlock(
+				select(blockEditorStore).getClientIdsWithDescendants(),
+				getFeedbackBlockIds(aiFeedback.getLastReview()?.notes),
+				null,
+				1
+			),
 			reviewCount:
 				get(PREFERENCES_SCOPE, PREFERENCE_KEYS.reviewCount) || 0,
 			dismissedTips:
@@ -45,11 +53,10 @@ export default function TipNotice() {
 	}, []);
 	const { dismissedTips } = tipsState;
 	const { set } = useDispatch(preferencesStore);
-	const { selectBlock } = useDispatch(blockEditorStore);
 
 	const actionHandlers = {
 		'select-first-note': firstNoteClientId
-			? () => selectBlock(firstNoteClientId)
+			? () => navigateToBlock(firstNoteClientId)
 			: null,
 	};
 

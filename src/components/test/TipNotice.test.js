@@ -21,6 +21,7 @@ import { speak } from '@wordpress/a11y';
  * Internal dependencies
  */
 import TipNotice from '../TipNotice';
+import { navigateToBlock } from '../../utils/navigate-to-block';
 
 // The real block editor store is heavy, so stand in a minimal one.
 vi.mock('@wordpress/block-editor', async () => {
@@ -28,31 +29,21 @@ vi.mock('@wordpress/block-editor', async () => {
 		await vi.importActual('@wordpress/data');
 	return {
 		store: createStore('core/block-editor', {
-			reducer: (state = { blocks: [], selected: null }, action) => {
-				switch (action.type) {
-					case 'SET_BLOCKS':
-						return { ...state, blocks: action.blocks };
-					case 'SELECT_BLOCK':
-						return { ...state, selected: action.clientId };
-				}
-				return state;
-			},
+			reducer: (state = { blocks: [] }, action) =>
+				action.type === 'SET_BLOCKS'
+					? { ...state, blocks: action.blocks }
+					: state,
 			selectors: {
-				getBlock: (state, clientId) =>
-					state.blocks.includes(clientId) ? { clientId } : null,
-				getSelectedBlockClientId: (state) => state.selected,
+				getClientIdsWithDescendants: (state) => state.blocks,
 			},
 			actions: {
 				setBlocks: (blocks) => ({ type: 'SET_BLOCKS', blocks }),
-				selectBlock: (clientId) => ({
-					type: 'SELECT_BLOCK',
-					clientId,
-				}),
 			},
 		}),
 	};
 });
 vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
+vi.mock('../../utils/navigate-to-block', () => ({ navigateToBlock: vi.fn() }));
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 /**
@@ -64,8 +55,8 @@ vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
  * @param {Array<Object>} state.models        Available models.
  * @param {Array<Object>} state.focusAreas    Available focus areas.
  * @param {Array<Object>} state.tones         Available tones.
- * @param {Object}        state.blockMapping  Last review block mapping.
- * @param {Array<string>} state.blocks        Client IDs in the editor.
+ * @param {Array<Object>} state.notes         Last review notes.
+ * @param {Array<string>} state.blocks        Client IDs in document order.
  * @param {boolean}       state.withShortcut  Register the review shortcut.
  * @return {Object} The registry and render container.
  */
@@ -75,7 +66,7 @@ function renderTip({
 	models = [],
 	focusAreas = [],
 	tones = [],
-	blockMapping = {},
+	notes = [],
 	blocks = [],
 	withShortcut = false,
 }) {
@@ -89,7 +80,7 @@ function renderTip({
 				getAvailableModels: () => models,
 				getAvailableFocusAreas: () => focusAreas,
 				getAvailableTones: () => tones,
-				getLastReview: () => ({ block_mapping: blockMapping }),
+				getLastReview: () => ({ notes }),
 			},
 		})
 	);
@@ -138,23 +129,27 @@ describe('TipNotice', () => {
 		expect(container.querySelector('.ai-feedback-tip')).toBeNull();
 	});
 
-	it('selects the first block with a note from the tip action', () => {
-		const { registry } = renderTip({
+	it('goes to the topmost block with a note, not the top priority one', () => {
+		navigateToBlock.mockClear();
+		renderTip({
 			reviewCount: 1,
-			blockMapping: { missing: 1, 'block-2': 2 },
-			blocks: ['block-2'],
+			// Notes arrive sorted by priority, so the bottom block is first.
+			notes: [
+				{ block_id: 'block-3' },
+				{ block_id: 'missing' },
+				{ block_ids: ['block-2', 'block-3'] },
+			],
+			blocks: ['block-1', 'block-2', 'block-3'],
 		});
 
 		fireEvent.click(
 			screen.getByRole('button', { name: 'Show first note' })
 		);
-		expect(
-			registry.select(blockEditorStore).getSelectedBlockClientId()
-		).toBe('block-2');
+		expect(navigateToBlock).toHaveBeenCalledWith('block-2');
 	});
 
 	it('hides the action when no noted block is in the editor', () => {
-		renderTip({ reviewCount: 1, blockMapping: { gone: 1 } });
+		renderTip({ reviewCount: 1, notes: [{ block_id: 'gone' }] });
 		expect(
 			screen.queryByRole('button', { name: 'Show first note' })
 		).not.toBeInTheDocument();
