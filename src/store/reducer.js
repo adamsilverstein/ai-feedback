@@ -43,6 +43,7 @@ export const TYPES = {
 	SET_AVAILABLE_TONES: 'SET_AVAILABLE_TONES',
 	SET_AVAILABLE_LOCALES: 'SET_AVAILABLE_LOCALES',
 	START_REVIEW: 'START_REVIEW',
+	RECEIVE_PARTIAL_REVIEW: 'RECEIVE_PARTIAL_REVIEW',
 	REVIEW_SUCCESS: 'REVIEW_SUCCESS',
 	REVIEW_ERROR: 'REVIEW_ERROR',
 	ADD_TO_HISTORY: 'ADD_TO_HISTORY',
@@ -122,6 +123,41 @@ function addReviewToHistories(histories, review) {
 			toHistoryEntry(review),
 			...(histories[review.post_id] || []),
 		]),
+	};
+}
+
+/**
+ * Keep note dismissals made while a multi-part review was still running.
+ *
+ * Each part replaces the review with one merged from the raw responses,
+ * which would otherwise undo a dismissal made in the sidebar.
+ *
+ * @param {Object|null} review   New review.
+ * @param {Object|null} previous Review it replaces.
+ * @return {Object|null} Review with the earlier note state kept.
+ */
+function keepNoteState(review, previous) {
+	if (!previous?.is_in_progress || !previous.notes || !review?.notes) {
+		return review;
+	}
+	const previousNotes = new Map(
+		previous.notes.map((note) => [note.id, note])
+	);
+	return {
+		...review,
+		notes: review.notes.map((note) => {
+			const old = previousNotes.get(note.id);
+			if (!old) {
+				return note;
+			}
+			return {
+				...note,
+				...(old.is_resolved !== undefined && {
+					is_resolved: old.is_resolved,
+				}),
+				...(old.status !== undefined && { status: old.status }),
+			};
+		}),
 	};
 }
 
@@ -225,6 +261,19 @@ export default function reducer(state = initialState, action) {
 				reviewProgress: action.progress,
 			};
 
+		case TYPES.RECEIVE_PARTIAL_REVIEW:
+			// Ignore parts that arrive after the review has finished.
+			if (!state.isReviewing) {
+				return state;
+			}
+			return {
+				...state,
+				lastReview: {
+					...keepNoteState(action.review, state.lastReview),
+					is_in_progress: true,
+				},
+			};
+
 		case TYPES.REVIEW_SUCCESS:
 			return {
 				...state,
@@ -232,7 +281,7 @@ export default function reducer(state = initialState, action) {
 				reviewStage: null,
 				unavailableRetries: 0,
 				reviewProgress: null,
-				lastReview: action.review,
+				lastReview: keepNoteState(action.review, state.lastReview),
 				reviewHistories: addReviewToHistories(
 					state.reviewHistories,
 					action.review
@@ -246,6 +295,14 @@ export default function reducer(state = initialState, action) {
 				reviewStage: null,
 				reviewProgress: null,
 				error: action.error,
+				// A review that stops early must not stay marked as running.
+				lastReview: state.lastReview?.is_in_progress
+					? {
+							...state.lastReview,
+							is_in_progress: false,
+							is_partial: true,
+						}
+					: state.lastReview,
 				unavailableRetries:
 					action.error?.code === 'ai_service_unavailable'
 						? state.unavailableRetries + 1
