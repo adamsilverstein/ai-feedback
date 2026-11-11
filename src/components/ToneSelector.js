@@ -1,0 +1,101 @@
+/**
+ * Tone Selector Component
+ */
+import { SelectControl } from '@wordpress/components';
+import { useSelect, useDispatch } from '@wordpress/data';
+import { useEffect, useState } from '@wordpress/element';
+import { __ } from '@wordpress/i18n';
+import { STORE_NAME } from '../store';
+
+/**
+ * Help text for each tone option.
+ *
+ * Built at render time rather than module load so translations are applied.
+ *
+ * @return {Object} Help text keyed by tone id.
+ */
+const getToneHelp = () => ({
+	professional: __(
+		'Clear and authoritative. Best for business content and documentation.',
+		'ai-feedback'
+	),
+	casual: __(
+		'Conversational and friendly. Best for blogs and social media.',
+		'ai-feedback'
+	),
+	academic: __(
+		'Scholarly and precise. Best for research and educational content.',
+		'ai-feedback'
+	),
+	friendly: __(
+		'Warm and engaging. Best for community and customer content.',
+		'ai-feedback'
+	),
+});
+
+/**
+ * Tone Selector component.
+ *
+ * @return {Element} Tone selector component.
+ */
+export default function ToneSelector() {
+	const { availableTones, targetTone } = useSelect(
+		(select) => ({
+			availableTones: select(STORE_NAME).getAvailableTones(),
+			targetTone: select(STORE_NAME).getTargetTone(),
+		}),
+		[]
+	);
+
+	const { updateSettings } = useDispatch(STORE_NAME);
+	const [draftTone, setDraftTone] = useState(targetTone ?? '');
+
+	useEffect(() => {
+		setDraftTone(targetTone ?? '');
+	}, [targetTone]);
+
+	if (!availableTones || availableTones.length === 0) {
+		return null;
+	}
+
+	const options = availableTones.map((tone) => ({
+		label: tone.label,
+		value: tone.id,
+	}));
+
+	const handleChange = (value) => {
+		setDraftTone(value);
+		// Roll back to the last saved tone if saving fails; the store
+		// surfaces the error notice.
+		Promise.resolve(
+			updateSettings({
+				default_tone: value,
+			})
+		).catch(() => {
+			setDraftTone((current) =>
+				current === value ? (targetTone ?? '') : current
+			);
+		});
+	};
+
+	const toneDescription = availableTones.find(
+		(tone) => tone.id === draftTone
+	)?.description;
+
+	return (
+		<SelectControl
+			label={__('Target Tone', 'ai-feedback')}
+			value={draftTone}
+			options={options}
+			onChange={handleChange}
+			help={
+				getToneHelp()[draftTone] ||
+				toneDescription ||
+				__(
+					'The tone the AI will evaluate your content against.',
+					'ai-feedback'
+				)
+			}
+		/>
+	);
+}
