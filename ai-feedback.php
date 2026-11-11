@@ -164,7 +164,12 @@ register_activation_hook( __FILE__, __NAMESPACE__ . '\\activate' );
 /**
  * Plugin deactivation hook.
  */
-function deactivate() {
+function deactivate(): void {
+	// Clear pending reply-generation cron events so WP-Cron does not fire a
+	// hook with no listener once the plugin is disabled. The literal mirrors
+	// Reply_Cron_Dispatcher::CRON_HOOK; the class may not be loaded here.
+	wp_clear_scheduled_hook( 'ai_feedback_generate_reply' );
+
 	// Flush rewrite rules.
 	flush_rewrite_rules();
 }

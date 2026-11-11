@@ -73,7 +73,7 @@ class Reply_Service {
 	 */
 	public function register(): void {
 		add_action(
-			Reply_Detector::ACTION_REPLY_RECEIVED,
+			Reply_Cron_Dispatcher::CRON_HOOK,
 			array( $this, 'on_reply_received' ),
 			10,
 			4
@@ -81,11 +81,12 @@ class Reply_Service {
 	}
 
 	/**
-	 * Action callback for Reply_Detector::ACTION_REPLY_RECEIVED.
+	 * Cron callback for Reply_Cron_Dispatcher::CRON_HOOK.
 	 *
 	 * Wraps handle_reply() to satisfy the void-return contract that
 	 * WordPress actions require; handle_reply() returns a value for
-	 * direct testability.
+	 * direct testability. Also records final status on the reply comment
+	 * so the frontend can poll for completion.
 	 *
 	 * @param  int    $comment_id Reply comment ID.
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
@@ -93,7 +94,33 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 */
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
-		$this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+		try {
+			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+		} catch ( \Throwable $e ) {
+			// Record a terminal state so the frontend stops waiting.
+			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
+			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'ai-feedback' ) );
+		}
+
+		// A non-positive ID means persistence silently failed. Marking that
+		// 'complete' would leave the frontend waiting on a reply that does not exist.
+		if ( ! is_wp_error( $result ) && $result <= 0 ) {
+			$result = new WP_Error( 'reply_not_saved', __( 'The AI reply could not be saved.', 'ai-feedback' ) );
+		}
+
+		if ( is_wp_error( $result ) ) {
+			Logger::debug( sprintf( 'Reply_Service: reply %d failed: %s', $comment_id, $result->get_error_code() ) );
+			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
+			update_comment_meta(
+				$comment_id,
+				Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY,
+				mb_substr( sanitize_text_field( $result->get_error_message() ), 0, 300 )
+			);
+			return;
+		}
+
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'complete' );
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY, $result );
 	}
 
 	/**
