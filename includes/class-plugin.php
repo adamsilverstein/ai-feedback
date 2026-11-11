@@ -62,6 +62,13 @@ class Plugin {
 	private ?History_Controller $history_controller = null;
 
 	/**
+	 * Analytics controller instance.
+	 *
+	 * @var Analytics_Controller|null
+	 */
+	private ?Analytics_Controller $analytics_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -96,6 +103,11 @@ class Plugin {
 		add_action( 'init', array( Review_History::class, 'register_meta' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
+		add_action( 'ai_feedback_after_review', array( Analytics::class, 'track_review' ), 10, 2 );
+		add_action( 'deleted_user', array( Analytics::class, 'on_deleted_user' ) );
+		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
+		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
+		Analytics_Page::init();
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
 		// Add custom avatar for AI Feedback comments/notes.
@@ -120,6 +132,9 @@ class Plugin {
 
 		$this->history_controller = new History_Controller();
 		$this->history_controller->register_routes();
+
+		$this->analytics_controller = new Analytics_Controller();
+		$this->analytics_controller->register_routes();
 	}
 
 	/**

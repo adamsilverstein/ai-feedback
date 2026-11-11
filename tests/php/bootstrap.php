@@ -557,3 +557,28 @@ if ( ! function_exists( 'sanitize_textarea_field' ) ) {
 		return trim( strip_tags( $str ) );
 	}
 }
+
+// Analytics mocks.
+if ( ! function_exists( 'current_time' ) ) {
+	function current_time( $type, $gmt = 0 ) {
+		$now = $GLOBALS['test_now'] ?? time();
+		return 'mysql' === $type ? gmdate( 'Y-m-d H:i:s', $now ) : gmdate( $type, $now );
+	}
+}
+
+if ( ! function_exists( 'get_userdata' ) ) {
+	function get_userdata( $user_id ) {
+		$name = $GLOBALS['test_users'][ $user_id ] ?? null;
+		return null === $name ? false : (object) array( 'display_name' => $name );
+	}
+}
+
+require_once $includes_dir . 'class-analytics.php';
+require_once $includes_dir . 'class-analytics-controller.php';
+
+if ( ! function_exists( 'get_user_by' ) ) {
+	function get_user_by( $field, $value ) {
+		$id = $GLOBALS['test_user_emails'][ $value ] ?? null;
+		return null === $id ? false : (object) array( 'ID' => $id );
+	}
+}
