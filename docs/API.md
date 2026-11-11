@@ -36,7 +36,7 @@ X-WP-Nonce: {nonce}
 ```json
 {
   "post_id": 123,
-  "model": "claude-sonnet-4",
+  "model": "claude-sonnet-5-5",
   "focus_areas": ["content", "tone", "flow"],
   "target_tone": "professional"
 }
@@ -85,7 +85,7 @@ X-WP-Nonce: {nonce}
       "critical": 0
     }
   },
-  "model_used": "claude-sonnet-4",
+  "model_used": "claude-sonnet-5-5",
   "tokens_used": 1523,
   "created_at": "2025-12-06T14:30:00Z"
 }
@@ -184,19 +184,19 @@ X-WP-Nonce: {nonce}
 
 ```json
 {
-  "default_model": "claude-sonnet-4",
+  "default_model": "claude-sonnet-5-5",
   "default_focus_areas": ["content", "tone", "flow"],
   "default_tone": "professional",
   "available_models": [
     {
-      "id": "claude-sonnet-4-20250514",
-      "name": "Claude Sonnet 4",
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
       "provider": "anthropic",
       "capabilities": ["text"],
       "max_tokens": 200000
     },
     {
-      "id": "claude-opus-4-20250514",
+      "id": "claude-opus-4",
       "name": "Claude Opus 4",
       "provider": "anthropic",
       "capabilities": ["text"],
@@ -326,7 +326,7 @@ X-WP-Nonce: {nonce}
     {
       "review_id": "550e8400-e29b-41d4-a716-446655440000",
       "created_at": "2025-12-06T14:30:00Z",
-      "model_used": "claude-sonnet-4",
+      "model_used": "claude-sonnet-5-5",
       "focus_areas": ["content", "tone", "flow"],
       "summary": {
         "total_notes": 5,

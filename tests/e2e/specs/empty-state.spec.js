@@ -21,51 +21,67 @@ test.describe('Empty State', () => {
 		).toBeVisible();
 	});
 
-	test.skip('shows prerequisites when post is not saved', async ({
-		admin,
-		page,
-		aiFeedback,
-	}) => {
-		await admin.createNewPost();
-		await aiFeedback.openSidebar();
+	test.describe('prerequisites', () => {
+		test.beforeEach(async ({ page }) => {
+			// The welcome modal opens after an async status check and can
+			// cover the sidebar, so mark it as seen.
+			await page.addInitScript(() => {
+				try {
+					window.localStorage.setItem('ai-feedback-welcomed', 'true');
+				} catch {
+					// Storage unavailable; the modal may still open.
+				}
+			});
+		});
 
-		// Verify prerequisites are shown
-		await expect(page.getByText('Before you start:')).toBeVisible();
-		await expect(
-			page.getByText('Add some content to your post')
-		).toBeVisible();
-		await expect(page.getByText('Save your post as a draft')).toBeVisible();
+		test('asks for content and a save on a new post', async ({
+			admin,
+			page,
+		}) => {
+			await admin.createNewPost();
+			const panel = await openPanel(page);
 
-		// Review button should not be visible
-		await expect(
-			page.getByRole('button', { name: 'Review Document' })
-		).not.toBeVisible();
-	});
+			await expect(panel.getByText('Before you start:')).toBeVisible();
+			await expect(
+				panel.getByText('Add some content to your post')
+			).toBeVisible();
+			await expect(
+				panel.getByText('Save your post as a draft')
+			).toBeVisible();
+			await expect(
+				panel.getByRole('button', { name: 'Review Document' })
+			).toHaveCount(0);
+		});
 
-	test.skip('shows only save prerequisite when post has content but is not saved', async ({
-		admin,
-		page,
-		editor,
-		aiFeedback,
-	}) => {
-		await admin.createNewPost();
+		test('asks for a save when an unsaved post has content', async ({
+			admin,
+			editor,
+			page,
+		}) => {
+			await admin.createNewPost({ title: 'Unsaved Post' });
+			await editor.insertBlock({
+				name: 'core/paragraph',
+				attributes: { content: 'Content that has not been saved.' },
+			});
+			const panel = await openPanel(page);
 
-		// Add some content
-		await editor.canvas
-			.getByRole('textbox', { name: 'Add title' })
-			.fill('Test Post');
-		await editor.canvas
-			.getByRole('textbox', { name: 'Type / to choose a block' })
-			.fill('This is test content for the post.');
+			await expect(
+				panel.getByText('Add some content to your post')
+			).toBeHidden();
+			await expect(
+				panel.getByText('Save your post as a draft')
+			).toBeVisible();
+			await expect(
+				panel.getByRole('button', { name: 'Review Document' })
+			).toHaveCount(0);
 
-		await aiFeedback.openSidebar();
+			await editor.saveDraft();
 
-		// Should show save prerequisite but not content prerequisite
-		await expect(page.getByText('Before you start:')).toBeVisible();
-		await expect(
-			page.getByText('Add some content to your post')
-		).not.toBeVisible();
-		await expect(page.getByText('Save your post as a draft')).toBeVisible();
+			await expect(panel.getByText('Before you start:')).toBeHidden();
+			await expect(
+				panel.getByRole('button', { name: 'Review Document' })
+			).toBeEnabled();
+		});
 	});
 
 	test.skip('shows Review Document button when post is saved with content', async ({
@@ -173,3 +189,22 @@ test.describe('Empty State', () => {
 		await expect(iconContainer).toBeVisible();
 	});
 });
+
+/**
+ * Open the AI Feedback sidebar from its pinned top bar button.
+ *
+ * @param {import('@playwright/test').Page} page Page.
+ * @return {Promise<import('@playwright/test').Locator>} The panel.
+ */
+async function openPanel(page) {
+	const toggle = page
+		.getByRole('region', { name: 'Editor top bar' })
+		.getByRole('button', { name: 'AI Feedback' });
+	await toggle.waitFor();
+	if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
+		await toggle.click();
+	}
+	const panel = page.locator('.ai-feedback-panel');
+	await expect(panel.getByText('No reviews yet')).toBeVisible();
+	return panel;
+}

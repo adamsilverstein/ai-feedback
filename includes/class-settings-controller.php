@@ -39,7 +39,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v2';
 
 	/**
 	 * Cache duration for models (1 hour).
@@ -118,6 +118,31 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
+	 * Get the saved default model, falling back when it is no longer offered
+	 * (such as a retired model ID).
+	 *
+	 * The fallback is the plugin default, or the first offered model when a
+	 * filter removed the plugin default from the list.
+	 *
+	 * @return string Model ID.
+	 */
+	private function get_default_model(): string {
+		$model     = get_option( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL );
+		$available = wp_list_pluck( $this->get_available_models(), 'id' );
+
+		if ( is_string( $model ) && in_array( $model, $available, true ) ) {
+			return $model;
+		}
+
+		if ( in_array( AI_FEEDBACK_DEFAULT_MODEL, $available, true ) || empty( $available ) ) {
+			return AI_FEEDBACK_DEFAULT_MODEL;
+		}
+
+		$first = reset( $available );
+		return is_string( $first ) ? $first : AI_FEEDBACK_DEFAULT_MODEL;
+	}
+
+	/**
 	 * Get settings.
 	 *
 	 * @param  WP_REST_Request $request Request object.
@@ -125,7 +150,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 */
 	public function get_settings( WP_REST_Request $request ) {
 		$settings = array(
-			'default_model'         => get_option( 'ai_feedback_default_model', 'claude-sonnet-4' ),
+			'default_model'         => $this->get_default_model(),
 			'default_focus_areas'   => get_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
 			'default_tone'          => get_option( 'ai_feedback_default_tone', 'professional' ),
 			'feedback_locale'       => get_option( 'ai_feedback_feedback_locale', 'auto' ),
@@ -289,8 +314,8 @@ class Settings_Controller extends WP_REST_Controller {
 		// Define available models.
 		$models = array(
 			array(
-				'id'           => 'claude-sonnet-4',
-				'name'         => 'Claude Sonnet 4',
+				'id'           => 'claude-sonnet-5-5',
+				'name'         => 'Claude Sonnet 5.5',
 				'provider'     => 'anthropic',
 				'capabilities' => array( 'text' ),
 				'max_tokens'   => 200000,
