@@ -307,6 +307,31 @@ describe('FeedbackItem quick fixes', () => {
 		).toBeInTheDocument();
 	});
 
+	it('disables the fix while the block holds a suggestion', () => {
+		renderItem(fixItem, vi.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: {
+						content:
+							'The <mark class="wp-suggestion-add" data-suggestion-id="9">short</mark><mark class="wp-suggestion-del" data-suggestion-id="9">long</mark> sentence is passive here.',
+					},
+				},
+			},
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply fix' })
+		).toHaveAttribute('aria-disabled', 'true');
+		expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute(
+			'aria-disabled',
+			'true'
+		);
+		expect(
+			screen.getByText(/This block has a suggested edit/)
+		).toBeInTheDocument();
+	});
+
 	it('labels applied fixes', () => {
 		renderItem({ ...fixItem, is_resolved: true }, vi.fn(), {
 			blocks,

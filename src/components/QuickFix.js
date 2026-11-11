@@ -12,6 +12,7 @@ import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
+import { hasSuggestionMarkers } from '../utils/suggestions';
 import {
 	applyFixToContent,
 	getFixPreview,
@@ -129,7 +130,10 @@ export default function QuickFix({ item }) {
 		return null;
 	}
 
-	const preview = getFixPreview(content, fix);
+	// Marker text holds both the added and the deleted runs, so a fix could
+	// match inside a deletion and inherit its format.
+	const hasSuggestions = hasSuggestionMarkers(content);
+	const preview = hasSuggestions ? null : getFixPreview(content, fix);
 	const canApply = !!preview;
 
 	const setResolved = async (resolved) => {
@@ -203,7 +207,15 @@ export default function QuickFix({ item }) {
 	return (
 		<div className="ai-feedback-quick-fix">
 			<p className="ai-feedback-quick-fix-summary">{describeFix(fix)}</p>
-			{!canApply && (
+			{hasSuggestions && (
+				<p className="ai-feedback-quick-fix-unavailable description">
+					{__(
+						'This block has a suggested edit. Accept or reject it from the Notes sidebar before applying this fix.',
+						'ai-feedback'
+					)}
+				</p>
+			)}
+			{!canApply && !hasSuggestions && (
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
 						'The block text has changed, so this fix can no longer be applied.',
