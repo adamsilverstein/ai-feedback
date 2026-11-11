@@ -123,7 +123,10 @@ describe('startReview', () => {
 
 		advance(gen, { has_history: false });
 		advance(gen);
-		advance(gen, reviewResponse({ notes: [first] }));
+		expect(advance(gen, reviewResponse({ notes: [first] })).value).toEqual(
+			expect.objectContaining({ type: TYPES.RECEIVE_PARTIAL_REVIEW })
+		);
+		advance(gen);
 		advance(gen);
 
 		expect(suggestQuickFixes).not.toHaveBeenCalled();
@@ -164,8 +167,19 @@ describe('startReview', () => {
 		expect(first).not.toHaveProperty('review_id');
 
 		expect(
-			advance(gen, reviewResponse({ summary_text: 'Part one.' })).value
+			advance(
+				gen,
+				reviewResponse({ summary_text: 'Part one.', note_count: 1 })
+			).value
 		).toEqual({
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: expect.objectContaining({
+				summary_text: 'Part one.',
+				note_count: 1,
+				chunks: 1,
+			}),
+		});
+		expect(advance(gen).value).toEqual({
 			type: TYPES.SET_REVIEW_PROGRESS,
 			progress: { current: 2, total: 3 },
 		});
@@ -177,7 +191,20 @@ describe('startReview', () => {
 		});
 		expect(second).not.toHaveProperty('previous_summaries');
 
-		advance(gen, reviewResponse({ summary_text: 'Part two.' }));
+		expect(
+			advance(
+				gen,
+				reviewResponse({ summary_text: 'Part two.', note_count: 2 })
+			).value
+		).toEqual({
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: expect.objectContaining({
+				summary_text: 'Part two.',
+				note_count: 3,
+				chunks: 2,
+			}),
+		});
+		advance(gen);
 
 		const third = advance(gen).value.request.data;
 		expect(third).toMatchObject({
@@ -190,12 +217,24 @@ describe('startReview', () => {
 			gen,
 			reviewResponse({ summary_text: 'Whole document.' })
 		);
+		// The last part goes straight to REVIEW_SUCCESS.
 		expect(result.done).toBe(true);
 		expect(result.value.type).toBe(TYPES.REVIEW_SUCCESS);
 		expect(result.value.review).toMatchObject({
 			summary_text: 'Whole document.',
 			chunks: 3,
 		});
+	});
+
+	it('does not store a partial review for single-request reviews', () => {
+		const gen = startUntilFirstRequest({
+			blocks: makeBlocks(2),
+			chunkSize: 20,
+		});
+
+		advance(gen, { has_history: false });
+		const result = advance(gen, reviewResponse());
+		expect(result.value.type).toBe(TYPES.REVIEW_SUCCESS);
 	});
 
 	it('keeps finished chunks when a later chunk fails', () => {
@@ -207,7 +246,12 @@ describe('startReview', () => {
 		advance(gen, { has_history: false });
 		advance(gen);
 		const note = { id: 1, quick_fix: { find: 'a', replace: 'b' } };
-		advance(gen, reviewResponse({ note_count: 2, notes: [note] }));
+		expect(
+			advance(gen, reviewResponse({ note_count: 2, notes: [note] })).value
+		).toEqual(
+			expect.objectContaining({ type: TYPES.RECEIVE_PARTIAL_REVIEW })
+		);
+		advance(gen);
 		advance(gen);
 
 		const partial = gen.throw({

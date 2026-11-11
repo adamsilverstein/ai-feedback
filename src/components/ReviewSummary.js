@@ -66,6 +66,23 @@ export default function ReviewSummary({ review }) {
 				{__('Review Summary', 'ai-feedback')}
 			</h3>
 
+			{review.is_in_progress && (
+				<p className="ai-feedback-review-status description">
+					{__(
+						'Review in progress. Showing feedback from the parts finished so far.',
+						'ai-feedback'
+					)}
+				</p>
+			)}
+			{review.is_partial && (
+				<p className="ai-feedback-review-status description">
+					{__(
+						'This review did not finish. Showing feedback from the parts that finished before it stopped.',
+						'ai-feedback'
+					)}
+				</p>
+			)}
+
 			{/* AI-generated summary text */}
 			{summaryText && (
 				<div className="ai-summary-text">

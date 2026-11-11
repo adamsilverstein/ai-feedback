@@ -44,6 +44,115 @@ describe('reducer unavailableRetries', () => {
 	});
 });
 
+describe('reducer partial reviews', () => {
+	const previous = { review_id: 'old', notes: [{ id: 1 }] };
+	const reviewing = reducer(
+		{ ...initialState, lastReview: previous },
+		{ type: TYPES.START_REVIEW }
+	);
+	const partOne = {
+		review_id: 'new',
+		notes: [{ id: 10, is_resolved: false, status: 'hold' }],
+		chunks: 1,
+	};
+
+	it('shows finished parts while the review keeps running', () => {
+		const state = reducer(reviewing, {
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: partOne,
+		});
+
+		expect(state.lastReview).toEqual({ ...partOne, is_in_progress: true });
+		expect(state.isReviewing).toBe(true);
+		expect(state.reviewStage).toBe(reviewing.reviewStage);
+		expect(state.reviewHistories).toBe(reviewing.reviewHistories);
+	});
+
+	it('ignores parts that arrive after the review finished', () => {
+		const done = { ...initialState, lastReview: previous };
+		expect(
+			reducer(done, {
+				type: TYPES.RECEIVE_PARTIAL_REVIEW,
+				review: partOne,
+			})
+		).toBe(done);
+	});
+
+	it('clears the in-progress flag on success', () => {
+		let state = reducer(reviewing, {
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: partOne,
+		});
+		state = reducer(state, {
+			type: TYPES.REVIEW_SUCCESS,
+			review: { ...partOne, chunks: 2 },
+		});
+
+		expect(state.lastReview.is_in_progress).toBeUndefined();
+		expect(state.lastReview.chunks).toBe(2);
+		expect(state.isReviewing).toBe(false);
+	});
+
+	it('keeps dismissals made between parts', () => {
+		let state = reducer(reviewing, {
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: partOne,
+		});
+		state = reducer(state, {
+			type: TYPES.SET_NOTE_RESOLVED,
+			noteId: 10,
+			isResolved: true,
+			threadId: 10,
+			threadResolved: true,
+		});
+		state = reducer(state, {
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: {
+				...partOne,
+				notes: [...partOne.notes, { id: 11 }],
+			},
+		});
+		expect(state.lastReview.notes).toEqual([
+			{ id: 10, is_resolved: true, status: 'approved' },
+			{ id: 11 },
+		]);
+
+		state = reducer(state, {
+			type: TYPES.REVIEW_SUCCESS,
+			review: { ...partOne, notes: [...partOne.notes, { id: 11 }] },
+		});
+		expect(state.lastReview.notes[0]).toMatchObject({
+			is_resolved: true,
+			status: 'approved',
+		});
+	});
+
+	it('marks a running review incomplete when it stops early', () => {
+		let state = reducer(reviewing, {
+			type: TYPES.RECEIVE_PARTIAL_REVIEW,
+			review: partOne,
+		});
+		state = reducer(state, {
+			type: TYPES.REVIEW_ERROR,
+			error: { code: 'unknown_error', message: 'Stopped' },
+		});
+
+		expect(state.lastReview).toMatchObject({
+			review_id: 'new',
+			is_in_progress: false,
+			is_partial: true,
+		});
+	});
+
+	it('leaves a finished review alone on a later error', () => {
+		const state = reducer(reviewing, {
+			type: TYPES.REVIEW_ERROR,
+			error: { code: 'unknown_error', message: 'Down' },
+		});
+		expect(state.lastReview).toBe(previous);
+	});
+});
+
 describe('SET_SUGGESTION_STATUS', () => {
 	it('updates the matching note', () => {
 		const state = {

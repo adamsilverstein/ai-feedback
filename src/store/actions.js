@@ -354,6 +354,12 @@ export function* startReview({
 					blockMapping: response.block_mapping,
 				};
 			}
+
+			// Keep the sidebar in step with the notes in the editor. The
+			// last part is stored by REVIEW_SUCCESS below.
+			if (index < total - 1) {
+				yield receivePartialReview(mergeChunkResponses(responses));
+			}
 		}
 
 		// Runs after REVIEW_SUCCESS is stored, since it awaits a request first.
@@ -391,6 +397,21 @@ export function* startReview({
 			},
 		};
 	}
+}
+
+/**
+ * Store the merged review of the parts finished so far.
+ *
+ * Unlike REVIEW_SUCCESS, this leaves the review running.
+ *
+ * @param {Object} review Merged review.
+ * @return {Object} Action object.
+ */
+export function receivePartialReview(review) {
+	return {
+		type: TYPES.RECEIVE_PARTIAL_REVIEW,
+		review,
+	};
 }
 
 /**

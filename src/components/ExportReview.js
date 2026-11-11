@@ -22,9 +22,12 @@ const NOTICE_ID = 'ai-feedback-export';
 /**
  * Export dropdown for a review.
  *
+ * Hidden until the review has finished every part, so an incomplete review
+ * can't be exported as if it were the whole document.
+ *
  * @param {Object} props        Component props.
  * @param {Object} props.review Review response.
- * @return {Element} Dropdown menu.
+ * @return {Element|null} Dropdown menu.
  */
 export default function ExportReview({ review }) {
 	const postTitle = useSelect(
@@ -55,6 +58,10 @@ export default function ExportReview({ review }) {
 	const save = (content, extension, mimeType) => {
 		downloadBlob(getExportFilename(review, extension), content, mimeType);
 	};
+
+	if (review?.is_in_progress || review?.is_partial) {
+		return null;
+	}
 
 	return (
 		<DropdownMenu
