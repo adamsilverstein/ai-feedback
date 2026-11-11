@@ -32,6 +32,7 @@ class NotesThreadResolutionTest extends TestCase {
 
 		require_once __DIR__ . '/fixtures/fake-comments.php';
 		require_once dirname( __DIR__, 2 ) . '/includes/class-notes-controller.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/class-reply-detector.php';
 
 		\ai_feedback_test_reset_comments(); // @phpstan-ignore function.notFound (defined in the fixture above)
 		unset( $GLOBALS['test_current_user_can'] );
@@ -43,7 +44,7 @@ class NotesThreadResolutionTest extends TestCase {
 	 * Clean up capability overrides.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_current_user_can'] );
+		unset( $GLOBALS['test_current_user_can'], $GLOBALS['test_dispatched_calls'] );
 		parent::tearDown();
 	}
 
@@ -298,5 +299,79 @@ class NotesThreadResolutionTest extends TestCase {
 
 		$this->assertFalse( $this->manager->set_thread_resolved( $reply, true ) );
 		$this->assertFalse( $this->manager->is_thread_resolved( $reply ) );
+	}
+
+	/**
+	 * Read a test global that holds an array.
+	 *
+	 * @param  string $key Global name.
+	 * @return array<mixed> The array, or an empty one when unset.
+	 */
+	private static function global_array( string $key ): array {
+		$value = $GLOBALS[ $key ] ?? array();
+		return is_array( $value ) ? $value : array();
+	}
+
+	/**
+	 * Run Reply_Detector on a note as the `wp_insert_comment` action sees it.
+	 *
+	 * Only meta passed to wp_insert_comment() exists when the action fires,
+	 * so meta added later is dropped first.
+	 *
+	 * @param  int $comment_id Note ID.
+	 * @return int Number of reply actions dispatched.
+	 */
+	private function detect_at_insert( int $comment_id ): int {
+		$args = self::global_array( 'test_inserted_args' )[ $comment_id ] ?? null;
+		$meta = is_array( $args ) && is_array( $args['comment_meta'] ?? null ) ? $args['comment_meta'] : array();
+
+		$all_meta                         = self::global_array( 'test_comment_meta' );
+		$all_meta[ $comment_id ]          = $meta;
+		$GLOBALS['test_comment_meta']     = $all_meta;
+		$GLOBALS['test_dispatched_calls'] = array();
+
+		$comment = get_comment( $comment_id );
+		$this->assertInstanceOf( \WP_Comment::class, $comment );
+
+		( new \AI_Feedback\Reply_Detector() )->maybe_dispatch_reply( $comment_id, $comment );
+
+		return count( self::global_array( 'test_dispatched_calls' ) );
+	}
+
+	/**
+	 * The status markers set_thread_resolved() inserts never trigger an AI
+	 * reply, while a real reply in the same thread does.
+	 */
+	public function test_thread_status_markers_do_not_trigger_ai_reply(): void {
+		$thread = wp_insert_comment(
+			array(
+				'comment_post_ID' => 10,
+				'comment_type'    => 'note',
+				'comment_meta'    => array(
+					'ai_feedback' => '1',
+					'block_id'    => 'abc-123',
+				),
+			)
+		);
+		$this->assertIsInt( $thread );
+
+		$reply = wp_insert_comment(
+			array(
+				'comment_post_ID' => 10,
+				'comment_type'    => 'note',
+				'comment_parent'  => $thread,
+				'comment_content' => 'Why is this a problem?',
+			)
+		);
+		$this->assertIsInt( $reply );
+		$this->assertSame( 1, $this->detect_at_insert( $reply ) );
+
+		foreach ( array( true, false ) as $resolved ) {
+			$this->assertTrue( $this->manager->set_thread_resolved( $thread, $resolved ) );
+
+			$marker = array_key_last( self::global_array( 'test_comments' ) );
+			$this->assertIsInt( $marker );
+			$this->assertSame( 0, $this->detect_at_insert( $marker ), $resolved ? 'resolve' : 'reopen' );
+		}
 	}
 }

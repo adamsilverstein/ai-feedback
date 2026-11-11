@@ -4,7 +4,9 @@
  * Description: Lets Playwright run reviews without a real AI provider. Only loaded by wp-env.
  *
  * Requests that carry the `ai_feedback_e2e` cookie get the plugin's built-in
- * mock AI response and skip the per-user review rate limit. Requests without
+ * mock AI responses, skip the per-user review rate limit, and never spawn
+ * WP-Cron. Tests run cron themselves by requesting wp-cron.php with the
+ * cookie, so queued AI replies also use the mock. Requests without
  * the cookie, such as manual testing in the same environment, and any site
  * that is not a local environment are untouched.
  *
@@ -19,6 +21,17 @@ if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type
 
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', true );
+}
+
+// A spawned loopback carries no cookie, so it would send queued replies to a
+// real provider.
+if ( ! defined( 'DISABLE_WP_CRON' ) ) {
+	define( 'DISABLE_WP_CRON', true );
+}
+
+// Clear a lock left by a cookie-less spawn so the test's own run is not skipped.
+if ( wp_doing_cron() ) {
+	delete_transient( 'doing_cron' );
 }
 
 add_filter(

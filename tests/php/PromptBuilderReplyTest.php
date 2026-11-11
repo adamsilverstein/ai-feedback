@@ -93,6 +93,22 @@ class PromptBuilderReplyTest extends TestCase {
 	}
 
 	/**
+	 * Content flagged as plain text is used as is.
+	 */
+	public function test_plain_text_block_content_is_not_stripped(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content'     => 'Use <br> sparingly.',
+				'block_is_text'     => true,
+				'original_feedback' => 'Unclear.',
+				'user_reply'        => 'Why?',
+			)
+		);
+
+		$this->assertStringContainsString( 'Block content: Use <br> sparingly.', $prompt );
+	}
+
+	/**
 	 * Category and severity are both rendered when provided.
 	 */
 	public function test_category_and_severity_are_prefixed_on_original_feedback(): void {

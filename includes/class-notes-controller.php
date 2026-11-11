@@ -196,6 +196,43 @@ class Notes_Controller extends WP_REST_Controller {
 				),
 			)
 		);
+
+		// Pending AI suggestions whose markers are gone.
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/post/(?P<post_id>\d+)/saved-pending-suggestions',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_saved_pending_suggestions' ),
+					'permission_callback' => array( $this, 'get_notes_permissions_check' ),
+					'args'                => array(
+						'post_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Lists pending AI suggestions whose markers are gone from the post.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_saved_pending_suggestions( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$post_id = $request->get_param( 'post_id' );
+		$post_id = is_numeric( $post_id ) ? (int) $post_id : 0;
+
+		return rest_ensure_response(
+			array(
+				'note_ids' => ( new Suggestions() )->get_saved_pending_ids( $post_id ),
+			)
+		);
 	}
 
 	/**

@@ -11,6 +11,8 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
+import useSuggestionStatus from '../hooks/useSuggestionStatus';
+import { hasSuggestionMarkers } from '../utils/suggestions';
 import {
 	applyFixToContent,
 	getFixPreview,
@@ -40,6 +42,41 @@ export function describeFix(fix) {
 }
 
 /**
+ * Describe where a quick fix stands as a Gutenberg suggestion.
+ *
+ * @param {string} status Suggestion status from `_wp_suggestion_status`.
+ * @return {string} Status message.
+ */
+export function describeSuggestionStatus(status) {
+	switch (status) {
+		case 'applied':
+			return __('You accepted this suggested edit.', 'ai-feedback');
+		case 'applied-unsaved':
+			return __(
+				'You accepted this suggested edit. Save the post to keep it.',
+				'ai-feedback'
+			);
+		case 'rejected':
+			return __('You rejected this suggested edit.', 'ai-feedback');
+		case 'rejected-unsaved':
+			return __(
+				'You rejected this suggested edit. Save the post to confirm.',
+				'ai-feedback'
+			);
+		case 'outdated':
+			return __(
+				'This suggested edit no longer applies because the text changed.',
+				'ai-feedback'
+			);
+		default:
+			return __(
+				'Suggested in the text. Accept or reject it from the Notes sidebar.',
+				'ai-feedback'
+			);
+	}
+}
+
+/**
  * Quick fix component.
  *
  * @param {Object} props      Component props.
@@ -49,6 +86,7 @@ export function describeFix(fix) {
 export default function QuickFix({ item }) {
 	const fix = item.quick_fix;
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+	const suggestionStatus = useSuggestionStatus(item);
 
 	const { attributeKey, content } = useSelect(
 		(select) => {
@@ -72,13 +110,30 @@ export default function QuickFix({ item }) {
 	const { createSuccessNotice, createWarningNotice } =
 		useDispatch(noticesStore);
 
+	// Gutenberg's suggestion UI owns fixes that became suggestions.
+	if (suggestionStatus) {
+		return (
+			<div className="ai-feedback-quick-fix">
+				<p className="ai-feedback-quick-fix-summary">
+					{describeFix(fix)}
+				</p>
+				<p className="ai-feedback-quick-fix-suggested description">
+					{describeSuggestionStatus(suggestionStatus)}
+				</p>
+			</div>
+		);
+	}
+
 	// Blocks without rich text content (eg. a list or quote, whose text lives
 	// in inner blocks) can't take a quick fix here.
 	if (!attributeKey) {
 		return null;
 	}
 
-	const preview = getFixPreview(content, fix);
+	// Marker text holds both the added and the deleted runs, so a fix could
+	// match inside a deletion and inherit its format.
+	const hasSuggestions = hasSuggestionMarkers(content);
+	const preview = hasSuggestions ? null : getFixPreview(content, fix);
 	const canApply = !!preview;
 
 	const setResolved = async (resolved) => {
@@ -152,7 +207,15 @@ export default function QuickFix({ item }) {
 	return (
 		<div className="ai-feedback-quick-fix">
 			<p className="ai-feedback-quick-fix-summary">{describeFix(fix)}</p>
-			{!canApply && (
+			{hasSuggestions && (
+				<p className="ai-feedback-quick-fix-unavailable description">
+					{__(
+						'This block has a suggested edit. Accept or reject it from the Notes sidebar before applying this fix.',
+						'ai-feedback'
+					)}
+				</p>
+			)}
+			{!canApply && !hasSuggestions && (
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
 						'The block text has changed, so this fix can no longer be applied.',

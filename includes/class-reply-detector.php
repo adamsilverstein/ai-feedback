@@ -18,8 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Detects replies to AI Feedback notes.
  *
  * A "reply" is any `note`-type comment in a thread whose root is an
- * AI-authored note (a comment with `ai_feedback` meta set to '1') AND which
- * was not itself authored by AI Feedback.
+ * AI-authored note (a comment with `ai_feedback` meta set to '1'), which
+ * was not itself authored by AI Feedback, and which has text. Resolve and
+ * reopen status markers are not replies.
  *
  * The second check stops our own replies from re-triggering detection. It
  * relies on AI replies passing `ai_feedback` through `comment_meta` in
@@ -76,6 +77,22 @@ class Reply_Detector {
 		// Ignore replies authored by AI Feedback itself.
 		$is_ai_reply = (bool) get_comment_meta( $comment_id, 'ai_feedback', true );
 		if ( $is_ai_reply ) {
+			return;
+		}
+
+		/*
+		 * Resolving or reopening a thread adds a status marker reply. The
+		 * REST API saves `_wp_note_status` after this action fires, so the
+		 * editor's empty resolve marker is caught by its empty content.
+		 * A reopen with text is a real reply and still gets an AI response.
+		 */
+		$note_status = get_comment_meta( $comment_id, '_wp_note_status', true );
+		if ( is_string( $note_status ) && '' !== $note_status ) {
+			return;
+		}
+
+		$content = $comment->comment_content ?? '';
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
 			return;
 		}
 

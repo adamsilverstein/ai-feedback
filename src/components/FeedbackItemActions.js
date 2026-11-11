@@ -10,6 +10,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { arrowRight } from '@wordpress/icons';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
+import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import QuickFix from './QuickFix';
 
 /**
@@ -27,8 +28,13 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 		useDispatch(noticesStore);
 	const [isSaving, setIsSaving] = useState(false);
 
+	const suggestionStatus = useSuggestionStatus(item);
+
 	const isDismissed = !!item.is_resolved;
-	const canDismiss = !!item.id;
+	// Dismissing would leave a pending suggestion live in the text; it has to
+	// be rejected from the Notes sidebar instead.
+	const canDismiss =
+		!!item.id && (isDismissed || suggestionStatus !== 'pending');
 
 	const updateDismissed = async (dismissed) => {
 		setIsSaving(true);

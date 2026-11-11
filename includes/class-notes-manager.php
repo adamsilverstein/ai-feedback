@@ -776,7 +776,8 @@ class Notes_Manager {
 	 *
 	 * Notes created before these fields were stored return empty strings; the
 	 * sidebar falls back to the note content for those. `quick_fix` is null
-	 * when the note has none.
+	 * when the note has none, and `suggestion_status` is null unless the fix
+	 * was added as a Gutenberg suggestion.
 	 *
 	 * @param  int $note_id Note ID.
 	 * @return array<string, string|array{find: string, replace: string}|null> Feedback fields.
@@ -795,6 +796,8 @@ class Notes_Manager {
 		}
 
 		$values['quick_fix'] = $this->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
+
+		$values['suggestion_status'] = ( new Suggestions() )->get_status( $note_id );
 
 		return $values;
 	}

@@ -17,4 +17,6 @@ parameters:
             path: ai-feedback.php
         -
             message: '#Right side of && is always false\.#'
-            path: includes/class-review-service.php
+            paths:
+                - includes/class-review-service.php
+                - includes/class-reply-service.php

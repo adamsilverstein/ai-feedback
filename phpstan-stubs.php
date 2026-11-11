@@ -96,3 +96,27 @@ if ( ! class_exists( 'WP_AI_Client_Prompt_Builder' ) ) {
 		}
 	}
 }
+
+if ( ! function_exists( 'gutenberg_get_suggestion_anchor_index' ) ) {
+	/**
+	 * Gutenberg suggestion mode: indexes the suggestion anchors in content.
+	 *
+	 * @param string $content Post content.
+	 * @return array<int, array<string, true>> Note ID => set of anchor kinds.
+	 */
+	function gutenberg_get_suggestion_anchor_index( $content ) {
+		return array();
+	}
+}
+
+if ( ! function_exists( 'gutenberg_is_experiment_enabled' ) ) {
+	/**
+	 * Gutenberg plugin experiment check.
+	 *
+	 * @param string $name Experiment name.
+	 * @return bool
+	 */
+	function gutenberg_is_experiment_enabled( $name ) {
+		return false;
+	}
+}

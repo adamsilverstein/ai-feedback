@@ -15,6 +15,11 @@ import {
 	DEFAULT_CHUNK_SIZE,
 } from '../utils/chunk-review';
 import { refreshCoreNotes } from '../utils/refresh-core-notes';
+import {
+	removeOrphanedSuggestions,
+	suggestQuickFixes,
+} from '../utils/suggestions';
+import { recordCompletedReview } from '../tips';
 
 /**
  * Fetch settings from the server.
@@ -357,6 +362,12 @@ export function* startReview({
 			}
 		}
 
+		// Runs after REVIEW_SUCCESS is stored, since it awaits a request first.
+		suggestReviewQuickFixes(responses);
+
+		// Only count once every chunk has finished.
+		recordCompletedReview();
+
 		return {
 			type: TYPES.REVIEW_SUCCESS,
 			review: total > 1 ? mergeChunkResponses(responses) : responses[0],
@@ -367,6 +378,7 @@ export function* startReview({
 
 		// Keep the notes from parts that finished before the failure.
 		if (responses.length > 0) {
+			suggestReviewQuickFixes(responses);
 			yield {
 				type: TYPES.REVIEW_SUCCESS,
 				review: {
@@ -400,6 +412,23 @@ export function receivePartialReview(review) {
 		type: TYPES.RECEIVE_PARTIAL_REVIEW,
 		review,
 	};
+}
+
+/**
+ * Turns the quick fixes from a review's responses into suggestions.
+ *
+ * Not awaited, so the review finishes without waiting on the note writes.
+ *
+ * @param {Object[]} responses Review responses.
+ */
+function suggestReviewQuickFixes(responses) {
+	suggestQuickFixes(
+		responses.flatMap((response) => response.notes || [])
+	).catch((error) => {
+		// The quick fixes stay available in the sidebar.
+		// eslint-disable-next-line no-console
+		console.warn('[AI-Feedback] Could not add suggestions:', error);
+	});
 }
 
 /**
@@ -459,6 +488,21 @@ export function setFixApplied(noteId, isApplied) {
 		type: TYPES.SET_FIX_APPLIED,
 		noteId,
 		isApplied,
+	};
+}
+
+/**
+ * Record a note's Gutenberg suggestion status.
+ *
+ * @param {number}      noteId Note ID.
+ * @param {string|null} status Suggestion status, or null when the note is not a suggestion.
+ * @return {Object} Action object.
+ */
+export function setSuggestionStatus(noteId, status) {
+	return {
+		type: TYPES.SET_SUGGESTION_STATUS,
+		noteId,
+		status,
 	};
 }
 
@@ -546,6 +590,11 @@ export function* fetchPreviousReview(postId) {
 			hasReview: response.has_review,
 			reviewId: response.review?.review_id,
 			noteCount: response.review?.note_count,
+		});
+
+		// Covers pending suggestions from every review, not only this one.
+		removeOrphanedSuggestions(postId).catch(() => {
+			// Suggestions without markers stay; the next load retries.
 		});
 
 		if (response.has_review && response.review) {
