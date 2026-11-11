@@ -42,6 +42,11 @@ namespace {
 		 * tests invoke handle_reply() directly and don't need dispatch.
 		 */
 		function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+			$GLOBALS['test_added_actions'][] = array(
+				'hook'          => $hook,
+				'callback'      => $callback,
+				'accepted_args' => $accepted_args,
+			);
 			return true;
 		}
 	}
