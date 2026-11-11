@@ -85,14 +85,15 @@ export function* updateSettings(settings) {
 /**
  * Start a document review.
  *
- * @param {Object} options            Review options.
- * @param {number} options.postId     Post ID to review.
- * @param {string} options.title      Post title from editor.
- * @param {Array}  options.blocks     Blocks with clientIds and content.
- * @param {string} options.model      AI model to use.
- * @param {Array}  options.focusAreas Focus areas.
- * @param {string} options.targetTone Target tone.
- * @param {string} options.locale     Feedback locale.
+ * @param {Object}  options            Review options.
+ * @param {number}  options.postId     Post ID to review.
+ * @param {string}  options.title      Post title from editor.
+ * @param {Array}   options.blocks     Blocks with clientIds and content.
+ * @param {string}  options.model      AI model to use.
+ * @param {Array}   options.focusAreas Focus areas.
+ * @param {string}  options.targetTone Target tone.
+ * @param {string}  options.locale     Feedback locale.
+ * @param {boolean} options.isRetry    Whether this retries a review that failed because the AI service was unavailable.
  * @return {Object} Action object.
  */
 export function* startReview({
@@ -103,6 +104,7 @@ export function* startReview({
 	focusAreas,
 	targetTone,
 	locale,
+	isRetry = false,
 }) {
 	// eslint-disable-next-line no-console
 	console.log('[AI-Feedback] Starting review', {
@@ -125,7 +127,7 @@ export function* startReview({
 		}))
 	);
 
-	yield { type: TYPES.START_REVIEW };
+	yield { type: TYPES.START_REVIEW, isRetry };
 
 	try {
 		// Fetch existing feedback history for continuation reviews.

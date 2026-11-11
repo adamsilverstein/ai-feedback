@@ -165,4 +165,80 @@ test.describe('Error Handling', () => {
 		);
 		await expect(summary).toContainText('1 feedback item');
 	});
+
+	test('retries automatically when the AI service is unavailable', async ({
+		page,
+		editor,
+		aiFeedback,
+	}) => {
+		await aiFeedback.createAndSavePost(
+			{ title: 'Outage Test', content: 'Content for outage test.' },
+			{ editor }
+		);
+
+		await aiFeedback.openSidebar();
+
+		let calls = 0;
+		// Match both pretty permalinks and the ?rest_route= form, plus any
+		// query args apiFetch adds.
+		const isReviewRequest = (url) =>
+			/\/ai-feedback\/v1\/review(?:$|[?&])/.test(
+				decodeURIComponent(url.toString())
+			);
+		await page.route(isReviewRequest, async (route) => {
+			calls++;
+			if (calls === 1) {
+				await route.fulfill({
+					status: 503,
+					contentType: 'application/json',
+					body: JSON.stringify({
+						code: 'ai_service_unavailable',
+						message:
+							'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.',
+						data: { status: 503, retry_after: 3 },
+					}),
+				});
+				return;
+			}
+			await route.fulfill({
+				status: 200,
+				contentType: 'application/json',
+				body: JSON.stringify({
+					review_id: 'retry-review-id',
+					notes: [],
+					note_ids: [],
+					block_mapping: {},
+					summary: {
+						total_notes: 0,
+						by_category: {},
+						by_severity: {},
+					},
+					summary_text: 'Recovered after retry.',
+					note_count: 0,
+					timestamp: new Date().toISOString(),
+				}),
+			});
+		});
+
+		// Click directly: waiting for the button to settle could outlast the
+		// retry delay and miss the notice.
+		await page
+			.locator('.ai-feedback-panel button.is-primary')
+			.filter({ hasText: /Review( Document)?/i })
+			.first()
+			.click();
+
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(
+			panel.getByText('Retrying automatically in 3 seconds.')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Retry now' })
+		).toBeVisible();
+
+		await expect(panel.getByText('Recovered after retry.')).toBeVisible({
+			timeout: 10000,
+		});
+		expect(calls).toBe(2);
+	});
 });

@@ -42,6 +42,7 @@ export default function AIFeedbackPanel() {
 		feedbackLocale,
 		postTitle,
 		availableModels,
+		unavailableRetries,
 	} = useSelect((select) => {
 		// Settings are loaded by the getSettings resolver, so select them to
 		// trigger the fetch of available models and locales.
@@ -61,6 +62,7 @@ export default function AIFeedbackPanel() {
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
+			unavailableRetries: select(STORE_NAME).getUnavailableRetries(),
 		};
 	}, []);
 
@@ -73,11 +75,15 @@ export default function AIFeedbackPanel() {
 	const canReview = isSaved && hasContent;
 
 	/**
-	 * Handle starting a review from empty state.
+	 * Handle starting a review from empty state or a retry.
+	 *
+	 * @param {Object}  options         Options.
+	 * @param {boolean} options.isRetry Whether this retries a review that failed because the AI service was unavailable.
+	 * @return {Promise<boolean|undefined>} False when the review could not start.
 	 */
-	const handleStartReview = async () => {
+	const handleStartReview = async ({ isRetry = false } = {}) => {
 		if (!canReview) {
-			return;
+			return false;
 		}
 
 		const blocks = extractBlockData(editorBlocks);
@@ -91,6 +97,7 @@ export default function AIFeedbackPanel() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				isRetry,
 			});
 		} catch (reviewError) {
 			// Error is already in the store, no additional action needed
@@ -129,14 +136,21 @@ export default function AIFeedbackPanel() {
 				lastReview={lastReview}
 				error={error}
 			/>
-			{error && <ErrorNotice error={error} onRemove={clearError} />}
+			{error && (
+				<ErrorNotice
+					error={error}
+					onRemove={clearError}
+					retries={unavailableRetries}
+					onRetry={() => handleStartReview({ isRetry: true })}
+				/>
+			)}
 
 			{/* EmptyState and the review panel are mutually exclusive render
 			    paths, so the REVIEW_BUTTON_ID below is in the DOM exactly
 			    once at a time and always wraps the actionable button. */}
 			{!lastReview && !isReviewing ? (
 				<EmptyState
-					onStartReview={handleStartReview}
+					onStartReview={() => handleStartReview()}
 					canReview={canReview}
 					hasContent={hasContent}
 					isSaved={isSaved}
