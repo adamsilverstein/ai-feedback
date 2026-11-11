@@ -76,6 +76,13 @@ class Plugin {
 	private ?Reply_Detector $reply_detector = null;
 
 	/**
+	 * Reply service instance.
+	 *
+	 * @var Reply_Service|null
+	 */
+	private ?Reply_Service $reply_service = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -122,6 +129,9 @@ class Plugin {
 
 		$this->reply_detector = new Reply_Detector();
 		$this->reply_detector->register();
+
+		$this->reply_service = new Reply_Service();
+		$this->reply_service->register();
 	}
 
 	/**
