@@ -10,6 +10,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { arrowRight } from '@wordpress/icons';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
+import QuickFix from './QuickFix';
 
 /**
  * Feedback item actions.
@@ -64,47 +65,59 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 
 	const handleRestore = () => updateDismissed(false);
 
+	const showQuickFix =
+		!!item.quick_fix && !item.is_group && !isDismissed && !!item.block_id;
+
 	return (
-		<div className="ai-feedback-item-actions">
-			{onNavigate && item.block_id && (
-				<Button
-					variant="secondary"
-					size="small"
-					icon={arrowRight}
-					iconPosition="right"
-					onClick={() => onNavigate(item.block_id)}
-					className="go-to-block-button"
-				>
-					{__('Go to block', 'ai-feedback')}
-				</Button>
-			)}
-			{canDismiss && (
-				<Button
-					variant="tertiary"
-					size="small"
-					onClick={isDismissed ? handleRestore : handleDismiss}
-					isBusy={isSaving}
-					disabled={isSaving}
-					accessibleWhenDisabled
-					aria-label={
-						isDismissed
-							? sprintf(
-									/* translators: %s: feedback title */
-									__('Restore feedback: %s', 'ai-feedback'),
-									title
-								)
-							: sprintf(
-									/* translators: %s: feedback title */
-									__('Dismiss feedback: %s', 'ai-feedback'),
-									title
-								)
-					}
-				>
-					{isDismissed
-						? __('Restore', 'ai-feedback')
-						: __('Dismiss', 'ai-feedback')}
-				</Button>
-			)}
-		</div>
+		<>
+			{showQuickFix && <QuickFix item={item} />}
+			<div className="ai-feedback-item-actions">
+				{onNavigate && item.block_id && (
+					<Button
+						variant="secondary"
+						size="small"
+						icon={arrowRight}
+						iconPosition="right"
+						onClick={() => onNavigate(item.block_id)}
+						className="go-to-block-button"
+					>
+						{__('Go to block', 'ai-feedback')}
+					</Button>
+				)}
+				{canDismiss && (
+					<Button
+						variant="tertiary"
+						size="small"
+						onClick={isDismissed ? handleRestore : handleDismiss}
+						isBusy={isSaving}
+						disabled={isSaving}
+						accessibleWhenDisabled
+						aria-label={
+							isDismissed
+								? sprintf(
+										/* translators: %s: feedback title */
+										__(
+											'Restore feedback: %s',
+											'ai-feedback'
+										),
+										title
+									)
+								: sprintf(
+										/* translators: %s: feedback title */
+										__(
+											'Dismiss feedback: %s',
+											'ai-feedback'
+										),
+										title
+									)
+						}
+					>
+						{isDismissed
+							? __('Restore', 'ai-feedback')
+							: __('Dismiss', 'ai-feedback')}
+					</Button>
+				)}
+			</div>
+		</>
 	);
 }

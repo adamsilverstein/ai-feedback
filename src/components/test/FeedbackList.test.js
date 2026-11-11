@@ -5,6 +5,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 /**
+ * WordPress dependencies
+ */
+import { createRegistry, RegistryProvider } from '@wordpress/data';
+
+/**
  * Internal dependencies
  */
 import FeedbackList from '../FeedbackList';
@@ -13,8 +18,29 @@ import { PriorityBadge } from '../FeedbackItem';
 jest.mock('@wordpress/block-editor', () => ({
 	store: 'core/block-editor',
 }));
+jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 // The item actions are covered by FeedbackItem.test.js.
 jest.mock('../FeedbackItemActions', () => () => null);
+
+/**
+ * Render the list with a registry that has the feedback store.
+ *
+ * @param {Array} feedbackItems Feedback items.
+ * @return {Object} Render result.
+ */
+function renderList(feedbackItems) {
+	const registry = createRegistry();
+	registry.registerStore('ai-feedback/store', {
+		reducer: (state = {}) => state,
+		selectors: { isFixApplied: () => false },
+	});
+
+	return render(
+		<RegistryProvider value={registry}>
+			<FeedbackList feedbackItems={feedbackItems} />
+		</RegistryProvider>
+	);
+}
 
 const items = [
 	{
@@ -67,14 +93,14 @@ describe('FeedbackList', () => {
 			.map((el) => el.textContent);
 
 	it('lists the highest priority item first by default', () => {
-		render(<FeedbackList feedbackItems={items} />);
+		renderList(items);
 		const rows = renderedIds();
 		expect(rows[0]).toContain('Factual error');
 		expect(rows[1]).toContain('Late suggestion');
 	});
 
 	it('re-sorts by document order when selected', () => {
-		render(<FeedbackList feedbackItems={items} />);
+		renderList(items);
 		fireEvent.change(screen.getByLabelText('Sort by'), {
 			target: { value: 'document' },
 		});
@@ -84,7 +110,7 @@ describe('FeedbackList', () => {
 	});
 
 	it('renders nothing without items', () => {
-		const { container } = render(<FeedbackList feedbackItems={[]} />);
+		const { container } = renderList([]);
 		expect(container).toBeEmptyDOMElement();
 	});
 });
