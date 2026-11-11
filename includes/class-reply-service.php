@@ -270,8 +270,7 @@ class Reply_Service {
 
 			$attrs    = is_array( $block['attrs'] ?? null ) ? $block['attrs'] : array();
 			$metadata = is_array( $attrs['metadata'] ?? null ) ? $attrs['metadata'] : array();
-			$linked   = $metadata['noteId'] ?? null;
-			if ( is_numeric( $linked ) && (int) $linked === $note_id ) {
+			if ( self::links_note( $metadata['noteId'] ?? null, $note_id ) ) {
 				return $block;
 			}
 
@@ -284,6 +283,26 @@ class Reply_Service {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Whether a block's `metadata.noteId` value includes a note ID.
+	 *
+	 * The editor stores a single thread as a scalar and several threads as an
+	 * array, and either form may hold numeric strings.
+	 *
+	 * @param mixed $linked  Raw `metadata.noteId` value.
+	 * @param int   $note_id Root note ID.
+	 * @return bool
+	 */
+	private static function links_note( mixed $linked, int $note_id ): bool {
+		foreach ( is_array( $linked ) ? $linked : array( $linked ) as $id ) {
+			if ( is_numeric( $id ) && (int) $id === $note_id ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

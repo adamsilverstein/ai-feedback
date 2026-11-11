@@ -537,6 +537,22 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * The editor stores `noteId` as an array once a block has several note
+	 * threads, so a match anywhere in that array links the block.
+	 */
+	public function test_prompt_includes_content_of_block_with_note_id_array(): void {
+		$this->seed_parent_and_reply();
+		$block                                = self::leaf_block( 'core/paragraph', '<p>Shared block text.</p>' );
+		$block['attrs']['metadata']['noteId'] = array( 205, '100' );
+		$this->seed_post_blocks( array( $block ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Shared block text.', $service->captured_prompt );
+	}
+
+	/**
 	 * When no block links to the note, the reply still goes out without block text.
 	 */
 	public function test_missing_linked_block_leaves_block_content_empty(): void {
