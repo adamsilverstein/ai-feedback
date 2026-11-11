@@ -12,11 +12,19 @@ import { store as preferencesStore } from '@wordpress/preferences';
 /**
  * Internal dependencies
  */
-import { startReview } from '../actions';
+import { fetchPreviousReview, startReview } from '../actions';
 import { TYPES } from '../reducer';
+import {
+	removeOrphanedSuggestions,
+	suggestQuickFixes,
+} from '../../utils/suggestions';
 
 vi.mock('@wordpress/block-editor', () => ({
 	store: 'core/block-editor',
+}));
+vi.mock('../../utils/suggestions', () => ({
+	removeOrphanedSuggestions: vi.fn(() => Promise.resolve(0)),
+	suggestQuickFixes: vi.fn(() => Promise.resolve(0)),
 }));
 
 const makeBlocks = (count) =>
@@ -85,6 +93,7 @@ describe('startReview', () => {
 		// eslint-disable-next-line vitest/no-standalone-expect
 		expect(log).toHaveBeenCalled();
 		vi.restoreAllMocks();
+		vi.clearAllMocks();
 	});
 
 	it('sends a single request for small documents', () => {
@@ -102,6 +111,41 @@ describe('startReview', () => {
 			done: true,
 			value: { type: TYPES.REVIEW_SUCCESS, review: response },
 		});
+	});
+
+	it('turns the quick fixes from every chunk into suggestions', () => {
+		const gen = startUntilFirstRequest({
+			blocks: makeBlocks(4),
+			chunkSize: 2,
+		});
+		const first = { id: 1, quick_fix: { find: 'a', replace: 'b' } };
+		const second = { id: 2 };
+
+		advance(gen, { has_history: false });
+		advance(gen);
+		advance(gen, reviewResponse({ notes: [first] }));
+		advance(gen);
+
+		expect(suggestQuickFixes).not.toHaveBeenCalled();
+		const result = advance(gen, reviewResponse({ notes: [second] }));
+
+		expect(result.value.type).toBe(TYPES.REVIEW_SUCCESS);
+		expect(suggestQuickFixes).toHaveBeenCalledTimes(1);
+		expect(suggestQuickFixes).toHaveBeenCalledWith([first, second]);
+	});
+
+	it('logs instead of rejecting when adding suggestions fails', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		suggestQuickFixes.mockReturnValueOnce(Promise.reject(new Error('x')));
+		const gen = startUntilFirstRequest({ blocks: makeBlocks(1) });
+
+		advance(gen, { has_history: false });
+		expect(advance(gen, reviewResponse()).value.type).toBe(
+			TYPES.REVIEW_SUCCESS
+		);
+
+		await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+		warn.mockRestore();
 	});
 
 	it('reviews large documents in chunks and reports progress', () => {
@@ -162,7 +206,8 @@ describe('startReview', () => {
 
 		advance(gen, { has_history: false });
 		advance(gen);
-		advance(gen, reviewResponse({ note_count: 2 }));
+		const note = { id: 1, quick_fix: { find: 'a', replace: 'b' } };
+		advance(gen, reviewResponse({ note_count: 2, notes: [note] }));
 		advance(gen);
 
 		const partial = gen.throw({
@@ -173,6 +218,8 @@ describe('startReview', () => {
 			type: TYPES.REVIEW_SUCCESS,
 			review: { note_count: 2, is_partial: true },
 		});
+		// Fixes from the parts that finished still become suggestions.
+		expect(suggestQuickFixes).toHaveBeenCalledWith([note]);
 
 		expect(advance(gen).value).toMatchObject({
 			type: TYPES.REVIEW_ERROR,
@@ -212,4 +259,34 @@ describe('startReview', () => {
 			expect(getReviewCount()).toBe(2);
 		});
 	});
+});
+
+describe('fetchPreviousReview', () => {
+	beforeEach(() => {
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.clearAllMocks();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it.each([
+		['with', { has_review: true, review: reviewResponse() }],
+		['without', { has_review: false, review: null }],
+	])(
+		'cleans up orphaned suggestions for the post %s a review',
+		(label, response) => {
+			const gen = fetchPreviousReview(42);
+
+			expect(gen.next().value).toEqual({
+				type: TYPES.FETCHING_PREVIOUS_REVIEW,
+			});
+			gen.next();
+			const result = gen.next(response);
+
+			expect(result.value.type).toBe(TYPES.RECEIVE_PREVIOUS_REVIEW);
+			expect(removeOrphanedSuggestions).toHaveBeenCalledWith(42);
+		}
+	);
 });

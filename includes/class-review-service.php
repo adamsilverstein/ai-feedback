@@ -620,6 +620,15 @@ class Review_Service {
 				'feedback'   => 'This is mock feedback for testing purposes. The AI integration is working correctly.',
 				'suggestion' => 'Consider this mock suggestion for improvement.',
 			);
+
+			// Give tests a quick fix to work with.
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( str_contains( $content, 'in order to' ) ) {
+				$feedback[ $i ]['quick_fix'] = array(
+					'find'    => 'in order to',
+					'replace' => 'to',
+				);
+			}
 		}
 
 		// Build response with summary.

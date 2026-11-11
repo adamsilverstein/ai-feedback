@@ -1,8 +1,8 @@
 /**
  * Apply AI quick fixes (plain text find/replace) to block content.
  *
- * Kept self-contained so it can be swapped for core's note suggestions once
- * Gutenberg ships them (see #145).
+ * When Gutenberg's Suggestion Mode is available the same fixes become
+ * suggestions instead (see suggestions.js).
  */
 import {
 	create,
@@ -38,7 +38,7 @@ export function getRichTextAttributeKey(blockType) {
  * @param {string|RichTextData|undefined} value Attribute value.
  * @return {string} HTML string.
  */
-function toHtml(value) {
+export function toHtml(value) {
 	if (value === undefined || value === null) {
 		return '';
 	}
@@ -90,7 +90,7 @@ export function findMatches(text, find) {
  * @param {Object} fix   Quick fix with `find` and `replace`.
  * @return {number} Start offset, or -1 unless the text appears exactly once.
  */
-function findUniqueOffset(value, fix) {
+export function findUniqueOffset(value, fix) {
 	const matches = findMatches(value.text, fix?.find);
 	return matches.length === 1 ? matches[0] : -1;
 }

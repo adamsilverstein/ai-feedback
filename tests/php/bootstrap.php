@@ -29,6 +29,9 @@ if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
 
+// Loaded after ABSPATH, which it requires.
+require_once $includes_dir . 'class-suggestions.php';
+
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {
 	function get_locale() {
@@ -43,8 +46,10 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
+	// Tests can force a filter's result through $GLOBALS['test_filter_results'].
 	function apply_filters( $_hook_name, $value, ...$args ) {
-		return $value;
+		$results = $GLOBALS['test_filter_results'] ?? array();
+		return array_key_exists( $_hook_name, $results ) ? $results[ $_hook_name ] : $value;
 	}
 }
 
@@ -504,6 +509,9 @@ if ( ! function_exists( 'get_post' ) ) {
 	function get_post( $post_id ) {
 		if ( in_array( (int) $post_id, $GLOBALS['test_missing_posts'] ?? array(), true ) ) {
 			return null;
+		}
+		if ( isset( $GLOBALS['test_posts'][ (int) $post_id ] ) ) {
+			return $GLOBALS['test_posts'][ (int) $post_id ];
 		}
 		return (object) array(
 			'ID'           => (int) $post_id,

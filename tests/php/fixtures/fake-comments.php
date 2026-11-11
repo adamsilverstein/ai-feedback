@@ -19,6 +19,7 @@ if ( ! class_exists( 'WP_Comment' ) ) {
 		public $comment_author   = '';
 		public $comment_content  = '';
 		public $comment_date     = '2026-01-01 00:00:00';
+		public $comment_date_gmt = '2026-01-01 00:00:00';
 		public $user_id          = '0';
 	}
 }

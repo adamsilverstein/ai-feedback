@@ -43,10 +43,19 @@ function renderItem(
 		appliedFixes = {},
 		updateBlockAttributes = vi.fn(),
 		blockType = { attributes: { content: { type: 'rich-text' } } },
+		notes = null,
 	} = {}
 ) {
 	const registry = createRegistry();
 	registry.register(noticesStore);
+	registry.registerStore('core/editor', {
+		reducer: (state = {}) => state,
+		selectors: { getCurrentPostId: () => 1 },
+	});
+	registry.registerStore('core', {
+		reducer: (state = notes) => state,
+		selectors: { getEntityRecords: (state) => state },
+	});
 	registry.registerStore('ai-feedback/store', {
 		reducer: (state = {}) => state,
 		actions: {
@@ -298,6 +307,31 @@ describe('FeedbackItem quick fixes', () => {
 		).toBeInTheDocument();
 	});
 
+	it('disables the fix while the block holds a suggestion', () => {
+		renderItem(fixItem, vi.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: {
+						content:
+							'The <mark class="wp-suggestion-add" data-suggestion-id="9">short</mark><mark class="wp-suggestion-del" data-suggestion-id="9">long</mark> sentence is passive here.',
+					},
+				},
+			},
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply fix' })
+		).toHaveAttribute('aria-disabled', 'true');
+		expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute(
+			'aria-disabled',
+			'true'
+		);
+		expect(
+			screen.getByText(/This block has a suggested edit/)
+		).toBeInTheDocument();
+	});
+
 	it('labels applied fixes', () => {
 		renderItem({ ...fixItem, is_resolved: true }, vi.fn(), {
 			blocks,
@@ -308,5 +342,94 @@ describe('FeedbackItem quick fixes', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Apply fix' })
 		).not.toBeInTheDocument();
+	});
+
+	it('points to the Notes sidebar once the fix is a suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.getByText('Replace “is passive” with “reads actively”')
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				'Suggested in the text. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
+	});
+
+	it('hides dismiss while the suggestion is pending', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.queryByRole('button', { name: /^Dismiss feedback/ })
+		).not.toBeInTheDocument();
+	});
+
+	it('offers dismiss again once the suggestion is decided', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [
+				{
+					id: 7,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: 'rejected',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.getByRole('button', { name: /^Dismiss feedback/ })
+		).toBeInTheDocument();
+	});
+
+	it('reads the status Gutenberg wrote to the note', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [
+				{
+					id: 7,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: 'applied-unsaved',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.getByText(
+				'You accepted this suggested edit. Save the post to keep it.'
+			)
+		).toBeInTheDocument();
+	});
+
+	it('offers the fix again once the note is no longer a suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [{ id: 7, meta: { _wp_suggestion: '' } }],
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply fix' })
+		).toBeInTheDocument();
+	});
+
+	it('shows a decided suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'applied' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.getByText('You accepted this suggested edit.')
+		).toBeInTheDocument();
 	});
 });
