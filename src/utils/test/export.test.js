@@ -3,6 +3,7 @@
  */
 import {
 	normalizeFeedbackItem,
+	escapeMarkdown,
 	groupBySeverity,
 	generateMarkdownReport,
 	generatePlainTextSummary,
@@ -169,6 +170,20 @@ describe('getExportFilename', () => {
 	it('includes the date and short review ID', () => {
 		expect(getExportFilename(review, 'md')).toBe(
 			'ai-feedback-2026-11-08-550e8400.md'
+		);
+	});
+});
+
+describe('escapeMarkdown', () => {
+	it('keeps AI text from changing the report structure', () => {
+		expect(escapeMarkdown('# Heading')).toBe('\\# Heading');
+		expect(escapeMarkdown('- item\n1. step')).toBe('\\- item\n1\\. step');
+		expect(escapeMarkdown('---')).toBe('\\---');
+		expect(escapeMarkdown('<script>x</script>')).toBe(
+			'\\<script\\>x\\</script\\>'
+		);
+		expect(escapeMarkdown('Use `code` and *stars*')).toBe(
+			'Use \\`code\\` and \\*stars\\*'
 		);
 	});
 });

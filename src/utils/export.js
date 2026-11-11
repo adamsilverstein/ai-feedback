@@ -4,6 +4,7 @@
  * Turn a review response into Markdown, plain text or JSON for sharing.
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
+import { getFeedbackContent } from './feedback-content';
 
 export const SEVERITIES = ['critical', 'important', 'suggestion'];
 
@@ -21,85 +22,35 @@ function getSeverityHeadings() {
 }
 
 /**
- * Convert an HTML fragment to plain text without executing or loading anything.
- *
- * @param {string} html HTML fragment.
- * @return {string} Plain text.
- */
-function htmlToText(html) {
-	if (!html) {
-		return '';
-	}
-	const doc = new window.DOMParser().parseFromString(html, 'text/html');
-	return (doc.body.textContent || '').trim();
-}
-
-/**
  * Normalize a feedback item or a stored note to a common shape.
- *
- * Fresh reviews return notes whose content is HTML built by
- * Notes_Manager::build_note_content(): a bold title, the feedback, an
- * italic "Suggestion:" line and trailing badges.
  *
  * @param {Object} item Feedback item or note.
  * @return {Object} Item with title, feedback, suggestion, category and severity.
  */
 export function normalizeFeedbackItem(item) {
-	const base = {
+	return {
 		category: item.category || '',
 		severity: item.severity || '',
 		isResolved: !!item.is_resolved,
+		...getFeedbackContent(item),
 	};
+}
 
-	if (item.title || item.feedback) {
-		return {
-			...base,
-			title: item.title || '',
-			feedback: item.feedback || '',
-			suggestion: item.suggestion || '',
-		};
-	}
-
-	const raw = item.content?.raw ?? item.content?.rendered ?? '';
-	const doc = new window.DOMParser().parseFromString(raw, 'text/html');
-	const body = doc.body;
-	body.querySelectorAll('.ai-feedback-badge').forEach((el) => el.remove());
-
-	// The title is a <strong> only when it opens the note.
-	let title = '';
-	const first = Array.from(body.childNodes).find(
-		(node) => node.nodeType !== 3 || node.textContent.trim() !== ''
-	);
-	if (first && first.nodeName === 'STRONG') {
-		title = first.textContent.trim();
-		first.remove();
-	}
-
-	// The suggestion follows a top-level <em> holding the label, so inline
-	// emphasis inside the feedback is left alone.
-	const label = __('Suggestion:', 'ai-feedback');
-	const marker = Array.from(body.children).find(
-		(el) => el.nodeName === 'EM' && el.textContent.trim() === label
-	);
-
-	let feedbackHtml = body.innerHTML;
-	let suggestion = '';
-	if (marker) {
-		const after = doc.createElement('div');
-		while (marker.nextSibling) {
-			after.appendChild(marker.nextSibling);
-		}
-		marker.remove();
-		feedbackHtml = body.innerHTML;
-		suggestion = htmlToText(after.innerHTML);
-	}
-
-	return {
-		...base,
-		title,
-		feedback: htmlToText(feedbackHtml),
-		suggestion,
-	};
+/**
+ * Escape text so it reads literally in Markdown.
+ *
+ * AI-written text could otherwise start headings, quotes or lists, or embed
+ * raw HTML, when the report is viewed elsewhere.
+ *
+ * @param {string} text Plain text.
+ * @return {string} Markdown-safe text.
+ */
+export function escapeMarkdown(text) {
+	return String(text || '')
+		.replace(/[\\`*_[\]<>]/g, '\\$&')
+		.replace(/^(\s*)([#+-])(?=\s|$)/gm, '$1\\$2')
+		.replace(/^(\s*)(\d+)\.(?=\s|$)/gm, '$1$2\\.')
+		.replace(/^(\s*)(-{3,}|={3,})\s*$/gm, '$1\\$2');
 }
 
 /**
@@ -136,21 +87,23 @@ export function getReviewItems(review) {
  * @return {string} Markdown.
  */
 function formatMarkdownItem(item) {
-	const title = (item.title || __('Feedback', 'ai-feedback')).replace(
-		/\s+/g,
-		' '
+	const title = escapeMarkdown(
+		(item.title || __('Feedback', 'ai-feedback')).replace(/\s+/g, ' ')
 	);
 	let md = `#### ${title}\n\n`;
 	if (item.category) {
-		md += `**${__('Category:', 'ai-feedback')}** ${item.category}`;
+		md += `**${__('Category:', 'ai-feedback')}** ${escapeMarkdown(item.category)}`;
 		md += item.isResolved ? ` (${__('resolved', 'ai-feedback')})` : '';
 		md += '\n\n';
 	}
 	if (item.feedback) {
-		md += `${item.feedback}\n\n`;
+		md += `${escapeMarkdown(item.feedback)}\n\n`;
 	}
 	if (item.suggestion) {
-		const quoted = item.suggestion.replace(/\r?\n/g, '\n> ');
+		const quoted = escapeMarkdown(item.suggestion).replace(
+			/\r?\n/g,
+			'\n> '
+		);
 		md += `> **${__('Suggestion:', 'ai-feedback')}** ${quoted}\n\n`;
 	}
 	return md;
@@ -164,6 +117,10 @@ function formatMarkdownItem(item) {
  * @return {string} Markdown.
  */
 export function generateMarkdownReport(review, postTitle) {
+	if (!review) {
+		return '';
+	}
+
 	const items = getReviewItems(review);
 	const headings = getSeverityHeadings();
 
@@ -182,7 +139,7 @@ export function generateMarkdownReport(review, postTitle) {
 	md += '\n';
 
 	if (review.summary_text) {
-		md += `## ${__('Summary', 'ai-feedback')}\n\n${review.summary_text}\n\n`;
+		md += `## ${__('Summary', 'ai-feedback')}\n\n${escapeMarkdown(review.summary_text)}\n\n`;
 	}
 
 	if (items.length === 0) {
@@ -227,6 +184,10 @@ export function generateMarkdownReport(review, postTitle) {
  * @return {string} Plain text.
  */
 export function generatePlainTextSummary(review, postTitle) {
+	if (!review) {
+		return '';
+	}
+
 	const grouped = groupBySeverity(getReviewItems(review));
 	const title = sprintf(
 		/* translators: %s: post title */
@@ -257,6 +218,10 @@ export function generatePlainTextSummary(review, postTitle) {
  * @return {string} Pretty-printed JSON.
  */
 export function generateJSON(review, postTitle) {
+	if (!review) {
+		return '';
+	}
+
 	return JSON.stringify(
 		{
 			review_id: review.review_id,
