@@ -18,11 +18,14 @@ namespace {
 
 	if ( ! class_exists( 'WP_Post' ) ) {
 		class WP_Post {
-			public $ID                = 0;
-			public $post_modified_gmt = '';
+			public int $ID                   = 0;
+			public string $post_modified_gmt = '';
 
-			public function __construct( $post = null ) {
-				foreach ( (array) $post as $key => $value ) {
+			/**
+			 * @param array<string, int|string> $post Post fields.
+			 */
+			public function __construct( array $post = array() ) {
+				foreach ( $post as $key => $value ) {
 					$this->$key = $value;
 				}
 			}
@@ -30,7 +33,7 @@ namespace {
 	}
 
 	if ( ! function_exists( 'wp_get_post_autosave' ) ) {
-		function wp_get_post_autosave( $post_id, $user_id = 0 ) {
+		function wp_get_post_autosave( int $post_id, int $user_id = 0 ): WP_Post|false {
 			return $GLOBALS['test_autosaves'][ $post_id ] ?? false;
 		}
 	}
