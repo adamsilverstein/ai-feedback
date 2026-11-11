@@ -13,6 +13,7 @@ import { getPriorityLevel } from '../utils/priority';
 import { getFeedbackContent } from '../utils/feedback-content';
 import FeedbackItemActions from './FeedbackItemActions';
 import { STORE_NAME } from '../store';
+import FeedbackReplies from './FeedbackReplies';
 
 /**
  * Get severity badge emoji.
@@ -82,12 +83,14 @@ function getSeverityLabel(severity) {
 /**
  * Single feedback item component (non-grouped).
  *
- * @param {Object}   props            Component props.
- * @param {Object}   props.item       Feedback item data.
- * @param {Function} props.onNavigate Navigation callback.
+ * @param {Object}   props                   Component props.
+ * @param {Object}   props.item              Feedback item data.
+ * @param {Object}   [props.thread]          Reply thread for this item's note.
+ * @param {Function} props.onNavigate        Navigation callback.
+ * @param {Function} [props.onReplyComplete] Called once a pending AI reply is saved.
  * @return {Element} Feedback item component.
  */
-function SingleFeedbackItem({ item, onNavigate }) {
+function SingleFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 	const { title, feedback, suggestion } = getFeedbackContent(item);
 	const isDismissed = !!item.is_resolved;
 	const isFixApplied = useSelect(
@@ -144,6 +147,12 @@ function SingleFeedbackItem({ item, onNavigate }) {
 					title={title}
 					onNavigate={onNavigate}
 				/>
+
+				<FeedbackReplies
+					replies={thread?.replies ?? []}
+					pendingReplyId={thread?.pending_reply_id ?? null}
+					onReplyComplete={onReplyComplete}
+				/>
 			</CardBody>
 		</Card>
 	);
@@ -152,12 +161,14 @@ function SingleFeedbackItem({ item, onNavigate }) {
 /**
  * Grouped feedback items component.
  *
- * @param {Object}   props            Component props.
- * @param {Object}   props.item       Grouped feedback item data.
- * @param {Function} props.onNavigate Navigation callback.
+ * @param {Object}   props                   Component props.
+ * @param {Object}   props.item              Grouped feedback item data.
+ * @param {Object}   [props.thread]          Reply thread for this item's note.
+ * @param {Function} props.onNavigate        Navigation callback.
+ * @param {Function} [props.onReplyComplete] Called once a pending AI reply is saved.
  * @return {Element} Feedback group component.
  */
-function GroupedFeedbackItem({ item, onNavigate }) {
+function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 	const [expanded, setExpanded] = useState(false);
 	const { title, feedback, suggestion } = getFeedbackContent(item);
 	const isDismissed = !!item.is_resolved;
@@ -243,6 +254,18 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 			<CardBody className="ai-feedback-group-actions">
 				<FeedbackItemActions item={item} title={title} />
 			</CardBody>
+
+			{/* Outside the collapsible body so a pending reply is polled and
+			    announced even while the group is collapsed. */}
+			{(thread?.replies?.length > 0 || thread?.pending_reply_id) && (
+				<CardBody>
+					<FeedbackReplies
+						replies={thread.replies ?? []}
+						pendingReplyId={thread.pending_reply_id ?? null}
+						onReplyComplete={onReplyComplete}
+					/>
+				</CardBody>
+			)}
 		</Card>
 	);
 }
@@ -252,18 +275,27 @@ function GroupedFeedbackItem({ item, onNavigate }) {
  *
  * Determines whether to render a single item or a grouped item.
  *
- * @param {Object} props      Component props.
- * @param {Object} props.item Feedback item data.
+ * @param {Object}   props                   Component props.
+ * @param {Object}   props.item              Feedback item data.
+ * @param {Object}   [props.thread]          Reply thread for this item's note.
+ * @param {Function} [props.onReplyComplete] Called once a pending AI reply is saved.
  * @return {Element} Feedback item component.
  */
-export default function FeedbackItem({ item }) {
+export default function FeedbackItem({ item, thread, onReplyComplete }) {
 	const handleNavigate = (blockId) => {
 		navigateToBlock(blockId);
 	};
 
-	if (item.is_group) {
-		return <GroupedFeedbackItem item={item} onNavigate={handleNavigate} />;
-	}
+	const ItemComponent = item.is_group
+		? GroupedFeedbackItem
+		: SingleFeedbackItem;
 
-	return <SingleFeedbackItem item={item} onNavigate={handleNavigate} />;
+	return (
+		<ItemComponent
+			item={item}
+			thread={thread}
+			onNavigate={handleNavigate}
+			onReplyComplete={onReplyComplete}
+		/>
+	);
 }

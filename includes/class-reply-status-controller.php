@@ -59,6 +59,126 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				'schema' => array( $this, 'get_item_schema' ),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base,
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_threads' ),
+					'permission_callback' => array( $this, 'get_threads_permissions_check' ),
+					'args'                => array(
+						'post' => array(
+							'description'       => __( 'ID of the post whose AI Feedback reply threads to list.', 'ai-feedback' ),
+							'type'              => 'integer',
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Permission check for a post's reply threads.
+	 *
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @return bool|WP_Error
+	 */
+	public function get_threads_permissions_check( WP_REST_Request $request ): bool|WP_Error {
+		$post_id = $this->get_int_param( $request, 'post' );
+		if ( $post_id <= 0 || ! current_user_can( 'edit_post', $post_id ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to view these conversations.', 'ai-feedback' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * GET /replies?post={post_id}
+	 *
+	 * Lists the replies under each AI Feedback note in a post, oldest first,
+	 * as plain text, plus the newest user reply in each thread that is still
+	 * waiting for an AI response. One request covers the whole sidebar.
+	 *
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @return WP_REST_Response
+	 */
+	public function get_threads( WP_REST_Request $request ): WP_REST_Response {
+		$post_id  = $this->get_int_param( $request, 'post' );
+		$comments = get_comments(
+			array(
+				'post_id' => $post_id,
+				'type'    => 'note',
+				'status'  => 'all',
+				'orderby' => array(
+					'comment_date' => 'ASC',
+					'comment_ID'   => 'ASC',
+				),
+			)
+		);
+
+		$ai_note_ids = array();
+		$replies     = array();
+		foreach ( is_array( $comments ) ? $comments : array() as $comment ) {
+			if ( ! is_object( $comment ) ) {
+				continue;
+			}
+			$id = (int) $comment->comment_ID;
+			if ( get_comment_meta( $id, 'ai_feedback', true ) && 0 === (int) $comment->comment_parent ) {
+				$ai_note_ids[ $id ] = true;
+			}
+			if ( (int) $comment->comment_parent > 0 ) {
+				$replies[] = $comment;
+			}
+		}
+
+		$threads = array();
+		foreach ( $replies as $comment ) {
+			$parent_id = (int) $comment->comment_parent;
+			if ( ! isset( $ai_note_ids[ $parent_id ] ) ) {
+				continue;
+			}
+
+			$id    = (int) $comment->comment_ID;
+			$is_ai = (bool) get_comment_meta( $id, 'ai_feedback', true );
+
+			$threads[ $parent_id ]['replies'][] = array(
+				'id'      => $id,
+				'author'  => $comment->comment_author,
+				'content' => trim( wp_strip_all_tags( $comment->comment_content ) ),
+				'is_ai'   => $is_ai,
+				'date'    => $comment->comment_date,
+			);
+
+			if ( ! $is_ai ) {
+				// Only the newest user reply matters: an older pending one has been superseded.
+				$status = self::meta_string( $id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+
+				$threads[ $parent_id ]['pending_reply_id'] = 'pending' === $status ? $id : null;
+			}
+		}
+
+		foreach ( $threads as $parent_id => $thread ) {
+			$threads[ $parent_id ]['pending_reply_id'] = $thread['pending_reply_id'] ?? null;
+		}
+
+		return new WP_REST_Response(
+			array(
+				'post'    => $post_id,
+				// Cast so an empty result encodes as {} rather than [].
+				'threads' => (object) $threads,
+			),
+			200
+		);
 	}
 
 	/**
@@ -186,8 +306,20 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	 * @return int
 	 */
 	private function get_reply_id( WP_REST_Request $request ): int {
-		$id = $request->get_param( 'id' );
-		return is_numeric( $id ) ? absint( $id ) : 0;
+		return $this->get_int_param( $request, 'id' );
+	}
+
+	/**
+	 * Read a positive integer parameter from the request.
+	 *
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @param  string          $name    Parameter name.
+	 * @return int The value, or 0 when missing or invalid.
+	 */
+	private function get_int_param( WP_REST_Request $request, string $name ): int {
+		$value = $request->get_param( $name );
+		return is_numeric( $value ) ? absint( $value ) : 0;
 	}
 
 	/**
@@ -198,7 +330,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	 * @return \WP_Comment|null
 	 */
 	private function get_reply_comment( WP_REST_Request $request ): ?\WP_Comment {
-		$id = $this->get_reply_id( $request );
+		$id = $this->get_int_param( $request, 'id' );
 		if ( $id <= 0 ) {
 			return null;
 		}
