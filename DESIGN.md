@@ -455,7 +455,7 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 
 | Option Key | Type | Default | Description |
 |------------|------|---------|-------------|
-| `ai_feedback_default_model` | string | `''` | Default AI model to use |
+| `ai_feedback_default_model` | string | `'claude-sonnet-5-5'` | Default AI model to use |
 | `ai_feedback_default_focus` | array | `['content', 'tone', 'flow']` | Default focus areas |
 | `ai_feedback_default_tone` | string | `'professional'` | Default target tone |
 
