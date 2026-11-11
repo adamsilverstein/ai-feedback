@@ -29,6 +29,9 @@ if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
 
+// Loaded after ABSPATH, which it requires.
+require_once $includes_dir . 'class-suggestions.php';
+
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {
 	function get_locale() {

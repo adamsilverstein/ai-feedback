@@ -96,3 +96,15 @@ if ( ! class_exists( 'WP_AI_Client_Prompt_Builder' ) ) {
 		}
 	}
 }
+
+if ( ! function_exists( 'gutenberg_is_experiment_enabled' ) ) {
+	/**
+	 * Gutenberg plugin experiment check.
+	 *
+	 * @param string $name Experiment name.
+	 * @return bool
+	 */
+	function gutenberg_is_experiment_enabled( $name ) {
+		return false;
+	}
+}

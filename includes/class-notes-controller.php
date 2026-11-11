@@ -196,6 +196,89 @@ class Notes_Controller extends WP_REST_Controller {
 				),
 			)
 		);
+
+		// Turn a note's quick fix into a Gutenberg suggestion, or back.
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<note_id>\d+)/suggestion',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'create_suggestion' ),
+					'permission_callback' => array( $this, 'update_note_permissions_check' ),
+					'args'                => array(
+						'note_id'    => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+						),
+						'block_name' => array(
+							'required'          => true,
+							'type'              => 'string',
+							'pattern'           => '^[a-z0-9-]+/[a-z0-9-]+$',
+							'sanitize_callback' => 'sanitize_text_field',
+						),
+						'text'       => array(
+							'description' => __( 'Current plain text of the block.', 'ai-feedback' ),
+							'required'    => true,
+							'type'        => 'string',
+						),
+					),
+				),
+				array(
+					'methods'             => WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'delete_suggestion' ),
+					'permission_callback' => array( $this, 'update_note_permissions_check' ),
+					'args'                => array(
+						'note_id' => array(
+							'required'          => true,
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Creates a suggestion from a note's quick fix.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_suggestion( WP_REST_Request $request ) {
+		$note_id    = $request->get_param( 'note_id' );
+		$block_name = $request->get_param( 'block_name' );
+		$text       = $request->get_param( 'text' );
+
+		$result = ( new Suggestions( $this->notes_manager ) )->create_for_note(
+			is_numeric( $note_id ) ? (int) $note_id : 0,
+			is_string( $block_name ) ? $block_name : '',
+			is_string( $text ) ? $text : ''
+		);
+
+		return is_wp_error( $result ) ? $result : rest_ensure_response( $result );
+	}
+
+	/**
+	 * Removes a pending suggestion from a note, leaving the feedback.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_suggestion( WP_REST_Request $request ) {
+		$note_id = $request->get_param( 'note_id' );
+		$note_id = is_numeric( $note_id ) ? (int) $note_id : 0;
+
+		$result = ( new Suggestions( $this->notes_manager ) )->remove_for_note( $note_id );
+
+		return is_wp_error( $result ) ? $result : rest_ensure_response(
+			array(
+				'note_id' => $note_id,
+				'deleted' => true,
+			)
+		);
 	}
 
 	/**

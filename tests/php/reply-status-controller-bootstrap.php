@@ -20,6 +20,7 @@ namespace {
 			public $comment_ID      = '0';
 			public $comment_post_ID = '0';
 			public $comment_parent  = '0';
+			public $user_id         = '0';
 			public $comment_type    = 'note';
 			public $comment_content = '';
 			public $comment_author  = '';
