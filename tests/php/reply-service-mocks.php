@@ -127,6 +127,27 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'parse_blocks' ) ) {
+		/**
+		 * parse_blocks mock returning $GLOBALS['test_parsed_blocks'][ $content ].
+		 *
+		 * Tests register the parsed structure for a given content string so the
+		 * real block parser is not needed. Each call is counted in
+		 * $GLOBALS['test_parse_blocks_calls'].
+		 *
+		 * @param string $content Post content.
+		 * @return array<mixed>
+		 */
+		function parse_blocks( string $content ): array {
+			$calls                              = $GLOBALS['test_parse_blocks_calls'] ?? 0;
+			$GLOBALS['test_parse_blocks_calls'] = ( is_int( $calls ) ? $calls : 0 ) + 1;
+
+			$registered = $GLOBALS['test_parsed_blocks'] ?? array();
+			$blocks     = is_array( $registered ) ? ( $registered[ $content ] ?? array() ) : array();
+			return is_array( $blocks ) ? $blocks : array();
+		}
+	}
+
 	if ( ! function_exists( 'current_time' ) ) {
 		function current_time( $type, $gmt = 0 ) {
 			return '2026-04-18 10:34:00';
