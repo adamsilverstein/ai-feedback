@@ -225,6 +225,7 @@ class Reply_Service {
 
 		return array(
 			'block_content'     => null !== $block ? self::block_text( $block ) : '',
+			'block_is_text'     => true,
 			'block_type'        => $block_type,
 			'original_feedback' => $parent->comment_content,
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),

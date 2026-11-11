@@ -572,6 +572,21 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Markup written as text, like a tag in a code sample, survives into the prompt.
+	 */
+	public function test_block_content_keeps_escaped_markup(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array( self::leaf_block( 'core/code', '<pre class="wp-block-code"><code>Wrap it in &lt;div class=&quot;box&quot;&gt;.</code></pre>', 100 ) )
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Wrap it in <div class="box">.' . "\n", $service->captured_prompt );
+	}
+
+	/**
 	 * The note's block_name meta wins over the parsed block name.
 	 */
 	public function test_block_name_meta_takes_precedence_over_parsed_block_name(): void {
