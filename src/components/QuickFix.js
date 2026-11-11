@@ -11,6 +11,7 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
+import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import {
 	applyFixToContent,
 	getFixPreview,
@@ -48,11 +49,19 @@ export function describeFix(fix) {
 export function describeSuggestionStatus(status) {
 	switch (status) {
 		case 'applied':
-		case 'applied-unsaved':
 			return __('You accepted this suggested edit.', 'ai-feedback');
+		case 'applied-unsaved':
+			return __(
+				'You accepted this suggested edit. Save the post to keep it.',
+				'ai-feedback'
+			);
 		case 'rejected':
-		case 'rejected-unsaved':
 			return __('You rejected this suggested edit.', 'ai-feedback');
+		case 'rejected-unsaved':
+			return __(
+				'You rejected this suggested edit. Save the post to confirm.',
+				'ai-feedback'
+			);
 		case 'outdated':
 			return __(
 				'This suggested edit no longer applies because the text changed.',
@@ -76,6 +85,7 @@ export function describeSuggestionStatus(status) {
 export default function QuickFix({ item }) {
 	const fix = item.quick_fix;
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+	const suggestionStatus = useSuggestionStatus(item);
 
 	const { attributeKey, content } = useSelect(
 		(select) => {
@@ -100,14 +110,14 @@ export default function QuickFix({ item }) {
 		useDispatch(noticesStore);
 
 	// Gutenberg's suggestion UI owns fixes that became suggestions.
-	if (item.suggestion_status) {
+	if (suggestionStatus) {
 		return (
 			<div className="ai-feedback-quick-fix">
 				<p className="ai-feedback-quick-fix-summary">
 					{describeFix(fix)}
 				</p>
 				<p className="ai-feedback-quick-fix-suggested description">
-					{describeSuggestionStatus(item.suggestion_status)}
+					{describeSuggestionStatus(suggestionStatus)}
 				</p>
 			</div>
 		);

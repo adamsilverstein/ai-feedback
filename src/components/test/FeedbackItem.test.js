@@ -43,10 +43,19 @@ function renderItem(
 		appliedFixes = {},
 		updateBlockAttributes = vi.fn(),
 		blockType = { attributes: { content: { type: 'rich-text' } } },
+		notes = null,
 	} = {}
 ) {
 	const registry = createRegistry();
 	registry.register(noticesStore);
+	registry.registerStore('core/editor', {
+		reducer: (state = {}) => state,
+		selectors: { getCurrentPostId: () => 1 },
+	});
+	registry.registerStore('core', {
+		reducer: (state = notes) => state,
+		selectors: { getEntityRecords: (state) => state },
+	});
 	registry.registerStore('ai-feedback/store', {
 		reducer: (state = {}) => state,
 		actions: {
@@ -326,6 +335,38 @@ describe('FeedbackItem quick fixes', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Apply fix' })
 		).not.toBeInTheDocument();
+	});
+
+	it('reads the status Gutenberg wrote to the note', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [
+				{
+					id: 7,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: 'applied-unsaved',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.getByText(
+				'You accepted this suggested edit. Save the post to keep it.'
+			)
+		).toBeInTheDocument();
+	});
+
+	it('offers the fix again once the note is no longer a suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [{ id: 7, meta: { _wp_suggestion: '' } }],
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply fix' })
+		).toBeInTheDocument();
 	});
 
 	it('shows a decided suggestion', () => {
