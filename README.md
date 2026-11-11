@@ -20,7 +20,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 - **WordPress**: 7.0 or higher
 - **PHP**: 8.1 or higher
 - **AI Provider**: At least one provider configured under Settings → Connectors
-- **Node.js**: 18.0 or higher (for development)
+- **Node.js**: 22.0 or higher (for development)
 - **npm**: 9.0 or higher (for development)
 
 ## Installation

@@ -566,14 +566,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 ### Test Setup
 
-`tests/js/setup.js`:
+Globals are off, so import `vi` and the other APIs from `vitest` in every file, including setup files. Mock factories must return the module shape, so a default export goes under `default`:
 
 ```javascript
-import '@testing-library/jest-dom/vitest';
-import { registerStore } from '@wordpress/data';
+import { vi } from 'vitest';
 
-// Mock WordPress packages
-vi.mock( '@wordpress/api-fetch', () => vi.fn() );
+vi.mock( '@wordpress/api-fetch', () => ( { default: vi.fn() } ) );
 vi.mock( '@wordpress/data', async () => ( {
     ...( await vi.importActual( '@wordpress/data' ) ),
     useSelect: vi.fn(),
