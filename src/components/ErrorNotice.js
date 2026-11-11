@@ -55,6 +55,10 @@ function getErrorAction(error) {
  * @return {Element} Error notice.
  */
 export default function ErrorNotice({ error, onRemove }) {
+	const message =
+		error.message ||
+		__('The review could not be completed.', 'ai-feedback');
+
 	return (
 		<Notice
 			status="error"
@@ -64,11 +68,11 @@ export default function ErrorNotice({ error, onRemove }) {
 			spokenMessage={sprintf(
 				/* translators: %s: error message */
 				__('Error: %s', 'ai-feedback'),
-				error.message
+				message
 			)}
 		>
 			<div className="ai-feedback-error-content">
-				<div className="ai-feedback-error-message">{error.message}</div>
+				<div className="ai-feedback-error-message">{message}</div>
 				{error.code && (
 					<div className="ai-feedback-error-code">
 						{__('Error code:', 'ai-feedback')} {error.code}
