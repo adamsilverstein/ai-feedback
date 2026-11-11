@@ -7,31 +7,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
-import { dispatch } from '@wordpress/data';
-import { store as blockEditorStore } from '@wordpress/block-editor';
-
-/**
- * Navigate to a specific block in the editor.
- *
- * @param {string} clientId Block client ID to navigate to.
- */
-function navigateToBlock(clientId) {
-	const { selectBlock } = dispatch(blockEditorStore);
-
-	if (selectBlock) {
-		selectBlock(clientId);
-		// Scroll to block if possible
-		const blockElement = document.querySelector(
-			`[data-block="${clientId}"]`
-		);
-		if (blockElement) {
-			blockElement.scrollIntoView({
-				behavior: 'smooth',
-				block: 'center',
-			});
-		}
-	}
-}
+import { navigateToBlock } from '../utils/navigate-to-block';
 
 /**
  * Get severity badge emoji.

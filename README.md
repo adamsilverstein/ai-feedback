@@ -130,6 +130,17 @@ You can change these in the plugin sidebar within the block editor.
 4. Click **Review Document**
 5. AI will analyze your content and attach notes to relevant blocks
 
+### Keyboard Shortcuts
+
+The shortcuts use the editor's "access" modifier: <kbd>Shift</kbd>+<kbd>Alt</kbd> on Windows and Linux, <kbd>Ctrl</kbd>+<kbd>Option</kbd> on a Mac. They are also listed in the editor's Keyboard shortcuts help (Access + H).
+
+| Shortcut | Action |
+|----------|--------|
+| Access + R | Open the sidebar and review the document |
+| Access + F | Show or hide the AI Feedback sidebar |
+| Access + J | Go to the next block with AI feedback |
+| Access + K | Go to the previous block with AI feedback |
+
 ### Working with Notes
 
 - 📝 Notes appear as indicators on blocks with feedback
