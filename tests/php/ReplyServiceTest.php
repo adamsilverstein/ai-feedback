@@ -63,11 +63,12 @@ class ReplyServiceTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		parent::setUp();
-		$GLOBALS['test_comments']       = array();
-		$GLOBALS['test_comment_meta']   = array();
-		$GLOBALS['test_options']        = array();
-		$GLOBALS['test_post_content']   = array();
-		$GLOBALS['test_parsed_blocks']  = array();
+		$GLOBALS['test_comments']           = array();
+		$GLOBALS['test_comment_meta']       = array();
+		$GLOBALS['test_options']            = array();
+		$GLOBALS['test_post_content']       = array();
+		$GLOBALS['test_parsed_blocks']      = array();
+		$GLOBALS['test_parse_blocks_calls'] = 0;
 	}
 
 	/**
@@ -79,7 +80,9 @@ class ReplyServiceTest extends TestCase {
 			$GLOBALS['test_comment_meta'],
 			$GLOBALS['test_options'],
 			$GLOBALS['test_post_content'],
-			$GLOBALS['test_parsed_blocks']
+			$GLOBALS['test_parsed_blocks'],
+			$GLOBALS['test_parse_blocks_calls'],
+			$GLOBALS['test_missing_posts']
 		);
 		parent::tearDown();
 	}
@@ -566,6 +569,53 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "Block content: Tom & Jerry said \"hi\" \u{2013} it's 5 pm.\n", $service->captured_prompt );
+	}
+
+	/**
+	 * The note's block_name meta wins over the parsed block name.
+	 */
+	public function test_block_name_meta_takes_precedence_over_parsed_block_name(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['block_name'] = 'core/heading';
+		$this->seed_post_blocks(
+			array( self::leaf_block( 'core/paragraph', '<p>Block text.</p>', 100 ) )
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block type: core/heading', $service->captured_prompt );
+		$this->assertStringContainsString( 'Block content: Block text.', $service->captured_prompt );
+	}
+
+	/**
+	 * A post deleted before the cron run still gets a reply, without block text.
+	 */
+	public function test_missing_post_leaves_block_content_empty(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_missing_posts'] = array( 42 );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$result  = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame( 999, $result );
+		$this->assertStringContainsString( "Block content: \n", $service->captured_prompt );
+		$this->assertSame( 0, $GLOBALS['test_parse_blocks_calls'] );
+	}
+
+	/**
+	 * Empty post content skips block parsing.
+	 */
+	public function test_empty_post_content_skips_block_parsing(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_post_content'][42] = '';
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$result  = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame( 999, $result );
+		$this->assertStringContainsString( "Block content: \n", $service->captured_prompt );
+		$this->assertSame( 0, $GLOBALS['test_parse_blocks_calls'] );
 	}
 
 	/**

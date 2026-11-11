@@ -132,12 +132,14 @@ namespace {
 		 * parse_blocks mock returning $GLOBALS['test_parsed_blocks'][ $content ].
 		 *
 		 * Tests register the parsed structure for a given content string so the
-		 * real block parser is not needed.
+		 * real block parser is not needed. Each call is counted in
+		 * $GLOBALS['test_parse_blocks_calls'].
 		 *
 		 * @param string $content Post content.
-		 * @return array
+		 * @return array<mixed>
 		 */
-		function parse_blocks( $content ) {
+		function parse_blocks( string $content ): array {
+			$GLOBALS['test_parse_blocks_calls'] = ( $GLOBALS['test_parse_blocks_calls'] ?? 0 ) + 1;
 			return $GLOBALS['test_parsed_blocks'][ $content ] ?? array();
 		}
 	}
