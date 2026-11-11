@@ -18,7 +18,12 @@ import { PriorityBadge } from '../FeedbackItem';
 jest.mock('@wordpress/block-editor', () => ({
 	store: 'core/block-editor',
 }));
+jest.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
 jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+jest.mock('../../hooks/useReplyThreads', () => () => ({
+	threads: {},
+	onReplyComplete: () => {},
+}));
 // The item actions are covered by FeedbackItem.test.js.
 jest.mock('../FeedbackItemActions', () => () => null);
 
@@ -33,6 +38,10 @@ function renderList(feedbackItems) {
 	registry.registerStore('ai-feedback/store', {
 		reducer: (state = {}) => state,
 		selectors: { isFixApplied: () => false },
+	});
+	registry.registerStore('core/editor', {
+		reducer: (state = {}) => state,
+		selectors: { getCurrentPostId: () => 1 },
 	});
 
 	return render(

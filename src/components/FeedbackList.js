@@ -7,7 +7,10 @@
 import { __ } from '@wordpress/i18n';
 import { useMemo, useState } from '@wordpress/element';
 import { SelectControl } from '@wordpress/components';
+import { useSelect } from '@wordpress/data';
+import { store as editorStore } from '@wordpress/editor';
 import FeedbackItem from './FeedbackItem';
+import useReplyThreads from '../hooks/useReplyThreads';
 import {
 	SORT_CATEGORY,
 	SORT_DOCUMENT,
@@ -29,6 +32,12 @@ export default function FeedbackList({ feedbackItems }) {
 		() => sortFeedback(feedbackItems || [], sortBy),
 		[feedbackItems, sortBy]
 	);
+
+	const postId = useSelect(
+		(select) => select(editorStore).getCurrentPostId(),
+		[]
+	);
+	const { threads, onReplyComplete } = useReplyThreads(postId);
 
 	if (!feedbackItems || feedbackItems.length === 0) {
 		return null;
@@ -76,7 +85,11 @@ export default function FeedbackList({ feedbackItems }) {
 
 					return (
 						<div key={key} role="listitem">
-							<FeedbackItem item={item} />
+							<FeedbackItem
+								item={item}
+								thread={threads[item.parent || item.id]}
+								onReplyComplete={onReplyComplete}
+							/>
 						</div>
 					);
 				})}
