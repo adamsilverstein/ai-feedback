@@ -86,7 +86,9 @@ test.describe('Progressive tips', () => {
 			.click();
 
 		await expect(
-			page.getByText('AI Feedback tips and welcome screen reset.')
+			page.getByTestId('snackbar').filter({
+				hasText: 'AI Feedback tips and welcome screen reset.',
+			})
 		).toBeVisible();
 		expect(await getTipPreference(page, 'reviewCount')).toBe(0);
 		expect(await getTipPreference(page, 'dismissedTips')).toEqual([]);
