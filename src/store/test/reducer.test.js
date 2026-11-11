@@ -63,6 +63,27 @@ describe('SET_SUGGESTION_STATUS', () => {
 		]);
 	});
 
+	it('needs the review stored first, since REVIEW_SUCCESS replaces it', () => {
+		const review = { notes: [{ id: 2 }] };
+		const status = {
+			type: TYPES.SET_SUGGESTION_STATUS,
+			noteId: 2,
+			status: 'pending',
+		};
+
+		const early = reducer(reducer(initialState, status), {
+			type: TYPES.REVIEW_SUCCESS,
+			review,
+		});
+		expect(early.lastReview.notes[0].suggestion_status).toBeUndefined();
+
+		const late = reducer(
+			reducer(initialState, { type: TYPES.REVIEW_SUCCESS, review }),
+			status
+		);
+		expect(late.lastReview.notes[0].suggestion_status).toBe('pending');
+	});
+
 	it('ignores the action without a review', () => {
 		expect(
 			reducer(initialState, {
