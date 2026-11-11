@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect } from 'vitest';
 import reducer, { initialState, TYPES } from '../reducer';
 
 const unavailable = {

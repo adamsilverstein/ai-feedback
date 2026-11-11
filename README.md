@@ -20,7 +20,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 - **WordPress**: 7.0 or higher
 - **PHP**: 8.1 or higher
 - **AI Provider**: At least one provider configured under Settings → Connectors
-- **Node.js**: 18.0 or higher (for development)
+- **Node.js**: 22.0 or higher (for development)
 - **npm**: 9.0 or higher (for development)
 
 ## Installation
@@ -212,7 +212,7 @@ npm run plugin-zip         # Create release zip
 ### Running Tests
 
 ```bash
-# JavaScript tests (Jest)
+# JavaScript tests (Vitest)
 npm run test:unit
 
 # PHP tests (PHPUnit)
@@ -237,7 +237,7 @@ The plugin follows:
 All pull requests automatically run through GitHub Actions CI/CD:
 - ✅ JavaScript linting (ESLint, Stylelint, Prettier)
 - ✅ PHP linting (PHPCS, PHPStan)
-- ✅ JavaScript unit tests (Jest)
+- ✅ JavaScript unit tests (Vitest)
 - ✅ PHP unit tests (PHPUnit) across PHP 8.1-8.3
 
 See [docs/CI.md](docs/CI.md) for details on running checks locally and setting up branch protection.

@@ -1,6 +1,7 @@
 /**
  * WordPress dependencies
  */
+import { describe, it, expect } from 'vitest';
 import { RichTextData } from '@wordpress/rich-text';
 
 /**

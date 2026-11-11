@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi } from 'vitest';
 import {
 	act,
 	fireEvent,
@@ -8,7 +9,6 @@ import {
 	screen,
 	waitFor,
 } from '@testing-library/react';
-import '@testing-library/jest-dom';
 
 /**
  * WordPress dependencies
@@ -21,9 +21,9 @@ import { store as noticesStore } from '@wordpress/notices';
  */
 import FeedbackItem from '../FeedbackItem';
 
-jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
-jest.mock('@wordpress/blocks', () => ({ store: 'core/blocks' }));
-jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+vi.mock('@wordpress/blocks', () => ({ store: 'core/blocks' }));
+vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 const item = {
 	id: 7,
@@ -37,11 +37,11 @@ const item = {
 
 function renderItem(
 	props,
-	setNoteResolved = jest.fn(),
+	setNoteResolved = vi.fn(),
 	{
 		blocks = {},
 		appliedFixes = {},
-		updateBlockAttributes = jest.fn(),
+		updateBlockAttributes = vi.fn(),
 		blockType = { attributes: { content: { type: 'rich-text' } } },
 	} = {}
 ) {
@@ -122,7 +122,7 @@ describe('FeedbackItem quick actions', () => {
 	});
 
 	it('dismisses the item and offers undo', async () => {
-		const setNoteResolved = jest.fn();
+		const setNoteResolved = vi.fn();
 		const registry = renderItem({}, setNoteResolved);
 
 		await act(async () => {
@@ -148,7 +148,7 @@ describe('FeedbackItem quick actions', () => {
 	});
 
 	it('shows dismissed items collapsed with a restore action', async () => {
-		const setNoteResolved = jest.fn();
+		const setNoteResolved = vi.fn();
 		renderItem({ is_resolved: true }, setNoteResolved);
 
 		expect(screen.getByText('Dismissed')).toBeInTheDocument();
@@ -188,8 +188,8 @@ describe('FeedbackItem quick fixes', () => {
 	};
 
 	it('describes the fix and applies it with undo', async () => {
-		const updateBlockAttributes = jest.fn();
-		const setNoteResolved = jest.fn();
+		const updateBlockAttributes = vi.fn();
+		const setNoteResolved = vi.fn();
 		const registry = renderItem(fixItem, setNoteResolved, {
 			blocks,
 			updateBlockAttributes,
@@ -221,8 +221,8 @@ describe('FeedbackItem quick fixes', () => {
 	});
 
 	it('refuses to undo over later edits', async () => {
-		const updateBlockAttributes = jest.fn();
-		const registry = renderItem(fixItem, jest.fn(), {
+		const updateBlockAttributes = vi.fn();
+		const registry = renderItem(fixItem, vi.fn(), {
 			blocks,
 			updateBlockAttributes,
 		});
@@ -258,7 +258,7 @@ describe('FeedbackItem quick fixes', () => {
 	});
 
 	it('hides the fix for blocks without rich text content', () => {
-		renderItem(fixItem, jest.fn(), {
+		renderItem(fixItem, vi.fn(), {
 			blocks: {
 				'block-1': { name: 'core/image', attributes: { url: 'x' } },
 			},
@@ -271,7 +271,7 @@ describe('FeedbackItem quick fixes', () => {
 	});
 
 	it('shows a preview before applying', async () => {
-		renderItem(fixItem, jest.fn(), { blocks });
+		renderItem(fixItem, vi.fn(), { blocks });
 
 		fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
@@ -281,7 +281,7 @@ describe('FeedbackItem quick fixes', () => {
 	});
 
 	it('disables the fix when the block text has changed', () => {
-		renderItem(fixItem, jest.fn(), {
+		renderItem(fixItem, vi.fn(), {
 			blocks: {
 				'block-1': {
 					name: 'core/paragraph',
@@ -299,7 +299,7 @@ describe('FeedbackItem quick fixes', () => {
 	});
 
 	it('labels applied fixes', () => {
-		renderItem({ ...fixItem, is_resolved: true }, jest.fn(), {
+		renderItem({ ...fixItem, is_resolved: true }, vi.fn(), {
 			blocks,
 			appliedFixes: { 7: true },
 		});

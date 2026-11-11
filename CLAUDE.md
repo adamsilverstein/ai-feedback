@@ -128,7 +128,7 @@ Edit `class-prompt-builder.php`. Consider:
 
 **Runtime:** WordPress 7.0+, PHP 8.1+ (the core AI Client and Connectors API are bundled in WordPress 7.0)
 
-**Development:** Node 18+, Composer 2+, Docker (for wp-env)
+**Development:** Node 22+, Composer 2+, Docker (for wp-env)
 
 ## Code Style
 

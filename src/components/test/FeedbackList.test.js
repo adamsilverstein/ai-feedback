@@ -1,8 +1,8 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import '@testing-library/jest-dom';
 
 /**
  * WordPress dependencies
@@ -15,17 +15,19 @@ import { createRegistry, RegistryProvider } from '@wordpress/data';
 import FeedbackList from '../FeedbackList';
 import { PriorityBadge } from '../FeedbackItem';
 
-jest.mock('@wordpress/block-editor', () => ({
+vi.mock('@wordpress/block-editor', () => ({
 	store: 'core/block-editor',
 }));
-jest.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
-jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
-jest.mock('../../hooks/useReplyThreads', () => () => ({
-	threads: {},
-	onReplyComplete: () => {},
+vi.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
+vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+vi.mock('../../hooks/useReplyThreads', () => ({
+	default: () => ({
+		threads: {},
+		onReplyComplete: () => {},
+	}),
 }));
 // The item actions are covered by FeedbackItem.test.js.
-jest.mock('../FeedbackItemActions', () => () => null);
+vi.mock('../FeedbackItemActions', () => ({ default: () => null }));
 
 /**
  * Render the list with a registry that has the feedback store.

@@ -21,7 +21,7 @@
 		"url": "https://github.com/adamsilverstein/ai-feedback/issues"
 	},
 	"engines": {
-		"node": ">=18.0.0",
+		"node": ">=22.0.0",
 		"npm": ">=9.0.0"
 	},
 	"files": [
@@ -64,8 +64,11 @@
 		"@wordpress/blocks": "^15.10.0",
 		"@wordpress/e2e-test-utils-playwright": "^1.37.0",
 		"@wordpress/env": "^10.36.0",
-		"@wordpress/scripts": "^31.6.0",
+		"@wordpress/scripts": "^36.0.0",
+		"jsdom": "^31.0.0",
 		"prettier": "^3.7.4",
+		"vite": "^8.3.6",
+		"vitest": "^5.1.0",
 		"wait-on": "^9.0.3"
 	},
 	"scripts": {
@@ -86,5 +89,8 @@
 		"env:stop": "wp-env stop",
 		"env:clean": "wp-env clean",
 		"plugin-zip": "wp-scripts plugin-zip"
+	},
+	"overrides": {
+		"@types/node": "^24.0.0"
 	}
 }

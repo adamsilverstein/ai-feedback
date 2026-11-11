@@ -87,7 +87,7 @@ export default function QuickFix({ item }) {
 		}
 		try {
 			await setNoteResolved(item.id, resolved);
-		} catch (error) {
+		} catch {
 			// The edit itself succeeded, but the note's state didn't change.
 			createWarningNotice(
 				resolved

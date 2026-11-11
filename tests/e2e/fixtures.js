@@ -212,7 +212,7 @@ class AIFeedbackUtils {
 					response.status() === 200,
 				{ timeout }
 			);
-		} catch (error) {
+		} catch {
 			// If no request was made (settings unchanged), just wait for debounce time
 			await this.page.waitForTimeout(600);
 		}

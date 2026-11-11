@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect, afterEach } from 'vitest';
 import {
 	SORT_CATEGORY,
 	SORT_DOCUMENT,

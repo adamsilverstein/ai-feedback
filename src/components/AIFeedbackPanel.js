@@ -104,7 +104,7 @@ export default function AIFeedbackPanel() {
 				chunkSize,
 				isRetry,
 			});
-		} catch (reviewError) {
+		} catch {
 			// Error is already in the store, no additional action needed
 		}
 	};

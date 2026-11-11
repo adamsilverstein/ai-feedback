@@ -1,19 +1,19 @@
 /**
  * Tests for ToneSelector component.
  */
-import '@testing-library/jest-dom';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSelect, useDispatch } from '@wordpress/data';
 import ToneSelector from '../ToneSelector';
 
 // Mock WordPress modules.
-jest.mock('@wordpress/data', () => ({
-	useSelect: jest.fn(),
-	useDispatch: jest.fn(),
+vi.mock('@wordpress/data', () => ({
+	useSelect: vi.fn(),
+	useDispatch: vi.fn(),
 }));
 
-jest.mock('@wordpress/components', () => ({
+vi.mock('@wordpress/components', () => ({
 	// eslint-disable-next-line jsx-a11y/label-has-associated-control
 	SelectControl: ({ label, value, options, onChange, help }) => (
 		<label htmlFor={`sel-${label}`}>
@@ -35,11 +35,11 @@ jest.mock('@wordpress/components', () => ({
 	),
 }));
 
-jest.mock('@wordpress/i18n', () => ({
+vi.mock('@wordpress/i18n', () => ({
 	__: (text) => text,
 }));
 
-jest.mock('../../store', () => ({
+vi.mock('../../store', () => ({
 	STORE_NAME: 'ai-feedback/store',
 }));
 
@@ -50,7 +50,7 @@ const MOCK_TONES = [
 	{ id: 'friendly', label: 'Friendly' },
 ];
 
-const mockUpdateSettings = jest.fn();
+const mockUpdateSettings = vi.fn();
 
 function setupMocks(targetTone = 'professional', availableTones = MOCK_TONES) {
 	useSelect.mockImplementation((selector) =>
@@ -64,7 +64,7 @@ function setupMocks(targetTone = 'professional', availableTones = MOCK_TONES) {
 
 describe('ToneSelector', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	it('renders the tone select control', () => {

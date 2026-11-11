@@ -1,8 +1,8 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import '@testing-library/jest-dom';
 
 /**
  * Internal dependencies
@@ -12,11 +12,11 @@ import { STAGE_ANALYZING, STAGE_PREPARING } from '../../store/review-stages';
 
 describe('ReviewProgress', () => {
 	beforeEach(() => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 	});
 
 	afterEach(() => {
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('shows the current step and label', () => {
@@ -63,7 +63,7 @@ describe('ReviewProgress', () => {
 		const initial = Number(bar.getAttribute('value'));
 
 		act(() => {
-			jest.advanceTimersByTime(10000);
+			vi.advanceTimersByTime(10000);
 		});
 
 		expect(Number(bar.getAttribute('value'))).toBeGreaterThan(initial);
@@ -76,11 +76,11 @@ describe('ReviewProgress', () => {
 		);
 
 		act(() => {
-			jest.advanceTimersByTime(3000);
+			vi.advanceTimersByTime(3000);
 		});
 		rerender(<ReviewProgress stageKey={STAGE_ANALYZING} />);
 		act(() => {
-			jest.advanceTimersByTime(4000);
+			vi.advanceTimersByTime(4000);
 		});
 
 		expect(screen.getByText('7s elapsed')).toBeInTheDocument();

@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect } from 'vitest';
 import { isPostSaved } from '../post-status';
 
 describe('isPostSaved', () => {

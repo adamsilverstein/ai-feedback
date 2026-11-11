@@ -1,17 +1,18 @@
-// @jest-environment jsdom
-/* eslint-env jest */
 /**
  * Tests for useReplyThreads.
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
-const mockApiFetch = jest.fn();
-jest.mock('@wordpress/api-fetch', () => (args) => mockApiFetch(args));
+const mockApiFetch = vi.fn();
+vi.mock('@wordpress/api-fetch', () => ({
+	default: (args) => mockApiFetch(args),
+}));
 
 // Stand-in for the notes the editor's Notes UI has loaded.
 let mockEditorNotes = [];
-const mockInvalidateResolution = jest.fn();
-jest.mock('@wordpress/data', () => ({
+const mockInvalidateResolution = vi.fn();
+vi.mock('@wordpress/data', () => ({
 	useSelect: (mapSelect) =>
 		mapSelect(() => ({
 			getEntityRecords: () => mockEditorNotes,

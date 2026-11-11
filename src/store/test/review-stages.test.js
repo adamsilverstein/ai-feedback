@@ -1,8 +1,9 @@
 /**
  * Internal dependencies
  */
-jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 
+import { describe, it, expect, vi } from 'vitest';
 import reducer, { initialState, TYPES } from '../reducer';
 import { getReviewStage } from '../selectors';
 import { setReviewStage, startReview } from '../actions';
@@ -109,7 +110,7 @@ describe('startReview stage transitions', () => {
 		});
 
 		// Silence the action's debug logging.
-		jest.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'log').mockImplementation(() => {});
 
 		const stageActions = [];
 		let step = generator.next();
@@ -144,8 +145,8 @@ describe('startReview stage transitions', () => {
 	});
 
 	it('ends with REVIEW_ERROR when the review request fails', () => {
-		jest.spyOn(console, 'log').mockImplementation(() => {});
-		jest.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		const generator = startReview({
 			postId: 1,

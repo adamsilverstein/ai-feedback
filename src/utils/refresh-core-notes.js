@@ -14,7 +14,7 @@ export function refreshCoreNotes() {
 		dispatch('core').invalidateResolutionForStoreSelector(
 			'getEntityRecords'
 		);
-	} catch (error) {
+	} catch {
 		// The core data store isn't available; nothing to refresh.
 	}
 }

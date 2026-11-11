@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 /**
@@ -8,7 +9,7 @@ import { render, screen } from '@testing-library/react';
  */
 import ErrorNotice from '../ErrorNotice';
 
-jest.mock('@wordpress/a11y', () => ({ speak: jest.fn() }));
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 
 describe('ErrorNotice', () => {
 	beforeEach(() => {

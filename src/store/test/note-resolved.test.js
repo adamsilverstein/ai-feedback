@@ -1,15 +1,16 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect, vi } from 'vitest';
 import reducer, { initialState, TYPES } from '../reducer';
 import { getUnresolvedNotesCount } from '../selectors';
 import { setNoteResolved } from '../actions';
 import { refreshCoreNotes } from '../../utils/refresh-core-notes';
 
-jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 
-jest.mock('../../utils/refresh-core-notes', () => ({
-	refreshCoreNotes: jest.fn(),
+vi.mock('../../utils/refresh-core-notes', () => ({
+	refreshCoreNotes: vi.fn(),
 }));
 
 const stateWithNotes = {
