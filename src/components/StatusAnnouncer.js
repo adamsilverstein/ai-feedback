@@ -42,12 +42,15 @@ export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
 			prevState.hasError = false;
 			prevState.reviewCompleted = false;
 		}
-		// Announce review completed
+		// Announce review completed. A partial review means a part failed,
+		// which the error notice announces instead.
 		else if (
 			!isReviewing &&
 			prevState.isReviewing &&
 			!prevState.reviewCompleted &&
-			lastReview
+			lastReview &&
+			!lastReview.is_in_progress &&
+			!lastReview.is_partial
 		) {
 			const noteCount = lastReview.notes?.length || 0;
 			speak(
