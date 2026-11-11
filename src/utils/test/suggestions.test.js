@@ -60,6 +60,12 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 					};
 				case 'core/editor':
 					return {
+						...(mocks.editorReady === undefined
+							? {}
+							: {
+									__unstableIsEditorReady: () =>
+										mocks.editorReady,
+								}),
 						getEditedPostContent: () => mocks.postContent,
 						getCurrentPostAttribute: (name) =>
 							name === 'content' ? mocks.savedContent : undefined,
@@ -247,6 +253,11 @@ describe('marker helpers', () => {
 			true
 		);
 		expect(hasSuggestionMarkers('<mark class="wp-note">')).toBe(false);
+		// The class name as plain text is not a marker.
+		expect(hasSuggestionMarkers('<p>wp-suggestion-add</p>')).toBe(false);
+		expect(hasSuggestionMarkers('<p class="wp-suggestion-add">x</p>')).toBe(
+			false
+		);
 		expect(hasSuggestionMarker('<mark data-suggestion-id="12">', 12)).toBe(
 			true
 		);
@@ -475,6 +486,7 @@ describe('removeOrphanedSuggestions', () => {
 	afterEach(() => {
 		delete window.__experimentalSuggestionMode;
 		delete window.aiFeedbackData;
+		delete mocks.editorReady;
 	});
 
 	it('removes saved pending suggestions whose markers are gone', async () => {
@@ -510,7 +522,7 @@ describe('removeOrphanedSuggestions', () => {
 	});
 
 	it('leaves suggestions the server does not list', async () => {
-		// Created after the last save, or a newer autosave exists.
+		// Too recent, still anchored, or a newer autosave exists.
 		mocks.apiFetch.mockResolvedValue({ note_ids: [] });
 
 		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
@@ -525,5 +537,22 @@ describe('removeOrphanedSuggestions', () => {
 
 		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('waits for the editor to be ready', async () => {
+		mocks.editorReady = false;
+
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(0);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('cleans up an empty post once the editor is ready', async () => {
+		mocks.editorReady = true;
+		mocks.postContent = '';
+		mocks.savedContent = '';
+
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(2);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(12, null);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(13, null);
 	});
 });

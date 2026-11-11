@@ -57,7 +57,10 @@ export function isSuggestionModeAvailable() {
  * @return {boolean} True if any suggestion marker is present.
  */
 export function hasSuggestionMarkers(content) {
-	return /\bwp-suggestion-(add|del|format)\b/.test(toHtml(content));
+	// Matches the class on a `<mark>` tag, not the same words in the text.
+	return /<mark\b[^>]*\bclass="[^"]*\bwp-suggestion-(?:add|del|format)\b/.test(
+		toHtml(content)
+	);
 }
 
 /**
@@ -204,7 +207,9 @@ function saveNoteMeta(noteId, meta) {
  * Turns one note's quick fix into a suggestion.
  *
  * The payload is stored first; if the server dropped it, or the block
- * changed while the request ran, it is removed again.
+ * changed while the request ran, it is removed again. A reload between the
+ * two steps leaves a pending suggestion without markers, which
+ * `removeOrphanedSuggestions()` later turns back into a plain note.
  *
  * @param {Object} note Feedback note with `id`, `block_id` and `quick_fix`.
  * @return {Promise<boolean>} Whether the suggestion was added.
@@ -264,8 +269,14 @@ async function removeSuggestion(noteId) {
 			_wp_suggestion_status: null,
 		});
 		dataDispatch(STORE_NAME).setSuggestionStatus(noteId, null);
-	} catch {
-		// The note stays a suggestion; Gutenberg shows it without an anchor.
+	} catch (error) {
+		// The note stays a suggestion until the orphan cleanup removes it.
+		// eslint-disable-next-line no-console
+		console.warn(
+			'[AI-Feedback] Could not remove suggestion:',
+			noteId,
+			error
+		);
 	}
 }
 
@@ -334,8 +345,10 @@ export async function suggestQuickFixes(notes) {
  *
  * Markers live in the post content, so they are lost if the editor reloads
  * before the post is saved. The server lists only pending AI suggestions
- * created before the last save, and none while a newer autosave exists, so
- * markers held by another editor's unsaved content are left alone.
+ * that neither the saved post nor its autosave anchors and that are older
+ * than its cleanup delay, so markers held by another editor's unsaved
+ * content are left alone. Any the edited or saved content still marks are
+ * kept too.
  *
  * @param {number} postId Post ID.
  * @return {Promise<number>} Number of suggestions removed.
@@ -354,9 +367,14 @@ export async function removeOrphanedSuggestions(postId) {
 	}
 
 	const editor = dataSelect(EDITOR_STORE);
-	const html = editor.getEditedPostContent();
-	// Content that hasn't loaded yet would make every suggestion look orphaned.
-	if (!html || !html.trim()) {
+	const html = editor.getEditedPostContent() || '';
+	// Content that hasn't loaded yet would make every suggestion look
+	// orphaned. Once the editor is ready, an empty post really has no markers.
+	const isReady =
+		typeof editor.__unstableIsEditorReady === 'function'
+			? editor.__unstableIsEditorReady()
+			: !!html.trim();
+	if (!isReady) {
 		return 0;
 	}
 	// A marker removed without saving can still come back with undo, so keep
