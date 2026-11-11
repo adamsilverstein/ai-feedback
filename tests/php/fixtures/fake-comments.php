@@ -33,6 +33,7 @@ if ( ! class_exists( 'WP_User' ) ) {
 function ai_feedback_test_reset_comments(): void {
 	$GLOBALS['test_comments']      = array();
 	$GLOBALS['test_comment_meta']  = array();
+	$GLOBALS['test_inserted_args'] = array();
 	$GLOBALS['test_next_comment']  = 1;
 	$GLOBALS['test_current_user']  = null;
 }
@@ -52,7 +53,8 @@ if ( ! function_exists( 'wp_insert_comment' ) ) {
 		$comment->comment_content  = $data['comment_content'] ?? '';
 		$comment->user_id          = (string) ( $data['user_id'] ?? 0 );
 
-		$GLOBALS['test_comments'][ $id ] = $comment;
+		$GLOBALS['test_comments'][ $id ]      = $comment;
+		$GLOBALS['test_inserted_args'][ $id ] = $data;
 
 		foreach ( $data['comment_meta'] ?? array() as $key => $value ) {
 			$GLOBALS['test_comment_meta'][ $id ][ $key ] = $value;
