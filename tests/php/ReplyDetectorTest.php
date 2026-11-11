@@ -327,4 +327,39 @@ class ReplyDetectorTest extends TestCase {
 
 		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
 	}
+
+	/**
+	 * Reopening a thread with text in the editor is a real reply, so it still
+	 * gets an AI response. Core saves `_wp_note_status` only after the
+	 * `wp_insert_comment` action, so the detector sees text and no meta.
+	 */
+	public function test_reopen_with_text_before_meta_saved_dispatches(): void {
+		$GLOBALS['test_comment_meta'] = array(
+			100 => array(
+				'ai_feedback' => '1',
+				'block_id'    => 'abc-123',
+			),
+		);
+
+		$reply = (object) array(
+			'comment_type'     => 'note',
+			'comment_parent'   => 100,
+			'comment_post_ID'  => 42,
+			'comment_approved' => '0',
+			'comment_content'  => 'Reopening, still an issue.',
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, $reply );
+
+		$calls = $GLOBALS['test_dispatched_calls'];
+		$this->assertSame(
+			array(
+				array(
+					'hook' => Reply_Detector::ACTION_REPLY_RECEIVED,
+					'args' => array( 200, 100, 42, 'abc-123' ),
+				),
+			),
+			$calls
+		);
+	}
 }

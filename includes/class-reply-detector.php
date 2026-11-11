@@ -84,6 +84,7 @@ class Reply_Detector {
 		 * Resolving or reopening a thread adds a status marker reply. The
 		 * REST API saves `_wp_note_status` after this action fires, so the
 		 * editor's empty resolve marker is caught by its empty content.
+		 * A reopen with text is a real reply and still gets an AI response.
 		 */
 		$note_status = get_comment_meta( $comment_id, '_wp_note_status', true );
 		if ( is_string( $note_status ) && '' !== $note_status ) {
