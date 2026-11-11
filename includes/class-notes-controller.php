@@ -277,11 +277,16 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
+		$thread = $this->notes_manager->sync_thread_status( is_numeric( $note_id ) ? (int) $note_id : 0, true );
+
 		return rest_ensure_response(
 			array(
-				'success'     => true,
-				'note_id'     => $note_id,
-				'is_resolved' => true,
+				'success'         => true,
+				'note_id'         => $note_id,
+				'is_resolved'     => true,
+				'thread_id'       => $thread['thread_id'],
+				'thread_resolved' => $thread['thread_resolved'],
+				'thread_changed'  => $thread['thread_changed'],
 			)
 		);
 	}
@@ -315,11 +320,16 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
+		$thread = $this->notes_manager->sync_thread_status( is_numeric( $note_id ) ? (int) $note_id : 0, false );
+
 		return rest_ensure_response(
 			array(
-				'success'     => true,
-				'note_id'     => $note_id,
-				'is_resolved' => false,
+				'success'         => true,
+				'note_id'         => $note_id,
+				'is_resolved'     => false,
+				'thread_id'       => $thread['thread_id'],
+				'thread_resolved' => $thread['thread_resolved'],
+				'thread_changed'  => $thread['thread_changed'],
 			)
 		);
 	}
@@ -459,8 +469,12 @@ class Notes_Controller extends WP_REST_Controller {
 	 * @return bool|WP_Error
 	 */
 	public function update_note_permissions_check( WP_REST_Request $request ) {
-		// User must be able to edit posts.
-		if ( ! current_user_can( 'edit_posts' ) ) {
+		// User must be able to edit the post the note belongs to.
+		$note_id = $request->get_param( 'note_id' );
+		$note    = is_numeric( $note_id ) ? get_comment( (int) $note_id ) : null;
+		$post_id = $note instanceof \WP_Comment ? (int) $note->comment_post_ID : 0;
+
+		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to update notes.', 'ai-feedback' ),

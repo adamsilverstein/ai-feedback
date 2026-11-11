@@ -9,6 +9,8 @@ import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
 import { navigateToBlock } from '../utils/navigate-to-block';
 import { getPriorityLevel } from '../utils/priority';
+import { getFeedbackContent } from '../utils/feedback-content';
+import FeedbackItemActions from './FeedbackItemActions';
 
 /**
  * Get severity badge emoji.
@@ -84,8 +86,15 @@ function getSeverityLabel(severity) {
  * @return {Element} Feedback item component.
  */
 function SingleFeedbackItem({ item, onNavigate }) {
+	const { title, feedback, suggestion } = getFeedbackContent(item);
+	const isDismissed = !!item.is_resolved;
+
 	return (
-		<Card className="ai-feedback-item" size="small" tabIndex={0}>
+		<Card
+			className={`ai-feedback-item${isDismissed ? ' is-dismissed' : ''}`}
+			size="small"
+			tabIndex={0}
+		>
 			<CardBody>
 				<div className="ai-feedback-item-header">
 					<span
@@ -100,27 +109,33 @@ function SingleFeedbackItem({ item, onNavigate }) {
 						{getSeverityBadge(item.severity)}
 					</span>
 					<PriorityBadge priority={item.priority} />
-					<strong className="feedback-title">{item.title}</strong>
+					<strong className="feedback-title">{title}</strong>
+					{isDismissed && (
+						<span className="feedback-dismissed-label">
+							{__('Dismissed', 'ai-feedback')}
+						</span>
+					)}
 				</div>
 
-				<p className="feedback-text">{item.feedback}</p>
+				{!isDismissed && (
+					<>
+						{feedback && (
+							<p className="feedback-text">{feedback}</p>
+						)}
 
-				{item.suggestion && (
-					<p className="feedback-suggestion">
-						<em>{item.suggestion}</em>
-					</p>
+						{suggestion && (
+							<p className="feedback-suggestion">
+								<em>{suggestion}</em>
+							</p>
+						)}
+					</>
 				)}
 
-				{item.block_id && (
-					<Button
-						variant="link"
-						size="small"
-						onClick={() => onNavigate(item.block_id)}
-						className="go-to-block-button"
-					>
-						{__('Go to block', 'ai-feedback')} →
-					</Button>
-				)}
+				<FeedbackItemActions
+					item={item}
+					title={title}
+					onNavigate={onNavigate}
+				/>
 			</CardBody>
 		</Card>
 	);
@@ -136,9 +151,15 @@ function SingleFeedbackItem({ item, onNavigate }) {
  */
 function GroupedFeedbackItem({ item, onNavigate }) {
 	const [expanded, setExpanded] = useState(false);
+	const { title, feedback, suggestion } = getFeedbackContent(item);
+	const isDismissed = !!item.is_resolved;
 
 	return (
-		<Card className="ai-feedback-group" size="small" tabIndex={0}>
+		<Card
+			className={`ai-feedback-group${isDismissed ? ' is-dismissed' : ''}`}
+			size="small"
+			tabIndex={0}
+		>
 			<CardHeader>
 				<div className="ai-feedback-group-header">
 					<Button
@@ -159,7 +180,12 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 							{getSeverityBadge(item.severity)}
 						</span>
 						<PriorityBadge priority={item.priority} />
-						<span className="group-title">{item.title}</span>
+						<span className="group-title">{title}</span>
+						{isDismissed && (
+							<span className="feedback-dismissed-label">
+								{__('Dismissed', 'ai-feedback')}
+							</span>
+						)}
 						<Icon
 							icon={expanded ? chevronUp : chevronDown}
 							size={20}
@@ -170,11 +196,11 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 
 			{expanded && (
 				<CardBody>
-					<p className="feedback-text">{item.feedback}</p>
+					{feedback && <p className="feedback-text">{feedback}</p>}
 
-					{item.suggestion && (
+					{suggestion && (
 						<p className="feedback-suggestion">
-							<em>{item.suggestion}</em>
+							<em>{suggestion}</em>
 						</p>
 					)}
 
@@ -205,6 +231,10 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 					</div>
 				</CardBody>
 			)}
+
+			<CardBody className="ai-feedback-group-actions">
+				<FeedbackItemActions item={item} title={title} />
+			</CardBody>
 		</Card>
 	);
 }

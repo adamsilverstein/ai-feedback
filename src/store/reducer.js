@@ -54,6 +54,7 @@ export const TYPES = {
 	SET_REVIEW_PROGRESS: 'SET_REVIEW_PROGRESS',
 	RECEIVE_REVIEW_HISTORY: 'RECEIVE_REVIEW_HISTORY',
 	RECEIVE_HISTORY_REVIEW: 'RECEIVE_HISTORY_REVIEW',
+	SET_NOTE_RESOLVED: 'SET_NOTE_RESOLVED',
 };
 
 /**
@@ -315,6 +316,36 @@ export default function reducer(state = initialState, action) {
 				isLoadingPreviousReview: false,
 				hasFetchedPreviousReview: true,
 				lastReview: action.review,
+			};
+
+		case TYPES.SET_NOTE_RESOLVED:
+			if (!state.lastReview?.notes) {
+				return state;
+			}
+			return {
+				...state,
+				lastReview: {
+					...state.lastReview,
+					notes: state.lastReview.notes.map((note) => {
+						let updated = note;
+						if (note.id === action.noteId) {
+							updated = {
+								...updated,
+								is_resolved: action.isResolved,
+							};
+						}
+						// Mirror the Notes panel thread status on its top-level note.
+						if (action.threadId && note.id === action.threadId) {
+							updated = {
+								...updated,
+								status: action.threadResolved
+									? 'approved'
+									: 'hold',
+							};
+						}
+						return updated;
+					}),
+				},
 			};
 
 		default:
