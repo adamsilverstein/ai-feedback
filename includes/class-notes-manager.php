@@ -154,17 +154,17 @@ class Notes_Manager {
 		$content = '';
 
 		// Add title.
-		if ( ! empty( $feedback_item['title'] ) ) {
+		if ( ! empty( $feedback_item['title'] ) && is_string( $feedback_item['title'] ) ) {
 			$content .= '<strong>' . esc_html( $feedback_item['title'] ) . '</strong>' . "\n\n";
 		}
 
 		// Add feedback.
-		if ( ! empty( $feedback_item['feedback'] ) ) {
+		if ( ! empty( $feedback_item['feedback'] ) && is_string( $feedback_item['feedback'] ) ) {
 			$content .= wp_kses_post( $feedback_item['feedback'] );
 		}
 
 		// Add suggestion if present.
-		if ( ! empty( $feedback_item['suggestion'] ) ) {
+		if ( ! empty( $feedback_item['suggestion'] ) && is_string( $feedback_item['suggestion'] ) ) {
 			$content .= "\n\n" . '<em>' . __( 'Suggestion:', 'ai-feedback' ) . '</em> ';
 			$content .= wp_kses_post( $feedback_item['suggestion'] );
 		}
@@ -242,15 +242,15 @@ class Notes_Manager {
 		// Store the feedback text separately so the sidebar can show it without
 		// parsing the note's HTML content.
 		if ( ! empty( $feedback_item['title'] ) ) {
-			$meta['feedback_title'] = $feedback_item['title'];
+			$meta['feedback_title'] = sanitize_text_field( $feedback_item['title'] );
 		}
 
 		if ( ! empty( $feedback_item['feedback'] ) ) {
-			$meta['feedback_text'] = $feedback_item['feedback'];
+			$meta['feedback_text'] = sanitize_textarea_field( $feedback_item['feedback'] );
 		}
 
 		if ( ! empty( $feedback_item['suggestion'] ) ) {
-			$meta['feedback_suggestion'] = $feedback_item['suggestion'];
+			$meta['feedback_suggestion'] = sanitize_textarea_field( $feedback_item['suggestion'] );
 		}
 
 		// Add block ID (clientId) if available.
