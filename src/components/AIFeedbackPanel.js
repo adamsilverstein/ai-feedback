@@ -16,6 +16,7 @@ import FocusAreaSelector from './FocusAreaSelector';
 import ToneSelector from './ToneSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+import ExportReview from './ExportReview';
 import ReviewHistory from './ReviewHistory';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
@@ -197,6 +198,9 @@ export default function AIFeedbackPanel() {
 						>
 							{/* ID used by skip links for keyboard navigation */}
 							<div id="ai-feedback-results">
+								<div className="ai-feedback-export-row">
+									<ExportReview review={lastReview} />
+								</div>
 								<ReviewSummary review={lastReview} />
 							</div>
 						</PanelBody>

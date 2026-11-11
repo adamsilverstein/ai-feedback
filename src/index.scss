@@ -823,3 +823,9 @@ $ai-feedback-text-muted: #595959;
 	color: #007017;
 	font-size: 12px;
 }
+
+/* Review export menu. */
+.ai-feedback-export-row {
+	display: flex;
+	justify-content: flex-end;
+}
