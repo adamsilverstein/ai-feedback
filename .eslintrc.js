@@ -18,5 +18,18 @@ module.exports = {
 				'import/no-extraneous-dependencies': 'off',
 			},
 		},
+		{
+			files: [
+				'**/__tests__/**/*.js',
+				'**/*.test.js',
+				'tests/unit/**/*.js',
+			],
+			env: {
+				jest: true,
+			},
+			rules: {
+				'import/no-extraneous-dependencies': 'off',
+			},
+		},
 	],
 };

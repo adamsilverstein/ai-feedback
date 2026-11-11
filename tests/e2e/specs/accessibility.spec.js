@@ -133,6 +133,8 @@ test.describe('Accessibility', () => {
 				.locator('.components-panel__body-toggle')
 				.filter({ hasText: 'Review Document' });
 
+			// Tone, focus area and help controls sit between these, so tab
+			// forward until each target is reached, in order.
 			await settingsToggle.focus();
 			for (const target of [
 				panel.getByLabel('AI Model'),
@@ -140,7 +142,17 @@ test.describe('Accessibility', () => {
 				reviewToggle,
 				panel.locator('#ai-feedback-review-button button'),
 			]) {
-				await page.keyboard.press('Tab');
+				let presses = 0;
+				do {
+					await page.keyboard.press('Tab');
+					presses++;
+				} while (
+					!(await target.evaluate(
+						(element) =>
+							element === element.ownerDocument.activeElement
+					)) &&
+					presses < 20
+				);
 				await expect(target).toBeFocused();
 			}
 		});
