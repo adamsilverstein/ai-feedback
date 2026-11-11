@@ -5,15 +5,28 @@ import { Notice, Button } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 import { getConnectorsUrl } from '../utils/connectors-url';
 import { getErrorKind } from '../utils/error-kind';
+import ServiceUnavailableAction from './ServiceUnavailableAction';
 
 /**
  * Get action button for specific error types.
  *
- * @param {Object} error Error object with code, message, and data.
+ * @param {Object}   error   Error object with code, message, and data.
+ * @param {number}   retries Consecutive failures because the AI service was unavailable.
+ * @param {Function} onRetry Starts the review again.
  * @return {Element|null} Action button or null.
  */
-function getErrorAction(error) {
+function getErrorAction(error, retries, onRetry) {
 	const kind = getErrorKind(error);
+
+	if (kind === 'unavailable') {
+		return (
+			<ServiceUnavailableAction
+				error={error}
+				retries={retries}
+				onRetry={onRetry}
+			/>
+		);
+	}
 
 	if (kind === 'credentials') {
 		return (
@@ -52,9 +65,11 @@ function getErrorAction(error) {
  * @param {Object}   props          Component props.
  * @param {Object}   props.error    Error object with code, message, and data.
  * @param {Function} props.onRemove Called when the notice is dismissed.
+ * @param {number}   props.retries  Consecutive failures because the AI service was unavailable.
+ * @param {Function} props.onRetry  Starts the review again.
  * @return {Element} Error notice.
  */
-export default function ErrorNotice({ error, onRemove }) {
+export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 	const message =
 		error.message ||
 		__('The review could not be completed.', 'ai-feedback');
@@ -78,7 +93,7 @@ export default function ErrorNotice({ error, onRemove }) {
 						{__('Error code:', 'ai-feedback')} {error.code}
 					</div>
 				)}
-				{getErrorAction(error)}
+				{getErrorAction(error, retries, onRetry)}
 			</div>
 		</Notice>
 	);

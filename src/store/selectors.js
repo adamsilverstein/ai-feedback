@@ -204,3 +204,13 @@ export function hasFetchedPreviousReview(state) {
 export function hasPreviousReview(state) {
 	return state.lastReview !== null;
 }
+
+/**
+ * Get how many reviews in a row failed because the AI service was down.
+ *
+ * @param {Object} state Store state.
+ * @return {number} Consecutive unavailable failures.
+ */
+export function getUnavailableRetries(state) {
+	return state.unavailableRetries;
+}

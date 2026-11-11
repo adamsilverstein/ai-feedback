@@ -102,7 +102,7 @@ X-WP-Nonce: {nonce}
 | 404 | `post_not_found` | Post does not exist |
 | 429 | `rate_limit_exceeded` | Too many review requests |
 | 500 | `ai_error` | AI provider returned an error |
-| 503 | `ai_unavailable` | AI provider is unavailable |
+| 503 | `ai_service_unavailable` | AI provider is temporarily unavailable (network error, provider outage or rate limit). `data.retry_after` gives the suggested wait in seconds. The review does not count against the hourly rate limit. |
 
 ```json
 {
@@ -554,6 +554,16 @@ function AIFeedbackPanel() {
 ## PHP Hooks
 
 ### Filters
+
+#### `ai_feedback_retry_after`
+
+Set how many seconds the editor waits before retrying a review that failed because the AI service was unavailable (default 30, clamped to 5-300). The editor retries automatically up to two times in a row while the AI Feedback panel is open, and always offers a "Retry now" button. Each user gets at most 10 rate limit refunds per hour for these failures, so a failing provider still sees a bounded number of requests.
+
+```php
+add_filter( 'ai_feedback_retry_after', function( int $seconds, WP_Error $error ): int {
+    return 60;
+}, 10, 2 );
+```
 
 #### `ai_feedback_system_instruction`
 

@@ -19,6 +19,7 @@ export const initialState = {
 	availableLocales: [],
 	isReviewing: false,
 	reviewStage: null,
+	unavailableRetries: 0,
 	lastReview: null,
 	reviewHistory: [],
 	error: null,
@@ -114,6 +115,10 @@ export default function reducer(state = initialState, action) {
 				isReviewing: true,
 				reviewStage: STAGE_PREPARING,
 				error: null,
+				// A review the user starts resets the automatic retry count.
+				unavailableRetries: action.isRetry
+					? state.unavailableRetries
+					: 0,
 			};
 
 		case TYPES.SET_REVIEW_STAGE:
@@ -131,6 +136,7 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: false,
 				reviewStage: null,
+				unavailableRetries: 0,
 				lastReview: action.review,
 				reviewHistory: [action.review, ...state.reviewHistory],
 			};
@@ -141,6 +147,10 @@ export default function reducer(state = initialState, action) {
 				isReviewing: false,
 				reviewStage: null,
 				error: action.error,
+				unavailableRetries:
+					action.error?.code === 'ai_service_unavailable'
+						? state.unavailableRetries + 1
+						: 0,
 			};
 
 		case TYPES.ADD_TO_HISTORY:

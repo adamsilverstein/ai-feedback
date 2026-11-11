@@ -71,6 +71,36 @@ class Review_Service {
 	);
 
 	/**
+	 * HTTP statuses that mean the AI provider is temporarily unavailable.
+	 *
+	 * @var int[]
+	 */
+	const UNAVAILABLE_STATUSES = array( 429, 500, 502, 503, 504 );
+
+	/**
+	 * Seconds the editor waits before retrying when the AI service is down.
+	 *
+	 * @var int
+	 */
+	const DEFAULT_RETRY_AFTER = 30;
+
+	/**
+	 * Longest retry delay the filter may set, in seconds.
+	 *
+	 * @var int
+	 */
+	const MAX_RETRY_AFTER = 300;
+
+	/**
+	 * Rate limit refunds allowed per user per hour.
+	 *
+	 * Bounds how many requests a user can send to a failing provider.
+	 *
+	 * @var int
+	 */
+	const MAX_REFUNDS_PER_HOUR = 10;
+
+	/**
 	 * Prompt builder instance.
 	 *
 	 * @var Prompt_Builder
@@ -177,7 +207,9 @@ class Review_Service {
 
 			if ( is_wp_error( $ai_response ) ) {
 				Logger::debug( sprintf( 'AI request failed: %s', $ai_response->get_error_message() ) );
-				return $ai_response;
+				return $this->is_service_unavailable_error( $ai_response )
+					? $this->service_unavailable_error( $ai_response )
+					: $ai_response;
 			}
 		}
 
@@ -448,6 +480,61 @@ class Review_Service {
 	}
 
 	/**
+	 * Whether an AI Client error means the service is temporarily down.
+	 *
+	 * Network failures, provider 5xx errors and rate limits qualify, unless
+	 * the error is one retrying cannot fix, such as an exhausted quota.
+	 *
+	 * @param  WP_Error $error The error returned after all retries.
+	 * @return bool True when the review can be retried later.
+	 */
+	public function is_service_unavailable_error( WP_Error $error ): bool {
+		if ( $this->is_non_retryable_error( $error ) ) {
+			return false;
+		}
+
+		$code = (string) $error->get_error_code();
+		if ( str_ends_with( $code, '_network_error' ) || str_ends_with( $code, '_upstream_server_error' ) ) {
+			return true;
+		}
+
+		$data   = $error->get_error_data();
+		$status = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
+
+		return in_array( $status, self::UNAVAILABLE_STATUSES, true );
+	}
+
+	/**
+	 * Build the error returned when the AI service is temporarily down.
+	 *
+	 * Uses a stable code and a plain message so the editor can offer a retry
+	 * without exposing provider details.
+	 *
+	 * @param  WP_Error $error The original AI Client error.
+	 * @return WP_Error Error with code `ai_service_unavailable` and status 503.
+	 */
+	protected function service_unavailable_error( WP_Error $error ): WP_Error {
+		/**
+		 * Filters how many seconds the editor waits before retrying a review
+		 * that failed because the AI service was unavailable.
+		 *
+		 * @param int      $retry_after Seconds to wait, between 5 and 300. Default 30.
+		 * @param WP_Error $error       The original AI Client error.
+		 */
+		$retry_after = min( self::MAX_RETRY_AFTER, max( 5, (int) apply_filters( 'ai_feedback_retry_after', self::DEFAULT_RETRY_AFTER, $error ) ) );
+
+		return new WP_Error(
+			'ai_service_unavailable',
+			__( 'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.', 'ai-feedback' ),
+			array(
+				'status'        => 503,
+				'retry_after'   => $retry_after,
+				'original_code' => $error->get_error_code(),
+			)
+		);
+	}
+
+	/**
 	 * Get mock AI response for testing.
 	 *
 	 * @param  array $blocks Document blocks with clientId, name, content.
@@ -653,6 +740,49 @@ class Review_Service {
 		// Add current review.
 		$reviews[] = time();
 		update_user_meta( $user_id, $rate_limit_key, $reviews );
+
+		return true;
+	}
+
+	/**
+	 * Give back the rate limit slot used by the user's latest review.
+	 *
+	 * Called when a review failed because the AI service was unavailable,
+	 * so retrying does not use up the hourly limit. Refunds are capped at
+	 * MAX_REFUNDS_PER_HOUR, so a failing provider still sees a bounded
+	 * number of requests. Entries are plain timestamps, so removing the
+	 * latest one is equivalent to removing this request's own entry.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return bool True when a slot was refunded.
+	 */
+	public function refund_rate_limit( int $user_id ): bool {
+		$reviews = get_user_meta( $user_id, 'ai_feedback_reviews', true );
+
+		if ( ! is_array( $reviews ) || empty( $reviews ) ) {
+			return false;
+		}
+
+		$refunds      = get_user_meta( $user_id, 'ai_feedback_refunds', true );
+		$one_hour_ago = time() - HOUR_IN_SECONDS;
+		$refunds      = array_values(
+			array_filter(
+				is_array( $refunds ) ? $refunds : array(),
+				static function ( $timestamp ) use ( $one_hour_ago ): bool {
+					return is_int( $timestamp ) && $timestamp > $one_hour_ago;
+				}
+			)
+		);
+
+		if ( count( $refunds ) >= self::MAX_REFUNDS_PER_HOUR ) {
+			return false;
+		}
+
+		array_pop( $reviews );
+		update_user_meta( $user_id, 'ai_feedback_reviews', array_values( $reviews ) );
+
+		$refunds[] = time();
+		update_user_meta( $user_id, 'ai_feedback_refunds', $refunds );
 
 		return true;
 	}
