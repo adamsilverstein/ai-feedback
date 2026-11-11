@@ -15,6 +15,10 @@ import {
 	DEFAULT_CHUNK_SIZE,
 } from '../utils/chunk-review';
 import { refreshCoreNotes } from '../utils/refresh-core-notes';
+import {
+	removeOrphanedSuggestions,
+	suggestQuickFixes,
+} from '../utils/suggestions';
 
 /**
  * Fetch settings from the server.
@@ -351,6 +355,11 @@ export function* startReview({
 			}
 		}
 
+		// Runs after REVIEW_SUCCESS is stored, since it awaits a request first.
+		suggestQuickFixes(
+			responses.flatMap((response) => response.notes || [])
+		);
+
 		return {
 			type: TYPES.REVIEW_SUCCESS,
 			review: total > 1 ? mergeChunkResponses(responses) : responses[0],
@@ -442,6 +451,21 @@ export function setFixApplied(noteId, isApplied) {
 }
 
 /**
+ * Record a note's Gutenberg suggestion status.
+ *
+ * @param {number}      noteId Note ID.
+ * @param {string|null} status Suggestion status, or null when the note is not a suggestion.
+ * @return {Object} Action object.
+ */
+export function setSuggestionStatus(noteId, status) {
+	return {
+		type: TYPES.SET_SUGGESTION_STATUS,
+		noteId,
+		status,
+	};
+}
+
+/**
  * Update block metadata with note IDs.
  * This is a control that dispatches to the block editor store.
  *
@@ -528,6 +552,7 @@ export function* fetchPreviousReview(postId) {
 		});
 
 		if (response.has_review && response.review) {
+			removeOrphanedSuggestions(response.review.notes);
 			return {
 				type: TYPES.RECEIVE_PREVIOUS_REVIEW,
 				review: response.review,

@@ -43,3 +43,33 @@ describe('reducer unavailableRetries', () => {
 		).toBe(0);
 	});
 });
+
+describe('SET_SUGGESTION_STATUS', () => {
+	it('updates the matching note', () => {
+		const state = {
+			...initialState,
+			lastReview: { notes: [{ id: 1 }, { id: 2 }] },
+		};
+
+		const next = reducer(state, {
+			type: TYPES.SET_SUGGESTION_STATUS,
+			noteId: 2,
+			status: 'pending',
+		});
+
+		expect(next.lastReview.notes).toEqual([
+			{ id: 1 },
+			{ id: 2, suggestion_status: 'pending' },
+		]);
+	});
+
+	it('ignores the action without a review', () => {
+		expect(
+			reducer(initialState, {
+				type: TYPES.SET_SUGGESTION_STATUS,
+				noteId: 2,
+				status: null,
+			})
+		).toBe(initialState);
+	});
+});

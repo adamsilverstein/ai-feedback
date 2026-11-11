@@ -57,6 +57,7 @@ export const TYPES = {
 	RECEIVE_HISTORY_REVIEW: 'RECEIVE_HISTORY_REVIEW',
 	SET_NOTE_RESOLVED: 'SET_NOTE_RESOLVED',
 	SET_FIX_APPLIED: 'SET_FIX_APPLIED',
+	SET_SUGGESTION_STATUS: 'SET_SUGGESTION_STATUS',
 };
 
 /**
@@ -359,6 +360,22 @@ export default function reducer(state = initialState, action) {
 			}
 			return { ...state, appliedFixes };
 		}
+
+		case TYPES.SET_SUGGESTION_STATUS:
+			if (!state.lastReview?.notes) {
+				return state;
+			}
+			return {
+				...state,
+				lastReview: {
+					...state.lastReview,
+					notes: state.lastReview.notes.map((note) =>
+						note.id === action.noteId
+							? { ...note, suggestion_status: action.status }
+							: note
+					),
+				},
+			};
 
 		default:
 			return state;

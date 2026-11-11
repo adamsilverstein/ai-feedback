@@ -40,6 +40,33 @@ export function describeFix(fix) {
 }
 
 /**
+ * Describe where a quick fix stands as a Gutenberg suggestion.
+ *
+ * @param {string} status Suggestion status from `_wp_suggestion_status`.
+ * @return {string} Status message.
+ */
+export function describeSuggestionStatus(status) {
+	switch (status) {
+		case 'applied':
+		case 'applied-unsaved':
+			return __('You accepted this suggested edit.', 'ai-feedback');
+		case 'rejected':
+		case 'rejected-unsaved':
+			return __('You rejected this suggested edit.', 'ai-feedback');
+		case 'outdated':
+			return __(
+				'This suggested edit no longer applies because the text changed.',
+				'ai-feedback'
+			);
+		default:
+			return __(
+				'Suggested in the text. Accept or reject it from the Notes sidebar.',
+				'ai-feedback'
+			);
+	}
+}
+
+/**
  * Quick fix component.
  *
  * @param {Object} props      Component props.
@@ -71,6 +98,20 @@ export default function QuickFix({ item }) {
 	const { setNoteResolved, setFixApplied } = useDispatch(STORE_NAME);
 	const { createSuccessNotice, createWarningNotice } =
 		useDispatch(noticesStore);
+
+	// Gutenberg's suggestion UI owns fixes that became suggestions.
+	if (item.suggestion_status) {
+		return (
+			<div className="ai-feedback-quick-fix">
+				<p className="ai-feedback-quick-fix-summary">
+					{describeFix(fix)}
+				</p>
+				<p className="ai-feedback-quick-fix-suggested description">
+					{describeSuggestionStatus(item.suggestion_status)}
+				</p>
+			</div>
+		);
+	}
 
 	// Blocks without rich text content (eg. a list or quote, whose text lives
 	// in inner blocks) can't take a quick fix here.

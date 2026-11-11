@@ -309,4 +309,32 @@ describe('FeedbackItem quick fixes', () => {
 			screen.queryByRole('button', { name: 'Apply fix' })
 		).not.toBeInTheDocument();
 	});
+
+	it('points to the Notes sidebar once the fix is a suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.getByText('Replace “is passive” with “reads actively”')
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				'Suggested in the text. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
+	});
+
+	it('shows a decided suggestion', () => {
+		renderItem({ ...fixItem, suggestion_status: 'applied' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.getByText('You accepted this suggested edit.')
+		).toBeInTheDocument();
+	});
 });
