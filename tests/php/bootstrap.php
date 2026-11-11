@@ -542,6 +542,11 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 if ( ! function_exists( 'do_action' ) ) {
 	function do_action( $hook_name, ...$args ) {
 		$GLOBALS['test_actions'][ $hook_name ][] = $args;
+		// The reply tests read dispatches in call order.
+		$GLOBALS['test_dispatched_calls'][] = array(
+			'hook' => $hook_name,
+			'args' => $args,
+		);
 	}
 }
 
