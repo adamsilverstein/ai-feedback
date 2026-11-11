@@ -98,6 +98,12 @@ test.describe('Accessibility', () => {
 				} catch {}
 			});
 			await admin.createNewPost();
+			// Earlier tests may have saved the welcome as seen.
+			await page.evaluate(() =>
+				window.wp.data
+					.dispatch('core/preferences')
+					.set('ai-feedback', 'welcomeDismissed', false)
+			);
 			await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 			const modal = page.getByRole('dialog', {

@@ -15,6 +15,7 @@ import {
 	DEFAULT_CHUNK_SIZE,
 } from '../utils/chunk-review';
 import { refreshCoreNotes } from '../utils/refresh-core-notes';
+import { recordCompletedReview } from '../tips';
 
 /**
  * Fetch settings from the server.
@@ -350,6 +351,9 @@ export function* startReview({
 				};
 			}
 		}
+
+		// Only count once every chunk has finished.
+		recordCompletedReview();
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
