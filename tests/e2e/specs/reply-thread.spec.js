@@ -246,17 +246,22 @@ test.describe('Reply loop', () => {
 		page,
 		editor,
 		admin,
+		requestUtils,
 		aiFeedback,
 		baseURL,
 	}) => {
-		// Set the content as an attribute: typing right after inserting the
-		// block can drop keystrokes, which leaves nothing to review.
-		await admin.createNewPost({ title: 'Reply loop' });
-		await editor.insertBlock({
-			name: 'core/paragraph',
-			attributes: { content: 'Revenue grew 40% last year.' },
+		// Create the post over REST: content added in a freshly loaded editor
+		// is sometimes lost before the save, which leaves nothing to review.
+		const post = await requestUtils.createPost({
+			title: 'Reply loop',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40% last year.</p><!-- /wp:paragraph -->',
+			status: 'draft',
 		});
-		await editor.saveDraft();
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
 		await aiFeedback.openSidebar();
 
 		const response = await aiFeedback.runReview();
