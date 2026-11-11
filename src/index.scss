@@ -8,7 +8,6 @@ $ai-feedback-text-muted: #595959;
 /* Screen reader only text - visually hidden but available to assistive technologies */
 .screen-reader-text {
 	border: 0;
-	clip: rect(1px, 1px, 1px, 1px);
 	clip-path: inset(50%);
 	height: 1px;
 	margin: -1px;
@@ -16,7 +15,7 @@ $ai-feedback-text-muted: #595959;
 	padding: 0;
 	position: absolute;
 	width: 1px;
-	word-wrap: normal;
+	overflow-wrap: normal;
 }
 
 /* Skip Links for keyboard navigation */
@@ -28,7 +27,6 @@ $ai-feedback-text-muted: #595959;
 		/* Hidden state using clip pattern (matches screen-reader-text) */
 		display: block;
 		border: 0;
-		clip: rect(1px, 1px, 1px, 1px);
 		clip-path: inset(50%);
 		height: 1px;
 		margin: -1px;
@@ -36,7 +34,7 @@ $ai-feedback-text-muted: #595959;
 		padding: 0;
 		position: absolute;
 		width: 1px;
-		word-wrap: normal;
+		overflow-wrap: normal;
 
 		/* Visual styling applied when visible */
 		background: var(--wp-admin-theme-color, #007cba);
@@ -49,7 +47,6 @@ $ai-feedback-text-muted: #595959;
 		&:focus {
 
 			/* Reveal on focus */
-			clip: auto;
 			clip-path: none;
 			height: auto;
 			width: auto;
@@ -657,7 +654,7 @@ $ai-feedback-text-muted: #595959;
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) {
+@media (prefers-contrast: more) {
 
 	.ai-feedback-panel .components-button:focus-visible {
 		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;
