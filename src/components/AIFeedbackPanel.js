@@ -16,6 +16,7 @@ import FocusAreaSelector from './FocusAreaSelector';
 import ToneSelector from './ToneSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
+import ReviewHistory from './ReviewHistory';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
 import ErrorNotice from './ErrorNotice';
@@ -202,6 +203,8 @@ export default function AIFeedbackPanel() {
 					)}
 				</>
 			)}
+
+			<ReviewHistory />
 		</div>
 	);
 }

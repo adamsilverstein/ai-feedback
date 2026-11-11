@@ -23,7 +23,8 @@ export const initialState = {
 	unavailableRetries: 0,
 	reviewProgress: null,
 	lastReview: null,
-	reviewHistory: [],
+	reviewHistories: {},
+	historyReviews: {},
 	error: null,
 	isLoadingSettings: false,
 	isLoadingPreviousReview: false,
@@ -51,7 +52,86 @@ export const TYPES = {
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
 	SET_REVIEW_STAGE: 'SET_REVIEW_STAGE',
 	SET_REVIEW_PROGRESS: 'SET_REVIEW_PROGRESS',
+	RECEIVE_REVIEW_HISTORY: 'RECEIVE_REVIEW_HISTORY',
+	RECEIVE_HISTORY_REVIEW: 'RECEIVE_HISTORY_REVIEW',
 };
+
+/**
+ * Maximum history entries kept, matching Review_History::MAX_ENTRIES.
+ */
+export const MAX_HISTORY_ENTRIES = 10;
+
+/**
+ * Reduce a review response to a history entry.
+ *
+ * @param {Object} review Review response from the API.
+ * @return {Object} History entry.
+ */
+export function toHistoryEntry(review) {
+	return {
+		review_id: review.review_id,
+		timestamp: review.timestamp,
+		model: review.model,
+		note_count: review.note_count ?? 0,
+		notes_failed: !!review.notes_error,
+		summary_text: review.summary_text || '',
+		summary: {
+			by_severity: review.summary?.by_severity || {},
+			by_category: review.summary?.by_category || {},
+		},
+	};
+}
+
+/**
+ * Merge history entries, newest first, without duplicates and capped.
+ *
+ * @param {Array} entries Entries in priority order; the first copy of a review wins.
+ * @return {Array} Merged history.
+ */
+export function mergeHistory(entries) {
+	const seen = new Set();
+	return entries
+		.filter((entry) => {
+			if (!entry?.review_id || seen.has(entry.review_id)) {
+				return false;
+			}
+			seen.add(entry.review_id);
+			return true;
+		})
+		.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+		.slice(0, MAX_HISTORY_ENTRIES);
+}
+
+/**
+ * Add a review to its post's history.
+ *
+ * @param {Object} histories History entries keyed by post ID.
+ * @param {Object} review    Review response.
+ * @return {Object} New histories.
+ */
+function addReviewToHistories(histories, review) {
+	if (!review?.post_id) {
+		return histories;
+	}
+	return {
+		...histories,
+		[review.post_id]: mergeHistory([
+			toHistoryEntry(review),
+			...(histories[review.post_id] || []),
+		]),
+	};
+}
+
+/**
+ * Cache key for a past review.
+ *
+ * @param {number} postId   Post ID.
+ * @param {string} reviewId Review ID.
+ * @return {string} Key.
+ */
+export function historyReviewKey(postId, reviewId) {
+	return `${postId}:${reviewId}`;
+}
 
 /**
  * Reducer function.
@@ -150,7 +230,10 @@ export default function reducer(state = initialState, action) {
 				unavailableRetries: 0,
 				reviewProgress: null,
 				lastReview: action.review,
-				reviewHistory: [action.review, ...state.reviewHistory],
+				reviewHistories: addReviewToHistories(
+					state.reviewHistories,
+					action.review
+				),
 			};
 
 		case TYPES.REVIEW_ERROR:
@@ -169,7 +252,34 @@ export default function reducer(state = initialState, action) {
 		case TYPES.ADD_TO_HISTORY:
 			return {
 				...state,
-				reviewHistory: [action.review, ...state.reviewHistory],
+				reviewHistories: addReviewToHistories(
+					state.reviewHistories,
+					action.review
+				),
+			};
+
+		case TYPES.RECEIVE_REVIEW_HISTORY:
+			// Keep entries added this session in case they finished before
+			// the fetch returned.
+			return {
+				...state,
+				reviewHistories: {
+					...state.reviewHistories,
+					[action.postId]: mergeHistory([
+						...(state.reviewHistories[action.postId] || []),
+						...(action.history || []),
+					]),
+				},
+			};
+
+		case TYPES.RECEIVE_HISTORY_REVIEW:
+			return {
+				...state,
+				historyReviews: {
+					...state.historyReviews,
+					[historyReviewKey(action.postId, action.reviewId)]:
+						action.review,
+				},
 			};
 
 		case TYPES.CLEAR_ERROR:

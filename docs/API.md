@@ -426,6 +426,36 @@ X-WP-Nonce: {nonce}
 }
 ```
 
+### GET /history/post/{post_id}
+
+Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. Requires `edit_post` on the post.
+
+#### Response
+
+```json
+{
+  "history": [
+    {
+      "review_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2026-11-08 10:00:00",
+      "model": "claude-sonnet-4",
+      "note_count": 3,
+      "user_id": 1,
+      "summary_text": "A clear draft with a few flow issues.",
+      "summary": {
+        "by_severity": { "critical": 0, "important": 1, "suggestion": 2 },
+        "by_category": { "content": 1, "tone": 0, "flow": 2, "design": 0 }
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
+### GET /history/post/{post_id}/review/{review_id}
+
+Returns one history entry plus the notes that review created, as `notes`. Notes deleted since the review ran are omitted. Returns `404` when the review is not in the post's history. Requires `edit_post` on the post.
+
 ---
 
 ## WordPress Data Store
@@ -697,7 +727,7 @@ add_action( 'ai_feedback_before_review', function( int $post_id, array $options 
 
 #### `ai_feedback_after_review`
 
-Fires after a review completes.
+Fires after a review completes and its notes are created. `$result` is the review response returned to the editor. Review history is recorded on this hook.
 
 ```php
 add_action( 'ai_feedback_after_review', function( int $post_id, array $result ): void {

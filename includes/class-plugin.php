@@ -55,6 +55,13 @@ class Plugin {
 	private ?Health_Controller $health_controller = null;
 
 	/**
+	 * History controller instance.
+	 *
+	 * @var History_Controller|null
+	 */
+	private ?History_Controller $history_controller = null;
+
+	/**
 	 * Get plugin instance.
 	 *
 	 * @return Plugin
@@ -86,7 +93,9 @@ class Plugin {
 	 * Initialize hooks.
 	 */
 	private function init_hooks(): void {
+		add_action( 'init', array( Review_History::class, 'register_meta' ) );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
 		// Add custom avatar for AI Feedback comments/notes.
@@ -108,6 +117,9 @@ class Plugin {
 
 		$this->health_controller = new Health_Controller();
 		$this->health_controller->register_routes();
+
+		$this->history_controller = new History_Controller();
+		$this->history_controller->register_routes();
 	}
 
 	/**
