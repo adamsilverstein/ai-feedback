@@ -337,6 +337,35 @@ describe('FeedbackItem quick fixes', () => {
 		).not.toBeInTheDocument();
 	});
 
+	it('hides dismiss while the suggestion is pending', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+		});
+
+		expect(
+			screen.queryByRole('button', { name: /^Dismiss feedback/ })
+		).not.toBeInTheDocument();
+	});
+
+	it('offers dismiss again once the suggestion is decided', () => {
+		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
+			blocks,
+			notes: [
+				{
+					id: 7,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: 'rejected',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.getByRole('button', { name: /^Dismiss feedback/ })
+		).toBeInTheDocument();
+	});
+
 	it('reads the status Gutenberg wrote to the note', () => {
 		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
 			blocks,
