@@ -1,6 +1,7 @@
 /**
  * Store reducer.
  */
+import { STAGE_PREPARING } from './review-stages';
 
 /**
  * Initial state.
@@ -17,6 +18,7 @@ export const initialState = {
 	availableTones: [],
 	availableLocales: [],
 	isReviewing: false,
+	reviewStage: null,
 	lastReview: null,
 	reviewHistory: [],
 	error: null,
@@ -44,6 +46,7 @@ export const TYPES = {
 	UPDATE_BLOCK_NOTES: 'UPDATE_BLOCK_NOTES',
 	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
+	SET_REVIEW_STAGE: 'SET_REVIEW_STAGE',
 };
 
 /**
@@ -109,13 +112,25 @@ export default function reducer(state = initialState, action) {
 			return {
 				...state,
 				isReviewing: true,
+				reviewStage: STAGE_PREPARING,
 				error: null,
+			};
+
+		case TYPES.SET_REVIEW_STAGE:
+			// Ignore late stage updates once the review has finished.
+			if (!state.isReviewing) {
+				return state;
+			}
+			return {
+				...state,
+				reviewStage: action.stage,
 			};
 
 		case TYPES.REVIEW_SUCCESS:
 			return {
 				...state,
 				isReviewing: false,
+				reviewStage: null,
 				lastReview: action.review,
 				reviewHistory: [action.review, ...state.reviewHistory],
 			};
@@ -124,6 +139,7 @@ export default function reducer(state = initialState, action) {
 			return {
 				...state,
 				isReviewing: false,
+				reviewStage: null,
 				error: action.error,
 			};
 

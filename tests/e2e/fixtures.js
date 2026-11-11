@@ -47,7 +47,7 @@ function buildReviewResponse(overrides = {}) {
 	return {
 		review_id: 'e2e-review',
 		post_id: 1,
-		model: 'claude-sonnet-4',
+		model: 'claude-sonnet-5-5',
 		notes: [],
 		note_ids: [],
 		block_mapping: {},

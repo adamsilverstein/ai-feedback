@@ -266,7 +266,7 @@ test.describe('Accessibility', () => {
 			});
 			await expect(progress).toHaveAttribute(
 				'aria-valuetext',
-				'Processing review'
+				'Step 2 of 3: AI is analyzing your content…'
 			);
 
 			releaseReview();

@@ -4,7 +4,7 @@
 const { test, expect } = require('../fixtures');
 
 const DEFAULT_SETTINGS = {
-	default_model: 'claude-sonnet-4',
+	default_model: 'claude-sonnet-5-5',
 	feedback_locale: 'auto',
 };
 
@@ -122,12 +122,12 @@ test.describe('AI Feedback Sidebar', () => {
 				.allTextContents();
 
 			expect(optionLabels).toEqual([
-				'Anthropic - Claude Sonnet 4',
+				'Anthropic - Claude Sonnet 5.5',
 				'Anthropic - Claude Opus 4',
 				'Openai - GPT-4o',
 				'Google - Gemini 2.0 Flash',
 			]);
-			await expect(modelSelect).toHaveValue('claude-sonnet-4');
+			await expect(modelSelect).toHaveValue('claude-sonnet-5-5');
 		});
 
 		test('saves the selected model and language', async ({

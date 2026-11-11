@@ -103,6 +103,16 @@ export function isReviewing(state) {
 }
 
 /**
+ * Get the current review stage key.
+ *
+ * @param {Object} state Store state.
+ * @return {string|null} Stage key, or null when no review is running.
+ */
+export function getReviewStage(state) {
+	return state.reviewStage;
+}
+
+/**
  * Get the last review.
  *
  * @param {Object} state Store state.
