@@ -10,29 +10,7 @@ import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { extractBlockData } from '../utils/block-utils';
 import { isPostSaved } from '../utils/post-status';
-
-/**
- * Indeterminate Progress Bar component.
- * Shows an animated progress bar that moves back and forth.
- *
- * @return {Element} Progress bar component.
- */
-function IndeterminateProgressBar() {
-	return (
-		<div
-			className="ai-feedback-progress-container"
-			role="progressbar"
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-label={__('Review progress', 'ai-feedback')}
-			aria-valuetext={__('Processing review', 'ai-feedback')}
-		>
-			<div className="ai-feedback-progress-bar">
-				<div className="ai-feedback-progress-indicator" />
-			</div>
-		</div>
-	);
-}
+import ReviewProgress from './ReviewProgress';
 
 /**
  * Review Button component.
@@ -46,6 +24,7 @@ export default function ReviewButton() {
 		postTitle,
 		editorBlocks,
 		isReviewing,
+		reviewStage,
 		selectedModel,
 		focusAreas,
 		targetTone,
@@ -57,6 +36,7 @@ export default function ReviewButton() {
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			editorBlocks: select(blockEditorStore).getBlocks(),
 			isReviewing: select(STORE_NAME).isReviewing(),
+			reviewStage: select(STORE_NAME).getReviewStage(),
 			selectedModel: select(STORE_NAME).getSelectedModel(),
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
@@ -123,14 +103,7 @@ export default function ReviewButton() {
 					{__('Save your post first to enable review', 'ai-feedback')}
 				</p>
 			)}
-			{isReviewing && (
-				<>
-					<IndeterminateProgressBar />
-					<p className="description">
-						{__('AI is analyzing your content…', 'ai-feedback')}
-					</p>
-				</>
-			)}
+			{isReviewing && <ReviewProgress stageKey={reviewStage} />}
 		</div>
 	);
 }
