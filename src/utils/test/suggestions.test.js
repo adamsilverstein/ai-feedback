@@ -18,6 +18,7 @@ import {
  */
 import {
 	buildSuggestionContent,
+	buildSuggestionPayload,
 	canSuggest,
 	hasSuggestionMarker,
 	hasSuggestionMarkers,
@@ -29,6 +30,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
 	apiFetch: vi.fn(),
+	saveEntityRecord: vi.fn(),
 	blocks: {},
 	postContent: '',
 	updateBlockAttributes: vi.fn(),
@@ -40,7 +42,6 @@ vi.mock('@wordpress/api-fetch', () => ({ default: mocks.apiFetch }));
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 vi.mock('@wordpress/blocks', () => ({ store: 'core/blocks' }));
 vi.mock('@wordpress/notices', () => ({ store: 'core/notices' }));
-vi.mock('../refresh-core-notes', () => ({ refreshCoreNotes: vi.fn() }));
 vi.mock('@wordpress/data', async (importOriginal) => {
 	const actual = await importOriginal();
 	return {
@@ -73,6 +74,8 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 					return { createInfoNotice: mocks.createInfoNotice };
 				case 'ai-feedback/store':
 					return { setSuggestionStatus: mocks.setSuggestionStatus };
+				case 'core':
+					return { saveEntityRecord: mocks.saveEntityRecord };
 				default:
 					return actual.dispatch(store);
 			}
@@ -81,6 +84,23 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 });
 
 const fix = { find: 'in order to', replace: 'to' };
+
+/**
+ * Resolves a meta save the way the comments endpoint answers it.
+ *
+ * @param {Object} record      Saved record.
+ * @param {number} record.id   Note ID.
+ * @param {Object} record.meta Meta values.
+ * @return {Promise<Object>} Comment record.
+ */
+const savedRecord = async ({ id, meta }) => ({
+	id,
+	author: 0,
+	meta: {
+		_wp_suggestion: meta._wp_suggestion ?? '',
+		_wp_suggestion_status: meta._wp_suggestion_status ?? '',
+	},
+});
 
 describe('buildSuggestionContent', () => {
 	it('adds an add run followed by a del run under one id', () => {
@@ -189,6 +209,34 @@ describe('buildSuggestionContent', () => {
 	});
 });
 
+describe('buildSuggestionPayload', () => {
+	it('describes a replacement as one inline operation', () => {
+		expect(
+			buildSuggestionPayload('core/paragraph', 'content', fix)
+		).toEqual({
+			schemaVersion: 2,
+			blockName: 'core/paragraph',
+			baseRevision: null,
+			operations: [
+				{
+					type: 'inline-suggestion',
+					attribute: 'content',
+					suggestionType: 'replace',
+				},
+			],
+		});
+	});
+
+	it('describes an empty replacement as a deletion', () => {
+		expect(
+			buildSuggestionPayload('core/heading', 'content', {
+				find: 'very ',
+				replace: '',
+			}).operations[0].suggestionType
+		).toBe('del');
+	});
+});
+
 describe('marker helpers', () => {
 	it('finds suggestion markers', () => {
 		expect(hasSuggestionMarkers('<mark class="wp-suggestion-add">')).toBe(
@@ -245,6 +293,9 @@ describe('suggestQuickFix', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			savedRecord(record)
+		);
 		mocks.blocks = {
 			'block-1': {
 				name: 'core/paragraph',
@@ -253,23 +304,27 @@ describe('suggestQuickFix', () => {
 		};
 	});
 
-	it('stores the payload, then writes the markers', async () => {
-		mocks.apiFetch.mockResolvedValue({ author: 0 });
-
+	it('stores the payload through core-data, then writes the markers', async () => {
 		await expect(suggestQuickFix(note)).resolves.toBe(true);
 
-		expect(mocks.apiFetch).toHaveBeenCalledWith({
-			path: '/ai-feedback/v1/notes/12/suggestion',
-			method: 'POST',
-			data: {
-				block_name: 'core/paragraph',
-				text: 'We met in order to plan.',
+		expect(mocks.saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			{
+				id: 12,
+				meta: {
+					_wp_suggestion: JSON.stringify(
+						buildSuggestionPayload('core/paragraph', 'content', fix)
+					),
+					_wp_suggestion_status: 'pending',
+				},
 			},
-		});
+			{ throwOnError: true }
+		);
+		expect(mocks.apiFetch).not.toHaveBeenCalled();
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
-			content: expect.stringContaining(
-				'<mark class="wp-suggestion-del" data-suggestion-id="12"'
-			),
+			content:
+				'We met <mark class="wp-suggestion-add" data-suggestion-id="12" data-suggestion-type="add" data-author="0">to</mark><mark class="wp-suggestion-del" data-suggestion-id="12" data-suggestion-type="del" data-author="0">in order to</mark> plan.',
 		});
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(12, 'pending');
 	});
@@ -278,25 +333,48 @@ describe('suggestQuickFix', () => {
 		mocks.blocks['block-1'].attributes.content = 'We met to plan.';
 
 		await expect(suggestQuickFix(note)).resolves.toBe(false);
-		expect(mocks.apiFetch).not.toHaveBeenCalled();
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
 	it('removes the payload when the block changed during the request', async () => {
-		mocks.apiFetch.mockImplementation(async ({ method }) => {
-			if (method === 'POST') {
-				mocks.blocks['block-1'].attributes.content = 'Rewritten.';
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, record) => {
+				if (record.meta._wp_suggestion) {
+					mocks.blocks['block-1'].attributes.content = 'Rewritten.';
+				}
+				return savedRecord(record);
 			}
-			return {};
-		});
+		);
 
 		await expect(suggestQuickFix(note)).resolves.toBe(false);
 
-		expect(mocks.apiFetch).toHaveBeenLastCalledWith({
-			path: '/ai-feedback/v1/notes/12/suggestion',
-			method: 'DELETE',
-		});
+		expect(mocks.saveEntityRecord).toHaveBeenLastCalledWith(
+			'root',
+			'comment',
+			{
+				id: 12,
+				meta: { _wp_suggestion: null, _wp_suggestion_status: null },
+			},
+			{ throwOnError: true }
+		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(12, null);
+	});
+
+	it('removes the note again when the server dropped the payload', async () => {
+		// Gutenberg's sanitize callback stores '' for a payload it rejects.
+		mocks.saveEntityRecord.mockImplementation(async (kind, name, record) =>
+			savedRecord({ id: record.id, meta: {} })
+		);
+
+		await expect(suggestQuickFix(note)).resolves.toBe(false);
+
+		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(2);
+		expect(mocks.saveEntityRecord.mock.calls[1][2]).toEqual({
+			id: 12,
+			meta: { _wp_suggestion: null, _wp_suggestion_status: null },
+		});
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 });
 
@@ -309,7 +387,9 @@ describe('suggestQuickFixes', () => {
 				attributes: { content: 'We met in order to plan.' },
 			},
 		};
-		mocks.apiFetch.mockResolvedValue({ author: 0 });
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			savedRecord(record)
+		);
 	});
 
 	afterEach(() => {
@@ -321,7 +401,7 @@ describe('suggestQuickFixes', () => {
 		await expect(
 			suggestQuickFixes([{ id: 12, block_id: 'block-1', quick_fix: fix }])
 		).resolves.toBe(0);
-		expect(mocks.apiFetch).not.toHaveBeenCalled();
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
 	it('adds eligible fixes and announces them', async () => {
@@ -337,10 +417,35 @@ describe('suggestQuickFixes', () => {
 		expect(mocks.createInfoNotice).toHaveBeenCalled();
 	});
 
+	it('only suggests the first fix in a block', async () => {
+		window.__experimentalSuggestionMode = true;
+		window.aiFeedbackData = { suggestions: true };
+		mocks.blocks['block-1'].attributes.content =
+			'We met in order to plan the very big launch.';
+		mocks.updateBlockAttributes.mockImplementationOnce((id, attributes) =>
+			Object.assign(mocks.blocks[id].attributes, attributes)
+		);
+
+		await expect(
+			suggestQuickFixes([
+				{ id: 12, block_id: 'block-1', quick_fix: fix },
+				{
+					id: 13,
+					block_id: 'block-1',
+					quick_fix: { find: 'very ', replace: '' },
+				},
+			])
+		).resolves.toBe(1);
+
+		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(1);
+		expect(mocks.saveEntityRecord.mock.calls[0][2].id).toBe(12);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
+	});
+
 	it('keeps going when one request fails', async () => {
 		window.__experimentalSuggestionMode = true;
 		window.aiFeedbackData = { suggestions: true };
-		mocks.apiFetch.mockRejectedValue(new Error('nope'));
+		mocks.saveEntityRecord.mockRejectedValue(new Error('nope'));
 
 		await expect(
 			suggestQuickFixes([{ id: 12, block_id: 'block-1', quick_fix: fix }])
@@ -352,7 +457,9 @@ describe('suggestQuickFixes', () => {
 describe('removeOrphanedSuggestions', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mocks.apiFetch.mockResolvedValue({});
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			savedRecord(record)
+		);
 	});
 
 	it('removes pending suggestions whose markers are gone', async () => {
@@ -368,10 +475,10 @@ describe('removeOrphanedSuggestions', () => {
 			])
 		).resolves.toBe(1);
 
-		expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
-		expect(mocks.apiFetch).toHaveBeenCalledWith({
-			path: '/ai-feedback/v1/notes/13/suggestion',
-			method: 'DELETE',
+		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(1);
+		expect(mocks.saveEntityRecord.mock.calls[0][2]).toEqual({
+			id: 13,
+			meta: { _wp_suggestion: null, _wp_suggestion_status: null },
 		});
 	});
 
@@ -383,6 +490,6 @@ describe('removeOrphanedSuggestions', () => {
 				{ id: 13, suggestion_status: 'pending' },
 			])
 		).resolves.toBe(0);
-		expect(mocks.apiFetch).not.toHaveBeenCalled();
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 });

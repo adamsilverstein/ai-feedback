@@ -21,26 +21,13 @@ namespace {
 			return ! empty( $GLOBALS['test_registered_meta'][ $object_type ][ $meta_key ] );
 		}
 	}
-
-	if ( ! function_exists( 'delete_comment_meta' ) ) {
-		function delete_comment_meta( $comment_id, $key ) {
-			unset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] );
-			return true;
-		}
-	}
-
-	if ( ! function_exists( 'wp_slash' ) ) {
-		// The comment meta mocks don't unslash, so slashing is a no-op here.
-		function wp_slash( $value ) {
-			return $value;
-		}
-	}
 	// phpcs:enable
 }
 
 namespace AI_Feedback\Tests {
 
 	use PHPUnit\Framework\TestCase;
+	use AI_Feedback\Notes_Manager;
 	use AI_Feedback\Suggestions;
 
 	/**
@@ -64,8 +51,9 @@ namespace AI_Feedback\Tests {
 			$GLOBALS['test_comments']              = array(
 				self::NOTE_ID => new \WP_Comment(
 					array(
-						'comment_ID'      => (string) self::NOTE_ID,
-						'comment_post_ID' => '42',
+						'comment_ID'       => (string) self::NOTE_ID,
+						'comment_post_ID'  => '42',
+						'comment_approved' => '0',
 					)
 				),
 			);
@@ -75,6 +63,14 @@ namespace AI_Feedback\Tests {
 					'feedback_quick_fix' => '{"find":"in order to","replace":"to"}',
 				),
 			);
+		}
+
+		/**
+		 * Clears forced filter results.
+		 */
+		protected function tearDown(): void {
+			unset( $GLOBALS['test_filter_results'] );
+			parent::tearDown();
 		}
 
 		/**
@@ -92,149 +88,15 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
-		 * A replacement builds a v2 payload with one inline operation.
+		 * The `ai_feedback_use_suggestions` filter has the last word.
 		 */
-		public function test_build_payload_for_replacement(): void {
-			$payload = ( new Suggestions() )->build_payload(
-				'core/paragraph',
-				'content',
-				array(
-					'find'    => 'in order to',
-					'replace' => 'to',
-				)
-			);
+		public function test_filter_overrides_availability(): void {
+			$GLOBALS['test_filter_results'] = array( 'ai_feedback_use_suggestions' => false );
+			$this->assertFalse( Suggestions::is_available() );
 
-			$this->assertSame(
-				array(
-					'schemaVersion' => 2,
-					'blockName'     => 'core/paragraph',
-					'baseRevision'  => null,
-					'operations'    => array(
-						array(
-							'type'           => 'inline-suggestion',
-							'attribute'      => 'content',
-							'suggestionType' => 'replace',
-						),
-					),
-				),
-				$payload
-			);
-		}
-
-		/**
-		 * An empty replacement is a deletion.
-		 */
-		public function test_empty_replacement_is_deletion(): void {
-			$this->assertSame(
-				'del',
-				Suggestions::suggestion_type(
-					array(
-						'find'    => 'very ',
-						'replace' => '',
-					)
-				)
-			);
-		}
-
-		/**
-		 * Creating a suggestion stores the payload and a pending status.
-		 */
-		public function test_create_for_note_stores_payload(): void {
-			$result = ( new Suggestions() )->create_for_note( self::NOTE_ID, 'core/paragraph', 'We met in order to plan.' );
-
-			$this->assertIsArray( $result );
-			$this->assertSame( 'replace', $result['suggestion_type'] );
-			$this->assertSame( 0, $result['author'] );
-			$this->assertSame( 'pending', $result['status'] );
-
-			$meta = $GLOBALS['test_comment_meta'][ self::NOTE_ID ];
-			$this->assertSame( 'pending', $meta[ Suggestions::STATUS_META ] );
-			$stored = json_decode( $meta[ Suggestions::PAYLOAD_META ], true );
-			$this->assertSame( 'core/paragraph', $stored['blockName'] );
-			$this->assertSame( 'pending', ( new Suggestions() )->get_status( self::NOTE_ID ) );
-		}
-
-		/**
-		 * A fix that no longer matches the block exactly once is refused.
-		 *
-		 * @dataProvider stale_text_provider
-		 *
-		 * @param string $text Current block text.
-		 */
-		public function test_create_for_note_refuses_stale_text( string $text ): void {
-			$result = ( new Suggestions() )->create_for_note( self::NOTE_ID, 'core/paragraph', $text );
-
-			$this->assertInstanceOf( \WP_Error::class, $result );
-			$this->assertSame( 'ai_feedback_suggestion_stale', $result->get_error_code() );
-			$this->assertArrayNotHasKey( Suggestions::PAYLOAD_META, $GLOBALS['test_comment_meta'][ self::NOTE_ID ] );
-		}
-
-		/**
-		 * Block text the fix no longer matches exactly once.
-		 *
-		 * @return array<string, array{string}>
-		 */
-		public static function stale_text_provider(): array {
-			return array(
-				'missing'   => array( 'We met to plan.' ),
-				'ambiguous' => array( 'in order to go, in order to stay' ),
-			);
-		}
-
-		/**
-		 * Notes the plugin did not write, or replies, are refused.
-		 */
-		public function test_create_for_note_refuses_other_notes(): void {
-			unset( $GLOBALS['test_comment_meta'][ self::NOTE_ID ]['ai_feedback'] );
-			$result = ( new Suggestions() )->create_for_note( self::NOTE_ID, 'core/paragraph', 'in order to' );
-			$this->assertInstanceOf( \WP_Error::class, $result );
-			$this->assertSame( 'invalid_note', $result->get_error_code() );
-
-			$GLOBALS['test_comment_meta'][ self::NOTE_ID ]['ai_feedback'] = '1';
-			$GLOBALS['test_comments'][ self::NOTE_ID ]->comment_parent    = '12';
-			$result = ( new Suggestions() )->create_for_note( self::NOTE_ID, 'core/paragraph', 'in order to' );
-			$this->assertInstanceOf( \WP_Error::class, $result );
-			$this->assertSame( 'ai_feedback_suggestion_reply', $result->get_error_code() );
-		}
-
-		/**
-		 * Without the experiment nothing is written.
-		 */
-		public function test_create_for_note_requires_availability(): void {
 			$GLOBALS['test_gutenberg_experiments'] = array();
-
-			$result = ( new Suggestions() )->create_for_note( self::NOTE_ID, 'core/paragraph', 'in order to' );
-
-			$this->assertInstanceOf( \WP_Error::class, $result );
-			$this->assertSame( 'ai_feedback_suggestions_unavailable', $result->get_error_code() );
-		}
-
-		/**
-		 * Decided suggestions can't be recreated or removed.
-		 */
-		public function test_decided_suggestion_is_locked(): void {
-			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::PAYLOAD_META ] = '{"schemaVersion":2}';
-			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::STATUS_META ]  = 'applied';
-
-			$suggestions = new Suggestions();
-			$created     = $suggestions->create_for_note( self::NOTE_ID, 'core/paragraph', 'in order to' );
-			$removed     = $suggestions->remove_for_note( self::NOTE_ID );
-
-			$this->assertInstanceOf( \WP_Error::class, $created );
-			$this->assertSame( 'ai_feedback_suggestion_decided', $created->get_error_code() );
-			$this->assertInstanceOf( \WP_Error::class, $removed );
-		}
-
-		/**
-		 * Removing a pending suggestion leaves a plain AI note.
-		 */
-		public function test_remove_for_note_clears_meta(): void {
-			$suggestions = new Suggestions();
-			$suggestions->create_for_note( self::NOTE_ID, 'core/paragraph', 'in order to' );
-
-			$this->assertTrue( $suggestions->remove_for_note( self::NOTE_ID ) );
-			$this->assertNull( $suggestions->get_status( self::NOTE_ID ) );
-			$this->assertSame( '1', $GLOBALS['test_comment_meta'][ self::NOTE_ID ]['ai_feedback'] );
+			$GLOBALS['test_filter_results']        = array( 'ai_feedback_use_suggestions' => true );
+			$this->assertTrue( Suggestions::is_available() );
 		}
 
 		/**
@@ -242,6 +104,34 @@ namespace AI_Feedback\Tests {
 		 */
 		public function test_status_is_null_without_payload(): void {
 			$this->assertNull( ( new Suggestions() )->get_status( self::NOTE_ID ) );
+
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::PAYLOAD_META ] = '';
+			$this->assertNull( ( new Suggestions() )->get_status( self::NOTE_ID ) );
+		}
+
+		/**
+		 * A payload without a status is pending.
+		 */
+		public function test_status_defaults_to_pending(): void {
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::PAYLOAD_META ] = '{"schemaVersion":2}';
+			$this->assertSame( 'pending', ( new Suggestions() )->get_status( self::NOTE_ID ) );
+
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::STATUS_META ] = 'rejected';
+			$this->assertSame( 'rejected', ( new Suggestions() )->get_status( self::NOTE_ID ) );
+		}
+
+		/**
+		 * Notes report their suggestion status next to the quick fix.
+		 */
+		public function test_note_fields_include_suggestion_status(): void {
+			$manager = new Notes_Manager();
+
+			$this->assertNull( $manager->get_notes_for_post( 42 )[0]['suggestion_status'] );
+
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::PAYLOAD_META ] = '{"schemaVersion":2}';
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::STATUS_META ]  = 'applied-unsaved';
+
+			$this->assertSame( 'applied-unsaved', $manager->get_notes_for_post( 42 )[0]['suggestion_status'] );
 		}
 	}
 }

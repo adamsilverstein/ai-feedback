@@ -797,7 +797,7 @@ class Notes_Manager {
 
 		$values['quick_fix'] = $this->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
 
-		$values['suggestion_status'] = ( new Suggestions( $this ) )->get_status( $note_id );
+		$values['suggestion_status'] = ( new Suggestions() )->get_status( $note_id );
 
 		return $values;
 	}

@@ -4,8 +4,10 @@
  * A suggestion is the AI note plus `<mark>` markers in the block content that
  * carry the note's id: an `add` run with the new text followed by a `del` run
  * over the old text. Authors accept or reject it from the Notes sidebar.
+ *
+ * The note's `_wp_suggestion` payload and `_wp_suggestion_status` are written
+ * through core-data, the same way Gutenberg's own suggester writes them.
  */
-import apiFetch from '@wordpress/api-fetch';
 import {
 	dispatch as dataDispatch,
 	select as dataSelect,
@@ -22,12 +24,17 @@ import {
 	toHTMLString,
 } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
-import { refreshCoreNotes } from './refresh-core-notes';
 
 const STORE_NAME = 'ai-feedback/store';
 
 // Named by string so the store's tests don't have to load @wordpress/editor.
 const EDITOR_STORE = 'core/editor';
+const CORE_STORE = 'core';
+
+/**
+ * Payload schema version Gutenberg's suggestions use.
+ */
+const SCHEMA_VERSION = 2;
 
 /**
  * Checks whether quick fixes should become suggestions.
@@ -151,10 +158,52 @@ function getBlockContent(clientId) {
 }
 
 /**
+ * Builds the `_wp_suggestion` payload for a quick fix.
+ *
+ * An empty replacement is a deletion; anything else is a replacement, which
+ * Gutenberg stores as an `add` run followed by a `del` run under one id.
+ *
+ * @param {string} blockName Block name, eg. `core/paragraph`.
+ * @param {string} attribute Rich text attribute holding the markers.
+ * @param {Object} fix       Quick fix with `find` and `replace`.
+ * @return {Object} Suggestion payload.
+ */
+export function buildSuggestionPayload(blockName, attribute, fix) {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		blockName,
+		baseRevision: null,
+		operations: [
+			{
+				type: 'inline-suggestion',
+				attribute,
+				suggestionType: fix.replace ? 'replace' : 'del',
+			},
+		],
+	};
+}
+
+/**
+ * Saves a note's meta through core-data.
+ *
+ * @param {number} noteId Note ID.
+ * @param {Object} meta   Meta values; null deletes a key.
+ * @return {Promise<Object>} The saved comment record.
+ */
+function saveNoteMeta(noteId, meta) {
+	return dataDispatch(CORE_STORE).saveEntityRecord(
+		'root',
+		'comment',
+		{ id: noteId, meta },
+		{ throwOnError: true }
+	);
+}
+
+/**
  * Turns one note's quick fix into a suggestion.
  *
- * The server stores the payload first; if the block changed while that
- * request ran, the payload is removed again.
+ * The payload is stored first; if the server dropped it, or the block
+ * changed while the request ran, it is removed again.
  *
  * @param {Object} note Feedback note with `id`, `block_id` and `quick_fix`.
  * @return {Promise<boolean>} Whether the suggestion was added.
@@ -168,21 +217,25 @@ export async function suggestQuickFix(note) {
 		return false;
 	}
 
-	const result = await apiFetch({
-		path: `/ai-feedback/v1/notes/${note.id}/suggestion`,
-		method: 'POST',
-		data: {
-			block_name: target.block.name,
-			text: create({ html: toHtml(target.content) }).text,
-		},
+	const saved = await saveNoteMeta(note.id, {
+		_wp_suggestion: JSON.stringify(
+			buildSuggestionPayload(
+				target.block.name,
+				target.key,
+				note.quick_fix
+			)
+		),
+		_wp_suggestion_status: 'pending',
 	});
 
 	const current = getBlockContent(note.block_id);
+	// Gutenberg's sanitize callback stores '' for a payload it rejects.
 	const updated =
+		!!saved?.meta?._wp_suggestion &&
 		current &&
 		buildSuggestionContent(current.content, note.quick_fix, {
 			id: note.id,
-			authorId: result?.author ?? null,
+			authorId: saved.author ?? null,
 		});
 
 	if (!updated) {
@@ -205,9 +258,9 @@ export async function suggestQuickFix(note) {
  */
 async function removeSuggestion(noteId) {
 	try {
-		await apiFetch({
-			path: `/ai-feedback/v1/notes/${noteId}/suggestion`,
-			method: 'DELETE',
+		await saveNoteMeta(noteId, {
+			_wp_suggestion: null,
+			_wp_suggestion_status: null,
 		});
 		dataDispatch(STORE_NAME).setSuggestionStatus(noteId, null);
 	} catch {
@@ -257,7 +310,6 @@ export async function suggestQuickFixes(notes) {
 	}
 
 	if (added > 0) {
-		refreshCoreNotes();
 		dataDispatch(noticesStore).createInfoNotice(
 			sprintf(
 				/* translators: %d: number of suggested edits */
@@ -303,9 +355,6 @@ export async function removeOrphanedSuggestions(notes) {
 	);
 
 	await Promise.all(orphaned.map((note) => removeSuggestion(note.id)));
-	if (orphaned.length > 0) {
-		refreshCoreNotes();
-	}
 
 	return orphaned.length;
 }

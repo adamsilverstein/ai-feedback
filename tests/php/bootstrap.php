@@ -46,8 +46,10 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 
 if ( ! function_exists( 'apply_filters' ) ) {
+	// Tests can force a filter's result through $GLOBALS['test_filter_results'].
 	function apply_filters( $_hook_name, $value, ...$args ) {
-		return $value;
+		$results = $GLOBALS['test_filter_results'] ?? array();
+		return array_key_exists( $_hook_name, $results ) ? $results[ $_hook_name ] : $value;
 	}
 }
 
