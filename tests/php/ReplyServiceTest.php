@@ -66,6 +66,8 @@ class ReplyServiceTest extends TestCase {
 		$GLOBALS['test_comments']       = array();
 		$GLOBALS['test_comment_meta']   = array();
 		$GLOBALS['test_options']        = array();
+		$GLOBALS['test_post_content']   = array();
+		$GLOBALS['test_parsed_blocks']  = array();
 	}
 
 	/**
@@ -75,7 +77,9 @@ class ReplyServiceTest extends TestCase {
 		unset(
 			$GLOBALS['test_comments'],
 			$GLOBALS['test_comment_meta'],
-			$GLOBALS['test_options']
+			$GLOBALS['test_options'],
+			$GLOBALS['test_post_content'],
+			$GLOBALS['test_parsed_blocks']
 		);
 		parent::tearDown();
 	}
@@ -447,5 +451,105 @@ class ReplyServiceTest extends TestCase {
 			'Provider exploded',
 			$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ]
 		);
+	}
+
+	/**
+	 * Register post content for post 42 and its parsed block tree.
+	 *
+	 * @param array<int, array<string, mixed>> $blocks Parsed blocks.
+	 */
+	private function seed_post_blocks( array $blocks ): void {
+		$GLOBALS['test_post_content'][42]                 = '<!-- post 42 -->';
+		$GLOBALS['test_parsed_blocks']['<!-- post 42 -->'] = $blocks;
+	}
+
+	/**
+	 * Build a parsed leaf block.
+	 *
+	 * @param string   $name    Block name.
+	 * @param string   $html    Block HTML.
+	 * @param int|null $note_id Linked note ID, if any.
+	 * @return array<string, mixed>
+	 */
+	private static function leaf_block( string $name, string $html, ?int $note_id = null ): array {
+		return array(
+			'blockName'    => $name,
+			'attrs'        => null === $note_id ? array() : array( 'metadata' => array( 'noteId' => $note_id ) ),
+			'innerBlocks'  => array(),
+			'innerHTML'    => $html,
+			'innerContent' => array( $html ),
+		);
+	}
+
+	/**
+	 * The prompt includes the text of the block linked to the note.
+	 */
+	public function test_prompt_includes_content_of_linked_block(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array(
+				self::leaf_block( 'core/paragraph', '<p>Unrelated intro.</p>' ),
+				self::leaf_block( 'core/paragraph', "<p>Revenue grew <strong>40%</strong>\n last year.</p>", 100 ),
+			)
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year.', $service->captured_prompt );
+		$this->assertStringNotContainsString( 'Unrelated intro.', $service->captured_prompt );
+		// Falls back to the parsed block name when the note has no block_name meta.
+		$this->assertStringContainsString( 'Block type: core/paragraph', $service->captured_prompt );
+	}
+
+	/**
+	 * A linked container block contributes its inner blocks' text, and a
+	 * block nested inside another container is still found.
+	 */
+	public function test_prompt_includes_inner_blocks_of_nested_linked_block(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['block_name'] = 'core/quote';
+
+		$quote = array(
+			'blockName'    => 'core/quote',
+			'attrs'        => array( 'metadata' => array( 'noteId' => '100' ) ),
+			'innerBlocks'  => array(
+				self::leaf_block( 'core/paragraph', '<p>First line.</p>' ),
+				self::leaf_block( 'core/paragraph', '<p>Second line.</p>' ),
+			),
+			'innerHTML'    => '<blockquote class="wp-block-quote"><cite>Ada</cite></blockquote>',
+			'innerContent' => array( '<blockquote class="wp-block-quote">', null, '', null, '<cite>Ada</cite></blockquote>' ),
+		);
+		$group = array(
+			'blockName'    => 'core/group',
+			'attrs'        => array(),
+			'innerBlocks'  => array( $quote ),
+			'innerHTML'    => '<div class="wp-block-group"></div>',
+			'innerContent' => array( '<div class="wp-block-group">', null, '</div>' ),
+		);
+		$this->seed_post_blocks( array( $group ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block type: core/quote', $service->captured_prompt );
+		$this->assertStringContainsString( 'Block content: First line. Second line. Ada', $service->captured_prompt );
+	}
+
+	/**
+	 * When no block links to the note, the reply still goes out without block text.
+	 */
+	public function test_missing_linked_block_leaves_block_content_empty(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array( self::leaf_block( 'core/paragraph', '<p>Some other block.</p>', 555 ) )
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$result  = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame( 999, $result );
+		$this->assertStringNotContainsString( 'Some other block.', $service->captured_prompt );
+		$this->assertStringContainsString( "Block content: \n", $service->captured_prompt );
 	}
 }

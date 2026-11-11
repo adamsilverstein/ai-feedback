@@ -217,9 +217,15 @@ class Reply_Service {
 		}
 		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
 
+		$block      = $this->find_note_block( $post_id, $parent_id );
+		$block_type = self::meta_string( $parent_id, 'block_name' );
+		if ( '' === $block_type && null !== $block && is_string( $block['blockName'] ?? null ) ) {
+			$block_type = $block['blockName'];
+		}
+
 		return array(
-			'block_content'     => '', // Future enhancement: derive from post_content.
-			'block_type'        => self::meta_string( $parent_id, 'block_name' ),
+			'block_content'     => null !== $block ? self::block_text( $block ) : '',
+			'block_type'        => $block_type,
 			'original_feedback' => $parent->comment_content,
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
@@ -228,6 +234,99 @@ class Reply_Service {
 			'target_tone'       => self::option_string( 'ai_feedback_default_tone', 'professional' ),
 			'locale'            => self::option_string( 'ai_feedback_feedback_locale', get_locale() ),
 		);
+	}
+
+	/**
+	 * Find the block a note is attached to in the saved post content.
+	 *
+	 * The editor links a block to its note thread through the block's
+	 * `metadata.noteId` attribute, which holds the thread's root note ID.
+	 *
+	 * @param int $post_id Post ID.
+	 * @param int $note_id Root note ID.
+	 * @return array<mixed>|null Parsed block, or null when the post or block is missing.
+	 */
+	private function find_note_block( int $post_id, int $note_id ): ?array {
+		$post = get_post( $post_id );
+		if ( null === $post || '' === $post->post_content ) {
+			return null;
+		}
+
+		return self::search_blocks( parse_blocks( $post->post_content ), $note_id );
+	}
+
+	/**
+	 * Depth-first search for the block whose `metadata.noteId` matches.
+	 *
+	 * @param array<mixed> $blocks  Parsed blocks.
+	 * @param int          $note_id Root note ID.
+	 * @return array<mixed>|null Matching block, or null.
+	 */
+	private static function search_blocks( array $blocks, int $note_id ): ?array {
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+
+			$attrs    = is_array( $block['attrs'] ?? null ) ? $block['attrs'] : array();
+			$metadata = is_array( $attrs['metadata'] ?? null ) ? $attrs['metadata'] : array();
+			$linked   = $metadata['noteId'] ?? null;
+			if ( is_numeric( $linked ) && (int) $linked === $note_id ) {
+				return $block;
+			}
+
+			if ( is_array( $block['innerBlocks'] ?? null ) ) {
+				$found = self::search_blocks( $block['innerBlocks'], $note_id );
+				if ( null !== $found ) {
+					return $found;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get a parsed block's plain text with whitespace collapsed.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return string Block text.
+	 */
+	private static function block_text( array $block ): string {
+		$text = preg_replace( '/\s+/u', ' ', wp_strip_all_tags( self::get_block_html( $block ) ) );
+		return trim( (string) $text );
+	}
+
+	/**
+	 * Rebuild a parsed block's HTML, including its inner blocks.
+	 *
+	 * `innerContent` holds HTML strings with a null placeholder where each
+	 * inner block goes, so walking it keeps the inner blocks in order.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return string Block HTML.
+	 */
+	private static function get_block_html( array $block ): string {
+		$inner_blocks  = is_array( $block['innerBlocks'] ?? null ) ? array_values( $block['innerBlocks'] ) : array();
+		$inner_content = is_array( $block['innerContent'] ?? null ) ? $block['innerContent'] : array();
+		$html          = '';
+		$index         = 0;
+
+		foreach ( $inner_content as $chunk ) {
+			if ( is_string( $chunk ) ) {
+				$html .= $chunk;
+				continue;
+			}
+
+			$inner = $inner_blocks[ $index ] ?? null;
+			++$index;
+			if ( is_array( $inner ) ) {
+				// Separate blocks so their text does not run together once tags are stripped.
+				$html .= ' ' . self::get_block_html( $inner ) . ' ';
+			}
+		}
+
+		return $html;
 	}
 
 	/**

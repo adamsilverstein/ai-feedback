@@ -127,6 +127,21 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'parse_blocks' ) ) {
+		/**
+		 * parse_blocks mock returning $GLOBALS['test_parsed_blocks'][ $content ].
+		 *
+		 * Tests register the parsed structure for a given content string so the
+		 * real block parser is not needed.
+		 *
+		 * @param string $content Post content.
+		 * @return array
+		 */
+		function parse_blocks( $content ) {
+			return $GLOBALS['test_parsed_blocks'][ $content ] ?? array();
+		}
+	}
+
 	if ( ! function_exists( 'current_time' ) ) {
 		function current_time( $type, $gmt = 0 ) {
 			return '2026-04-18 10:34:00';
