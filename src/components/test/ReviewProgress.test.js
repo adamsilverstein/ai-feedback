@@ -37,6 +37,23 @@ describe('ReviewProgress', () => {
 		expect(bar).toHaveAttribute('value', '5');
 	});
 
+	it('spreads the steps over every part of a chunked review', () => {
+		render(
+			<ReviewProgress
+				stageKey={STAGE_ANALYZING}
+				chunk={{ current: 2, total: 4 }}
+			/>
+		);
+
+		expect(screen.getByText('Reviewing part 2 of 4.')).toBeInTheDocument();
+
+		// Part 2 of 4 starts at 25%, and analyzing starts 20% into a part.
+		const bar = screen.getByRole('progressbar', {
+			name: 'Review progress',
+		});
+		expect(bar).toHaveAttribute('value', '30');
+	});
+
 	it('advances the bar and shows elapsed time during a long stage', () => {
 		render(<ReviewProgress stageKey={STAGE_ANALYZING} />);
 

@@ -29,6 +29,8 @@ export default function ReviewButton() {
 		focusAreas,
 		targetTone,
 		feedbackLocale,
+		chunkSize,
+		reviewProgress,
 	} = useSelect(
 		(select) => ({
 			postId: select(editorStore).getCurrentPostId(),
@@ -41,6 +43,8 @@ export default function ReviewButton() {
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
+			chunkSize: select(STORE_NAME).getChunkSize(),
+			reviewProgress: select(STORE_NAME).getReviewProgress(),
 		}),
 		[]
 	);
@@ -75,6 +79,7 @@ export default function ReviewButton() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				chunkSize,
 			});
 		} catch (error) {
 			// Error is already in the store
@@ -103,7 +108,9 @@ export default function ReviewButton() {
 					{__('Save your post first to enable review', 'ai-feedback')}
 				</p>
 			)}
-			{isReviewing && <ReviewProgress stageKey={reviewStage} />}
+			{isReviewing && (
+				<ReviewProgress stageKey={reviewStage} chunk={reviewProgress} />
+			)}
 		</div>
 	);
 }

@@ -12,6 +12,7 @@ export const initialState = {
 		defaultFocusAreas: ['content', 'tone', 'flow'],
 		defaultTone: 'professional',
 		feedbackLocale: 'auto',
+		chunkSize: 20,
 	},
 	availableModels: [],
 	availableFocusAreas: [],
@@ -20,6 +21,7 @@ export const initialState = {
 	isReviewing: false,
 	reviewStage: null,
 	unavailableRetries: 0,
+	reviewProgress: null,
 	lastReview: null,
 	reviewHistory: [],
 	error: null,
@@ -48,6 +50,7 @@ export const TYPES = {
 	FETCHING_PREVIOUS_REVIEW: 'FETCHING_PREVIOUS_REVIEW',
 	RECEIVE_PREVIOUS_REVIEW: 'RECEIVE_PREVIOUS_REVIEW',
 	SET_REVIEW_STAGE: 'SET_REVIEW_STAGE',
+	SET_REVIEW_PROGRESS: 'SET_REVIEW_PROGRESS',
 };
 
 /**
@@ -67,6 +70,7 @@ export default function reducer(state = initialState, action) {
 					defaultFocusAreas: action.settings.default_focus_areas,
 					defaultTone: action.settings.default_tone,
 					feedbackLocale: action.settings.feedback_locale || 'auto',
+					chunkSize: action.settings.chunk_size || 20,
 				},
 				availableModels: action.settings.available_models || [],
 				availableFocusAreas:
@@ -114,6 +118,7 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: true,
 				reviewStage: STAGE_PREPARING,
+				reviewProgress: null,
 				error: null,
 				// A review the user starts resets the automatic retry count.
 				unavailableRetries: action.isRetry
@@ -131,12 +136,19 @@ export default function reducer(state = initialState, action) {
 				reviewStage: action.stage,
 			};
 
+		case TYPES.SET_REVIEW_PROGRESS:
+			return {
+				...state,
+				reviewProgress: action.progress,
+			};
+
 		case TYPES.REVIEW_SUCCESS:
 			return {
 				...state,
 				isReviewing: false,
 				reviewStage: null,
 				unavailableRetries: 0,
+				reviewProgress: null,
 				lastReview: action.review,
 				reviewHistory: [action.review, ...state.reviewHistory],
 			};
@@ -146,6 +158,7 @@ export default function reducer(state = initialState, action) {
 				...state,
 				isReviewing: false,
 				reviewStage: null,
+				reviewProgress: null,
 				error: action.error,
 				unavailableRetries:
 					action.error?.code === 'ai_service_unavailable'

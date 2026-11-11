@@ -20,11 +20,15 @@ const SHOW_ELAPSED_AFTER_SECONDS = 5;
  * Stage changes come from the store and reflect real steps. Inside a stage the
  * bar eases forward with elapsed time, since the AI call can't report progress.
  *
- * @param {Object} props          Component props.
- * @param {string} props.stageKey Current stage key.
+ * A long document is reviewed in parts. The steps then repeat for each part,
+ * so the bar spreads them over the whole review.
+ *
+ * @param {Object}      props          Component props.
+ * @param {string}      props.stageKey Current stage key.
+ * @param {Object|null} props.chunk    `{ current, total }` when the review is split into parts.
  * @return {Element|null} Progress component.
  */
-export default function ReviewProgress({ stageKey }) {
+export default function ReviewProgress({ stageKey, chunk = null }) {
 	const stages = getReviewStages();
 	const stageIndex = stages.findIndex((stage) => stage.key === stageKey);
 	const stage = stages[stageIndex];
@@ -55,7 +59,20 @@ export default function ReviewProgress({ stageKey }) {
 	}
 
 	// The bar eases within the current step; the counter shows total time.
-	const progress = Math.round(getStageProgress(stage, stageElapsed));
+	const stageProgress = getStageProgress(stage, stageElapsed);
+	const progress = Math.round(
+		chunk
+			? ((chunk.current - 1) * 100 + stageProgress) / chunk.total
+			: stageProgress
+	);
+	const partText = chunk
+		? sprintf(
+				/* translators: 1: current part number, 2: total number of parts. */
+				__('Reviewing part %1$d of %2$d.', 'ai-feedback'),
+				chunk.current,
+				chunk.total
+			)
+		: '';
 	const elapsedSeconds = Math.floor((now - reviewStartedAt) / 1000);
 
 	const stepText = sprintf(
@@ -71,13 +88,21 @@ export default function ReviewProgress({ stageKey }) {
 				className="ai-feedback-review-progress-bar"
 				value={progress}
 				aria-label={__('Review progress', 'ai-feedback')}
-				aria-valuetext={sprintf(
-					/* translators: 1: "Step 1 of 3", 2: description of the step */
-					__('%1$s: %2$s', 'ai-feedback'),
-					stepText,
-					stage.label
-				)}
+				aria-valuetext={[
+					partText,
+					sprintf(
+						/* translators: 1: "Step 1 of 3", 2: description of the step */
+						__('%1$s: %2$s', 'ai-feedback'),
+						stepText,
+						stage.label
+					),
+				]
+					.filter(Boolean)
+					.join(' ')}
 			/>
+			{partText && (
+				<p className="ai-feedback-review-progress-part">{partText}</p>
+			)}
 			<p className="ai-feedback-review-progress-label" role="status">
 				<span className="ai-feedback-review-progress-step">
 					{stepText}

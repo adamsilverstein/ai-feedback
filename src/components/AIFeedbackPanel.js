@@ -43,6 +43,7 @@ export default function AIFeedbackPanel() {
 		postTitle,
 		availableModels,
 		unavailableRetries,
+		chunkSize,
 	} = useSelect((select) => {
 		// Settings are loaded by the getSettings resolver, so select them to
 		// trigger the fetch of available models and locales.
@@ -63,6 +64,7 @@ export default function AIFeedbackPanel() {
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
 			unavailableRetries: select(STORE_NAME).getUnavailableRetries(),
+			chunkSize: select(STORE_NAME).getChunkSize(),
 		};
 	}, []);
 
@@ -97,6 +99,7 @@ export default function AIFeedbackPanel() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				chunkSize,
 				isRetry,
 			});
 		} catch (reviewError) {
