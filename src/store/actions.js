@@ -427,6 +427,21 @@ export function* setNoteResolved(noteId, isResolved) {
 }
 
 /**
+ * Record whether a note's quick fix has been applied.
+ *
+ * @param {number}  noteId    Note ID.
+ * @param {boolean} isApplied Whether the fix is applied.
+ * @return {Object} Action object.
+ */
+export function setFixApplied(noteId, isApplied) {
+	return {
+		type: TYPES.SET_FIX_APPLIED,
+		noteId,
+		isApplied,
+	};
+}
+
+/**
  * Update block metadata with note IDs.
  * This is a control that dispatches to the block editor store.
  *

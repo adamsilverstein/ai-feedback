@@ -52,6 +52,7 @@
 		"@wordpress/keyboard-shortcuts": "^5.37.0",
 		"@wordpress/notices": "^5.36.0",
 		"@wordpress/plugins": "^7.36.0",
+		"@wordpress/rich-text": "^7.37.0",
 		"@wordpress/url": "^4.37.0"
 	},
 	"devDependencies": {

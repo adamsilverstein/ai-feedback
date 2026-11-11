@@ -44,8 +44,14 @@ class NotesManagerMetaTest extends TestCase {
 				'title'      => 'Wordy phrase',
 				'feedback'   => 'This sentence could be shorter.',
 				'suggestion' => 'Replace "in order to" with "to".',
+				'quick_fix'  => array(
+					'find'    => 'in order to',
+					'replace' => 'to',
+				),
 			)
 		);
+
+		$this->assertSame( '{"find":"in order to","replace":"to"}', $meta['feedback_quick_fix'] );
 
 		$this->assertSame( 'Wordy phrase', $meta['feedback_title'] );
 		$this->assertSame( 'This sentence could be shorter.', $meta['feedback_text'] );
