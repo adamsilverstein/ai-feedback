@@ -456,6 +456,30 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
 
 Returns one history entry plus the notes that review created, as `notes`. Notes deleted since the review ran are omitted. Returns `404` when the review is not in the post's history. Requires `edit_post` on the post.
 
+### GET /analytics
+
+Usage summary for the Settings > AI Feedback Analytics page. Requires `manage_options`.
+
+`period` is one of `7days`, `30days` (default), `90days` or `all`. Usage is stored as daily counts in the non-autoloaded `ai_feedback_analytics` option and kept for 365 days. Return `false` from the `ai_feedback_analytics_enabled` filter to stop recording. A user's counts are removed when the user is deleted, and are included in the core personal data export and eraser tools (Tools > Export/Erase Personal Data). Data starts accumulating once the plugin version with analytics is active; earlier reviews are not backfilled.
+
+`by_day` has one row per day for the fixed periods, including empty days. For `all` it only lists days with recorded reviews.
+
+#### Response
+
+```json
+{
+  "period": "7days",
+  "total_reviews": 4,
+  "total_feedback": 11,
+  "avg_feedback": 2.8,
+  "by_model": { "claude-sonnet-4": 3, "gpt-4o": 1 },
+  "by_severity": { "critical": 1, "important": 4, "suggestion": 6 },
+  "by_category": { "content": 5, "flow": 4, "tone": 2 },
+  "by_day": [ { "date": "2026-11-08", "reviews": 2, "feedback": 5 } ],
+  "top_users": [ { "user_id": 1, "name": "admin", "reviews": 4 } ]
+}
+```
+
 ---
 
 ## WordPress Data Store
