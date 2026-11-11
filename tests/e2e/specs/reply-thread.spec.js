@@ -309,12 +309,20 @@ test.describe('Reply loop', () => {
 			thread.locator('.ai-feedback-reply-pending')
 		).toContainText('AI is replying…');
 
+		// Both AI replies share the mock text, so clear the live region to
+		// prove the second one is announced too.
+		const politeRegion = page.locator('#a11y-speak-polite');
+		await politeRegion.evaluate((region) => {
+			region.textContent = '';
+		});
+
 		await runCron(page, baseURL);
 
 		await expect(aiReplies).toHaveCount(2, { timeout: 30000 });
 		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
 			0
 		);
+		await expect(politeRegion).toContainText('AI Feedback replied');
 
 		// Replies render oldest first, alternating user and AI.
 		await expect(thread.locator('.ai-feedback-reply')).toHaveClass([
