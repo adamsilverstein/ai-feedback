@@ -107,18 +107,23 @@ class Review_History {
 	 * @param array<string, mixed> $review  Review result returned by Review_Service.
 	 */
 	public static function record( int $post_id, array $review ): void {
-		$entry = self::build_entry( $review );
-		if ( '' === $entry['review_id'] ) {
-			return;
+		// History is a convenience, so a failure here must not fail the review.
+		try {
+			$entry = self::build_entry( $review );
+			if ( '' === $entry['review_id'] ) {
+				return;
+			}
+
+			// Read-modify-write: two reviews finishing at the same instant on one
+			// post could drop an entry. Acceptable for a short display history.
+			$history   = self::get( $post_id );
+			$history[] = $entry;
+			$history   = array_slice( $history, -self::MAX_ENTRIES );
+
+			update_post_meta( $post_id, self::META_KEY, $history );
+		} catch ( \Throwable $e ) {
+			Logger::debug( sprintf( 'Could not record review history: %s', $e->getMessage() ) );
 		}
-
-		// Read-modify-write: two reviews finishing at the same instant on one
-		// post could drop an entry. Acceptable for a short display history.
-		$history   = self::get( $post_id );
-		$history[] = $entry;
-		$history   = array_slice( $history, -self::MAX_ENTRIES );
-
-		update_post_meta( $post_id, self::META_KEY, $history );
 	}
 
 	/**

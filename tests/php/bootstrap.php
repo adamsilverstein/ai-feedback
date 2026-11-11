@@ -498,6 +498,15 @@ if (! function_exists('wp_strip_all_tags') ) {
     }
 }
 // Post meta, user and hook mocks backed by globals, for history tests.
+if ( ! function_exists( 'get_post' ) ) {
+	function get_post( $post_id ) {
+		if ( in_array( (int) $post_id, $GLOBALS['test_missing_posts'] ?? array(), true ) ) {
+			return null;
+		}
+		return (object) array( 'ID' => (int) $post_id );
+	}
+}
+
 if ( ! function_exists( 'get_post_meta' ) ) {
 	function get_post_meta( $post_id, $key = '', $single = false ) {
 		$value = $GLOBALS['test_post_meta'][ $post_id ][ $key ] ?? null;

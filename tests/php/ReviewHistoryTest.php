@@ -288,6 +288,22 @@ class ReviewHistoryTest extends TestCase {
 	}
 
 	/**
+	 * A post that does not exist is a 404, not a permissions error.
+	 */
+	public function test_permissions_check_rejects_missing_post(): void {
+		$GLOBALS['test_missing_posts'] = array( 404 );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'post_id', 404 );
+
+		$result = ( new History_Controller( new StubNotesManager() ) )->get_history_permissions_check( $request );
+		unset( $GLOBALS['test_missing_posts'] );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_post_invalid_id', $result->get_error_code() );
+	}
+
+	/**
 	 * Users who can edit the post are allowed.
 	 */
 	public function test_permissions_check_allows_editors(): void {

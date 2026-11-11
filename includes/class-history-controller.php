@@ -169,6 +169,14 @@ class History_Controller extends WP_REST_Controller {
 	public function get_history_permissions_check( WP_REST_Request $request ): bool|WP_Error {
 		$post_id = $this->get_post_id( $request );
 
+		if ( $post_id && ! get_post( $post_id ) ) {
+			return new WP_Error(
+				'rest_post_invalid_id',
+				__( 'Invalid post ID.', 'ai-feedback' ),
+				array( 'status' => 404 )
+			);
+		}
+
 		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
