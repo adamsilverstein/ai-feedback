@@ -82,7 +82,9 @@ export default function TipNotice() {
 			status="info"
 			className="ai-feedback-tip"
 			onRemove={dismiss}
-			politeness="polite"
+			// Speaking the tip would cut off the review complete
+			// announcement, which lands at the same moment.
+			spokenMessage=""
 			actions={actions}
 		>
 			{tip.content}

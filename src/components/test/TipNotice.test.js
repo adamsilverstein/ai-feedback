@@ -15,6 +15,7 @@ import {
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as keyboardShortcutsStore } from '@wordpress/keyboard-shortcuts';
 import { store as preferencesStore } from '@wordpress/preferences';
+import { speak } from '@wordpress/a11y';
 
 /**
  * Internal dependencies
@@ -51,6 +52,7 @@ vi.mock('@wordpress/block-editor', async () => {
 		}),
 	};
 });
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 /**
@@ -184,5 +186,12 @@ describe('TipNotice', () => {
 			],
 		});
 		expect(container.querySelector('.ai-feedback-tip')).toBeNull();
+	});
+
+	it('does not announce the tip over the review result', () => {
+		speak.mockClear();
+		const { container } = renderTip({ reviewCount: 1 });
+		expect(container.querySelector('.ai-feedback-tip')).not.toBeNull();
+		expect(speak).not.toHaveBeenCalled();
 	});
 });
