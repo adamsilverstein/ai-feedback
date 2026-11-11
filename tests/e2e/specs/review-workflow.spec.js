@@ -51,7 +51,7 @@ test.describe('Review Workflow', () => {
 		);
 		await expect(summary.getByRole('status')).toHaveText('1 feedback item');
 		await expect(summary).toContainText('Created notes for 1 block');
-		await expect(summary).toContainText('Reviewed with: claude-sonnet-4');
+		await expect(summary).toContainText('Reviewed with: claude-sonnet-5-5');
 		await expect(aiFeedback.getReviewButton()).toBeEnabled();
 		await expect(aiFeedback.getReviewButton()).toHaveText(
 			'Review Document'
@@ -206,7 +206,7 @@ test.describe('Review Workflow', () => {
 				path: '/ai-feedback/v1/settings',
 				method: 'POST',
 				data: {
-					default_model: 'claude-sonnet-4',
+					default_model: 'claude-sonnet-5-5',
 					feedback_locale: 'auto',
 				},
 			});
