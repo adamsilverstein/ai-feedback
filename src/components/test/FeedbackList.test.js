@@ -13,6 +13,8 @@ import { PriorityBadge } from '../FeedbackItem';
 jest.mock('@wordpress/block-editor', () => ({
 	store: 'core/block-editor',
 }));
+// The item actions are covered by FeedbackItem.test.js.
+jest.mock('../FeedbackItemActions', () => () => null);
 
 const items = [
 	{
