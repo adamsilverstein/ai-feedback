@@ -316,7 +316,9 @@ class Reply_Service {
 	 * @return string Block text.
 	 */
 	private static function block_text( array $block ): string {
-		$text = html_entity_decode( wp_strip_all_tags( self::get_block_html( $block ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// Keep a break between cells, lines and list items once tags are stripped.
+		$html = (string) preg_replace( '#<(?:br|/(?:p|li|td|th|tr|h[1-6]|div|figcaption|blockquote|pre))\b[^>]*>#i', '$0 ', self::get_block_html( $block ) );
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 

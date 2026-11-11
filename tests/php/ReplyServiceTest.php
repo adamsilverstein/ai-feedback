@@ -572,6 +572,21 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Line breaks and table cells don't run their text together.
+	 */
+	public function test_block_content_keeps_breaks_between_cells_and_lines(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array( self::leaf_block( 'core/table', '<figure class="wp-block-table"><table><tr><td>10</td><td>20</td></tr></table><figcaption>First<br>Second</figcaption></figure>', 100 ) )
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: 10 20 First Second\n", $service->captured_prompt );
+	}
+
+	/**
 	 * Markup written as text, like a tag in a code sample, survives into the prompt.
 	 */
 	public function test_block_content_keeps_escaped_markup(): void {
