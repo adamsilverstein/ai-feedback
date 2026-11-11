@@ -22,6 +22,26 @@ export const PREFERENCE_DEFAULTS = {
 	[PREFERENCE_KEYS.dismissedTips]: [],
 };
 
+// Welcome state lived in localStorage before moving to user preferences.
+const LEGACY_WELCOME_STORAGE_KEY = 'ai-feedback-welcomed';
+
+/**
+ * Read and clear the legacy localStorage welcome flag.
+ *
+ * @return {boolean} Whether the legacy flag was set.
+ */
+export function consumeLegacyWelcomeFlag() {
+	try {
+		const welcomed = window.localStorage.getItem(
+			LEGACY_WELCOME_STORAGE_KEY
+		);
+		window.localStorage.removeItem(LEGACY_WELCOME_STORAGE_KEY);
+		return !!welcomed;
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Count a completed review toward unlocking tips.
  */
@@ -67,7 +87,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			id: 'reply-to-notes',
 			minReviews: 2,
 			content: __(
-				'Tip: Reply to a note or resolve it before reviewing again. The next review takes your replies and open notes into account.',
+				'Tip: When a review leaves notes, reply to them or resolve them before reviewing again. The next review takes your replies and open notes into account.',
 				'ai-feedback'
 			),
 		},

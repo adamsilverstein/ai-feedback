@@ -10,7 +10,11 @@ import { __ } from '@wordpress/i18n';
 import { store as noticesStore } from '@wordpress/notices';
 import { store as preferencesStore } from '@wordpress/preferences';
 import { commentAuthorAvatar } from '@wordpress/icons';
-import { PREFERENCES_SCOPE, PREFERENCE_DEFAULTS } from '../tips';
+import {
+	PREFERENCES_SCOPE,
+	PREFERENCE_DEFAULTS,
+	consumeLegacyWelcomeFlag,
+} from '../tips';
 
 /**
  * Reset Tips Command component.
@@ -26,6 +30,8 @@ export default function ResetTipsCommand() {
 		label: __('Reset AI Feedback tips', 'ai-feedback'),
 		icon: commentAuthorAvatar,
 		callback: ({ close }) => {
+			// A leftover legacy flag would dismiss the welcome modal again.
+			consumeLegacyWelcomeFlag();
 			Object.entries(PREFERENCE_DEFAULTS).forEach(([key, value]) => {
 				set(PREFERENCES_SCOPE, key, value);
 			});

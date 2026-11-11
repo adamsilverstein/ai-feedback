@@ -12,25 +12,11 @@ import { check, pencil, commentContent } from '@wordpress/icons';
 import apiFetch from '@wordpress/api-fetch';
 import { store as preferencesStore } from '@wordpress/preferences';
 import { getConnectorsUrl } from '../utils/connectors-url';
-import { PREFERENCES_SCOPE, PREFERENCE_KEYS } from '../tips';
-
-// Welcome state lived in localStorage before moving to user preferences.
-const LEGACY_STORAGE_KEY = 'ai-feedback-welcomed';
-
-/**
- * Read and clear the legacy localStorage welcome flag.
- *
- * @return {boolean} Whether the legacy flag was set.
- */
-function consumeLegacyWelcomeFlag() {
-	try {
-		const welcomed = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-		window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-		return !!welcomed;
-	} catch {
-		return false;
-	}
-}
+import {
+	PREFERENCES_SCOPE,
+	PREFERENCE_KEYS,
+	consumeLegacyWelcomeFlag,
+} from '../tips';
 
 /**
  * WelcomeModal component shown on first sidebar open.

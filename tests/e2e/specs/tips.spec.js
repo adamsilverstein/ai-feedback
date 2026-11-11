@@ -65,7 +65,7 @@ test.describe('Progressive tips', () => {
 
 		// The next review only unlocks the next tip, not the dismissed one.
 		await aiFeedback.startReviewAndWait();
-		await expect(tip).toContainText(/Reply to a note/i);
+		await expect(tip).toContainText(/reply to them or resolve them/i);
 	});
 
 	test('resets tips from the command palette', async ({
