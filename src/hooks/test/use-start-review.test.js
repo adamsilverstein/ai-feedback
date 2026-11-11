@@ -52,6 +52,7 @@ function setup({
 			getFocusAreas: () => ['tone'],
 			getTargetTone: () => 'casual',
 			getFeedbackLocale: () => 'auto',
+			getChunkSize: () => 20,
 		},
 		actions: {
 			startReview: (args) => {
@@ -86,6 +87,7 @@ describe('useStartReview', () => {
 			focusAreas: ['tone'],
 			targetTone: 'casual',
 			locale: 'auto',
+			chunkSize: 20,
 		});
 	});
 
