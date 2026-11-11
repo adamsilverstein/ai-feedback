@@ -2,7 +2,13 @@
  * External dependencies
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import {
+	render,
+	screen,
+	waitFor,
+	act,
+	fireEvent,
+} from '@testing-library/react';
 
 /**
  * WordPress dependencies
@@ -95,5 +101,57 @@ describe('WelcomeModal', () => {
 
 		expect(await screen.findByRole('dialog')).toBeInTheDocument();
 		expect(getWelcomeDismissed(registry)).toBe(false);
+	});
+
+	it('saves the dismissal once the plugin is configured', async () => {
+		const registry = renderModal(false);
+
+		fireEvent.click(
+			await screen.findByRole('button', { name: 'Get Started' })
+		);
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		expect(getWelcomeDismissed(registry)).toBe(true);
+	});
+
+	it('does not save the dismissal while setup is required', async () => {
+		apiFetch.mockResolvedValue({
+			ai_client_available: true,
+			connector_configured: false,
+		});
+		const registry = renderModal(false);
+
+		await screen.findByRole('dialog', {
+			name: /Setup Required/,
+		});
+		// The footer button; the header X only has an aria-label.
+		fireEvent.click(screen.getByText('Close', { selector: 'button' }));
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		expect(getWelcomeDismissed(registry)).toBe(false);
+	});
+
+	it('stays closed when dismissed before the status check returns', async () => {
+		let resolveStatus;
+		apiFetch.mockReturnValue(
+			new Promise((resolve) => {
+				resolveStatus = resolve;
+			})
+		);
+		const registry = renderModal(false);
+
+		act(() => {
+			registry
+				.dispatch(preferencesStore)
+				.set('ai-feedback', 'welcomeDismissed', true);
+		});
+		await act(async () => {
+			resolveStatus({
+				ai_client_available: true,
+				connector_configured: true,
+			});
+		});
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 	});
 });
