@@ -417,7 +417,20 @@ const test = base.extend({
 		await use(new Editor({ page }));
 	},
 	admin: async ({ page, pageUtils, editor }, use) => {
-		await use(new Admin({ page, pageUtils, editor }));
+		const admin = new Admin({ page, pageUtils, editor });
+		// createNewPost() can return before the editor sets up its blocks,
+		// and that setup drops blocks inserted earlier. Wait for the canvas
+		// to render, as createNewPost() does from
+		// @wordpress/e2e-test-utils-playwright 3.2.0.
+		const createNewPost = admin.createNewPost;
+		admin.createNewPost = async (options) => {
+			await createNewPost(options);
+			await editor.canvas
+				.locator('body > *')
+				.first()
+				.waitFor({ state: 'attached' });
+		};
+		await use(admin);
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({
