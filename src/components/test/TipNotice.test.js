@@ -1,8 +1,8 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
 
 /**
  * WordPress dependencies
@@ -12,45 +12,19 @@ import {
 	createReduxStore,
 	RegistryProvider,
 } from '@wordpress/data';
+import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as keyboardShortcutsStore } from '@wordpress/keyboard-shortcuts';
+import { store as preferencesStore } from '@wordpress/preferences';
 
 /**
  * Internal dependencies
  */
 import TipNotice from '../TipNotice';
 
-// Minimal stand-ins for the core stores TipNotice reads from.
-jest.mock('@wordpress/preferences', () => {
+// The real block editor store is heavy, so stand in a minimal one.
+vi.mock('@wordpress/block-editor', async () => {
 	const { createReduxStore: createStore } =
-		jest.requireActual('@wordpress/data');
-	return {
-		store: createStore('core/preferences', {
-			reducer: (state = {}, action) =>
-				action.type === 'SET'
-					? {
-							...state,
-							[action.scope]: {
-								...state[action.scope],
-								[action.name]: action.value,
-							},
-						}
-					: state,
-			selectors: {
-				get: (state, scope, name) => state[scope]?.[name],
-			},
-			actions: {
-				set: (scope, name, value) => ({
-					type: 'SET',
-					scope,
-					name,
-					value,
-				}),
-			},
-		}),
-	};
-});
-jest.mock('@wordpress/block-editor', () => {
-	const { createReduxStore: createStore } =
-		jest.requireActual('@wordpress/data');
+		await vi.importActual('@wordpress/data');
 	return {
 		store: createStore('core/block-editor', {
 			reducer: (state = { blocks: [], selected: null }, action) => {
@@ -77,10 +51,7 @@ jest.mock('@wordpress/block-editor', () => {
 		}),
 	};
 });
-jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
-
-const { store: preferencesStore } = jest.requireMock('@wordpress/preferences');
-const { store: blockEditorStore } = jest.requireMock('@wordpress/block-editor');
+vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 /**
  * Render TipNotice against a fresh registry.
@@ -89,30 +60,48 @@ const { store: blockEditorStore } = jest.requireMock('@wordpress/block-editor');
  * @param {number}        state.reviewCount   Completed reviews.
  * @param {Array<string>} state.dismissedTips Dismissed tip IDs.
  * @param {Array<Object>} state.models        Available models.
+ * @param {Array<Object>} state.focusAreas    Available focus areas.
+ * @param {Array<Object>} state.tones         Available tones.
  * @param {Object}        state.blockMapping  Last review block mapping.
  * @param {Array<string>} state.blocks        Client IDs in the editor.
+ * @param {boolean}       state.withShortcut  Register the review shortcut.
  * @return {Object} The registry and render container.
  */
 function renderTip({
 	reviewCount = 0,
 	dismissedTips = [],
 	models = [],
+	focusAreas = [],
+	tones = [],
 	blockMapping = {},
 	blocks = [],
+	withShortcut = false,
 }) {
 	const registry = createRegistry();
 	registry.register(preferencesStore);
+	registry.register(keyboardShortcutsStore);
 	registry.register(
 		createReduxStore('ai-feedback/store', {
 			reducer: (state = {}) => state,
 			selectors: {
 				getAvailableModels: () => models,
+				getAvailableFocusAreas: () => focusAreas,
+				getAvailableTones: () => tones,
 				getLastReview: () => ({ block_mapping: blockMapping }),
 			},
 		})
 	);
 	registry.register(blockEditorStore);
 	registry.dispatch(blockEditorStore).setBlocks(blocks);
+
+	if (withShortcut) {
+		registry.dispatch(keyboardShortcutsStore).registerShortcut({
+			name: 'ai-feedback/review',
+			category: 'global',
+			description: 'Review',
+			keyCombination: { modifier: 'access', character: 'r' },
+		});
+	}
 
 	const { set } = registry.dispatch(preferencesStore);
 	set('ai-feedback', 'reviewCount', reviewCount);
@@ -167,5 +156,33 @@ describe('TipNotice', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Show first note' })
 		).not.toBeInTheDocument();
+	});
+
+	it('names the registered review shortcut in the keyboard tip', () => {
+		const dismissedTips = [
+			'notes-on-blocks',
+			'reply-to-notes',
+			'feedback-language',
+		];
+		const { container } = renderTip({
+			reviewCount: 10,
+			dismissedTips,
+			withShortcut: true,
+		});
+		const tip = container.querySelector('.ai-feedback-tip');
+		expect(tip).toHaveTextContent(/start a review from anywhere/);
+		expect(tip).toHaveTextContent(/Shift\+Alt\+R|⌃⌥R/);
+	});
+
+	it('skips the keyboard tip when the shortcut is not registered', () => {
+		const { container } = renderTip({
+			reviewCount: 10,
+			dismissedTips: [
+				'notes-on-blocks',
+				'reply-to-notes',
+				'feedback-language',
+			],
+		});
+		expect(container.querySelector('.ai-feedback-tip')).toBeNull();
 	});
 });

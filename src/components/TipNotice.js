@@ -6,9 +6,13 @@
 import { Notice } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as keyboardShortcutsStore } from '@wordpress/keyboard-shortcuts';
 import { store as preferencesStore } from '@wordpress/preferences';
 import { STORE_NAME } from '../store';
 import { PREFERENCES_SCOPE, PREFERENCE_KEYS, getActiveTip } from '../tips';
+
+const REVIEW_SHORTCUT = 'ai-feedback/review';
+const EMPTY_ARRAY = [];
 
 /**
  * Tip Notice component.
@@ -16,24 +20,30 @@ import { PREFERENCES_SCOPE, PREFERENCE_KEYS, getActiveTip } from '../tips';
  * @return {Element|null} Tip notice or null when there's nothing to show.
  */
 export default function TipNotice() {
-	const { reviewCount, dismissedTips, modelCount, firstNoteClientId } =
-		useSelect((select) => {
-			const { get } = select(preferencesStore);
-			const blockMapping =
-				select(STORE_NAME).getLastReview()?.block_mapping || {};
-			return {
-				firstNoteClientId:
-					Object.keys(blockMapping).find(
-						(clientId) =>
-							!!select(blockEditorStore).getBlock(clientId)
-					) || null,
-				reviewCount:
-					get(PREFERENCES_SCOPE, PREFERENCE_KEYS.reviewCount) || 0,
-				dismissedTips:
-					get(PREFERENCES_SCOPE, PREFERENCE_KEYS.dismissedTips) || [],
-				modelCount: select(STORE_NAME).getAvailableModels().length,
-			};
-		}, []);
+	const { firstNoteClientId, ...tipsState } = useSelect((select) => {
+		const { get } = select(preferencesStore);
+		const aiFeedback = select(STORE_NAME);
+		const blockMapping = aiFeedback.getLastReview()?.block_mapping || {};
+		return {
+			firstNoteClientId:
+				Object.keys(blockMapping).find(
+					(clientId) => !!select(blockEditorStore).getBlock(clientId)
+				) || null,
+			reviewCount:
+				get(PREFERENCES_SCOPE, PREFERENCE_KEYS.reviewCount) || 0,
+			dismissedTips:
+				get(PREFERENCES_SCOPE, PREFERENCE_KEYS.dismissedTips) ||
+				EMPTY_ARRAY,
+			modelCount: aiFeedback.getAvailableModels()?.length || 0,
+			focusAreaCount: aiFeedback.getAvailableFocusAreas()?.length || 0,
+			toneCount: aiFeedback.getAvailableTones()?.length || 0,
+			reviewShortcut:
+				select(keyboardShortcutsStore).getShortcutRepresentation(
+					REVIEW_SHORTCUT
+				) || '',
+		};
+	}, []);
+	const { dismissedTips } = tipsState;
 	const { set } = useDispatch(preferencesStore);
 	const { selectBlock } = useDispatch(blockEditorStore);
 
@@ -43,7 +53,7 @@ export default function TipNotice() {
 			: null,
 	};
 
-	const tip = getActiveTip({ reviewCount, dismissedTips, modelCount });
+	const tip = getActiveTip(tipsState);
 
 	if (!tip) {
 		return null;
