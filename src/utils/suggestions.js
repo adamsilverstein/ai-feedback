@@ -353,12 +353,23 @@ export async function removeOrphanedSuggestions(postId) {
 		return 0;
 	}
 
-	const html = dataSelect(EDITOR_STORE).getEditedPostContent();
+	const editor = dataSelect(EDITOR_STORE);
+	const html = editor.getEditedPostContent();
 	// Content that hasn't loaded yet would make every suggestion look orphaned.
 	if (!html || !html.trim()) {
 		return 0;
 	}
-	const orphaned = ids.filter((id) => !hasSuggestionMarker(html, id));
+	// A marker removed without saving can still come back with undo, so keep
+	// any suggestion the saved content still marks.
+	const savedHtml = editor.getCurrentPostAttribute('content');
+	const orphaned = ids.filter(
+		(id) =>
+			!hasSuggestionMarker(html, id) &&
+			!hasSuggestionMarker(
+				typeof savedHtml === 'string' ? savedHtml : '',
+				id
+			)
+	);
 
 	await Promise.all(orphaned.map((id) => removeSuggestion(id)));
 

@@ -59,7 +59,11 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 						}),
 					};
 				case 'core/editor':
-					return { getEditedPostContent: () => mocks.postContent };
+					return {
+						getEditedPostContent: () => mocks.postContent,
+						getCurrentPostAttribute: (name) =>
+							name === 'content' ? mocks.savedContent : undefined,
+					};
 				default:
 					return actual.select(store);
 			}
@@ -465,6 +469,7 @@ describe('removeOrphanedSuggestions', () => {
 		);
 		mocks.postContent =
 			'<!-- wp:paragraph --><p><mark class="wp-suggestion-del" data-suggestion-id="12">x</mark></p><!-- /wp:paragraph -->';
+		mocks.savedContent = mocks.postContent;
 	});
 
 	afterEach(() => {
@@ -484,6 +489,16 @@ describe('removeOrphanedSuggestions', () => {
 			meta: { _wp_suggestion: null, _wp_suggestion_status: null },
 		});
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(13, null);
+	});
+
+	it('keeps a suggestion whose marker is only in the saved content', async () => {
+		// The author removed marker 12 without saving, so undo can restore it.
+		mocks.postContent =
+			'<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->';
+
+		await expect(removeOrphanedSuggestions(42)).resolves.toBe(1);
+		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(1);
+		expect(mocks.saveEntityRecord.mock.calls[0][2].id).toBe(13);
 	});
 
 	it('does nothing without Suggestion Mode', async () => {
