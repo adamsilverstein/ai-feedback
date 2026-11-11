@@ -8,6 +8,7 @@ import { useState } from '@wordpress/element';
 import { Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { Icon, chevronUp, chevronDown } from '@wordpress/icons';
 import { navigateToBlock } from '../utils/navigate-to-block';
+import { getPriorityLevel } from '../utils/priority';
 
 /**
  * Get severity badge emoji.
@@ -22,6 +23,41 @@ function getSeverityBadge(severity) {
 		suggestion: '🟢',
 	};
 	return badges[severity] || '⚪';
+}
+
+/**
+ * Priority indicator badge.
+ *
+ * @param {Object} props          Component props.
+ * @param {number} props.priority Priority score.
+ * @return {Element|null} Badge element, or null for low or missing scores.
+ */
+export function PriorityBadge({ priority }) {
+	if (typeof priority !== 'number') {
+		return null;
+	}
+
+	// Low priority is implied, so only high and medium get a badge.
+	const level = getPriorityLevel(priority);
+	if (level === 'low') {
+		return null;
+	}
+
+	const labels = {
+		high: __('High priority', 'ai-feedback'),
+		medium: __('Medium priority', 'ai-feedback'),
+	};
+
+	return (
+		<span
+			className={`priority-badge priority-${level}`}
+			role="img"
+			aria-label={labels[level]}
+			title={labels[level]}
+		>
+			{level === 'high' ? '!' : '•'}
+		</span>
+	);
 }
 
 /**
@@ -63,6 +99,7 @@ function SingleFeedbackItem({ item, onNavigate }) {
 					>
 						{getSeverityBadge(item.severity)}
 					</span>
+					<PriorityBadge priority={item.priority} />
 					<strong className="feedback-title">{item.title}</strong>
 				</div>
 
@@ -121,6 +158,7 @@ function GroupedFeedbackItem({ item, onNavigate }) {
 						>
 							{getSeverityBadge(item.severity)}
 						</span>
+						<PriorityBadge priority={item.priority} />
 						<span className="group-title">{item.title}</span>
 						<Icon
 							icon={expanded ? chevronUp : chevronDown}

@@ -46,6 +46,54 @@ class Response_Parser {
 	);
 
 	/**
+	 * Severity weights used by calculate_priority().
+	 */
+	public const PRIORITY_SEVERITY_WEIGHTS = array(
+		'critical'   => 100,
+		'important'  => 50,
+		'suggestion' => 10,
+	);
+
+	/**
+	 * Category weights used by calculate_priority().
+	 */
+	public const PRIORITY_CATEGORY_WEIGHTS = array(
+		'content' => 30,
+		'flow'    => 20,
+		'tone'    => 15,
+		'design'  => 10,
+	);
+
+	/**
+	 * Block-type weights used by calculate_priority().
+	 *
+	 * Blocks not listed here fall back to PRIORITY_BLOCK_DEFAULT.
+	 */
+	public const PRIORITY_BLOCK_WEIGHTS = array(
+		'core/heading'   => 15,
+		'core/list'      => 10,
+		'core/quote'     => 10,
+		'core/paragraph' => 5,
+	);
+
+	/**
+	 * Default block-type weight when a block is not in PRIORITY_BLOCK_WEIGHTS.
+	 */
+	public const PRIORITY_BLOCK_DEFAULT = 5;
+
+	/**
+	 * Position bonus for the first block, reduced by PRIORITY_POSITION_STEP per block.
+	 */
+	public const PRIORITY_POSITION_MAX  = 25;
+	public const PRIORITY_POSITION_STEP = 5;
+
+	/**
+	 * Score thresholds clients use to bucket priorities into high / medium / low.
+	 */
+	public const PRIORITY_HIGH_THRESHOLD   = 100;
+	public const PRIORITY_MEDIUM_THRESHOLD = 50;
+
+	/**
 	 * Parse an AI response and extract validated feedback items with an optional summary.
 	 *
 	 * Given the raw AI response text, attempts to extract and decode JSON, validates and
@@ -158,7 +206,8 @@ class Response_Parser {
 		foreach ( $feedback_items as $item ) {
 			$validated = $this->validate_feedback_item( $item, $valid_block_ids, $block_info );
 			if ( $validated ) {
-				$parsed[] = $validated;
+				$validated['priority'] = $this->calculate_priority( $validated );
+				$parsed[]              = $validated;
 			}
 		}
 
@@ -169,10 +218,87 @@ class Response_Parser {
 
 		Logger::debug( sprintf( 'Grouped into %d feedback items', count( $grouped ) ) );
 
+		// Sort by priority so the most impactful feedback surfaces first.
+		$grouped = $this->sort_by_priority( $grouped );
+
 		return array(
 			'summary'  => $this->sanitize_summary( $summary ),
 			'feedback' => $grouped,
 		);
+	}
+
+	/**
+	 * Calculate a priority score for a single feedback item.
+	 *
+	 * Combines severity (largest factor), category, block type, and a small
+	 * position bonus for early blocks. The score is bucketed by clients into
+	 * high / medium / low using PRIORITY_*_THRESHOLD constants.
+	 *
+	 * Blocks without a known `block_name` still add PRIORITY_BLOCK_DEFAULT, so
+	 * the score always includes a block-type weight.
+	 *
+	 * @param  array<string, mixed> $item Validated feedback item. Expected keys: `severity`,
+	 *                                    `category`, optional `block_name`, optional `block_index`.
+	 * @return int Priority score (higher means more important).
+	 */
+	public function calculate_priority( array $item ): int {
+		$severity   = is_string( $item['severity'] ?? null ) ? $item['severity'] : '';
+		$category   = is_string( $item['category'] ?? null ) ? $item['category'] : '';
+		$block_name = is_string( $item['block_name'] ?? null ) ? $item['block_name'] : '';
+
+		$score  = self::PRIORITY_SEVERITY_WEIGHTS[ $severity ] ?? 0;
+		$score += self::PRIORITY_CATEGORY_WEIGHTS[ $category ] ?? 0;
+		$score += self::PRIORITY_BLOCK_WEIGHTS[ $block_name ] ?? self::PRIORITY_BLOCK_DEFAULT;
+
+		// Early blocks get a decreasing bonus (25, 20, 15, 10, 5, then 0).
+		if ( isset( $item['block_index'] ) && is_int( $item['block_index'] ) ) {
+			$score += max( 0, self::PRIORITY_POSITION_MAX - ( $item['block_index'] * self::PRIORITY_POSITION_STEP ) );
+		}
+
+		return $score;
+	}
+
+	/**
+	 * Sort feedback items by priority score, highest first.
+	 *
+	 * Items without a `priority` key are treated as zero. Ties are broken by
+	 * `block_index` so equal-priority items follow document order; `usort` is
+	 * stable on PHP 8+, so remaining ties keep their original order.
+	 *
+	 * @param  array<int, array<string, mixed>> $feedback Feedback items, each expected to have an integer `priority`.
+	 * @return array<int, array<string, mixed>> Feedback items sorted by descending priority.
+	 */
+	public function sort_by_priority( array $feedback ): array {
+		usort(
+			$feedback,
+			static function ( array $a, array $b ): int {
+				$pa = is_int( $a['priority'] ?? null ) ? $a['priority'] : 0;
+				$pb = is_int( $b['priority'] ?? null ) ? $b['priority'] : 0;
+				if ( $pa !== $pb ) {
+					return $pb <=> $pa;
+				}
+				return self::get_document_position( $a ) <=> self::get_document_position( $b );
+			}
+		);
+
+		return $feedback;
+	}
+
+	/**
+	 * Document position of a feedback item, used to break priority ties.
+	 *
+	 * Groups use their earliest member block, matching getDocumentPosition()
+	 * in src/utils/priority.js.
+	 *
+	 * @param  array<string, mixed> $item Feedback item.
+	 * @return int Block index, or PHP_INT_MAX when unknown.
+	 */
+	private static function get_document_position( array $item ): int {
+		$indexes = is_array( $item['block_indexes'] ?? null ) ? array_filter( $item['block_indexes'], 'is_int' ) : array();
+		if ( ! empty( $indexes ) ) {
+			return min( $indexes );
+		}
+		return is_int( $item['block_index'] ?? null ) ? $item['block_index'] : PHP_INT_MAX;
 	}
 
 	/**
@@ -221,7 +347,7 @@ class Response_Parser {
 	 * @param  mixed $item            Feedback item data.
 	 * @param  array $valid_block_ids Map of valid block IDs.
 	 * @param  array $block_info      Map of block IDs to their info (name, index).
-	 * @return array|null Array of validated and sanitized fields on success, `null` if the item is invalid.
+	 * @return array<string, mixed>|null Array of validated and sanitized fields on success, `null` if the item is invalid.
 	 */
 	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
 		// Must be an array.
@@ -617,8 +743,8 @@ class Response_Parser {
 	 * Groups feedback items with the same category and similar titles together.
 	 * This helps users identify patterns and fix similar issues more efficiently.
 	 *
-	 * @param  array $feedback Parsed feedback items.
-	 * @return array Grouped feedback items with is_group, count, and block_ids fields.
+	 * @param  array<int, array<string, mixed>> $feedback Parsed feedback items.
+	 * @return array<int, array<string, mixed>> Grouped feedback items with is_group, count, and block_ids fields.
 	 */
 	public function group_similar_feedback( array $feedback ): array {
 		if ( empty( $feedback ) ) {
@@ -639,6 +765,10 @@ class Response_Parser {
 				if ( $this->severity_rank( $item['severity'] ) >
 					$this->severity_rank( $groups[ $key ]['severity'] ) ) {
 					$groups[ $key ]['severity'] = $item['severity'];
+				}
+				// Keep highest priority across grouped items.
+				if ( isset( $item['priority'] ) && $item['priority'] > ( $groups[ $key ]['priority'] ?? 0 ) ) {
+					$groups[ $key ]['priority'] = $item['priority'];
 				}
 				// Preserve block_name and block_index arrays.
 				if ( ! empty( $item['block_name'] ) ) {

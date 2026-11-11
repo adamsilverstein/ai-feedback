@@ -155,11 +155,10 @@ test.describe('Review Workflow', () => {
 		await aiFeedback.runReview();
 
 		const blocks = await editor.getBlocks({ full: true });
-		await page
-			.locator('.ai-feedback-panel')
-			.getByRole('button', { name: 'Go to block' })
-			.nth(1)
-			.click();
+		const panel = page.locator('.ai-feedback-panel');
+		// Feedback is sorted by priority by default.
+		await panel.getByLabel('Sort by').selectOption('Document order');
+		await panel.getByRole('button', { name: 'Go to block' }).nth(1).click();
 
 		await expect
 			.poll(() =>

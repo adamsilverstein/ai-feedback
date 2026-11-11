@@ -56,6 +56,7 @@ X-WP-Nonce: {nonce}
       "block_index": 2,
       "category": "content",
       "severity": "suggestion",
+      "priority": 60,
       "title": "Consider adding context",
       "content": "The opening paragraph jumps directly into technical details. Adding a sentence about why this matters could help readers understand the significance.",
       "suggestion": "Start with the problem this solves before explaining the solution."
@@ -66,6 +67,7 @@ X-WP-Nonce: {nonce}
       "block_index": 5,
       "category": "tone",
       "severity": "important",
+      "priority": 70,
       "title": "Inconsistent tone",
       "content": "This section shifts to a very casual tone ('super easy', 'just do this') which contrasts with the professional tone used elsewhere.",
       "suggestion": null

@@ -336,6 +336,12 @@ if ( ! function_exists( 'wp_list_pluck' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_comment_meta' ) ) {
+	function get_comment_meta( $comment_id, $key = '', $single = false ) {
+		return $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? ( $single ? '' : array() );
+	}
+}
+
 if ( ! function_exists( 'rest_url' ) ) {
 	function rest_url( $path = '' ) {
 		return 'http://example.test/wp-json/' . ltrim( $path, '/' );
