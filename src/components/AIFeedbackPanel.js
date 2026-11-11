@@ -10,6 +10,7 @@ import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 import { getConnectorsUrl } from '../utils/connectors-url';
 import { getErrorKind } from '../utils/error-kind';
+import { isPostSaved } from '../utils/post-status';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -68,6 +69,7 @@ export default function AIFeedbackPanel() {
 		lastReview,
 		isLoadingSettings,
 		postId,
+		postStatus,
 		editorBlocks,
 		isReviewing,
 		selectedModel,
@@ -82,6 +84,7 @@ export default function AIFeedbackPanel() {
 			lastReview: select(STORE_NAME).getLastReview(),
 			isLoadingSettings: select(STORE_NAME).isLoadingSettings(),
 			postId: select(editorStore).getCurrentPostId(),
+			postStatus: select(editorStore).getEditedPostAttribute('status'),
 			editorBlocks: select(blockEditorStore).getBlocks(),
 			isReviewing: select(STORE_NAME).isReviewing(),
 			selectedModel: select(STORE_NAME).getSelectedModel(),
@@ -99,7 +102,7 @@ export default function AIFeedbackPanel() {
 	// Check if post has content (any text blocks)
 	const hasContent = hasTextContent(editorBlocks);
 
-	const isSaved = !!postId;
+	const isSaved = isPostSaved(postId, postStatus);
 	const canReview = isSaved && hasContent;
 
 	/**
