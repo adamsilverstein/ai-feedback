@@ -19,6 +19,7 @@ import {
 	removeOrphanedSuggestions,
 	suggestQuickFixes,
 } from '../utils/suggestions';
+import { recordCompletedReview } from '../tips';
 
 /**
  * Fetch settings from the server.
@@ -357,6 +358,9 @@ export function* startReview({
 
 		// Runs after REVIEW_SUCCESS is stored, since it awaits a request first.
 		suggestReviewQuickFixes(responses);
+
+		// Only count once every chunk has finished.
+		recordCompletedReview();
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,

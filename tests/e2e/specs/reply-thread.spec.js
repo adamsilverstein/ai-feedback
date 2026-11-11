@@ -1,9 +1,9 @@
 /**
  * E2E tests for the AI reply thread under a feedback note.
  *
- * The AI provider is mocked at the REST layer: the latest review, the reply
- * threads, and the reply status endpoint all return canned responses, so the
- * test covers the sidebar's half of the reply-to-AI-reply flow.
+ * The "Reply thread" tests mock the plugin's REST endpoints to pin down the
+ * sidebar states. The "Reply loop" test runs the whole flow on the server with
+ * the mock AI provider from tests/mu-plugins/ai-feedback-e2e.php.
  */
 const { test, expect } = require('../fixtures');
 
@@ -191,5 +191,160 @@ test.describe('Reply thread', () => {
 			'The AI reply could not be generated.',
 			{ timeout: 10000 }
 		);
+	});
+});
+
+/**
+ * Mock reply from Reply_Service::MOCK_REPLY.
+ */
+const MOCK_AI_REPLY =
+	'This is a mock AI reply for testing purposes. The conversation loop is working correctly.';
+
+/**
+ * Reply to a note the way the editor's Notes UI does.
+ *
+ * @param {import('@playwright/test').Page} page    Page.
+ * @param {number}                          parent  Note to reply to.
+ * @param {string}                          content Reply text.
+ */
+async function replyToNote(page, parent, content) {
+	await page.evaluate(
+		async ({ parentId, text }) => {
+			const { select, dispatch } = window.wp.data;
+			await dispatch('core').saveEntityRecord(
+				'root',
+				'comment',
+				{
+					post: select('core/editor').getCurrentPostId(),
+					content: text,
+					status: 'hold',
+					type: 'note',
+					parent: parentId,
+				},
+				{ throwOnError: true }
+			);
+		},
+		{ parentId: parent, text: content }
+	);
+}
+
+/**
+ * Run due WP-Cron events. The e2e cookie keeps the AI provider mocked.
+ *
+ * @param {import('@playwright/test').Page} page    Page.
+ * @param {string}                          baseURL Site URL.
+ */
+async function runCron(page, baseURL) {
+	const response = await page.request.get(
+		new URL('/wp-cron.php', baseURL).toString()
+	);
+	expect(response.ok()).toBe(true);
+}
+
+test.describe('Reply loop', () => {
+	// Mock mode follows the e2e cookie, not the queued event. Drain any reply a
+	// failed test left scheduled, so a later cookie-less cron run does not
+	// send it to a real provider.
+	test.afterEach(async ({ page, baseURL }) => {
+		await page.request
+			.get(new URL('/wp-cron.php', baseURL).toString())
+			.catch(() => {});
+	});
+
+	test('replies to a note get an AI reply through WP-Cron', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+		baseURL,
+	}) => {
+		// Create the post over REST: content added in a freshly loaded editor
+		// is sometimes lost before the save, which leaves nothing to review.
+		const post = await requestUtils.createPost({
+			title: 'Reply loop',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40% last year.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		const noteId = review.note_ids[0];
+		expect(noteId).toBeGreaterThan(0);
+
+		// First round: the user answers the AI note.
+		await replyToNote(page, noteId, 'It is cited in paragraph three.');
+
+		const thread = page.getByRole('list', { name: 'Conversation replies' });
+		await expect(thread.locator('.ai-feedback-reply-user')).toContainText(
+			'It is cited in paragraph three.',
+			{ timeout: 10000 }
+		);
+		const pendingRow = thread.locator('.ai-feedback-reply-pending');
+		await expect(pendingRow).toContainText('AI is replying…');
+
+		await runCron(page, baseURL);
+
+		const aiReplies = thread.locator('.ai-feedback-reply-ai');
+		await expect(aiReplies).toHaveCount(1, { timeout: 30000 });
+		await expect(aiReplies.first()).toContainText(MOCK_AI_REPLY);
+		await expect(pendingRow).toHaveCount(0);
+		await expect(page.locator('#a11y-speak-polite')).toContainText(
+			'AI Feedback replied'
+		);
+
+		// Second round: the user answers the AI's reply in the same thread.
+		await replyToNote(page, noteId, 'Linked it. Anything else?');
+
+		await expect(thread.locator('.ai-feedback-reply-user')).toHaveCount(2, {
+			timeout: 10000,
+		});
+		await expect(
+			thread.locator('.ai-feedback-reply-pending')
+		).toContainText('AI is replying…');
+
+		// Both AI replies share the mock text, so record what gets written to
+		// the live region from here on to prove the second one is announced.
+		const politeRegion = page.locator('#a11y-speak-polite');
+		await politeRegion.evaluate((region) => {
+			window.aiFeedbackPoliteLog = [];
+			new window.MutationObserver(() => {
+				window.aiFeedbackPoliteLog.push(region.textContent);
+			}).observe(region, {
+				childList: true,
+				characterData: true,
+				subtree: true,
+			});
+		});
+
+		await runCron(page, baseURL);
+
+		await expect(aiReplies).toHaveCount(2, { timeout: 30000 });
+		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
+			0
+		);
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					window.aiFeedbackPoliteLog.some((text) =>
+						text.includes('AI Feedback replied')
+					)
+				)
+			)
+			.toBe(true);
+
+		// Replies render oldest first, alternating user and AI.
+		await expect(thread.locator('.ai-feedback-reply')).toHaveClass([
+			/ai-feedback-reply-user/,
+			/ai-feedback-reply-ai/,
+			/ai-feedback-reply-user/,
+			/ai-feedback-reply-ai/,
+		]);
 	});
 });

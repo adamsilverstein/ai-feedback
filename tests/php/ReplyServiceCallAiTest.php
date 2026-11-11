@@ -107,4 +107,31 @@ class ReplyServiceCallAiTest extends TestCase {
 		$this->assertSame( Reply_Service::AI_HTTP_TIMEOUT, $GLOBALS['fake_ai_builder']->timeout_during_call );
 		$this->assertEmpty( $GLOBALS['fake_filters']['wp_ai_client_default_request_timeout'] ?? array() );
 	}
+
+	/**
+	 * Mock mode returns the canned reply without touching the AI Client.
+	 */
+	public function test_mock_mode_returns_mock_reply_without_calling_ai(): void {
+		$this->fake_ai_client( 'Real reply' );
+		define( 'AI_FEEDBACK_MOCK_MODE', true );
+
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+
+		$this->assertSame( Reply_Service::MOCK_REPLY, $result );
+		$this->assertNull( $GLOBALS['fake_ai_builder'] );
+	}
+
+	/**
+	 * Mock mode defined as false, as ai-feedback.php does in production,
+	 * still calls the AI Client.
+	 */
+	public function test_mock_mode_false_calls_ai_client(): void {
+		$this->fake_ai_client( 'Real reply' );
+		define( 'AI_FEEDBACK_MOCK_MODE', false );
+
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+
+		$this->assertSame( 'Real reply', $result );
+		$this->assertNotNull( $GLOBALS['fake_ai_builder'] );
+	}
 }

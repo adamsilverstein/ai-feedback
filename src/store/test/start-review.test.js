@@ -4,6 +4,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
+ * WordPress dependencies
+ */
+import { dispatch, select } from '@wordpress/data';
+import { store as preferencesStore } from '@wordpress/preferences';
+
+/**
  * Internal dependencies
  */
 import { fetchPreviousReview, startReview } from '../actions';
@@ -220,6 +226,38 @@ describe('startReview', () => {
 			error: { code: 'prompt_client_error', message: 'Down' },
 		});
 		expect(error).toHaveBeenCalled();
+	});
+
+	describe('review count for progressive tips', () => {
+		const getReviewCount = () =>
+			select(preferencesStore).get('ai-feedback', 'reviewCount');
+
+		beforeEach(() => {
+			dispatch(preferencesStore).set('ai-feedback', 'reviewCount', 2);
+		});
+
+		it('counts a completed review', () => {
+			const gen = startUntilFirstRequest({ blocks: makeBlocks(1) });
+			advance(gen, { has_history: false });
+			advance(gen, reviewResponse());
+
+			expect(getReviewCount()).toBe(3);
+		});
+
+		it('does not count a failed or partial review', () => {
+			const gen = startUntilFirstRequest({
+				blocks: makeBlocks(4),
+				chunkSize: 2,
+			});
+			advance(gen, { has_history: false });
+			advance(gen);
+			advance(gen, reviewResponse());
+			advance(gen);
+			gen.throw({ code: 'prompt_client_error', message: 'Down' });
+			advance(gen);
+
+			expect(getReviewCount()).toBe(2);
+		});
 	});
 });
 

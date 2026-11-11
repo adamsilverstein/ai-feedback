@@ -602,6 +602,9 @@ EOT;
 	 *     Reply context.
 	 *
 	 *     @type string $block_content     The raw content of the block being discussed.
+	 *     @type bool   $block_is_text     Optional. Whether `block_content` is already plain text,
+	 *                                     so markup written as text (e.g. `<div>` in a code
+	 *                                     sample) is kept. Default false.
 	 *     @type string $block_type        Optional. The block type (e.g. `core/paragraph`).
 	 *     @type string $original_feedback The original AI feedback text on this block.
 	 *     @type string $original_category Optional. Category of the original feedback (content|tone|flow|design).
@@ -630,7 +633,8 @@ EOT;
 		if ( '' !== $block_type ) {
 			$prompt .= 'Block type: ' . $block_type . "\n";
 		}
-		$prompt .= 'Block content: ' . wp_strip_all_tags( $block_content ) . "\n\n";
+		$block_is_text = true === ( $context['block_is_text'] ?? false );
+		$prompt       .= 'Block content: ' . ( $block_is_text ? $block_content : wp_strip_all_tags( $block_content ) ) . "\n\n";
 
 		$prompt .= "ORIGINAL FEEDBACK:\n";
 		if ( '' !== $original_category || '' !== $original_severity ) {

@@ -513,7 +513,10 @@ if ( ! function_exists( 'get_post' ) ) {
 		if ( isset( $GLOBALS['test_posts'][ (int) $post_id ] ) ) {
 			return $GLOBALS['test_posts'][ (int) $post_id ];
 		}
-		return (object) array( 'ID' => (int) $post_id );
+		return (object) array(
+			'ID'           => (int) $post_id,
+			'post_content' => $GLOBALS['test_post_content'][ (int) $post_id ] ?? '',
+		);
 	}
 }
 
