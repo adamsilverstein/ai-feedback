@@ -385,7 +385,6 @@ class Review_Controller extends WP_REST_Controller {
 			'review_id'          => array(
 				'required'    => false,
 				'type'        => 'string',
-				'default'     => '',
 				'format'      => 'uuid',
 				'description' => __( 'Review ID returned for the first chunk of a chunked review.', 'ai-feedback' ),
 			),
