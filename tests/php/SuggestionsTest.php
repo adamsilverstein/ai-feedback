@@ -20,6 +20,7 @@ namespace {
 		class WP_Post {
 			public int $ID                   = 0;
 			public string $post_modified_gmt = '';
+			public string $post_content      = '';
 
 			/**
 			 * @param array<string, int|string> $post Post fields.
@@ -119,48 +120,114 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
-		 * Sets post 42's last save time.
+		 * Sets post 42's last save time and content.
 		 *
 		 * @param string $modified_gmt Last modified date, GMT.
+		 * @param string $content      Saved post content.
 		 */
-		private function set_post_modified( string $modified_gmt ): void {
+		private function set_post_modified( string $modified_gmt, string $content = '' ): void {
 			$GLOBALS['test_posts'] = array(
 				42 => new \WP_Post(
 					array(
 						'ID'                => 42,
 						'post_modified_gmt' => $modified_gmt,
+						'post_content'      => $content,
 					)
 				),
 			);
 		}
 
 		/**
-		 * Only pending suggestions created before the last save are listed.
+		 * Returns a GMT date some seconds ago.
+		 *
+		 * @param int $seconds Seconds before now.
+		 * @return string MySQL date, GMT.
 		 */
-		public function test_saved_pending_ids_skip_suggestions_newer_than_the_save(): void {
-			$this->set_post_modified( '2026-05-01 12:00:00' );
-			$this->add_suggestion( 401, '2026-05-01 11:00:00' );
-			$this->add_suggestion( 402, '2026-05-01 13:00:00' );
-			$this->add_suggestion( 403, '2026-05-01 12:00:00' );
-			$this->add_suggestion( 404, '2026-05-01 11:00:00', '' );
-			$this->add_suggestion( 405, '2026-05-01 11:00:00', 'applied-unsaved' );
+		private function ago( int $seconds ): string {
+			return gmdate( 'Y-m-d H:i:s', time() - $seconds );
+		}
+
+		/**
+		 * Returns a marker for a suggestion id.
+		 *
+		 * @param int $note_id Note ID.
+		 * @return string Marker HTML.
+		 */
+		private function marker( int $note_id ): string {
+			return '<p><mark class="wp-suggestion-del" data-suggestion-id="' . $note_id . '">x</mark></p>';
+		}
+
+		/**
+		 * Only pending suggestions older than the cleanup delay are listed.
+		 */
+		public function test_saved_pending_ids_skip_recent_and_decided_suggestions(): void {
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$this->add_suggestion( 402, $this->ago( 10 * MINUTE_IN_SECONDS ) );
+			$this->add_suggestion( 404, $this->ago( 2 * HOUR_IN_SECONDS ), '' );
+			$this->add_suggestion( 405, $this->ago( 2 * HOUR_IN_SECONDS ), 'applied-unsaved' );
 
 			$this->assertSame( array( 401, 404 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
+		 * A save after the suggestion is not proof its markers are gone.
+		 *
+		 * Another editor can save without the markers while the one that
+		 * added them still holds them, so a recent suggestion is kept.
+		 */
+		public function test_saved_pending_ids_ignore_an_unrelated_save(): void {
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 5 * MINUTE_IN_SECONDS ) );
+
+			$this->assertSame( array(), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
+		 * Suggestions whose markers the saved post or autosave holds are kept.
+		 */
+		public function test_saved_pending_ids_skip_anchored_suggestions(): void {
+			$this->set_post_modified( $this->ago( HOUR_IN_SECONDS ), $this->marker( 401 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$this->add_suggestion( 402, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$this->add_suggestion( 403, $this->ago( 2 * HOUR_IN_SECONDS ) );
+
+			$GLOBALS['test_autosaves'] = array(
+				42 => new \WP_Post(
+					array(
+						'post_modified_gmt' => $this->ago( 2 * HOUR_IN_SECONDS ),
+						'post_content'      => $this->marker( 402 ),
+					)
+				),
+			);
+
+			$this->assertSame( array( 403 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
+		 * The cleanup delay can be filtered.
+		 */
+		public function test_saved_pending_ids_delay_is_filterable(): void {
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 5 * MINUTE_IN_SECONDS ) );
+
+			$GLOBALS['test_filter_results'] = array( 'ai_feedback_suggestion_cleanup_delay' => 60 );
+			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 		}
 
 		/**
 		 * A newer autosave may hold the markers, so nothing is listed.
 		 */
 		public function test_saved_pending_ids_wait_for_a_newer_autosave(): void {
-			$this->set_post_modified( '2026-05-01 12:00:00' );
-			$this->add_suggestion( 401, '2026-05-01 11:00:00' );
+			$this->set_post_modified( $this->ago( HOUR_IN_SECONDS ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 
 			$GLOBALS['test_autosaves'] = array(
-				42 => new \WP_Post( array( 'post_modified_gmt' => '2026-05-01 12:30:00' ) ),
+				42 => new \WP_Post( array( 'post_modified_gmt' => $this->ago( 60 ) ) ),
 			);
 			$this->assertSame( array(), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 
-			$GLOBALS['test_autosaves'][42]->post_modified_gmt = '2026-05-01 11:30:00';
+			$GLOBALS['test_autosaves'][42]->post_modified_gmt = $this->ago( 90 * MINUTE_IN_SECONDS );
 			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 		}
 
@@ -170,8 +237,8 @@ namespace AI_Feedback\Tests {
 		public function test_rest_route_returns_saved_pending_ids(): void {
 			require_once dirname( __DIR__, 2 ) . '/includes/class-notes-controller.php';
 
-			$this->set_post_modified( '2026-05-01 12:00:00' );
-			$this->add_suggestion( 401, '2026-05-01 11:00:00' );
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 
 			$request = new \WP_REST_Request();
 			$request->set_param( 'post_id', 42 );
@@ -185,8 +252,8 @@ namespace AI_Feedback\Tests {
 		 * Nothing is listed without Suggestion Mode or a post.
 		 */
 		public function test_saved_pending_ids_need_suggestion_mode_and_a_post(): void {
-			$this->set_post_modified( '2026-05-01 12:00:00' );
-			$this->add_suggestion( 401, '2026-05-01 11:00:00' );
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 
 			$GLOBALS['test_gutenberg_experiments'] = array();
 			$this->assertSame( array(), ( new Suggestions() )->get_saved_pending_ids( 42 ) );

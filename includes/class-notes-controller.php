@@ -197,7 +197,7 @@ class Notes_Controller extends WP_REST_Controller {
 			)
 		);
 
-		// Pending AI suggestions the saved post should hold markers for.
+		// Pending AI suggestions whose markers are gone.
 		register_rest_route(
 			$this->namespace,
 			'/' . $this->rest_base . '/post/(?P<post_id>\d+)/saved-pending-suggestions',
@@ -219,7 +219,7 @@ class Notes_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Lists pending AI suggestions created before the post's last save.
+	 * Lists pending AI suggestions whose markers are gone from the post.
 	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error

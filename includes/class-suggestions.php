@@ -71,12 +71,23 @@ class Suggestions {
 	}
 
 	/**
-	 * Lists pending AI suggestions whose markers the saved post should hold.
+	 * Seconds a pending AI suggestion is kept before it may be cleaned up.
 	 *
-	 * Markers live in the post content, so a suggestion created after the
-	 * last save may only exist in another editor's unsaved content. Only
-	 * suggestions older than the last save are listed, and none while a
-	 * newer autosave exists, since restoring it brings markers back.
+	 * An editor holding unsaved markers autosaves them within a minute or so,
+	 * into the post for a draft or an autosave revision otherwise, where the
+	 * anchor check below finds them.
+	 */
+	public const CLEANUP_DELAY = HOUR_IN_SECONDS;
+
+	/**
+	 * Lists pending AI suggestions whose markers are gone.
+	 *
+	 * Markers live in the post content, so they are lost when the editor
+	 * reloads before saving. A note is listed only when neither the saved post
+	 * nor its autosave holds its anchor and it is older than the cleanup delay,
+	 * so markers that are still unsaved in another editor are left alone. A
+	 * save alone is not taken as proof, since it may come from an editor that
+	 * never had the markers.
 	 *
 	 * @param  int $post_id Post ID.
 	 * @return list<int> Note IDs.
@@ -113,17 +124,58 @@ class Suggestions {
 			)
 		);
 
+		/**
+		 * Filters how long a pending AI suggestion is kept before cleanup.
+		 *
+		 * @param int $delay   Seconds.
+		 * @param int $post_id Post ID.
+		 */
+		$delay   = (int) apply_filters( 'ai_feedback_suggestion_cleanup_delay', self::CLEANUP_DELAY, $post_id );
+		$cutoff  = time() - max( 0, $delay );
+		$content = array( $post->post_content );
+		if ( $autosave instanceof \WP_Post ) {
+			$content[] = $autosave->post_content;
+		}
+
 		$ids = array();
 		foreach ( is_array( $notes ) ? $notes : array() as $note ) {
 			if ( ! $note instanceof \WP_Comment ) {
 				continue;
 			}
 			$note_id = (int) $note->comment_ID;
-			if ( 'pending' === $this->get_status( $note_id ) && $post->post_modified_gmt > $note->comment_date_gmt ) {
+			$created = strtotime( $note->comment_date_gmt . ' UTC' );
+			if (
+				'pending' === $this->get_status( $note_id ) &&
+				false !== $created &&
+				$created <= $cutoff &&
+				! self::is_anchored( $note_id, $content )
+			) {
 				$ids[] = $note_id;
 			}
 		}
 
 		return $ids;
+	}
+
+	/**
+	 * Checks whether any of the given content holds a suggestion's anchor.
+	 *
+	 * @param  int           $note_id  Note ID.
+	 * @param  array<string> $contents Post content to search.
+	 * @return bool True if a marker for the note is present.
+	 */
+	private static function is_anchored( int $note_id, array $contents ): bool {
+		foreach ( $contents as $content ) {
+			if ( function_exists( 'gutenberg_get_suggestion_anchor_index' ) ) {
+				if ( isset( gutenberg_get_suggestion_anchor_index( $content )[ $note_id ] ) ) {
+					return true;
+				}
+				continue;
+			}
+			if ( str_contains( $content, 'data-suggestion-id="' . $note_id . '"' ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
