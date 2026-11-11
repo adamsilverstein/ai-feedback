@@ -79,15 +79,37 @@ The `fixtures.js` file provides custom utilities for testing the AI Feedback plu
 
 The `aiFeedback` fixture provides:
 
-- `openSidebar()`: Opens the AI Feedback sidebar
-- `selectModel(modelId)`: Selects an AI model
-- `toggleFocusArea(label, checked)`: Toggles a focus area checkbox
-- `selectTone(toneId)`: Selects a target tone
-- `expandReviewSettings()`: Expands the Review Settings panel
-- `waitForSettingsSave(ms)`: Waits for debounced settings to save (default 600ms)
-- `mockReviewAPI(response)`: Mocks the review API with a custom response
-- `mockReviewAPIError(status, code, message)`: Mocks the review API to return an error
+- `openSidebar()`: Opens the AI Feedback sidebar from its pinned top bar button and dismisses the welcome or setup modal
+- `createAndSavePost({ title, content }, { editor })`: Creates a post with one paragraph and saves it as a draft
+- `getReviewButton()`: Locates the primary review button in the empty state or the Review Document panel
+- `runReview()`: Clicks the review button and waits for the review request and busy state to finish
+- `mockReviewAPI(response, { delay })`: Mocks the review endpoint; `response` is merged over a default review
+- `mockReviewAPIError(status, code, message, data)`: Mocks the review endpoint with an error
+- `routeREST(route, handler)` / `unrouteREST(route)`: Route any plugin REST endpoint, e.g. `'/settings'`
+- `waitForSettingsSave(ms)`: Waits for debounced settings to save
 - `startReviewAndWait(timeout)`: Starts a review and waits for completion
+
+REST mocks match both `/wp-json/ai-feedback/v1/...` and the `?rest_route=/ai-feedback/v1/...` form wp-env uses without pretty permalinks, so use these helpers rather than hand-written URL globs.
+
+### Mock AI Responses
+
+No test ever calls a real AI provider. The `e2eMockMode` auto fixture sets an `ai_feedback_e2e` cookie, and `tests/mu-plugins/ai-feedback-e2e.php` (mapped into wp-env) responds to that cookie by:
+
+- defining `AI_FEEDBACK_MOCK_MODE`, so reviews run through the real REST, parsing and notes code with the plugin's built-in mock AI response
+- clearing the per-user review rate limit, so the suite can run more than 10 reviews an hour
+
+The `skipWelcomeModal` auto fixture also marks the welcome modal as seen in `localStorage`, since it opens after an async status check and can otherwise cover the sidebar mid-test.
+
+Requests without the cookie, such as manual testing in the same wp-env site, are not affected. Use `mockReviewAPI()` or `mockReviewAPIError()` when a test needs a specific response or error.
+
+### Running Against Another Port
+
+If port 8889 is taken, start wp-env on another port and point Playwright at it:
+
+```bash
+WP_ENV_PORT=8930 WP_ENV_TESTS_PORT=8931 npm run env:start
+WP_BASE_URL=http://localhost:8930 npm run test:e2e
+```
 
 ## Writing Tests
 

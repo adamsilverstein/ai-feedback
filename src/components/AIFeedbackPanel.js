@@ -40,8 +40,12 @@ export default function AIFeedbackPanel() {
 		feedbackLocale,
 		postTitle,
 		availableModels,
-	} = useSelect(
-		(select) => ({
+	} = useSelect((select) => {
+		// Settings are loaded by the getSettings resolver, so select them to
+		// trigger the fetch of available models and locales.
+		select(STORE_NAME).getSettings();
+
+		return {
 			error: select(STORE_NAME).getError(),
 			lastReview: select(STORE_NAME).getLastReview(),
 			isLoadingSettings: select(STORE_NAME).isLoadingSettings(),
@@ -55,9 +59,8 @@ export default function AIFeedbackPanel() {
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
-		}),
-		[]
-	);
+		};
+	}, []);
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
