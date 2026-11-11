@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 /**
@@ -15,11 +16,11 @@ import { speak } from '@wordpress/a11y';
  */
 import useStartReview from '../use-start-review';
 
-jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
-jest.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
-jest.mock('@wordpress/a11y', () => ({ speak: jest.fn() }));
-jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
-jest.mock('../../utils/block-utils', () => ({
+vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+vi.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
+vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+vi.mock('../../utils/block-utils', () => ({
 	extractBlockData: (blocks) => blocks,
 }));
 
@@ -29,7 +30,7 @@ function setup({
 	blocks = [{ clientId: 'a' }],
 	isReviewing = false,
 } = {}) {
-	const startReview = jest.fn();
+	const startReview = vi.fn();
 	const registry = createRegistry();
 	registry.register(noticesStore);
 	registry.registerStore('core/editor', {

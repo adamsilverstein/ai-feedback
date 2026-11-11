@@ -1,12 +1,13 @@
-// @jest-environment jsdom
-/* eslint-env jest */
 /**
  * Tests for useReplyStatus.
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
-const mockApiFetch = jest.fn();
-jest.mock('@wordpress/api-fetch', () => (args) => mockApiFetch(args));
+const mockApiFetch = vi.fn();
+vi.mock('@wordpress/api-fetch', () => ({
+	default: (args) => mockApiFetch(args),
+}));
 
 import useReplyStatus, {
 	MAX_PENDING_MS,
@@ -68,7 +69,7 @@ describe('useReplyStatus', () => {
 	});
 
 	it('stops polling when the component unmounts mid-pending', async () => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 
 		mockApiFetch.mockResolvedValue({
 			reply_id: 200,
@@ -89,16 +90,16 @@ describe('useReplyStatus', () => {
 
 		// Advance past the poll interval; no additional fetch should fire.
 		act(() => {
-			jest.advanceTimersByTime(10_000);
+			vi.advanceTimersByTime(10_000);
 		});
 
 		expect(mockApiFetch).toHaveBeenCalledTimes(1);
 
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('gives up with a failed status after repeated unknown responses', async () => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'unknown' });
 
 		const { result } = renderHook(() => useReplyStatus(200));
@@ -106,7 +107,7 @@ describe('useReplyStatus', () => {
 		for (let i = 0; i < MAX_UNKNOWN_POLLS; i++) {
 			await act(async () => {
 				await Promise.resolve();
-				jest.advanceTimersByTime(MAX_POLL_INTERVAL_MS);
+				vi.advanceTimersByTime(MAX_POLL_INTERVAL_MS);
 			});
 		}
 
@@ -114,15 +115,15 @@ describe('useReplyStatus', () => {
 		expect(mockApiFetch).toHaveBeenCalledTimes(MAX_UNKNOWN_POLLS);
 
 		act(() => {
-			jest.advanceTimersByTime(MAX_POLL_INTERVAL_MS * 5);
+			vi.advanceTimersByTime(MAX_POLL_INTERVAL_MS * 5);
 		});
 		expect(mockApiFetch).toHaveBeenCalledTimes(MAX_UNKNOWN_POLLS);
 
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('gives up on a reply that stays pending too long', async () => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
 
 		const { result } = renderHook(() => useReplyStatus(200));
@@ -131,7 +132,7 @@ describe('useReplyStatus', () => {
 		for (let i = 0; i < polls; i++) {
 			await act(async () => {
 				await Promise.resolve();
-				jest.advanceTimersByTime(MAX_POLL_INTERVAL_MS);
+				vi.advanceTimersByTime(MAX_POLL_INTERVAL_MS);
 			});
 		}
 
@@ -140,7 +141,7 @@ describe('useReplyStatus', () => {
 			'The AI reply is taking longer than expected.'
 		);
 
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('does not report the previous reply status after the ID changes', async () => {

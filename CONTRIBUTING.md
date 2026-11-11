@@ -73,7 +73,7 @@ All contributions must include appropriate tests.
 
 ### JavaScript Tests
 ```bash
-npm run test:unit        # Run Jest tests
+npm run test:unit        # Run Vitest tests
 npm run test:e2e         # Run Playwright E2E tests
 ```
 
@@ -128,7 +128,7 @@ All pull requests must pass automated checks:
 
 - ✅ **JavaScript Linting** - ESLint, Stylelint, Prettier
 - ✅ **PHP Linting** - PHPCS, PHPStan
-- ✅ **JavaScript Tests** - Jest unit tests
+- ✅ **JavaScript Tests** - Vitest unit tests
 - ✅ **PHP Tests** - PHPUnit tests across PHP 8.1-8.3
 
 **Pull requests cannot be merged until all checks pass.**

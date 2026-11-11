@@ -33,7 +33,7 @@ Checks PHP code quality and standards compliance:
 ### JavaScript Testing
 **File**: `.github/workflows/test-js.yml`
 
-Runs JavaScript unit tests using Jest.
+Runs JavaScript unit tests using Vitest.
 
 **Triggered on**: Pull requests and pushes when JavaScript or test files change
 
@@ -74,7 +74,7 @@ npm run lint:pkg-json    # Package.json validation
 npm run format -- --check # Prettier formatting
 
 # Testing
-npm run test:unit        # Jest unit tests
+npm run test:unit        # Vitest unit tests
 ```
 
 ### PHP Checks

@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 
 /**
@@ -14,11 +15,13 @@ import { store as keyboardShortcutsStore } from '@wordpress/keyboard-shortcuts';
  */
 import KeyboardShortcuts, { getShortcuts } from '../KeyboardShortcuts';
 
-jest.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
-jest.mock('../../hooks/use-start-review', () => () => ({
-	startReview: jest.fn(),
+vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
+vi.mock('../../hooks/use-start-review', () => ({
+	default: () => ({
+		startReview: vi.fn(),
+	}),
 }));
-jest.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
 describe('getShortcuts', () => {
 	it('defines unique names and key combinations', () => {
@@ -87,7 +90,7 @@ function createTestRegistry(enableComplementaryArea) {
 
 describe('KeyboardShortcuts', () => {
 	it('registers shortcuts on mount and removes them on unmount', () => {
-		const registry = createTestRegistry(jest.fn());
+		const registry = createTestRegistry(vi.fn());
 
 		const { unmount } = render(
 			<RegistryProvider value={registry}>
@@ -116,7 +119,7 @@ describe('KeyboardShortcuts', () => {
 
 describe('KeyboardShortcuts handlers', () => {
 	it('opens the sidebar on Shift+Alt+F', () => {
-		const enableComplementaryArea = jest.fn();
+		const enableComplementaryArea = vi.fn();
 		const registry = createTestRegistry(enableComplementaryArea);
 
 		render(

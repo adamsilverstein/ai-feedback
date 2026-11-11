@@ -1,19 +1,19 @@
 /**
  * Tests for FocusAreaSelector component.
  */
-import '@testing-library/jest-dom';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSelect, useDispatch } from '@wordpress/data';
 import FocusAreaSelector from '../FocusAreaSelector';
 
 // Mock WordPress modules.
-jest.mock('@wordpress/data', () => ({
-	useSelect: jest.fn(),
-	useDispatch: jest.fn(),
+vi.mock('@wordpress/data', () => ({
+	useSelect: vi.fn(),
+	useDispatch: vi.fn(),
 }));
 
-jest.mock('@wordpress/components', () => ({
+vi.mock('@wordpress/components', () => ({
 	// eslint-disable-next-line jsx-a11y/label-has-associated-control
 	CheckboxControl: ({ label, checked, onChange, help, disabled }) => (
 		<label htmlFor={`cb-${label}`}>
@@ -31,11 +31,11 @@ jest.mock('@wordpress/components', () => ({
 	),
 }));
 
-jest.mock('@wordpress/i18n', () => ({
+vi.mock('@wordpress/i18n', () => ({
 	__: (text) => text,
 }));
 
-jest.mock('../../store', () => ({
+vi.mock('../../store', () => ({
 	STORE_NAME: 'ai-feedback/store',
 }));
 
@@ -54,7 +54,7 @@ const MOCK_FOCUS_AREAS = [
 	},
 ];
 
-const mockUpdateSettings = jest.fn();
+const mockUpdateSettings = vi.fn();
 
 function setupMocks(
 	focusAreas = ['content', 'tone', 'flow'],
@@ -71,7 +71,7 @@ function setupMocks(
 
 describe('FocusAreaSelector', () => {
 	beforeEach(() => {
-		jest.clearAllMocks();
+		vi.clearAllMocks();
 	});
 
 	it('renders all focus area checkboxes', () => {

@@ -1,12 +1,17 @@
-jest.mock('@wordpress/block-editor', () => ({
-	store: 'core/block-editor',
-}));
+/**
+ * External dependencies
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Internal dependencies
  */
 import { startReview } from '../actions';
 import { TYPES } from '../reducer';
+
+vi.mock('@wordpress/block-editor', () => ({
+	store: 'core/block-editor',
+}));
 
 const makeBlocks = (count) =>
 	Array.from({ length: count }, (_, i) => ({
@@ -61,10 +66,19 @@ function startUntilFirstRequest(options) {
 }
 
 describe('startReview', () => {
+	let log;
+	let error;
+
+	beforeEach(() => {
+		log = vi.spyOn(console, 'log').mockImplementation(() => {});
+		error = vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
 	afterEach(() => {
 		// The store logs each step of a review for debugging.
-		// eslint-disable-next-line jest/no-standalone-expect
-		expect(console).toHaveLogged();
+		// eslint-disable-next-line vitest/no-standalone-expect
+		expect(log).toHaveBeenCalled();
+		vi.restoreAllMocks();
 	});
 
 	it('sends a single request for small documents', () => {
@@ -158,6 +172,6 @@ describe('startReview', () => {
 			type: TYPES.REVIEW_ERROR,
 			error: { code: 'prompt_client_error', message: 'Down' },
 		});
-		expect(console).toHaveErrored();
+		expect(error).toHaveBeenCalled();
 	});
 });

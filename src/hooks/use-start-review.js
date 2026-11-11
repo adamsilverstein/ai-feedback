@@ -68,7 +68,7 @@ export default function useStartReview() {
 				locale: feedback.getFeedbackLocale(),
 				chunkSize: feedback.getChunkSize(),
 			});
-		} catch (error) {
+		} catch {
 			// The error is already in the store and shown in the sidebar.
 		}
 	};

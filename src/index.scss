@@ -8,7 +8,6 @@ $ai-feedback-text-muted: #595959;
 /* Screen reader only text - visually hidden but available to assistive technologies */
 .screen-reader-text {
 	border: 0;
-	clip: rect(1px, 1px, 1px, 1px);
 	clip-path: inset(50%);
 	height: 1px;
 	margin: -1px;
@@ -16,7 +15,7 @@ $ai-feedback-text-muted: #595959;
 	padding: 0;
 	position: absolute;
 	width: 1px;
-	word-wrap: normal;
+	overflow-wrap: normal;
 }
 
 /* Skip Links for keyboard navigation */
@@ -28,7 +27,6 @@ $ai-feedback-text-muted: #595959;
 		/* Hidden state using clip pattern (matches screen-reader-text) */
 		display: block;
 		border: 0;
-		clip: rect(1px, 1px, 1px, 1px);
 		clip-path: inset(50%);
 		height: 1px;
 		margin: -1px;
@@ -36,7 +34,7 @@ $ai-feedback-text-muted: #595959;
 		padding: 0;
 		position: absolute;
 		width: 1px;
-		word-wrap: normal;
+		overflow-wrap: normal;
 
 		/* Visual styling applied when visible */
 		background: var(--wp-admin-theme-color, #007cba);
@@ -49,7 +47,6 @@ $ai-feedback-text-muted: #595959;
 		&:focus {
 
 			/* Reveal on focus */
-			clip: auto;
 			clip-path: none;
 			height: auto;
 			width: auto;
@@ -755,7 +752,9 @@ $ai-feedback-reply-error: #cc1818;
 	list-style: none;
 	margin: 12px 0 0;
 	padding: 8px 0 0;
-	border-top: 1px solid $ai-feedback-reply-border;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: $ai-feedback-reply-border;
 }
 
 .ai-feedback-reply {
@@ -802,7 +801,7 @@ $ai-feedback-reply-error: #cc1818;
 
 .ai-feedback-reply-content {
 	color: $ai-feedback-reply-text;
-	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 .ai-feedback-reply-pending .ai-feedback-reply-error {
@@ -811,7 +810,7 @@ $ai-feedback-reply-error: #cc1818;
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) {
+@media (prefers-contrast: more) {
 
 	.ai-feedback-panel .components-button:focus-visible {
 		box-shadow: 0 0 0 2px #fff, 0 0 0 5px currentcolor;

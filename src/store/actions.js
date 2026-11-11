@@ -203,7 +203,7 @@ function applyReviewResponse(response, postId) {
 		registryDispatch('core/notes')?.invalidateResolution('getNotes', [
 			postId,
 		]);
-	} catch (e) {
+	} catch {
 		// Fallback to core comments invalidation if specific store isn't available.
 		try {
 			const queryArgs = {
@@ -220,7 +220,7 @@ function applyReviewResponse(response, postId) {
 				'comment',
 				queryArgs,
 			]);
-		} catch (e2) {
+		} catch {
 			// Ignore errors if stores aren't initialized yet.
 		}
 	}

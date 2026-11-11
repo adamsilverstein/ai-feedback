@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect } from 'vitest';
 import { getFeedbackContent } from '../feedback-content';
 
 describe('getFeedbackContent', () => {

@@ -1,21 +1,21 @@
-// @jest-environment jsdom
-/* eslint-env jest */
 /**
  * Tests for FeedbackReplies component.
  */
-import '@testing-library/jest-dom';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { speak } from '@wordpress/a11y';
 
 // Drive the polling hook's status directly.
 let mockStatus = 'pending';
-jest.mock('../hooks/useReplyStatus', () => () => ({ status: mockStatus }));
+vi.mock('../hooks/useReplyStatus', () => ({
+	default: () => ({ status: mockStatus }),
+}));
 
-jest.mock('@wordpress/a11y', () => ({ speak: jest.fn() }));
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 
 // Mock @wordpress/components Spinner to a plain element — avoids pulling the
 // full WP components bundle into the test runtime.
-jest.mock('@wordpress/components', () => ({
+vi.mock('@wordpress/components', () => ({
 	Spinner: () => <span data-testid="wp-spinner" />,
 }));
 
@@ -84,7 +84,7 @@ describe('FeedbackReplies', () => {
 	});
 
 	it('hides the spinner and reports completion once the reply is saved', () => {
-		const onReplyComplete = jest.fn();
+		const onReplyComplete = vi.fn();
 		const { rerender } = render(
 			<FeedbackReplies
 				replies={[]}

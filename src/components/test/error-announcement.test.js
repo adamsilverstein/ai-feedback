@@ -1,6 +1,7 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 
 /**
@@ -14,7 +15,7 @@ import { speak } from '@wordpress/a11y';
 import ErrorNotice from '../ErrorNotice';
 import StatusAnnouncer from '../StatusAnnouncer';
 
-jest.mock('@wordpress/a11y', () => ({ speak: jest.fn() }));
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 
 const error = {
 	code: 'ai_request_failed',

@@ -1,8 +1,8 @@
 /**
  * External dependencies
  */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import '@testing-library/jest-dom';
 
 /**
  * Internal dependencies
@@ -19,15 +19,15 @@ const error = {
 
 describe('ServiceUnavailableAction', () => {
 	beforeEach(() => {
-		jest.useFakeTimers();
+		vi.useFakeTimers();
 	});
 
 	afterEach(() => {
-		jest.useRealTimers();
+		vi.useRealTimers();
 	});
 
 	it('retries automatically after the suggested delay', () => {
-		const onRetry = jest.fn();
+		const onRetry = vi.fn();
 		render(
 			<ServiceUnavailableAction
 				error={error}
@@ -41,18 +41,18 @@ describe('ServiceUnavailableAction', () => {
 		).toBeInTheDocument();
 
 		act(() => {
-			jest.advanceTimersByTime(9999);
+			vi.advanceTimersByTime(9999);
 		});
 		expect(onRetry).not.toHaveBeenCalled();
 
 		act(() => {
-			jest.advanceTimersByTime(1);
+			vi.advanceTimersByTime(1);
 		});
 		expect(onRetry).toHaveBeenCalledTimes(1);
 	});
 
 	it('retries immediately when asked', () => {
-		const onRetry = jest.fn();
+		const onRetry = vi.fn();
 		render(
 			<ServiceUnavailableAction
 				error={error}
@@ -66,7 +66,7 @@ describe('ServiceUnavailableAction', () => {
 	});
 
 	it('stops the automatic retry when cancelled', () => {
-		const onRetry = jest.fn();
+		const onRetry = vi.fn();
 		render(
 			<ServiceUnavailableAction
 				error={error}
@@ -79,7 +79,7 @@ describe('ServiceUnavailableAction', () => {
 			screen.getByRole('button', { name: 'Cancel automatic retry' })
 		);
 		act(() => {
-			jest.advanceTimersByTime(60000);
+			vi.advanceTimersByTime(60000);
 		});
 
 		expect(onRetry).not.toHaveBeenCalled();
@@ -89,7 +89,7 @@ describe('ServiceUnavailableAction', () => {
 	});
 
 	it('stops retrying automatically after repeated failures', () => {
-		const onRetry = jest.fn();
+		const onRetry = vi.fn();
 		render(
 			<ServiceUnavailableAction
 				error={error}
@@ -99,7 +99,7 @@ describe('ServiceUnavailableAction', () => {
 		);
 
 		act(() => {
-			jest.advanceTimersByTime(60000);
+			vi.advanceTimersByTime(60000);
 		});
 
 		expect(onRetry).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('ServiceUnavailableAction', () => {
 			<ServiceUnavailableAction
 				error={{ ...error, data: { retry_after: 999999 } }}
 				retries={1}
-				onRetry={jest.fn()}
+				onRetry={vi.fn()}
 			/>
 		);
 
@@ -128,7 +128,7 @@ describe('ServiceUnavailableAction', () => {
 	});
 
 	it('explains when the review cannot start', async () => {
-		const onRetry = jest.fn(() => false);
+		const onRetry = vi.fn(() => false);
 		render(
 			<ServiceUnavailableAction
 				error={error}
@@ -138,7 +138,7 @@ describe('ServiceUnavailableAction', () => {
 		);
 
 		await act(async () => {
-			jest.advanceTimersByTime(10000);
+			vi.advanceTimersByTime(10000);
 		});
 
 		expect(onRetry).toHaveBeenCalledTimes(1);

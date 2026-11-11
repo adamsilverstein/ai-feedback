@@ -1,6 +1,7 @@
 /**
  * Internal dependencies
  */
+import { describe, it, expect } from 'vitest';
 import { describeChange, formatNoteCount } from '../review-history';
 
 describe('describeChange', () => {
