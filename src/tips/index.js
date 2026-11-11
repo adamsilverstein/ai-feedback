@@ -5,6 +5,8 @@
  * across browsers instead of being tied to localStorage.
  */
 import { __, sprintf } from '@wordpress/i18n';
+import { dispatch, select } from '@wordpress/data';
+import { store as preferencesStore } from '@wordpress/preferences';
 
 export const PREFERENCES_SCOPE = 'ai-feedback';
 
@@ -19,6 +21,22 @@ export const PREFERENCE_DEFAULTS = {
 	[PREFERENCE_KEYS.reviewCount]: 0,
 	[PREFERENCE_KEYS.dismissedTips]: [],
 };
+
+/**
+ * Count a completed review toward unlocking tips.
+ */
+export function recordCompletedReview() {
+	const reviewCount =
+		select(preferencesStore).get(
+			PREFERENCES_SCOPE,
+			PREFERENCE_KEYS.reviewCount
+		) || 0;
+	dispatch(preferencesStore).set(
+		PREFERENCES_SCOPE,
+		PREFERENCE_KEYS.reviewCount,
+		reviewCount + 1
+	);
+}
 
 /**
  * Get the tip definitions, in display order.

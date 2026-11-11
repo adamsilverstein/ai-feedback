@@ -4,9 +4,15 @@
 import { describe, it, expect } from 'vitest';
 
 /**
+ * WordPress dependencies
+ */
+import { dispatch, select } from '@wordpress/data';
+import { store as preferencesStore } from '@wordpress/preferences';
+
+/**
  * Internal dependencies
  */
-import { getActiveTip, getTips } from '../index';
+import { getActiveTip, getTips, recordCompletedReview } from '../index';
 
 const ALL_FEATURES = {
 	modelCount: 3,
@@ -102,5 +108,22 @@ describe('getActiveTip', () => {
 		expect(new Set(ids).size).toBe(ids.length);
 		const thresholds = tips.map((tip) => tip.minReviews);
 		expect([...thresholds].sort((a, b) => a - b)).toEqual(thresholds);
+	});
+});
+
+describe('recordCompletedReview', () => {
+	const getReviewCount = () =>
+		select(preferencesStore).get('ai-feedback', 'reviewCount');
+
+	it('starts counting from an unset preference', () => {
+		dispatch(preferencesStore).set('ai-feedback', 'reviewCount', undefined);
+		recordCompletedReview();
+		expect(getReviewCount()).toBe(1);
+	});
+
+	it('adds one to the stored count', () => {
+		dispatch(preferencesStore).set('ai-feedback', 'reviewCount', 4);
+		recordCompletedReview();
+		expect(getReviewCount()).toBe(5);
 	});
 });
