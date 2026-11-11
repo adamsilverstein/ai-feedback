@@ -44,6 +44,11 @@ class Reply_Service {
 	public const MAX_THREAD_ENTRIES = 20;
 
 	/**
+	 * Reply returned instead of calling the AI when AI_FEEDBACK_MOCK_MODE is on.
+	 */
+	public const MOCK_REPLY = 'This is a mock AI reply for testing purposes. The conversation loop is working correctly.';
+
+	/**
 	 * Prompt builder instance.
 	 *
 	 * @var Prompt_Builder
@@ -257,6 +262,9 @@ class Reply_Service {
 	/**
 	 * Call the WordPress 7.0 core AI Client to generate the reply text.
 	 *
+	 * Returns MOCK_REPLY in AI_FEEDBACK_MOCK_MODE, like Review_Service, so
+	 * the reply loop can run end to end without a provider.
+	 *
 	 * Protected so tests can subclass and override.
 	 *
 	 * @param  string $prompt             User prompt.
@@ -265,6 +273,11 @@ class Reply_Service {
 	 * @return string|WP_Error AI reply text or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
+		if ( defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE ) {
+			Logger::debug( 'Reply_Service: using mock reply' );
+			return self::MOCK_REPLY;
+		}
+
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
