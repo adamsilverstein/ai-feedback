@@ -497,3 +497,63 @@ if (! function_exists('wp_strip_all_tags') ) {
         return strip_tags( $text );
     }
 }
+// Post meta, user and hook mocks backed by globals, for history tests.
+if ( ! function_exists( 'get_post' ) ) {
+	function get_post( $post_id ) {
+		if ( in_array( (int) $post_id, $GLOBALS['test_missing_posts'] ?? array(), true ) ) {
+			return null;
+		}
+		return (object) array( 'ID' => (int) $post_id );
+	}
+}
+
+if ( ! function_exists( 'get_post_meta' ) ) {
+	function get_post_meta( $post_id, $key = '', $single = false ) {
+		$value = $GLOBALS['test_post_meta'][ $post_id ][ $key ] ?? null;
+		if ( null === $value ) {
+			return $single ? '' : array();
+		}
+		return $single ? $value : array( $value );
+	}
+}
+
+if ( ! function_exists( 'update_post_meta' ) ) {
+	function update_post_meta( $post_id, $key, $value ) {
+		$GLOBALS['test_post_meta'][ $post_id ][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'register_post_meta' ) ) {
+	function register_post_meta( $post_type, $key, $args ) {
+		$GLOBALS['test_registered_post_meta'][ $key ] = $args;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() {
+		return $GLOBALS['test_current_user_id'] ?? 1;
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( $hook_name, ...$args ) {
+		$GLOBALS['test_actions'][ $hook_name ][] = $args;
+	}
+}
+
+if ( ! function_exists( 'rest_authorization_required_code' ) ) {
+	function rest_authorization_required_code() {
+		return 403;
+	}
+}
+
+require_once $includes_dir . 'class-review-history.php';
+require_once $includes_dir . 'class-history-controller.php';
+
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	function sanitize_textarea_field( $str ) {
+		return trim( strip_tags( $str ) );
+	}
+}

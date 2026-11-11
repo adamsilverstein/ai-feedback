@@ -539,3 +539,35 @@ export function* fetchFeedbackHistory(postId) {
 		return { notes: [], has_history: false, total: 0 };
 	}
 }
+
+/**
+ * Receive the review history for a post.
+ *
+ * @param {number} postId  Post ID.
+ * @param {Array}  history History entries, newest first.
+ * @return {Object} Action object.
+ */
+export function receiveReviewHistory(postId, history) {
+	return {
+		type: TYPES.RECEIVE_REVIEW_HISTORY,
+		postId,
+		history,
+	};
+}
+
+/**
+ * Receive a past review with its notes.
+ *
+ * @param {number}      postId   Post ID.
+ * @param {string}      reviewId Review ID.
+ * @param {Object|null} review   Review, or null if not found.
+ * @return {Object} Action object.
+ */
+export function receiveHistoryReview(postId, reviewId, review) {
+	return {
+		type: TYPES.RECEIVE_HISTORY_REVIEW,
+		postId,
+		reviewId,
+		review,
+	};
+}
