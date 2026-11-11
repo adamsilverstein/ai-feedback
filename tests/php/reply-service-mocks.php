@@ -139,8 +139,12 @@ namespace {
 		 * @return array<mixed>
 		 */
 		function parse_blocks( string $content ): array {
-			$GLOBALS['test_parse_blocks_calls'] = ( $GLOBALS['test_parse_blocks_calls'] ?? 0 ) + 1;
-			return $GLOBALS['test_parsed_blocks'][ $content ] ?? array();
+			$calls                              = $GLOBALS['test_parse_blocks_calls'] ?? 0;
+			$GLOBALS['test_parse_blocks_calls'] = ( is_int( $calls ) ? $calls : 0 ) + 1;
+
+			$registered = $GLOBALS['test_parsed_blocks'] ?? array();
+			$blocks     = is_array( $registered ) ? ( $registered[ $content ] ?? array() ) : array();
+			return is_array( $blocks ) ? $blocks : array();
 		}
 	}
 
