@@ -196,7 +196,7 @@ By leveraging the native Notes system, feedback becomes a first-class collaborat
 │                             │
 │ Model                       │
 │ ┌─────────────────────────┐ │
-│ │ Claude Sonnet 4     ▼   │ │
+│ │ Claude Sonnet 5.5   ▼   │ │
 │ └─────────────────────────┘ │
 │                             │
 │ Focus Areas                 │
@@ -455,7 +455,7 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 
 | Option Key | Type | Default | Description |
 |------------|------|---------|-------------|
-| `ai_feedback_default_model` | string | `''` | Default AI model to use |
+| `ai_feedback_default_model` | string | `'claude-sonnet-5-5'` | Default AI model to use |
 | `ai_feedback_default_focus` | array | `['content', 'tone', 'flow']` | Default focus areas |
 | `ai_feedback_default_tone` | string | `'professional'` | Default target tone |
 
@@ -505,7 +505,7 @@ Initiate a document review.
 ```json
 {
   "post_id": 123,
-  "model": "claude-sonnet-4",
+  "model": "claude-sonnet-5-5",
   "focus_areas": ["content", "tone", "flow"],
   "target_tone": "professional"
 }
@@ -570,13 +570,13 @@ Get current settings.
 **Response:**
 ```json
 {
-  "default_model": "claude-sonnet-4",
+  "default_model": "claude-sonnet-5-5",
   "default_focus_areas": ["content", "tone", "flow"],
   "default_tone": "professional",
   "available_models": [
     {
-      "id": "claude-sonnet-4",
-      "name": "Claude Sonnet 4",
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5",
       "provider": "anthropic"
     },
     {

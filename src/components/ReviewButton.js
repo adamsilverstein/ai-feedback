@@ -9,6 +9,7 @@ import { store as noticesStore } from '@wordpress/notices';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { extractBlockData } from '../utils/block-utils';
+import { isPostSaved } from '../utils/post-status';
 
 /**
  * Indeterminate Progress Bar component.
@@ -68,7 +69,7 @@ export default function ReviewButton() {
 	const { createWarningNotice } = useDispatch(noticesStore);
 
 	const handleReview = async () => {
-		if (!postId || postStatus === 'auto-draft') {
+		if (!isPostSaved(postId, postStatus)) {
 			return;
 		}
 
@@ -102,7 +103,7 @@ export default function ReviewButton() {
 		}
 	};
 
-	const isUnsaved = !postId || postStatus === 'auto-draft';
+	const isUnsaved = !isPostSaved(postId, postStatus);
 	const isDisabled = isUnsaved || isReviewing;
 
 	return (

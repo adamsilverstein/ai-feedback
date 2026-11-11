@@ -1,15 +1,14 @@
 /**
  * AI Feedback Panel Component
  */
-import { PanelBody, Notice, Button } from '@wordpress/components';
+import { PanelBody } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
-import { getConnectorsUrl } from '../utils/connectors-url';
-import { getErrorKind } from '../utils/error-kind';
+import { isPostSaved } from '../utils/post-status';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -17,45 +16,9 @@ import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import EmptyState from './EmptyState';
 import StatusAnnouncer from './StatusAnnouncer';
+import ErrorNotice from './ErrorNotice';
 import WelcomeModal from './WelcomeModal';
 import SkipLinks from './SkipLinks';
-
-/**
- * Get action button for specific error types.
- *
- * @param {Object} error Error object with code, message, and data.
- * @return {Element|null} Action button or null.
- */
-function getErrorAction(error) {
-	const kind = getErrorKind(error);
-
-	if (kind === 'credentials') {
-		return (
-			<Button
-				variant="link"
-				href={getConnectorsUrl()}
-				target="_blank"
-				rel="noopener noreferrer"
-				className="ai-feedback-error-action"
-			>
-				{__('Open Connectors Settings', 'ai-feedback')}
-			</Button>
-		);
-	}
-
-	if (kind === 'rate_limit') {
-		return (
-			<p className="ai-feedback-error-help">
-				{__(
-					'Please wait before making another request.',
-					'ai-feedback'
-				)}
-			</p>
-		);
-	}
-
-	return null;
-}
 
 /**
  * AI Feedback Panel component.
@@ -68,6 +31,7 @@ export default function AIFeedbackPanel() {
 		lastReview,
 		isLoadingSettings,
 		postId,
+		postStatus,
 		editorBlocks,
 		isReviewing,
 		selectedModel,
@@ -86,6 +50,7 @@ export default function AIFeedbackPanel() {
 			lastReview: select(STORE_NAME).getLastReview(),
 			isLoadingSettings: select(STORE_NAME).isLoadingSettings(),
 			postId: select(editorStore).getCurrentPostId(),
+			postStatus: select(editorStore).getEditedPostAttribute('status'),
 			editorBlocks: select(blockEditorStore).getBlocks(),
 			isReviewing: select(STORE_NAME).isReviewing(),
 			selectedModel: select(STORE_NAME).getSelectedModel(),
@@ -102,7 +67,7 @@ export default function AIFeedbackPanel() {
 	// Check if post has content (any text blocks)
 	const hasContent = hasTextContent(editorBlocks);
 
-	const isSaved = !!postId;
+	const isSaved = isPostSaved(postId, postStatus);
 	const canReview = isSaved && hasContent;
 
 	/**
@@ -162,26 +127,7 @@ export default function AIFeedbackPanel() {
 				lastReview={lastReview}
 				error={error}
 			/>
-			{error && (
-				<Notice
-					status="error"
-					isDismissible={true}
-					onRemove={clearError}
-					className="ai-feedback-error-notice"
-				>
-					<div className="ai-feedback-error-content">
-						<div className="ai-feedback-error-message">
-							{error.message}
-						</div>
-						{error.code && (
-							<div className="ai-feedback-error-code">
-								{__('Error code:', 'ai-feedback')} {error.code}
-							</div>
-						)}
-						{getErrorAction(error)}
-					</div>
-				</Notice>
-			)}
+			{error && <ErrorNotice error={error} onRemove={clearError} />}
 
 			{/* EmptyState and the review panel are mutually exclusive render
 			    paths, so the REVIEW_BUTTON_ID below is in the DOM exactly

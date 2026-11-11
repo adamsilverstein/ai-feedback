@@ -681,7 +681,7 @@ jest.mock( '@wordpress/data' );
 
 describe( 'ModelSelector', () => {
     const mockModels = [
-        { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'anthropic' },
+        { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic' },
         { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai' },
     ];
 
@@ -698,19 +698,19 @@ describe( 'ModelSelector', () => {
     it( 'renders available models', () => {
         useSelect.mockReturnValue( {
             availableModels: mockModels,
-            selectedModel: 'claude-sonnet-4',
+            selectedModel: 'claude-sonnet-5-5',
         } );
 
         render( <ModelSelector /> );
 
         expect( screen.getByRole( 'combobox' ) ).toBeInTheDocument();
-        expect( screen.getByText( 'Claude Sonnet 4' ) ).toBeInTheDocument();
+        expect( screen.getByText( 'Claude Sonnet 5.5' ) ).toBeInTheDocument();
     } );
 
     it( 'calls updateSettings on model change', () => {
         useSelect.mockReturnValue( {
             availableModels: mockModels,
-            selectedModel: 'claude-sonnet-4',
+            selectedModel: 'claude-sonnet-5-5',
         } );
 
         render( <ModelSelector /> );
@@ -739,7 +739,7 @@ describe( 'ModelSelector', () => {
     it( 'groups models by provider', () => {
         useSelect.mockReturnValue( {
             availableModels: mockModels,
-            selectedModel: 'claude-sonnet-4',
+            selectedModel: 'claude-sonnet-5-5',
         } );
 
         render( <ModelSelector /> );
@@ -818,7 +818,7 @@ describe( 'AI Feedback Store Reducer', () => {
         const stateWithSettings = {
             ...initialState,
             settings: {
-                defaultModel: 'claude-sonnet-4',
+                defaultModel: 'claude-sonnet-5-5',
                 focusAreas: [ 'content' ],
             },
         };
@@ -828,7 +828,7 @@ describe( 'AI Feedback Store Reducer', () => {
             payload: { focusAreas: [ 'content', 'tone' ] },
         } );
 
-        expect( state.settings.defaultModel ).toBe( 'claude-sonnet-4' );
+        expect( state.settings.defaultModel ).toBe( 'claude-sonnet-5-5' );
         expect( state.settings.focusAreas ).toEqual( [ 'content', 'tone' ] );
     } );
 } );

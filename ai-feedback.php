@@ -28,6 +28,7 @@ define( 'AI_FEEDBACK_PLUGIN_FILE', __FILE__ );
 define( 'AI_FEEDBACK_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_FEEDBACK_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'AI_FEEDBACK_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'AI_FEEDBACK_DEFAULT_MODEL', 'claude-sonnet-5-5' );
 
 // Require Composer autoloader.
 if ( file_exists( AI_FEEDBACK_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
@@ -150,7 +151,7 @@ function display_ai_client_notice() {
  */
 function activate() {
 	// Set default options.
-	add_option( 'ai_feedback_default_model', 'claude-sonnet-4' );
+	add_option( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL );
 	add_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) );
 	add_option( 'ai_feedback_default_tone', 'professional' );
 	add_option( 'ai_feedback_version', AI_FEEDBACK_VERSION );
