@@ -356,9 +356,7 @@ export function* startReview({
 		}
 
 		// Runs after REVIEW_SUCCESS is stored, since it awaits a request first.
-		suggestQuickFixes(
-			responses.flatMap((response) => response.notes || [])
-		);
+		suggestReviewQuickFixes(responses);
 
 		return {
 			type: TYPES.REVIEW_SUCCESS,
@@ -370,6 +368,7 @@ export function* startReview({
 
 		// Keep the notes from parts that finished before the failure.
 		if (responses.length > 0) {
+			suggestReviewQuickFixes(responses);
 			yield {
 				type: TYPES.REVIEW_SUCCESS,
 				review: {
@@ -388,6 +387,23 @@ export function* startReview({
 			},
 		};
 	}
+}
+
+/**
+ * Turns the quick fixes from a review's responses into suggestions.
+ *
+ * Not awaited, so the review finishes without waiting on the note writes.
+ *
+ * @param {Object[]} responses Review responses.
+ */
+function suggestReviewQuickFixes(responses) {
+	suggestQuickFixes(
+		responses.flatMap((response) => response.notes || [])
+	).catch((error) => {
+		// The quick fixes stay available in the sidebar.
+		// eslint-disable-next-line no-console
+		console.warn('[AI-Feedback] Could not add suggestions:', error);
+	});
 }
 
 /**

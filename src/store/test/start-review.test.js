@@ -18,7 +18,7 @@ vi.mock('@wordpress/block-editor', () => ({
 }));
 vi.mock('../../utils/suggestions', () => ({
 	removeOrphanedSuggestions: vi.fn(() => Promise.resolve(0)),
-	suggestQuickFixes: vi.fn(),
+	suggestQuickFixes: vi.fn(() => Promise.resolve(0)),
 }));
 
 const makeBlocks = (count) =>
@@ -128,6 +128,20 @@ describe('startReview', () => {
 		expect(suggestQuickFixes).toHaveBeenCalledWith([first, second]);
 	});
 
+	it('logs instead of rejecting when adding suggestions fails', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		suggestQuickFixes.mockReturnValueOnce(Promise.reject(new Error('x')));
+		const gen = startUntilFirstRequest({ blocks: makeBlocks(1) });
+
+		advance(gen, { has_history: false });
+		expect(advance(gen, reviewResponse()).value.type).toBe(
+			TYPES.REVIEW_SUCCESS
+		);
+
+		await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+		warn.mockRestore();
+	});
+
 	it('reviews large documents in chunks and reports progress', () => {
 		const gen = startUntilFirstRequest({
 			blocks: makeBlocks(5),
@@ -186,7 +200,8 @@ describe('startReview', () => {
 
 		advance(gen, { has_history: false });
 		advance(gen);
-		advance(gen, reviewResponse({ note_count: 2 }));
+		const note = { id: 1, quick_fix: { find: 'a', replace: 'b' } };
+		advance(gen, reviewResponse({ note_count: 2, notes: [note] }));
 		advance(gen);
 
 		const partial = gen.throw({
@@ -197,6 +212,8 @@ describe('startReview', () => {
 			type: TYPES.REVIEW_SUCCESS,
 			review: { note_count: 2, is_partial: true },
 		});
+		// Fixes from the parts that finished still become suggestions.
+		expect(suggestQuickFixes).toHaveBeenCalledWith([note]);
 
 		expect(advance(gen).value).toMatchObject({
 			type: TYPES.REVIEW_ERROR,
