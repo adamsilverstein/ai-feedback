@@ -283,7 +283,7 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
  */
 export default function FeedbackItem({ item, thread, onReplyComplete }) {
 	const handleNavigate = (blockId) => {
-		navigateToBlock(blockId);
+		navigateToBlock(blockId, item.id);
 	};
 
 	const ItemComponent = item.is_group
