@@ -196,6 +196,13 @@ export default function Dashboard() {
 		suggestion: __('Suggestion', 'ai-feedback'),
 	};
 
+	const categoryLabels = {
+		content: __('Content', 'ai-feedback'),
+		tone: __('Tone', 'ai-feedback'),
+		flow: __('Flow', 'ai-feedback'),
+		design: __('Design', 'ai-feedback'),
+	};
+
 	return (
 		<div className="ai-feedback-analytics">
 			<div className="ai-feedback-analytics-toolbar">
@@ -269,7 +276,10 @@ export default function Dashboard() {
 						<BarList
 							title={__('Categories', 'ai-feedback')}
 							column={__('Category', 'ai-feedback')}
-							rows={toRows(data.by_category)}
+							rows={toRows(data.by_category).map((row) => ({
+								...row,
+								label: categoryLabels[row.label] || row.label,
+							}))}
 						/>
 						<BarList
 							title={__('Top users', 'ai-feedback')}

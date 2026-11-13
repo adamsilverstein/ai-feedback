@@ -24,6 +24,20 @@ export function getAvailableModels(state) {
 }
 
 /**
+ * Get a model's display name.
+ *
+ * @param {Object} state   Store state.
+ * @param {string} modelId Model ID.
+ * @return {string} Model name, or the ID when the model is not listed.
+ */
+export function getModelName(state, modelId) {
+	return (
+		state.availableModels?.find((model) => model.id === modelId)?.name ||
+		modelId
+	);
+}
+
+/**
  * Get selected model.
  *
  * @param {Object} state Store state.
