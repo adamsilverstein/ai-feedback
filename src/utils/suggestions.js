@@ -125,7 +125,7 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 			value: {
 				text: fix.replace,
 				formats: Array.from({ length }, () => value.formats[start]),
-				replacements: Array.from({ length }),
+				replacements: new Array(length),
 			},
 		});
 		markup += `${openMarker('add', id, authorId)}${added}</mark>`;

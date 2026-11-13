@@ -116,3 +116,20 @@ describe('findMatches', () => {
 		expect(findMatches(text, find)).toEqual(expected);
 	});
 });
+
+describe('applyFixToContent replacements', () => {
+	it('leaves no undefined entries for core-data to read', () => {
+		const result = applyFixToContent(
+			RichTextData.fromHTMLString('We utilize tools daily.'),
+			{ find: 'utilize', replace: 'use' }
+		);
+		const seen = [];
+
+		// forEach skips holes, which is how core-data walks this array when
+		// it orders footnotes.
+		result.replacements.forEach((replacement) => seen.push(replacement));
+
+		expect(seen).toEqual([]);
+		expect(result.toHTMLString()).toBe('We use tools daily.');
+	});
+});
