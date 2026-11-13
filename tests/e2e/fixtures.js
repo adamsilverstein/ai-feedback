@@ -159,14 +159,30 @@ class AIFeedbackUtils {
 	 *
 	 * @param {Object} options         - Options object.
 	 * @param {string} options.title   - Post title.
-	 * @param {string} options.content - Paragraph content to type.
+	 * @param {string} options.content - Paragraph content.
 	 * @param {Object} deps            - Dependencies.
 	 * @param {Object} deps.editor     - Editor fixture.
 	 */
 	async createAndSavePost({ title, content }, { editor }) {
 		await this.admin.createNewPost({ title });
-		await editor.insertBlock({ name: 'core/paragraph' });
-		await this.page.keyboard.type(content);
+		// Set the content on the block rather than typing it, so it does
+		// not depend on focus reaching the new paragraph.
+		await editor.insertBlock({
+			name: 'core/paragraph',
+			attributes: { content },
+		});
+		await expect
+			.poll(
+				async () =>
+					(await editor.getBlocks()).map(
+						(block) => block.attributes.content
+					),
+				{
+					message:
+						'createAndSavePost(): the paragraph content is missing before saving',
+				}
+			)
+			.toContain(content);
 		await this.page.getByRole('button', { name: 'Save draft' }).click();
 		await this.page.waitForSelector('.editor-post-saved-state.is-saved');
 	}
@@ -401,7 +417,20 @@ const test = base.extend({
 		await use(new Editor({ page }));
 	},
 	admin: async ({ page, pageUtils, editor }, use) => {
-		await use(new Admin({ page, pageUtils, editor }));
+		const admin = new Admin({ page, pageUtils, editor });
+		// createNewPost() can return before the editor sets up its blocks,
+		// and that setup drops blocks inserted earlier. Wait for the canvas
+		// to render, as createNewPost() does from
+		// @wordpress/e2e-test-utils-playwright 3.2.0.
+		const createNewPost = admin.createNewPost;
+		admin.createNewPost = async (options) => {
+			await createNewPost(options);
+			await editor.canvas
+				.locator('body > *')
+				.first()
+				.waitFor({ state: 'attached' });
+		};
+		await use(admin);
 	},
 	requestUtils: async ({}, use) => {
 		const requestUtils = await RequestUtils.setup({

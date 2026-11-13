@@ -84,7 +84,7 @@ class Suggestions {
 	 *
 	 * Markers live in the post content, so they are lost when the editor
 	 * reloads before saving. A note is listed only when neither the saved post
-	 * nor its autosave holds its anchor and it is older than the cleanup delay,
+	 * nor any user's autosave holds its anchor and it is older than the cleanup delay,
 	 * so markers that are still unsaved in another editor are left alone. A
 	 * save alone is not taken as proof, since it may come from an editor that
 	 * never had the markers.
@@ -98,9 +98,11 @@ class Suggestions {
 			return array();
 		}
 
-		$autosave = wp_get_post_autosave( $post_id );
-		if ( $autosave instanceof \WP_Post && $autosave->post_modified_gmt > $post->post_modified_gmt ) {
-			return array();
+		$autosaves = self::get_autosaves( $post_id );
+		foreach ( $autosaves as $autosave ) {
+			if ( $autosave->post_modified_gmt > $post->post_modified_gmt ) {
+				return array();
+			}
 		}
 
 		$notes = get_comments(
@@ -133,7 +135,7 @@ class Suggestions {
 		$delay   = (int) apply_filters( 'ai_feedback_suggestion_cleanup_delay', self::CLEANUP_DELAY, $post_id );
 		$cutoff  = time() - max( 0, $delay );
 		$content = array( $post->post_content );
-		if ( $autosave instanceof \WP_Post ) {
+		foreach ( $autosaves as $autosave ) {
 			$content[] = $autosave->post_content;
 		}
 
@@ -155,6 +157,25 @@ class Suggestions {
 		}
 
 		return $ids;
+	}
+
+	/**
+	 * Returns every user's autosave of a post.
+	 *
+	 * `wp_get_post_autosave()` without a user returns only the latest one,
+	 * while each editor autosaves separately.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return list<\WP_Post> Autosave revisions.
+	 */
+	private static function get_autosaves( int $post_id ): array {
+		$autosaves = array();
+		foreach ( wp_get_post_revisions( $post_id, array( 'check_enabled' => false ) ) as $revision ) {
+			if ( false !== wp_is_post_autosave( $revision ) ) {
+				$autosaves[] = $revision;
+			}
+		}
+		return $autosaves;
 	}
 
 	/**

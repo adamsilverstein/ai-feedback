@@ -70,7 +70,7 @@ tests/e2e/
 
 The `fixtures.js` file provides custom utilities for testing the AI Feedback plugin:
 
-- `admin`: WordPress admin utilities from `@wordpress/e2e-test-utils-playwright`
+- `admin`: WordPress admin utilities from `@wordpress/e2e-test-utils-playwright`; `createNewPost()` also waits for the editor canvas, so blocks inserted right after it are kept
 - `editor`: WordPress editor utilities
 - `page`: Playwright page object
 - `aiFeedback`: Custom utilities for AI Feedback plugin
@@ -80,7 +80,7 @@ The `fixtures.js` file provides custom utilities for testing the AI Feedback plu
 The `aiFeedback` fixture provides:
 
 - `openSidebar()`: Opens the AI Feedback sidebar from its pinned top bar button and dismisses the welcome or setup modal
-- `createAndSavePost({ title, content }, { editor })`: Creates a post with one paragraph and saves it as a draft
+- `createAndSavePost({ title, content }, { editor })`: Creates a post with one paragraph and saves it as a draft, failing early if the paragraph content is missing
 - `getReviewButton()`: Locates the primary review button in the empty state or the Review Document panel
 - `runReview()`: Clicks the review button and waits for the review request and busy state to finish
 - `mockReviewAPI(response, { delay })`: Mocks the review endpoint; `response` is merged over a default review
