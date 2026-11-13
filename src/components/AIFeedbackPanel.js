@@ -5,6 +5,7 @@ import { PanelBody } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
@@ -24,6 +25,9 @@ import ErrorNotice from './ErrorNotice';
 import WelcomeModal from './WelcomeModal';
 import TipNotice from './TipNotice';
 import SkipLinks from './SkipLinks';
+
+const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
+const RESULTS_ID = 'ai-feedback-results';
 
 /**
  * AI Feedback Panel component.
@@ -73,6 +77,28 @@ export default function AIFeedbackPanel() {
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
+	// The settings sit above the progress and the results, so bring each
+	// into view when a review starts and when it finishes.
+	const wasReviewing = useRef(isReviewing);
+	useEffect(() => {
+		if (wasReviewing.current === isReviewing) {
+			return;
+		}
+		wasReviewing.current = isReviewing;
+
+		const targetId = isReviewing ? REVIEW_BUTTON_ID : RESULTS_ID;
+		if (!isReviewing && !lastReview) {
+			return;
+		}
+		const reduceMotion = window.matchMedia?.(
+			'(prefers-reduced-motion: reduce)'
+		)?.matches;
+		document.getElementById(targetId)?.scrollIntoView?.({
+			behavior: reduceMotion ? 'auto' : 'smooth',
+			block: 'start',
+		});
+	}, [isReviewing, lastReview]);
+
 	// Check if post has content (any text blocks)
 	const hasContent = hasTextContent(editorBlocks);
 
@@ -121,7 +147,6 @@ export default function AIFeedbackPanel() {
 	}
 
 	const showModelSelector = availableModels.length > 1;
-	const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
 	const hasReviewContent = !!lastReview || isReviewing;
 	const hasFeedbackItems =
 		!!lastReview && Array.isArray(lastReview.notes)
@@ -199,7 +224,7 @@ export default function AIFeedbackPanel() {
 						>
 							{!isReviewing && <TipNotice />}
 							{/* ID used by skip links for keyboard navigation */}
-							<div id="ai-feedback-results">
+							<div id={RESULTS_ID}>
 								<div className="ai-feedback-export-row">
 									<ExportReview review={lastReview} />
 								</div>
