@@ -39,7 +39,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v2';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v3';
 
 	/**
 	 * Cache duration for models (1 hour).
@@ -344,6 +344,8 @@ class Settings_Controller extends WP_REST_Controller {
 			),
 		);
 
+		$models = $this->filter_configured_models( $models );
+
 		// Allow filtering of available models.
 		$models = apply_filters( 'ai_feedback_available_models', $models );
 
@@ -351,6 +353,48 @@ class Settings_Controller extends WP_REST_Controller {
 		set_transient( self::MODELS_CACHE_KEY, $models, self::MODELS_CACHE_DURATION );
 
 		return $models;
+	}
+
+	/**
+	 * Limits models to the providers that are set up under Settings > Connectors.
+	 *
+	 * Keeps the full list when no listed provider is configured, so the
+	 * selector still has options before a connector is added.
+	 *
+	 * @param  list<array<string, mixed>> $models Models, each with a `provider` ID.
+	 * @return list<array<string, mixed>> Models whose provider is configured.
+	 */
+	protected function filter_configured_models( array $models ): array {
+		$get_registry = array( '\WordPress\AiClient\AiClient', 'defaultRegistry' );
+		if ( ! is_callable( $get_registry ) ) {
+			return $models;
+		}
+
+		try {
+			$registry = call_user_func( $get_registry );
+			if ( ! is_object( $registry ) || ! method_exists( $registry, 'hasProvider' ) || ! method_exists( $registry, 'isProviderConfigured' ) ) {
+				return $models;
+			}
+
+			$configured = array();
+			foreach ( $models as $model ) {
+				$provider = is_string( $model['provider'] ?? null ) ? $model['provider'] : '';
+				if ( ! isset( $configured[ $provider ] ) ) {
+					$configured[ $provider ] = $registry->hasProvider( $provider ) && $registry->isProviderConfigured( $provider );
+				}
+			}
+		} catch ( \Throwable $e ) {
+			return $models;
+		}
+
+		$available = array_values(
+			array_filter(
+				$models,
+				static fn ( array $model ): bool => is_string( $model['provider'] ?? null ) && ! empty( $configured[ $model['provider'] ] )
+			)
+		);
+
+		return array() === $available ? $models : $available;
 	}
 
 	/**
