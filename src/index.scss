@@ -908,3 +908,36 @@ $ai-feedback-reply-error: #cc1818;
 	display: flex;
 	justify-content: flex-end;
 }
+
+/* Help text ends a setting, so keep it clear of the label that follows. */
+/* stylelint-disable-next-line selector-class-pattern */
+.ai-feedback-panel .components-base-control__help {
+	margin-bottom: 16px;
+}
+
+/* Category and severity badges inside a note, shown by the core Notes UI. */
+.ai-feedback-badge {
+	display: inline-block;
+	margin-right: 4px;
+	padding: 0 8px;
+	border-radius: 2px;
+	background: #f0f0f0;
+	color: #1e1e1e;
+	font-size: 11px;
+	line-height: 20px;
+
+	&.ai-feedback-severity-critical {
+		background: #fcf0f1;
+		color: #8a2424;
+	}
+
+	&.ai-feedback-severity-important {
+		background: #fcf9e8;
+		color: #674e00;
+	}
+
+	&.ai-feedback-severity-suggestion {
+		background: #edfaef;
+		color: #005c12;
+	}
+}
