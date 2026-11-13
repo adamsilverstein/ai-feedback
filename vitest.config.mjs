@@ -24,5 +24,8 @@ export default defineConfig({
 		include: ['src/**/*.test.js'],
 		environment: 'jsdom',
 		setupFiles: ['./tests/js/vitest.setup.js'],
+		// Run @wordpress packages through Vite so their JSON imports load
+		// and vi.mock() reaches the copies they import from each other.
+		server: { deps: { inline: [/@wordpress\//] } },
 	},
 });
