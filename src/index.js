@@ -11,6 +11,7 @@ import { store as preferencesStore } from '@wordpress/preferences';
 import './store';
 import AIFeedbackPanel from './components/AIFeedbackPanel';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
+import ReplyWatcher from './components/ReplyWatcher';
 import ResetTipsCommand from './components/ResetTipsCommand';
 import { PREFERENCES_SCOPE, PREFERENCE_DEFAULTS } from './tips';
 import './index.scss';
@@ -25,6 +26,7 @@ registerPlugin('ai-feedback', {
 		return (
 			<>
 				<KeyboardShortcuts />
+				<ReplyWatcher />
 				<ResetTipsCommand />
 				<PluginSidebarMoreMenuItem
 					target="ai-feedback-sidebar"
