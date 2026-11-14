@@ -9,6 +9,8 @@ import { useSelect } from '@wordpress/data';
 import useReplyStatus from '../hooks/useReplyStatus';
 import useReplyThreads, { getNotesQuery } from '../hooks/useReplyThreads';
 
+const SIDEBAR_ID = 'ai-feedback/ai-feedback-sidebar';
+
 /**
  * Waits for one AI reply.
  *
@@ -57,8 +59,10 @@ function ThreadWatcher({ postId }) {
  * @return {Element|null} Watcher, or null while the post has no note replies.
  */
 export default function ReplyWatcher() {
-	const { postId, hasReplies } = useSelect((select) => {
+	const { postId, hasReplies, isSidebarOpen } = useSelect((select) => {
 		const id = select('core/editor').getCurrentPostId();
+		const activeArea =
+			select('core/interface')?.getActiveComplementaryArea?.('core');
 		const notes = id
 			? select('core').getEntityRecords(
 					'root',
@@ -69,8 +73,12 @@ export default function ReplyWatcher() {
 		return {
 			postId: id,
 			hasReplies: (notes || []).some((note) => note.parent > 0),
+			isSidebarOpen: activeArea === SIDEBAR_ID,
 		};
 	}, []);
 
-	return hasReplies ? <ThreadWatcher postId={postId} /> : null;
+	// The open sidebar polls the same replies itself.
+	return hasReplies && !isSidebarOpen ? (
+		<ThreadWatcher postId={postId} />
+	) : null;
 }
