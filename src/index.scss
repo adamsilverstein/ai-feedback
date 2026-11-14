@@ -79,7 +79,8 @@ $ai-feedback-text-muted: #595959;
 
 #ai-feedback-model-select,
 #ai-feedback-review-button,
-#ai-feedback-results {
+#ai-feedback-results,
+#ai-feedback-error {
 
 	/* Clear the sidebar's sticky header when scrolled into view. */
 	scroll-margin-top: 56px;

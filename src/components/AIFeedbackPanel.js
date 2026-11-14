@@ -28,6 +28,7 @@ import SkipLinks from './SkipLinks';
 
 const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
 const RESULTS_ID = 'ai-feedback-results';
+const ERROR_ID = 'ai-feedback-error';
 
 /**
  * AI Feedback Panel component.
@@ -86,10 +87,13 @@ export default function AIFeedbackPanel() {
 		}
 		wasReviewing.current = isReviewing;
 
-		const targetId = isReviewing ? REVIEW_BUTTON_ID : RESULTS_ID;
-		// A failed review keeps the previous results, so leave the error
-		// notice above them in view.
-		if (!isReviewing && (!lastReview || error)) {
+		// A failed review keeps the previous results, so show the error
+		// notice above them instead.
+		let targetId = REVIEW_BUTTON_ID;
+		if (!isReviewing) {
+			targetId = error ? ERROR_ID : RESULTS_ID;
+		}
+		if (!isReviewing && !error && !lastReview) {
 			return;
 		}
 		const reduceMotion = window.matchMedia?.(
@@ -170,12 +174,14 @@ export default function AIFeedbackPanel() {
 				error={error}
 			/>
 			{error && (
-				<ErrorNotice
-					error={error}
-					onRemove={clearError}
-					retries={unavailableRetries}
-					onRetry={() => handleStartReview({ isRetry: true })}
-				/>
+				<div id={ERROR_ID}>
+					<ErrorNotice
+						error={error}
+						onRemove={clearError}
+						retries={unavailableRetries}
+						onRetry={() => handleStartReview({ isRetry: true })}
+					/>
+				</div>
 			)}
 
 			{/* EmptyState and the review panel are mutually exclusive render
@@ -221,6 +227,9 @@ export default function AIFeedbackPanel() {
 
 					{lastReview && (
 						<PanelBody
+							// Remount per review so new results open even
+							// after the panel was closed.
+							key={lastReview.review_id}
 							title={__('Last Review', 'ai-feedback')}
 							initialOpen={true}
 						>
