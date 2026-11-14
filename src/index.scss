@@ -81,6 +81,9 @@ $ai-feedback-text-muted: #595959;
 #ai-feedback-review-button,
 #ai-feedback-results {
 
+	/* Clear the sidebar's sticky header when scrolled into view. */
+	scroll-margin-top: 56px;
+
 	&:focus {
 		outline: 2px solid var(--wp-admin-theme-color, #007cba);
 		outline-offset: 2px;

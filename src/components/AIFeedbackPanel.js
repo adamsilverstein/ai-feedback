@@ -87,7 +87,9 @@ export default function AIFeedbackPanel() {
 		wasReviewing.current = isReviewing;
 
 		const targetId = isReviewing ? REVIEW_BUTTON_ID : RESULTS_ID;
-		if (!isReviewing && !lastReview) {
+		// A failed review keeps the previous results, so leave the error
+		// notice above them in view.
+		if (!isReviewing && (!lastReview || error)) {
 			return;
 		}
 		const reduceMotion = window.matchMedia?.(
@@ -97,7 +99,7 @@ export default function AIFeedbackPanel() {
 			behavior: reduceMotion ? 'auto' : 'smooth',
 			block: 'start',
 		});
-	}, [isReviewing, lastReview]);
+	}, [isReviewing, lastReview, error]);
 
 	// Check if post has content (any text blocks)
 	const hasContent = hasTextContent(editorBlocks);
