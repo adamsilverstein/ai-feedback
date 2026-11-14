@@ -2,7 +2,7 @@
 	"name": "ai-feedback",
 	"version": "1.0.0",
 	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
-	"author": "Your Name",
+	"author": "Adam Silverstein",
 	"license": "GPL-2.0-or-later",
 	"keywords": [
 		"wordpress",

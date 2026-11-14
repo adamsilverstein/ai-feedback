@@ -40,6 +40,24 @@ jobs:
                   npm run plugin-zip
                   unzip -q ai-feedback.zip -d dist
 
+            - name: Check the tag matches the plugin version
+              if: github.event_name == 'release'
+              env:
+                  TAG: ${{ github.event.release.tag_name }}
+              run: |
+                  version=$(grep -m1 '^ \* Version:' ai-feedback.php | awk '{print $3}')
+                  stable=$(grep -m1 '^Stable tag:' readme.txt | awk '{print $3}')
+                  if [ "${TAG#v}" != "$version" ] || [ "$version" != "$stable" ]; then
+                      echo "::error::Tag $TAG, plugin Version $version and Stable tag $stable must match."
+                      exit 1
+                  fi
+
+            - name: Save the zip as a workflow artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: ai-feedback
+                  path: ai-feedback.zip
+
             - name: Upload zip to the release
               if: github.event_name == 'release'
               env:
@@ -54,6 +72,5 @@ jobs:
                   SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
                   SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
                   SLUG: ai-feedback
-                  VERSION: ${{ github.event.release.tag_name }}
                   BUILD_DIR: dist/ai-feedback
                   ASSETS_DIR: .wordpress-org
