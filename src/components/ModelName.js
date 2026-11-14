@@ -2,6 +2,7 @@
  * Model name.
  */
 import { useSelect } from '@wordpress/data';
+import { STORE_NAME } from '../store';
 
 /**
  * Shows a model's display name in place of its ID.
@@ -12,7 +13,7 @@ import { useSelect } from '@wordpress/data';
  */
 export default function ModelName({ id }) {
 	return useSelect(
-		(select) => select('ai-feedback/store')?.getModelName?.(id) || id,
+		(select) => select(STORE_NAME)?.getModelName?.(id) || id,
 		[id]
 	);
 }
