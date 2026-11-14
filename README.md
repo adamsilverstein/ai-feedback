@@ -6,13 +6,16 @@ AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's 
 
 The AI Feedback plugin integrates AI-powered content review directly into the WordPress block editor. It uses the WordPress 7.0 core [AI Client](https://make.wordpress.org/core/2026/03/24/introducing-the-ai-client-in-wordpress-7-0/) for provider-agnostic AI access, the [Connectors API](https://make.wordpress.org/core/2026/03/18/introducing-the-connectors-api-in-wordpress-7-0/) for credentials, and the native Notes API for contextual, block-level feedback.
 
+![Reviewing a draft: the AI Feedback sidebar runs a review, then notes and suggested edits appear on the blocks](docs/images/review.gif)
+
 ## Features
 
 - 🤖 **AI-Powered Reviews**: Get intelligent feedback on content quality, tone, flow, and design
 - 📝 **Native Notes Integration**: Feedback appears as WordPress block comments
 - 🔌 **Core Connectors API**: Reuses the credentials configured in Settings → Connectors
 - 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other provider registered with the core AI Client
-- 💬 **Conversational Feedback**: Reply to AI suggestions and get clarifications (Phase 4)
+- 💬 **Conversational Feedback**: Reply to AI feedback and get clarifications
+- ✏️ **Suggested Edits**: Simple fixes arrive as tracked suggestions you accept or reject (with Gutenberg's Suggestion Mode experiment)
 - 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
 
 ## Requirements
@@ -151,12 +154,33 @@ The shortcuts use the editor's "access" modifier: <kbd>Shift</kbd>+<kbd>Alt</kbd
   - **Suggestion**: Actionable recommendation (if applicable)
   - **Severity**: 🟢 Suggestion, 🟡 Important, 🔴 Critical
 
-### Reply to Feedback (Phase 4)
+![A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar](docs/images/suggestions.png)
 
-Once implemented, you'll be able to:
+### Suggested Edits
+
+When the AI proposes a simple wording change, such as fixing a typo or cutting filler words, the note carries the exact edit.
+
+**With Gutenberg's Suggestion Mode experiment** (Gutenberg plugin → Experiments → Collaboration → Suggestion Mode), the edit is added to the text as a tracked suggestion. Accept or reject each one from its note, then save the post to keep the result.
+
+![Accepting two suggested edits and rejecting a third from their notes](docs/images/accept-reject.gif)
+
+**Without Suggestion Mode**, the same edit is offered as a quick fix in the sidebar. **Preview** shows the change before **Apply fix** makes it.
+
+![The Preview fix dialog showing the old and new wording](docs/images/quick-fix-preview.png)
+
+### Reply to Feedback
+
 1. Click on a note to open it
-2. Type a reply asking for clarification
-3. AI will respond with context-aware suggestions
+2. Type a reply, for example to push back or ask for clarification
+3. The AI answers in the same thread, using the block's content and the conversation so far
+
+![A note thread with an author's reply and the AI's answer](docs/images/reply-thread.png)
+
+### Usage Analytics
+
+**Settings → AI Feedback Analytics** shows how many reviews were run, by which model and user, and how the feedback breaks down by severity and category.
+
+![The AI Feedback Analytics screen](docs/images/analytics.png)
 
 ## Development
 
