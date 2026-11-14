@@ -306,7 +306,11 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return list<array<string, mixed>>
 	 */
 	private function get_available_models(): array {
-		/** @var list<array<string, mixed>>|false $models */
+		/**
+		 * Cached model catalog.
+		 *
+		 * @var list<array<string, mixed>>|false $models
+		 */
 		$models = get_transient( self::MODELS_CACHE_KEY );
 		if ( ! is_array( $models ) ) {
 			$models = $this->get_model_catalog();
@@ -318,9 +322,13 @@ class Settings_Controller extends WP_REST_Controller {
 		$models = $this->filter_configured_models( $models );
 
 		// Allow filtering of available models.
+		/**
+		 * Models after the `ai_feedback_available_models` filter.
+		 *
+		 * @var list<array<string, mixed>>|null $filtered
+		 */
 		$filtered = apply_filters( 'ai_feedback_available_models', $models );
 
-		/** @var list<array<string, mixed>> */
 		return is_array( $filtered ) ? $filtered : $models;
 	}
 
