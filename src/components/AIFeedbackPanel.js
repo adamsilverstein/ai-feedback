@@ -5,6 +5,7 @@ import { PanelBody } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
@@ -24,6 +25,10 @@ import ErrorNotice from './ErrorNotice';
 import WelcomeModal from './WelcomeModal';
 import TipNotice from './TipNotice';
 import SkipLinks from './SkipLinks';
+
+const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
+const RESULTS_ID = 'ai-feedback-results';
+const ERROR_ID = 'ai-feedback-error';
 
 /**
  * AI Feedback Panel component.
@@ -73,6 +78,33 @@ export default function AIFeedbackPanel() {
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
+	// The settings sit above the progress and the results, so bring each
+	// into view when a review starts and when it finishes.
+	const wasReviewing = useRef(isReviewing);
+	useEffect(() => {
+		if (wasReviewing.current === isReviewing) {
+			return;
+		}
+		wasReviewing.current = isReviewing;
+
+		// A failed review keeps the previous results, so show the error
+		// notice above them instead.
+		let targetId = REVIEW_BUTTON_ID;
+		if (!isReviewing) {
+			targetId = error ? ERROR_ID : RESULTS_ID;
+		}
+		if (!isReviewing && !error && !lastReview) {
+			return;
+		}
+		const reduceMotion = window.matchMedia?.(
+			'(prefers-reduced-motion: reduce)'
+		)?.matches;
+		document.getElementById(targetId)?.scrollIntoView?.({
+			behavior: reduceMotion ? 'auto' : 'smooth',
+			block: 'start',
+		});
+	}, [isReviewing, lastReview, error]);
+
 	// Check if post has content (any text blocks)
 	const hasContent = hasTextContent(editorBlocks);
 
@@ -121,7 +153,6 @@ export default function AIFeedbackPanel() {
 	}
 
 	const showModelSelector = availableModels.length > 1;
-	const REVIEW_BUTTON_ID = 'ai-feedback-review-button';
 	const hasReviewContent = !!lastReview || isReviewing;
 	const hasFeedbackItems =
 		!!lastReview && Array.isArray(lastReview.notes)
@@ -143,12 +174,14 @@ export default function AIFeedbackPanel() {
 				error={error}
 			/>
 			{error && (
-				<ErrorNotice
-					error={error}
-					onRemove={clearError}
-					retries={unavailableRetries}
-					onRetry={() => handleStartReview({ isRetry: true })}
-				/>
+				<div id={ERROR_ID}>
+					<ErrorNotice
+						error={error}
+						onRemove={clearError}
+						retries={unavailableRetries}
+						onRetry={() => handleStartReview({ isRetry: true })}
+					/>
+				</div>
 			)}
 
 			{/* EmptyState and the review panel are mutually exclusive render
@@ -194,12 +227,15 @@ export default function AIFeedbackPanel() {
 
 					{lastReview && (
 						<PanelBody
+							// Remount per review so new results open even
+							// after the panel was closed.
+							key={lastReview.review_id}
 							title={__('Last Review', 'ai-feedback')}
 							initialOpen={true}
 						>
 							{!isReviewing && <TipNotice />}
 							{/* ID used by skip links for keyboard navigation */}
-							<div id="ai-feedback-results">
+							<div id={RESULTS_ID}>
 								<div className="ai-feedback-export-row">
 									<ExportReview review={lastReview} />
 								</div>

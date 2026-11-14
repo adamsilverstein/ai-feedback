@@ -4,6 +4,7 @@
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
 import FeedbackList from './FeedbackList';
+import ModelName from './ModelName';
 
 /**
  * Review Summary component.
@@ -223,7 +224,8 @@ export default function ReviewSummary({ review }) {
 			{model && (
 				<p className="model-used">
 					<em>
-						{__('Reviewed with:', 'ai-feedback')} {model}
+						{__('Reviewed with:', 'ai-feedback')}{' '}
+						<ModelName id={model} />
 					</em>
 				</p>
 			)}

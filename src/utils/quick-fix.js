@@ -119,7 +119,9 @@ export function applyFixToContent(content, fix) {
 	const replacement = {
 		text: fix.replace,
 		formats: Array.from({ length }, () => value.formats[start]),
-		replacements: Array.from({ length }),
+		// Sparse, like the arrays rich text builds: core-data reads every
+		// entry that exists when it orders footnotes.
+		replacements: new Array(length),
 	};
 	const updated = insert(value, replacement, start, start + fix.find.length);
 

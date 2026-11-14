@@ -10,6 +10,7 @@ import { useState, RawHTML } from '@wordpress/element';
 import { store as editorStore } from '@wordpress/editor';
 import { __, sprintf } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
+import ModelName from './ModelName';
 import {
 	describeChange,
 	formatReviewDate,
@@ -89,7 +90,8 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 			{entry.model && (
 				<p className="model-used">
 					<em>
-						{__('Reviewed with:', 'ai-feedback')} {entry.model}
+						{__('Reviewed with:', 'ai-feedback')}{' '}
+						<ModelName id={entry.model} />
 					</em>
 				</p>
 			)}
@@ -208,7 +210,7 @@ export default function ReviewHistory() {
 							)}
 							{entry.model && (
 								<div className="ai-feedback-history-model">
-									{entry.model}
+									<ModelName id={entry.model} />
 								</div>
 							)}
 							<Button

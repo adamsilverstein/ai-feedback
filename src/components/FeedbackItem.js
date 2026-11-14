@@ -234,7 +234,9 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 										<Button
 											variant="link"
 											size="small"
-											onClick={() => onNavigate(blockId)}
+											onClick={() =>
+												onNavigate(blockId, index === 0)
+											}
 											className="go-to-block-button"
 										>
 											{sprintf(
@@ -282,8 +284,10 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
  * @return {Element} Feedback item component.
  */
 export default function FeedbackItem({ item, thread, onReplyComplete }) {
-	const handleNavigate = (blockId) => {
-		navigateToBlock(blockId);
+	// The note is attached to the first block of a group, so only that block
+	// can be found by note ID once its client ID is stale.
+	const handleNavigate = (blockId, hasNote = true) => {
+		navigateToBlock(blockId, hasNote ? item.id : undefined);
 	};
 
 	const ItemComponent = item.is_group

@@ -39,7 +39,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v2';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v3';
 
 	/**
 	 * Cache duration for models (1 hour).
@@ -303,17 +303,42 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Get available AI models.
 	 *
-	 * @return array
+	 * @return list<array<string, mixed>>
 	 */
 	private function get_available_models(): array {
-		// Try to get from cache.
-		$cached = get_transient( self::MODELS_CACHE_KEY );
-		if ( false !== $cached ) {
-			return $cached;
+		/**
+		 * Cached model catalog.
+		 *
+		 * @var list<array<string, mixed>>|false $models
+		 */
+		$models = get_transient( self::MODELS_CACHE_KEY );
+		if ( ! is_array( $models ) ) {
+			$models = $this->get_model_catalog();
+			set_transient( self::MODELS_CACHE_KEY, $models, self::MODELS_CACHE_DURATION );
 		}
 
-		// Define available models.
-		$models = array(
+		// Connectors can be added or removed at any time, so only the catalog
+		// is cached and the configured providers are checked on every read.
+		$models = $this->filter_configured_models( $models );
+
+		// Allow filtering of available models.
+		/**
+		 * Models after the `ai_feedback_available_models` filter.
+		 *
+		 * @var list<array<string, mixed>>|null $filtered
+		 */
+		$filtered = apply_filters( 'ai_feedback_available_models', $models );
+
+		return is_array( $filtered ) ? $filtered : $models;
+	}
+
+	/**
+	 * Lists every model the plugin knows about.
+	 *
+	 * @return list<array<string, mixed>> Models.
+	 */
+	private function get_model_catalog(): array {
+		return array(
 			array(
 				'id'           => 'claude-sonnet-5-5',
 				'name'         => 'Claude Sonnet 5.5',
@@ -343,14 +368,64 @@ class Settings_Controller extends WP_REST_Controller {
 				'max_tokens'   => 1000000,
 			),
 		);
+	}
 
-		// Allow filtering of available models.
-		$models = apply_filters( 'ai_feedback_available_models', $models );
+	/**
+	 * Limits models to the providers that are set up under Settings > Connectors.
+	 *
+	 * Keeps the full list when no listed provider is configured, so the
+	 * selector still has options before a connector is added. Runs before the
+	 * `ai_feedback_available_models` filter, so models added there are kept.
+	 *
+	 * @param  list<array<string, mixed>> $models Models, each with a `provider` ID.
+	 * @return list<array<string, mixed>> Models whose provider is configured.
+	 */
+	protected function filter_configured_models( array $models ): array {
+		$registry = $this->get_provider_registry();
+		if ( null === $registry || ! method_exists( $registry, 'hasProvider' ) || ! method_exists( $registry, 'isProviderConfigured' ) ) {
+			return $models;
+		}
 
-		// Cache the result.
-		set_transient( self::MODELS_CACHE_KEY, $models, self::MODELS_CACHE_DURATION );
+		try {
+			$configured = array();
+			foreach ( $models as $model ) {
+				$provider = is_string( $model['provider'] ?? null ) ? $model['provider'] : '';
+				if ( ! isset( $configured[ $provider ] ) ) {
+					$configured[ $provider ] = $registry->hasProvider( $provider ) && $registry->isProviderConfigured( $provider );
+				}
+			}
+		} catch ( \Throwable $e ) {
+			return $models;
+		}
 
-		return $models;
+		$available = array_values(
+			array_filter(
+				$models,
+				static fn ( array $model ): bool => is_string( $model['provider'] ?? null ) && ! empty( $configured[ $model['provider'] ] )
+			)
+		);
+
+		return array() === $available ? $models : $available;
+	}
+
+	/**
+	 * Gets the core AI Client provider registry.
+	 *
+	 * @return object|null Registry, or null when the AI Client is unavailable.
+	 */
+	protected function get_provider_registry(): ?object {
+		$get_registry = array( '\WordPress\AiClient\AiClient', 'defaultRegistry' );
+		if ( ! is_callable( $get_registry ) ) {
+			return null;
+		}
+
+		try {
+			$registry = call_user_func( $get_registry );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		return is_object( $registry ) ? $registry : null;
 	}
 
 	/**
