@@ -4,7 +4,7 @@ Tags: ai, gutenberg, feedback, block-editor, notes
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -70,12 +70,27 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 
 == Screenshots ==
 
-1. AI Feedback panel in the block editor sidebar
-2. Review settings with model selection and focus areas
-3. AI-generated notes attached to blocks
-4. Note detail showing feedback and suggestions
+1. A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar
+2. The Preview fix dialog showing the old and new wording
+3. A note thread with an author's reply and the AI's answer
+4. The AI Feedback Analytics screen
 
 == Changelog ==
+
+= 1.0.0 =
+* First stable release, and the first release on WordPress.org.
+* Quick fixes: apply mechanical text changes straight from a note, with a preview of the old and new wording.
+* Quick fixes are added as Gutenberg suggestions when Suggestion Mode is on, so they can be accepted or rejected.
+* Reply to an AI note and get an AI answer in the same thread; replies run in the background via WP-Cron.
+* Feedback items are scored by priority, with quick actions in the sidebar.
+* Large documents are reviewed in chunks, and the sidebar updates after each part.
+* Staged progress during a review, and retries when the AI service is unavailable.
+* Review history panel, plus export and share options for reviews.
+* Usage analytics screen.
+* Keyboard shortcuts for running a review and moving between feedback items.
+* Contextual tooltips in settings and progressive tips for new users.
+* Accessibility fixes: review errors are announced once, with an "Error:" prefix.
+* Bug fixes from plugin testing.
 
 = 0.2.0 =
 * Migrated to the WordPress 7.0 core AI Client (`wp_ai_client_prompt()`).
@@ -96,6 +111,9 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * Review button with loading states.
 
 == Upgrade Notice ==
+
+= 1.0.0 =
+First stable release. Adds quick fixes, AI replies in note threads, review history, analytics and chunked reviews of long documents.
 
 = 0.2.0 =
 Now requires WordPress 7.0+ and PHP 8.1+. AI provider credentials are read from Settings → Connectors; the previous AI Experiments plugin dependency has been removed.
