@@ -1,0 +1,76 @@
+name: Release
+
+# Builds the plugin zip when a GitHub release is published, attaches it to
+# the release and deploys it to the WordPress.org plugin directory.
+# The WordPress.org deploy needs the SVN_USERNAME and SVN_PASSWORD secrets.
+
+on:
+    release:
+        types:
+            - published
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    release:
+        name: Build and deploy
+        runs-on: ubuntu-latest
+        env:
+            HAS_SVN_CREDENTIALS: ${{ secrets.SVN_USERNAME != '' }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v7
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build
+              run: npm run build
+
+            - name: Create plugin zip
+              run: |
+                  npm run plugin-zip
+                  unzip -q ai-feedback.zip -d dist
+
+            - name: Check the tag matches the plugin version
+              if: github.event_name == 'release'
+              env:
+                  TAG: ${{ github.event.release.tag_name }}
+              run: |
+                  version=$(grep -m1 '^ \* Version:' ai-feedback.php | awk '{print $3}')
+                  stable=$(grep -m1 '^Stable tag:' readme.txt | awk '{print $3}')
+                  if [ "${TAG#v}" != "$version" ] || [ "$version" != "$stable" ]; then
+                      echo "::error::Tag $TAG, plugin Version $version and Stable tag $stable must match."
+                      exit 1
+                  fi
+
+            - name: Save the zip as a workflow artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: ai-feedback
+                  path: ai-feedback.zip
+
+            - name: Upload zip to the release
+              if: github.event_name == 'release'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ github.event.release.tag_name }}
+              run: gh release upload "$TAG" ai-feedback.zip --clobber
+
+            - name: Deploy to WordPress.org
+              if: github.event_name == 'release' && env.HAS_SVN_CREDENTIALS == 'true'
+              uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # 2.3.0
+              env:
+                  SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+                  SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+                  SLUG: ai-feedback
+                  BUILD_DIR: dist/ai-feedback
+                  ASSETS_DIR: .wordpress-org

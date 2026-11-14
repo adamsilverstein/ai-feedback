@@ -3,7 +3,7 @@
  * Plugin Name: AI Feedback
  * Plugin URI: https://github.com/adamsilverstein/ai-feedback
  * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 7.0's core AI Client and Notes feature.
- * Version: 0.2.0
+ * Version: 1.0.0
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Adam Silverstein
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'AI_FEEDBACK_VERSION', '0.2.0' );
+define( 'AI_FEEDBACK_VERSION', '1.0.0' );
 define( 'AI_FEEDBACK_PLUGIN_FILE', __FILE__ );
 define( 'AI_FEEDBACK_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_FEEDBACK_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

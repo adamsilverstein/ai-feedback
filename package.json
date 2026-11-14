@@ -1,8 +1,8 @@
 {
 	"name": "ai-feedback",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
-	"author": "Your Name",
+	"author": "Adam Silverstein",
 	"license": "GPL-2.0-or-later",
 	"keywords": [
 		"wordpress",
@@ -29,8 +29,7 @@
 		"includes/",
 		"build/",
 		"assets/",
-		"readme.txt",
-		".wordpress-org/"
+		"readme.txt"
 	],
 	"main": "build/index.js",
 	"dependencies": {
