@@ -12,13 +12,13 @@
 		"editorial",
 		"block-editor"
 	],
-	"homepage": "https://github.com/adamsilverstein/ai-feedback#readme",
+	"homepage": "https://github.com/adamsilverstein/copydesk-ai#readme",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/adamsilverstein/ai-feedback.git"
+		"url": "https://github.com/adamsilverstein/copydesk-ai.git"
 	},
 	"bugs": {
-		"url": "https://github.com/adamsilverstein/ai-feedback/issues"
+		"url": "https://github.com/adamsilverstein/copydesk-ai/issues"
 	},
 	"engines": {
 		"node": ">=22.0.0",

@@ -255,7 +255,7 @@ export default function WelcomeModal() {
 					</Button>
 					<Button
 						variant="link"
-						href="https://github.com/adamsilverstein/ai-feedback#readme"
+						href="https://github.com/adamsilverstein/copydesk-ai#readme"
 						target="_blank"
 						rel="noopener noreferrer"
 					>

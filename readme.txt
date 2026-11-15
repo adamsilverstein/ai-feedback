@@ -128,7 +128,7 @@ Now requires WordPress 7.0+ and PHP 8.1+. AI provider credentials are read from 
 == Development ==
 
 The plugin is actively developed on GitHub:
-https://github.com/adamsilverstein/ai-feedback
+https://github.com/adamsilverstein/copydesk-ai
 
 Contributions are welcome.
 
