@@ -117,7 +117,7 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 == Upgrade Notice ==
 
 = 1.0.1 =
-AI Feedback is now Copydesk AI. The plugin now installs to a `copydesk-ai` folder, so if you installed AI Feedback from GitHub, deactivate and delete the old copy after activating this one. Existing notes, settings and history carry over.
+AI Feedback is now Copydesk AI. The plugin now installs to a `copydesk-ai` folder, so if you installed AI Feedback from GitHub, deactivate and delete that copy before activating this one. Existing notes, settings and history carry over.
 
 = 1.0.0 =
 First stable release. Adds quick fixes, AI replies in note threads, review history, analytics and chunked reviews of long documents.
