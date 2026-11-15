@@ -25,7 +25,7 @@
 		"npm": ">=9.0.0"
 	},
 	"files": [
-		"ai-feedback.php",
+		"copydesk-ai.php",
 		"includes/",
 		"build/",
 		"assets/",

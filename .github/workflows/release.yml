@@ -45,7 +45,7 @@ jobs:
               env:
                   TAG: ${{ github.event.release.tag_name }}
               run: |
-                  version=$(grep -m1 '^ \* Version:' ai-feedback.php | awk '{print $3}')
+                  version=$(grep -m1 '^ \* Version:' copydesk-ai.php | awk '{print $3}')
                   stable=$(grep -m1 '^Stable tag:' readme.txt | awk '{print $3}')
                   if [ "${TAG#v}" != "$version" ] || [ "$version" != "$stable" ]; then
                       echo "::error::Tag $TAG, plugin Version $version and Stable tag $stable must match."

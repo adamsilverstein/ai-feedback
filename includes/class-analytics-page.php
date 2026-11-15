@@ -71,7 +71,7 @@ class Analytics_Page {
 			return;
 		}
 
-		$plugin_file = dirname( __DIR__ ) . '/ai-feedback.php';
+		$plugin_file = dirname( __DIR__ ) . '/copydesk-ai.php';
 		$asset_file  = dirname( __DIR__ ) . '/build/analytics.asset.php';
 		if ( ! file_exists( $asset_file ) ) {
 			return;

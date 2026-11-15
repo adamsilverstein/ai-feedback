@@ -190,7 +190,7 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 
 ```
 ai-feedback/
-├── ai-feedback.php           # Main plugin file
+├── copydesk-ai.php           # Main plugin file
 ├── includes/                  # PHP classes
 │   ├── class-plugin.php      # Bootstrap
 │   ├── class-settings-controller.php

@@ -2,9 +2,9 @@ parameters:
     level: 5
     paths:
         - includes/
-        - ai-feedback.php
+        - copydesk-ai.php
     scanFiles:
-        - ai-feedback.php
+        - copydesk-ai.php
     bootstrapFiles:
         - phpstan-stubs.php
     excludePaths:
@@ -14,7 +14,7 @@ parameters:
         - '#Constant [A-Z_]+ not found\.#'
         -
             message: '#If condition is always false\.#'
-            path: ai-feedback.php
+            path: copydesk-ai.php
         -
             message: '#Right side of && is always false\.#'
             paths:
