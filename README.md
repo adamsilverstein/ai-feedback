@@ -1,4 +1,6 @@
-# AI Feedback Plugin
+# Copydesk AI
+
+Your AI copy editor, right in the block editor. (Formerly AI Feedback.)
 
 AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
 
@@ -188,7 +190,7 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 
 ```
 ai-feedback/
-├── ai-feedback.php           # Main plugin file
+├── copydesk-ai.php           # Main plugin file
 ├── includes/                  # PHP classes
 │   ├── class-plugin.php      # Bootstrap
 │   ├── class-settings-controller.php

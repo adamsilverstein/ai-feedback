@@ -50,7 +50,7 @@ export default function SkipLinks({
 	return (
 		<nav
 			className="ai-feedback-skip-links"
-			aria-label={__('Skip links', 'ai-feedback')}
+			aria-label={__('Skip links', 'copydesk-ai')}
 		>
 			{showModel && (
 				<a
@@ -58,7 +58,7 @@ export default function SkipLinks({
 					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
-					{__('Skip to model selection', 'ai-feedback')}
+					{__('Skip to model selection', 'copydesk-ai')}
 				</a>
 			)}
 			{hasSettings && (
@@ -67,7 +67,7 @@ export default function SkipLinks({
 					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
-					{__('Skip to review settings', 'ai-feedback')}
+					{__('Skip to review settings', 'copydesk-ai')}
 				</a>
 			)}
 			<a
@@ -75,7 +75,7 @@ export default function SkipLinks({
 				className="ai-feedback-skip-link"
 				onClick={handleSkipClick}
 			>
-				{__('Skip to review button', 'ai-feedback')}
+				{__('Skip to review button', 'copydesk-ai')}
 			</a>
 			{hasResults && (
 				<a
@@ -83,7 +83,7 @@ export default function SkipLinks({
 					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
-					{__('Skip to review results', 'ai-feedback')}
+					{__('Skip to review results', 'copydesk-ai')}
 				</a>
 			)}
 			{hasFeedbackItems && (
@@ -92,7 +92,7 @@ export default function SkipLinks({
 					className="ai-feedback-skip-link"
 					onClick={handleSkipClick}
 				>
-					{__('Skip to feedback items', 'ai-feedback')}
+					{__('Skip to feedback items', 'copydesk-ai')}
 				</a>
 			)}
 		</nav>

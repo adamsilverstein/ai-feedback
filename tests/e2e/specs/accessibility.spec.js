@@ -107,7 +107,7 @@ test.describe('Accessibility', () => {
 			await aiFeedback.openSidebar({ dismissWelcomeModal: false });
 
 			const modal = page.getByRole('dialog', {
-				name: /Welcome to AI Feedback|AI Feedback Setup Required/,
+				name: /Welcome to Copydesk AI|Copydesk AI Setup Required/,
 			});
 			await expect(modal).toBeVisible();
 

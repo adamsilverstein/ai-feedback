@@ -29,32 +29,32 @@ export default function EmptyState({
 				<Icon icon={commentContent} size={48} />
 			</div>
 
-			<h4>{__('No reviews yet', 'ai-feedback')}</h4>
+			<h4>{__('No reviews yet', 'copydesk-ai')}</h4>
 
 			<p className="ai-feedback-empty-description">
 				{__(
 					'Get AI-powered feedback on your writing to improve clarity, tone, and structure.',
-					'ai-feedback'
+					'copydesk-ai'
 				)}
 			</p>
 
 			{!canReview ? (
 				<div className="ai-feedback-empty-prereq">
-					<h5>{__('Before you start:', 'ai-feedback')}</h5>
+					<h5>{__('Before you start:', 'copydesk-ai')}</h5>
 					<ul>
 						{!hasContent && (
 							<li>
 								<Icon icon={pencil} size={16} />
 								{__(
 									'Add some content to your post',
-									'ai-feedback'
+									'copydesk-ai'
 								)}
 							</li>
 						)}
 						{!isSaved && (
 							<li>
 								<Icon icon={check} size={16} />
-								{__('Save your post as a draft', 'ai-feedback')}
+								{__('Save your post as a draft', 'copydesk-ai')}
 							</li>
 						)}
 					</ul>
@@ -62,7 +62,7 @@ export default function EmptyState({
 			) : (
 				<div id={reviewButtonId}>
 					<Button variant="primary" onClick={onStartReview}>
-						{__('Review Document', 'ai-feedback')}
+						{__('Review Document', 'copydesk-ai')}
 					</Button>
 				</div>
 			)}

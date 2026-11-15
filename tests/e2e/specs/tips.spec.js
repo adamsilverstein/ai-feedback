@@ -80,14 +80,14 @@ test.describe('Progressive tips', () => {
 
 		await pageUtils.pressKeys('primary+k');
 		const palette = page.getByRole('dialog', { name: 'Command palette' });
-		await palette.getByRole('combobox').fill('Reset AI Feedback tips');
+		await palette.getByRole('combobox').fill('Reset Copydesk AI tips');
 		await palette
-			.getByRole('option', { name: 'Reset AI Feedback tips' })
+			.getByRole('option', { name: 'Reset Copydesk AI tips' })
 			.click();
 
 		await expect(
 			page.getByTestId('snackbar').filter({
-				hasText: 'AI Feedback tips and welcome screen reset.',
+				hasText: 'Copydesk AI tips and welcome screen reset.',
 			})
 		).toBeVisible();
 		expect(await getTipPreference(page, 'reviewCount')).toBe(0);

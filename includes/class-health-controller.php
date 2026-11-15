@@ -63,7 +63,7 @@ class Health_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to access health status.', 'ai-feedback' ),
+				__( 'You do not have permission to access health status.', 'copydesk-ai' ),
 				array( 'status' => 403 )
 			);
 		}

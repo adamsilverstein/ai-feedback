@@ -104,7 +104,7 @@ class Reply_Cron_Dispatcher {
 			update_comment_meta(
 				$comment_id,
 				self::REPLY_ERROR_META_KEY,
-				__( 'The AI reply could not be scheduled.', 'ai-feedback' )
+				__( 'The AI reply could not be scheduled.', 'copydesk-ai' )
 			);
 		}
 	}

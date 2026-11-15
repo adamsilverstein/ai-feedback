@@ -104,7 +104,7 @@ describe('groupBySeverity', () => {
 describe('generateMarkdownReport', () => {
 	it('groups feedback by severity', () => {
 		const md = generateMarkdownReport(review, 'My Post');
-		expect(md).toContain('# AI Feedback Report: My Post');
+		expect(md).toContain('# Copydesk AI Report: My Post');
 		expect(md).toContain('**Model:** test-model');
 		expect(md).toContain('## Feedback (2 items)');
 		expect(md.indexOf('### Critical')).toBeLessThan(
@@ -165,12 +165,12 @@ describe('getExportFilename', () => {
 	it('strips unsafe characters', () => {
 		expect(
 			getExportFilename({ review_id: '../x/y', timestamp: '' }, 'json')
-		).toBe('ai-feedback-xy.json');
+		).toBe('copydesk-ai-xy.json');
 	});
 
 	it('includes the date and short review ID', () => {
 		expect(getExportFilename(review, 'md')).toBe(
-			'ai-feedback-2026-11-08-550e8400.md'
+			'copydesk-ai-2026-11-08-550e8400.md'
 		);
 	});
 });

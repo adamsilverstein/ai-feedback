@@ -68,7 +68,7 @@ export default function ReviewProgress({ stageKey, chunk = null }) {
 	const partText = chunk
 		? sprintf(
 				/* translators: 1: current part number, 2: total number of parts. */
-				__('Reviewing part %1$d of %2$d.', 'ai-feedback'),
+				__('Reviewing part %1$d of %2$d.', 'copydesk-ai'),
 				chunk.current,
 				chunk.total
 			)
@@ -77,7 +77,7 @@ export default function ReviewProgress({ stageKey, chunk = null }) {
 
 	const stepText = sprintf(
 		/* translators: 1: current step number, 2: total number of steps */
-		__('Step %1$d of %2$d', 'ai-feedback'),
+		__('Step %1$d of %2$d', 'copydesk-ai'),
 		stageIndex + 1,
 		stages.length
 	);
@@ -87,12 +87,12 @@ export default function ReviewProgress({ stageKey, chunk = null }) {
 			<ProgressBar
 				className="ai-feedback-review-progress-bar"
 				value={progress}
-				aria-label={__('Review progress', 'ai-feedback')}
+				aria-label={__('Review progress', 'copydesk-ai')}
 				aria-valuetext={[
 					partText,
 					sprintf(
 						/* translators: 1: "Step 1 of 3", 2: description of the step */
-						__('%1$s: %2$s', 'ai-feedback'),
+						__('%1$s: %2$s', 'copydesk-ai'),
 						stepText,
 						stage.label
 					),
@@ -116,7 +116,7 @@ export default function ReviewProgress({ stageKey, chunk = null }) {
 				>
 					{sprintf(
 						/* translators: %d: number of seconds */
-						__('%ds elapsed', 'ai-feedback'),
+						__('%ds elapsed', 'copydesk-ai'),
 						elapsedSeconds
 					)}
 				</p>

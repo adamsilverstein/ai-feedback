@@ -24,10 +24,10 @@ import { toRows, generateDailyCsv } from './utils';
  */
 function getPeriodOptions() {
 	return [
-		{ label: __('Last 7 days', 'ai-feedback'), value: '7days' },
-		{ label: __('Last 30 days', 'ai-feedback'), value: '30days' },
-		{ label: __('Last 90 days', 'ai-feedback'), value: '90days' },
-		{ label: __('All time', 'ai-feedback'), value: 'all' },
+		{ label: __('Last 7 days', 'copydesk-ai'), value: '7days' },
+		{ label: __('Last 30 days', 'copydesk-ai'), value: '30days' },
+		{ label: __('Last 90 days', 'copydesk-ai'), value: '90days' },
+		{ label: __('All time', 'copydesk-ai'), value: 'all' },
 	];
 }
 
@@ -69,14 +69,14 @@ function BarList({ title, rows, column }) {
 			</CardHeader>
 			<CardBody>
 				{rows.length === 0 ? (
-					<p>{__('No data for this period.', 'ai-feedback')}</p>
+					<p>{__('No data for this period.', 'copydesk-ai')}</p>
 				) : (
 					<table className="ai-feedback-analytics-bars">
 						<thead className="screen-reader-text">
 							<tr>
 								<th scope="col">{column}</th>
 								<th scope="col">
-									{__('Count', 'ai-feedback')}
+									{__('Count', 'copydesk-ai')}
 								</th>
 							</tr>
 						</thead>
@@ -119,7 +119,7 @@ function ReviewsOverTime({ days }) {
 	return (
 		<Card className="ai-feedback-analytics-panel ai-feedback-analytics-panel-wide">
 			<CardHeader>
-				<h2>{__('Reviews over time', 'ai-feedback')}</h2>
+				<h2>{__('Reviews over time', 'copydesk-ai')}</h2>
 			</CardHeader>
 			<CardBody>
 				<div
@@ -136,16 +136,16 @@ function ReviewsOverTime({ days }) {
 					))}
 				</div>
 				<details>
-					<summary>{__('Show data table', 'ai-feedback')}</summary>
+					<summary>{__('Show data table', 'copydesk-ai')}</summary>
 					<table className="widefat striped">
 						<thead>
 							<tr>
-								<th scope="col">{__('Date', 'ai-feedback')}</th>
+								<th scope="col">{__('Date', 'copydesk-ai')}</th>
 								<th scope="col">
-									{__('Reviews', 'ai-feedback')}
+									{__('Reviews', 'copydesk-ai')}
 								</th>
 								<th scope="col">
-									{__('Feedback items', 'ai-feedback')}
+									{__('Feedback items', 'copydesk-ai')}
 								</th>
 							</tr>
 						</thead>
@@ -191,16 +191,16 @@ export default function Dashboard() {
 	}, [period]);
 
 	const severityLabels = {
-		critical: __('Critical', 'ai-feedback'),
-		important: __('Important', 'ai-feedback'),
-		suggestion: __('Suggestion', 'ai-feedback'),
+		critical: __('Critical', 'copydesk-ai'),
+		important: __('Important', 'copydesk-ai'),
+		suggestion: __('Suggestion', 'copydesk-ai'),
 	};
 
 	const categoryLabels = {
-		content: __('Content', 'ai-feedback'),
-		tone: __('Tone', 'ai-feedback'),
-		flow: __('Flow', 'ai-feedback'),
-		design: __('Design', 'ai-feedback'),
+		content: __('Content', 'copydesk-ai'),
+		tone: __('Tone', 'copydesk-ai'),
+		flow: __('Flow', 'copydesk-ai'),
+		design: __('Design', 'copydesk-ai'),
 	};
 
 	return (
@@ -209,7 +209,7 @@ export default function Dashboard() {
 				<SelectControl
 					__next40pxDefaultSize
 					__nextHasNoMarginBottom
-					label={__('Period', 'ai-feedback')}
+					label={__('Period', 'copydesk-ai')}
 					value={period}
 					options={getPeriodOptions()}
 					onChange={setPeriod}
@@ -225,14 +225,14 @@ export default function Dashboard() {
 						)
 					}
 				>
-					{__('Export CSV', 'ai-feedback')}
+					{__('Export CSV', 'copydesk-ai')}
 				</Button>
 			</div>
 
 			{error && (
 				<Notice status="error" isDismissible={false}>
 					{error.message ||
-						__('Could not load analytics.', 'ai-feedback')}
+						__('Could not load analytics.', 'copydesk-ai')}
 				</Notice>
 			)}
 
@@ -242,17 +242,17 @@ export default function Dashboard() {
 				<>
 					<div className="ai-feedback-analytics-stats">
 						<Stat
-							label={__('Total reviews', 'ai-feedback')}
+							label={__('Total reviews', 'copydesk-ai')}
 							value={String(data.total_reviews)}
 						/>
 						<Stat
-							label={__('Total feedback items', 'ai-feedback')}
+							label={__('Total feedback items', 'copydesk-ai')}
 							value={String(data.total_feedback)}
 						/>
 						<Stat
 							label={__(
 								'Average items per review',
-								'ai-feedback'
+								'copydesk-ai'
 							)}
 							value={Number(data.avg_feedback).toFixed(1)}
 						/>
@@ -261,29 +261,29 @@ export default function Dashboard() {
 					<div className="ai-feedback-analytics-grid">
 						<ReviewsOverTime days={data.by_day} />
 						<BarList
-							title={__('Models', 'ai-feedback')}
-							column={__('Model', 'ai-feedback')}
+							title={__('Models', 'copydesk-ai')}
+							column={__('Model', 'copydesk-ai')}
 							rows={toRows(data.by_model)}
 						/>
 						<BarList
-							title={__('Severity', 'ai-feedback')}
-							column={__('Severity', 'ai-feedback')}
+							title={__('Severity', 'copydesk-ai')}
+							column={__('Severity', 'copydesk-ai')}
 							rows={toRows(data.by_severity).map((row) => ({
 								...row,
 								label: severityLabels[row.label] || row.label,
 							}))}
 						/>
 						<BarList
-							title={__('Categories', 'ai-feedback')}
-							column={__('Category', 'ai-feedback')}
+							title={__('Categories', 'copydesk-ai')}
+							column={__('Category', 'copydesk-ai')}
 							rows={toRows(data.by_category).map((row) => ({
 								...row,
 								label: categoryLabels[row.label] || row.label,
 							}))}
 						/>
 						<BarList
-							title={__('Top users', 'ai-feedback')}
-							column={__('User', 'ai-feedback')}
+							title={__('Top users', 'copydesk-ai')}
+							column={__('User', 'copydesk-ai')}
 							rows={data.top_users.map((user) => ({
 								key: user.user_id,
 								label: user.name,
@@ -297,7 +297,7 @@ export default function Dashboard() {
 							/* translators: %d: number of days kept */
 							__(
 								'Usage is counted per day and kept for %d days.',
-								'ai-feedback'
+								'copydesk-ai'
 							),
 							365
 						)}

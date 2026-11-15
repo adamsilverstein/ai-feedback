@@ -44,7 +44,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 		} catch (error) {
 			createErrorNotice(
 				error?.message ||
-					__('Could not update the feedback item.', 'ai-feedback'),
+					__('Could not update the feedback item.', 'copydesk-ai'),
 				{ type: 'snackbar' }
 			);
 			return false;
@@ -57,12 +57,12 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 		if (!(await updateDismissed(true))) {
 			return;
 		}
-		createSuccessNotice(__('Feedback dismissed.', 'ai-feedback'), {
+		createSuccessNotice(__('Feedback dismissed.', 'copydesk-ai'), {
 			type: 'snackbar',
 			id: `ai-feedback-dismissed-${item.id}`,
 			actions: [
 				{
-					label: __('Undo', 'ai-feedback'),
+					label: __('Undo', 'copydesk-ai'),
 					onClick: () => updateDismissed(false),
 				},
 			],
@@ -87,7 +87,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 						onClick={() => onNavigate(item.block_id)}
 						className="go-to-block-button"
 					>
-						{__('Go to block', 'ai-feedback')}
+						{__('Go to block', 'copydesk-ai')}
 					</Button>
 				)}
 				{canDismiss && (
@@ -104,7 +104,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 										/* translators: %s: feedback title */
 										__(
 											'Restore feedback: %s',
-											'ai-feedback'
+											'copydesk-ai'
 										),
 										title
 									)
@@ -112,15 +112,15 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 										/* translators: %s: feedback title */
 										__(
 											'Dismiss feedback: %s',
-											'ai-feedback'
+											'copydesk-ai'
 										),
 										title
 									)
 						}
 					>
 						{isDismissed
-							? __('Restore', 'ai-feedback')
-							: __('Dismiss', 'ai-feedback')}
+							? __('Restore', 'copydesk-ai')
+							: __('Dismiss', 'copydesk-ai')}
 					</Button>
 				)}
 			</div>

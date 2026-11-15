@@ -31,7 +31,7 @@ npm run lint:php    # PHPCS + PHPStan
 
 ```
 ai-feedback/
-├── ai-feedback.php              # Plugin bootstrap
+├── copydesk-ai.php              # Plugin bootstrap
 ├── includes/
 │   ├── class-plugin.php         # Initialization, hooks registration
 │   ├── class-review-service.php # Core review logic, AI integration

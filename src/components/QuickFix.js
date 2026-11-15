@@ -29,13 +29,13 @@ export function describeFix(fix) {
 	if (!fix.replace) {
 		return sprintf(
 			/* translators: %s: text to delete */
-			__('Delete “%s”', 'ai-feedback'),
+			__('Delete “%s”', 'copydesk-ai'),
 			fix.find
 		);
 	}
 	return sprintf(
 		/* translators: 1: text to replace, 2: replacement text */
-		__('Replace “%1$s” with “%2$s”', 'ai-feedback'),
+		__('Replace “%1$s” with “%2$s”', 'copydesk-ai'),
 		fix.find,
 		fix.replace
 	);
@@ -50,28 +50,28 @@ export function describeFix(fix) {
 export function describeSuggestionStatus(status) {
 	switch (status) {
 		case 'applied':
-			return __('You accepted this suggested edit.', 'ai-feedback');
+			return __('You accepted this suggested edit.', 'copydesk-ai');
 		case 'applied-unsaved':
 			return __(
 				'You accepted this suggested edit. Save the post to keep it.',
-				'ai-feedback'
+				'copydesk-ai'
 			);
 		case 'rejected':
-			return __('You rejected this suggested edit.', 'ai-feedback');
+			return __('You rejected this suggested edit.', 'copydesk-ai');
 		case 'rejected-unsaved':
 			return __(
 				'You rejected this suggested edit. Save the post to confirm.',
-				'ai-feedback'
+				'copydesk-ai'
 			);
 		case 'outdated':
 			return __(
 				'This suggested edit no longer applies because the text changed.',
-				'ai-feedback'
+				'copydesk-ai'
 			);
 		default:
 			return __(
 				'Suggested in the text. Accept or reject it from the Notes sidebar.',
-				'ai-feedback'
+				'copydesk-ai'
 			);
 	}
 }
@@ -148,11 +148,11 @@ export default function QuickFix({ item }) {
 				resolved
 					? __(
 							'The fix was applied, but the note could not be resolved.',
-							'ai-feedback'
+							'copydesk-ai'
 						)
 					: __(
 							'The fix was undone, but the note could not be reopened.',
-							'ai-feedback'
+							'copydesk-ai'
 						),
 				{ type: 'snackbar' }
 			);
@@ -171,12 +171,12 @@ export default function QuickFix({ item }) {
 		setResolved(true);
 		setIsPreviewOpen(false);
 
-		createSuccessNotice(__('Fix applied.', 'ai-feedback'), {
+		createSuccessNotice(__('Fix applied.', 'copydesk-ai'), {
 			type: 'snackbar',
 			id: `ai-feedback-fix-applied-${item.id}`,
 			actions: [
 				{
-					label: __('Undo', 'ai-feedback'),
+					label: __('Undo', 'copydesk-ai'),
 					onClick: () => {
 						// Don't overwrite edits made after the fix.
 						const current = registry
@@ -186,7 +186,7 @@ export default function QuickFix({ item }) {
 							createWarningNotice(
 								__(
 									'The block has changed since the fix was applied. Use the editor’s Undo instead.',
-									'ai-feedback'
+									'copydesk-ai'
 								),
 								{ type: 'snackbar' }
 							);
@@ -211,7 +211,7 @@ export default function QuickFix({ item }) {
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
 						'This block has a suggested edit. Accept or reject it from the Notes sidebar before applying this fix.',
-						'ai-feedback'
+						'copydesk-ai'
 					)}
 				</p>
 			)}
@@ -219,7 +219,7 @@ export default function QuickFix({ item }) {
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
 						'The block text has changed, so this fix can no longer be applied.',
-						'ai-feedback'
+						'copydesk-ai'
 					)}
 				</p>
 			)}
@@ -231,7 +231,7 @@ export default function QuickFix({ item }) {
 					disabled={!canApply}
 					accessibleWhenDisabled
 				>
-					{__('Apply fix', 'ai-feedback')}
+					{__('Apply fix', 'copydesk-ai')}
 				</Button>
 				<Button
 					variant="secondary"
@@ -240,13 +240,13 @@ export default function QuickFix({ item }) {
 					disabled={!canApply}
 					accessibleWhenDisabled
 				>
-					{__('Preview', 'ai-feedback')}
+					{__('Preview', 'copydesk-ai')}
 				</Button>
 			</div>
 
 			{isPreviewOpen && preview && (
 				<Modal
-					title={__('Preview fix', 'ai-feedback')}
+					title={__('Preview fix', 'copydesk-ai')}
 					onRequestClose={() => setIsPreviewOpen(false)}
 					className="ai-feedback-quick-fix-modal"
 				>
@@ -261,10 +261,10 @@ export default function QuickFix({ item }) {
 							variant="tertiary"
 							onClick={() => setIsPreviewOpen(false)}
 						>
-							{__('Cancel', 'ai-feedback')}
+							{__('Cancel', 'copydesk-ai')}
 						</Button>
 						<Button variant="primary" onClick={handleApply}>
-							{__('Apply fix', 'ai-feedback')}
+							{__('Apply fix', 'copydesk-ai')}
 						</Button>
 					</div>
 				</Modal>

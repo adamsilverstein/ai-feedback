@@ -37,7 +37,7 @@ function getErrorAction(error, retries, onRetry) {
 				rel="noopener noreferrer"
 				className="ai-feedback-error-action"
 			>
-				{__('Open Connectors Settings', 'ai-feedback')}
+				{__('Open Connectors Settings', 'copydesk-ai')}
 			</Button>
 		);
 	}
@@ -47,7 +47,7 @@ function getErrorAction(error, retries, onRetry) {
 			<p className="ai-feedback-error-help">
 				{__(
 					'Please wait before making another request.',
-					'ai-feedback'
+					'copydesk-ai'
 				)}
 			</p>
 		);
@@ -72,7 +72,7 @@ function getErrorAction(error, retries, onRetry) {
 export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 	const message =
 		error.message ||
-		__('The review could not be completed.', 'ai-feedback');
+		__('The review could not be completed.', 'copydesk-ai');
 
 	return (
 		<Notice
@@ -82,7 +82,7 @@ export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 			className="ai-feedback-error-notice"
 			spokenMessage={sprintf(
 				/* translators: %s: error message */
-				__('Error: %s', 'ai-feedback'),
+				__('Error: %s', 'copydesk-ai'),
 				message
 			)}
 		>
@@ -90,7 +90,7 @@ export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 				<div className="ai-feedback-error-message">{message}</div>
 				{error.code && (
 					<div className="ai-feedback-error-code">
-						{__('Error code:', 'ai-feedback')} {error.code}
+						{__('Error code:', 'copydesk-ai')} {error.code}
 					</div>
 				)}
 				{getErrorAction(error, retries, onRetry)}

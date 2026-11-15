@@ -36,11 +36,11 @@ export default function LanguageSelector() {
 
 	return (
 		<SelectControl
-			label={__('Feedback Language', 'ai-feedback')}
+			label={__('Feedback Language', 'copydesk-ai')}
 			value={feedbackLocale}
 			options={options}
 			onChange={handleChange}
-			help={__('Language for AI feedback responses', 'ai-feedback')}
+			help={__('Language for AI feedback responses', 'copydesk-ai')}
 		/>
 	);
 }

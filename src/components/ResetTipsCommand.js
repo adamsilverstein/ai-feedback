@@ -27,7 +27,7 @@ export default function ResetTipsCommand() {
 
 	useCommand({
 		name: 'ai-feedback/reset-tips',
-		label: __('Reset AI Feedback tips', 'ai-feedback'),
+		label: __('Reset Copydesk AI tips', 'copydesk-ai'),
 		icon: commentAuthorAvatar,
 		callback: ({ close }) => {
 			// A leftover legacy flag would dismiss the welcome modal again.
@@ -36,7 +36,7 @@ export default function ResetTipsCommand() {
 				set(PREFERENCES_SCOPE, key, value);
 			});
 			createInfoNotice(
-				__('AI Feedback tips and welcome screen reset.', 'ai-feedback'),
+				__('Copydesk AI tips and welcome screen reset.', 'copydesk-ai'),
 				{ type: 'snackbar' }
 			);
 			close();

@@ -144,7 +144,7 @@ class Review_Service {
 			Logger::debug( sprintf( 'Error: Post %d not found in database', $post_id ) );
 			return new WP_Error(
 				'invalid_post',
-				__( 'Post not found.', 'ai-feedback' )
+				__( 'Post not found.', 'copydesk-ai' )
 			);
 		}
 
@@ -155,7 +155,7 @@ class Review_Service {
 			Logger::debug( 'Error: No blocks provided for review' );
 			return new WP_Error(
 				'no_blocks',
-				__( 'No content blocks provided for review.', 'ai-feedback' )
+				__( 'No content blocks provided for review.', 'copydesk-ai' )
 			);
 		}
 
@@ -166,7 +166,7 @@ class Review_Service {
 			Logger::debug( sprintf( 'Error: Too many blocks (%d, max 100)', count( $blocks ) ) );
 			return new WP_Error(
 				'too_many_blocks',
-				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'ai-feedback' )
+				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'copydesk-ai' )
 			);
 		}
 
@@ -369,7 +369,7 @@ class Review_Service {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
-				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'ai-feedback' )
+				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'copydesk-ai' )
 			);
 		}
 
@@ -399,7 +399,7 @@ class Review_Service {
 			Logger::debug( sprintf( 'AI request threw %s: %s', get_class( $e ), $e->getMessage() ) );
 			return new WP_Error(
 				'ai_request_failed',
-				__( 'The AI request failed unexpectedly. Please try again.', 'ai-feedback' ),
+				__( 'The AI request failed unexpectedly. Please try again.', 'copydesk-ai' ),
 				array( 'status' => 500 )
 			);
 		} finally {
@@ -587,7 +587,7 @@ class Review_Service {
 
 		return new WP_Error(
 			'ai_service_unavailable',
-			__( 'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.', 'ai-feedback' ),
+			__( 'The AI service is temporarily unavailable. Your content was not changed. Please try again shortly.', 'copydesk-ai' ),
 			array(
 				'status'        => 503,
 				'retry_after'   => $retry_after,
@@ -765,7 +765,7 @@ class Review_Service {
 				'note_creation_failed',
 				sprintf(
 				/* translators: %s: error messages */
-					__( 'Failed to create notes: %s', 'ai-feedback' ),
+					__( 'Failed to create notes: %s', 'copydesk-ai' ),
 					implode( ', ', $errors )
 				)
 			);
@@ -804,7 +804,7 @@ class Review_Service {
 		if ( count( $reviews ) >= 10 ) {
 			return new WP_Error(
 				'rate_limit_exceeded',
-				__( 'You have reached the maximum number of reviews per hour (10). Please try again later.', 'ai-feedback' )
+				__( 'You have reached the maximum number of reviews per hour (10). Please try again later.', 'copydesk-ai' )
 			);
 		}
 

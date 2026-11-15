@@ -65,7 +65,7 @@ describe('WelcomeModal', () => {
 
 		expect(
 			await screen.findByRole('dialog', {
-				name: /Welcome to AI Feedback/,
+				name: /Welcome to Copydesk AI/,
 			})
 		).toBeInTheDocument();
 		expect(apiFetch).toHaveBeenCalledTimes(1);

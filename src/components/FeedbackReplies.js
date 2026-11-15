@@ -68,7 +68,7 @@ export default function FeedbackReplies({
 				speak(
 					sprintf(
 						/* translators: %s: AI reply text. */
-						__('AI Feedback replied: %s', 'ai-feedback'),
+						__('Copydesk AI replied: %s', 'copydesk-ai'),
 						reply.content
 					)
 				);
@@ -84,7 +84,7 @@ export default function FeedbackReplies({
 	return (
 		<ul
 			className="ai-feedback-replies"
-			aria-label={__('Conversation replies', 'ai-feedback')}
+			aria-label={__('Conversation replies', 'copydesk-ai')}
 		>
 			{replies.map((reply) => (
 				<li
@@ -98,7 +98,7 @@ export default function FeedbackReplies({
 				>
 					<span className="ai-feedback-reply-author">
 						{reply.is_ai
-							? __('AI Feedback', 'ai-feedback')
+							? __('Copydesk AI', 'copydesk-ai')
 							: reply.author}
 					</span>
 					<span className="ai-feedback-reply-content">
@@ -123,7 +123,7 @@ export default function FeedbackReplies({
 						<>
 							<Spinner />
 							<span className="ai-feedback-reply-content">
-								{__('AI is replying…', 'ai-feedback')}
+								{__('AI is replying…', 'copydesk-ai')}
 							</span>
 						</>
 					)}
@@ -131,7 +131,7 @@ export default function FeedbackReplies({
 						<span className="ai-feedback-reply-content ai-feedback-reply-error">
 							{__(
 								'The AI reply could not be generated. Reply again to retry.',
-								'ai-feedback'
+								'copydesk-ai'
 							)}
 						</span>
 					)}

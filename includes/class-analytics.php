@@ -134,7 +134,7 @@ class Analytics {
 	 */
 	public static function register_exporter( array $exporters ): array {
 		$exporters[ self::OPTION_KEY ] = array(
-			'exporter_friendly_name' => __( 'AI Feedback usage', 'ai-feedback' ),
+			'exporter_friendly_name' => __( 'Copydesk AI usage', 'copydesk-ai' ),
 			'callback'               => array( self::class, 'export_personal_data' ),
 		);
 
@@ -149,7 +149,7 @@ class Analytics {
 	 */
 	public static function register_eraser( array $erasers ): array {
 		$erasers[ self::OPTION_KEY ] = array(
-			'eraser_friendly_name' => __( 'AI Feedback usage', 'ai-feedback' ),
+			'eraser_friendly_name' => __( 'Copydesk AI usage', 'copydesk-ai' ),
 			'callback'             => array( self::class, 'erase_personal_data' ),
 		);
 
@@ -183,15 +183,15 @@ class Analytics {
 
 			$items[] = array(
 				'group_id'    => 'ai-feedback-usage',
-				'group_label' => __( 'AI Feedback usage', 'ai-feedback' ),
+				'group_label' => __( 'Copydesk AI usage', 'copydesk-ai' ),
 				'item_id'     => 'ai-feedback-usage-' . $date,
 				'data'        => array(
 					array(
-						'name'  => __( 'Date', 'ai-feedback' ),
+						'name'  => __( 'Date', 'copydesk-ai' ),
 						'value' => $date,
 					),
 					array(
-						'name'  => __( 'Reviews run', 'ai-feedback' ),
+						'name'  => __( 'Reviews run', 'copydesk-ai' ),
 						'value' => (string) $day['users'][ $key ],
 					),
 				),
@@ -379,7 +379,7 @@ class Analytics {
 			$user  = get_userdata( (int) $user_id );
 			$top[] = array(
 				'user_id' => (int) $user_id,
-				'name'    => $user ? $user->display_name : __( 'Unknown user', 'ai-feedback' ),
+				'name'    => $user ? $user->display_name : __( 'Unknown user', 'copydesk-ai' ),
 				'reviews' => $count,
 			);
 		}

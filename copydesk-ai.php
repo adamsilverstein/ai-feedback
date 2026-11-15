@@ -1,16 +1,16 @@
 <?php
 /**
- * Plugin Name: AI Feedback
+ * Plugin Name: Copydesk AI
  * Plugin URI: https://github.com/adamsilverstein/ai-feedback
  * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 7.0's core AI Client and Notes feature.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Adam Silverstein
  * Author URI: https://wordpress.org/profiles/adamsilverstein/
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: ai-feedback
+ * Text Domain: copydesk-ai
  *
  * @package AI_Feedback
  */
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'AI_FEEDBACK_VERSION', '1.0.0' );
+define( 'AI_FEEDBACK_VERSION', '1.0.1' );
 define( 'AI_FEEDBACK_PLUGIN_FILE', __FILE__ );
 define( 'AI_FEEDBACK_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AI_FEEDBACK_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -102,7 +102,7 @@ function display_version_notice() {
 	<?php
 	printf(
 				/* translators: %s: required WordPress version */
-		esc_html__( 'AI Feedback requires WordPress %s or higher.', 'ai-feedback' ),
+		esc_html__( 'Copydesk AI requires WordPress %s or higher.', 'copydesk-ai' ),
 		'7.0'
 	);
 	?>
@@ -121,7 +121,7 @@ function display_php_version_notice() {
 	<?php
 	printf(
 				/* translators: %s: required PHP version */
-		esc_html__( 'AI Feedback requires PHP %s or higher.', 'ai-feedback' ),
+		esc_html__( 'Copydesk AI requires PHP %s or higher.', 'copydesk-ai' ),
 		'8.1'
 	);
 	?>
@@ -136,7 +136,7 @@ function display_php_version_notice() {
 function display_ai_client_notice() {
 	$message = sprintf(
 		/* translators: %s: URL of the WordPress updates screen */
-		__( 'AI Feedback requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'ai-feedback' ),
+		__( 'Copydesk AI requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'copydesk-ai' ),
 		esc_url( admin_url( 'update-core.php' ) )
 	);
 	?>

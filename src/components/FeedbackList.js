@@ -47,19 +47,19 @@ export default function FeedbackList({ feedbackItems }) {
 		<>
 			<div className="ai-feedback-list-controls">
 				<SelectControl
-					label={__('Sort by', 'ai-feedback')}
+					label={__('Sort by', 'copydesk-ai')}
 					value={sortBy}
 					options={[
 						{
-							label: __('Priority (recommended)', 'ai-feedback'),
+							label: __('Priority (recommended)', 'copydesk-ai'),
 							value: SORT_PRIORITY,
 						},
 						{
-							label: __('Document order', 'ai-feedback'),
+							label: __('Document order', 'copydesk-ai'),
 							value: SORT_DOCUMENT,
 						},
 						{
-							label: __('Category', 'ai-feedback'),
+							label: __('Category', 'copydesk-ai'),
 							value: SORT_CATEGORY,
 						},
 					]}
@@ -72,7 +72,7 @@ export default function FeedbackList({ feedbackItems }) {
 				id="ai-feedback-items"
 				className="ai-feedback-list"
 				role="list"
-				aria-label={__('Feedback items', 'ai-feedback')}
+				aria-label={__('Feedback items', 'copydesk-ai')}
 			>
 				{sortedItems.map((item, index) => {
 					// For grouped items, use the first block_id from block_ids array.

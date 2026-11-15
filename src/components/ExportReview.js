@@ -40,7 +40,7 @@ export default function ExportReview({ review }) {
 	const copyToClipboard = async (content) => {
 		try {
 			await window.navigator.clipboard.writeText(content);
-			createSuccessNotice(__('Copied to clipboard.', 'ai-feedback'), {
+			createSuccessNotice(__('Copied to clipboard.', 'copydesk-ai'), {
 				type: 'snackbar',
 				id: NOTICE_ID,
 			});
@@ -48,7 +48,7 @@ export default function ExportReview({ review }) {
 			createErrorNotice(
 				__(
 					'Could not copy to the clipboard. Try downloading instead.',
-					'ai-feedback'
+					'copydesk-ai'
 				),
 				{ type: 'snackbar', id: NOTICE_ID }
 			);
@@ -66,12 +66,12 @@ export default function ExportReview({ review }) {
 	return (
 		<DropdownMenu
 			icon={share}
-			label={__('Export review', 'ai-feedback')}
+			label={__('Export review', 'copydesk-ai')}
 			className="ai-feedback-export"
 		>
 			{({ onClose }) => (
 				<>
-					<MenuGroup label={__('Copy', 'ai-feedback')}>
+					<MenuGroup label={__('Copy', 'copydesk-ai')}>
 						<MenuItem
 							icon={copy}
 							iconPosition="left"
@@ -82,7 +82,7 @@ export default function ExportReview({ review }) {
 								onClose();
 							}}
 						>
-							{__('Copy summary', 'ai-feedback')}
+							{__('Copy summary', 'copydesk-ai')}
 						</MenuItem>
 						<MenuItem
 							icon={copy}
@@ -94,10 +94,10 @@ export default function ExportReview({ review }) {
 								onClose();
 							}}
 						>
-							{__('Copy as Markdown', 'ai-feedback')}
+							{__('Copy as Markdown', 'copydesk-ai')}
 						</MenuItem>
 					</MenuGroup>
-					<MenuGroup label={__('Download', 'ai-feedback')}>
+					<MenuGroup label={__('Download', 'copydesk-ai')}>
 						<MenuItem
 							icon={download}
 							iconPosition="left"
@@ -110,7 +110,7 @@ export default function ExportReview({ review }) {
 								onClose();
 							}}
 						>
-							{__('Download Markdown', 'ai-feedback')}
+							{__('Download Markdown', 'copydesk-ai')}
 						</MenuItem>
 						<MenuItem
 							icon={download}
@@ -124,7 +124,7 @@ export default function ExportReview({ review }) {
 								onClose();
 							}}
 						>
-							{__('Download JSON', 'ai-feedback')}
+							{__('Download JSON', 'copydesk-ai')}
 						</MenuItem>
 					</MenuGroup>
 				</>

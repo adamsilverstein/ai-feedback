@@ -64,14 +64,14 @@ export default function ReviewSummary({ review }) {
 			aria-labelledby="review-summary-heading"
 		>
 			<h3 id="review-summary-heading" className="screen-reader-text">
-				{__('Review Summary', 'ai-feedback')}
+				{__('Review Summary', 'copydesk-ai')}
 			</h3>
 
 			{review.is_in_progress && (
 				<p className="ai-feedback-review-status description">
 					{__(
 						'Review in progress. Showing feedback from the parts finished so far.',
-						'ai-feedback'
+						'copydesk-ai'
 					)}
 				</p>
 			)}
@@ -79,7 +79,7 @@ export default function ReviewSummary({ review }) {
 				<p className="ai-feedback-review-status description">
 					{__(
 						'This review did not finish. Showing feedback from the parts that finished before it stopped.',
-						'ai-feedback'
+						'copydesk-ai'
 					)}
 				</p>
 			)}
@@ -100,14 +100,14 @@ export default function ReviewSummary({ review }) {
 				>
 					<strong>
 						{noteCount === 0
-							? __('No feedback items', 'ai-feedback')
+							? __('No feedback items', 'copydesk-ai')
 							: sprintf(
 									/* translators: %d: number of feedback items */
 									_n(
 										'%d feedback item',
 										'%d feedback items',
 										noteCount,
-										'ai-feedback'
+										'copydesk-ai'
 									),
 									noteCount
 								)}
@@ -122,7 +122,7 @@ export default function ReviewSummary({ review }) {
 						/* translators: 1: critical count, 2: important count, 3: suggestion count */
 						__(
 							'%1$d critical, %2$d important, %3$d suggestions',
-							'ai-feedback'
+							'copydesk-ai'
 						),
 						criticalCount,
 						importantCount,
@@ -137,8 +137,8 @@ export default function ReviewSummary({ review }) {
 					className="summary-by-severity"
 					aria-describedby="summary-stats"
 				>
-					<h4>{__('By Severity', 'ai-feedback')}</h4>
-					<ul aria-label={__('Feedback by severity', 'ai-feedback')}>
+					<h4>{__('By Severity', 'copydesk-ai')}</h4>
+					<ul aria-label={__('Feedback by severity', 'copydesk-ai')}>
 						{summary.by_severity.critical > 0 && (
 							<li className="severity-critical">
 								<span
@@ -146,13 +146,13 @@ export default function ReviewSummary({ review }) {
 									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
-										__('Severity level: %s', 'ai-feedback'),
-										__('Critical', 'ai-feedback')
+										__('Severity level: %s', 'copydesk-ai'),
+										__('Critical', 'copydesk-ai')
 									)}
 								>
 									🔴
 								</span>{' '}
-								{__('Critical', 'ai-feedback')}:{' '}
+								{__('Critical', 'copydesk-ai')}:{' '}
 								{summary.by_severity.critical}
 							</li>
 						)}
@@ -163,13 +163,13 @@ export default function ReviewSummary({ review }) {
 									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
-										__('Severity level: %s', 'ai-feedback'),
-										__('Important', 'ai-feedback')
+										__('Severity level: %s', 'copydesk-ai'),
+										__('Important', 'copydesk-ai')
 									)}
 								>
 									🟡
 								</span>{' '}
-								{__('Important', 'ai-feedback')}:{' '}
+								{__('Important', 'copydesk-ai')}:{' '}
 								{summary.by_severity.important}
 							</li>
 						)}
@@ -180,13 +180,13 @@ export default function ReviewSummary({ review }) {
 									role="img"
 									aria-label={sprintf(
 										/* translators: %s: severity level */
-										__('Severity level: %s', 'ai-feedback'),
-										__('Suggestion', 'ai-feedback')
+										__('Severity level: %s', 'copydesk-ai'),
+										__('Suggestion', 'copydesk-ai')
 									)}
 								>
 									🟢
 								</span>{' '}
-								{__('Suggestion', 'ai-feedback')}:{' '}
+								{__('Suggestion', 'copydesk-ai')}:{' '}
 								{summary.by_severity.suggestion}
 							</li>
 						)}
@@ -196,8 +196,8 @@ export default function ReviewSummary({ review }) {
 
 			{summary && summary.by_category && (
 				<div className="summary-by-category">
-					<h4>{__('By Category', 'ai-feedback')}</h4>
-					<ul aria-label={__('Feedback by category', 'ai-feedback')}>
+					<h4>{__('By Category', 'copydesk-ai')}</h4>
+					<ul aria-label={__('Feedback by category', 'copydesk-ai')}>
 						{Object.entries(summary.by_category)
 							.filter(([, count]) => count > 0)
 							.map(([category, count], index, array) => {
@@ -224,7 +224,7 @@ export default function ReviewSummary({ review }) {
 			{model && (
 				<p className="model-used">
 					<em>
-						{__('Reviewed with:', 'ai-feedback')}{' '}
+						{__('Reviewed with:', 'copydesk-ai')}{' '}
 						<ModelName id={model} />
 					</em>
 				</p>
@@ -235,7 +235,7 @@ export default function ReviewSummary({ review }) {
 					<p className="description">
 						{__(
 							'Feedback notes have been attached to your content blocks. Look for the note indicators in the editor.',
-							'ai-feedback'
+							'copydesk-ai'
 						)}
 					</p>
 					{mappedBlockCount > 0 && (
@@ -247,7 +247,7 @@ export default function ReviewSummary({ review }) {
 									'Created notes for %d block',
 									'Created notes for %d blocks',
 									mappedBlockCount,
-									'ai-feedback'
+									'copydesk-ai'
 								),
 								mappedBlockCount
 							)}
@@ -255,7 +255,7 @@ export default function ReviewSummary({ review }) {
 					)}
 					{review.notes_error && (
 						<p className="error">
-							⚠ {__('Note creation warning:', 'ai-feedback')}{' '}
+							⚠ {__('Note creation warning:', 'copydesk-ai')}{' '}
 							{review.notes_error}
 						</p>
 					)}
@@ -268,7 +268,7 @@ export default function ReviewSummary({ review }) {
 						✓{' '}
 						{__(
 							'Great job! The AI found no issues with your content.',
-							'ai-feedback'
+							'copydesk-ai'
 						)}
 					</p>
 				</div>
@@ -277,7 +277,7 @@ export default function ReviewSummary({ review }) {
 			{/* Detailed feedback list */}
 			{hasNotes && notes && notes.length > 0 && (
 				<div className="feedback-details">
-					<h4>{__('Feedback Details', 'ai-feedback')}</h4>
+					<h4>{__('Feedback Details', 'copydesk-ai')}</h4>
 					<FeedbackList feedbackItems={notes} />
 				</div>
 			)}

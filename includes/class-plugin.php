@@ -114,7 +114,7 @@ class Plugin {
 	 * @return string The AI Feedback comment author name.
 	 */
 	public static function get_ai_feedback_author(): string {
-		return __( 'AI Feedback', 'ai-feedback' );
+		return __( 'Copydesk AI', 'copydesk-ai' );
 	}
 
 	/**
@@ -203,6 +203,8 @@ class Plugin {
 			$asset['version'],
 			true
 		);
+
+		wp_set_script_translations( 'ai-feedback-editor', 'copydesk-ai' );
 
 		// Enqueue styles.
 		wp_enqueue_style(

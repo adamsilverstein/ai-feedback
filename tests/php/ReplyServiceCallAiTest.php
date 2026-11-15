@@ -122,7 +122,7 @@ class ReplyServiceCallAiTest extends TestCase {
 	}
 
 	/**
-	 * Mock mode defined as false, as ai-feedback.php does in production,
+	 * Mock mode defined as false, as copydesk-ai.php does in production,
 	 * still calls the AI Client.
 	 */
 	public function test_mock_mode_false_calls_ai_client(): void {

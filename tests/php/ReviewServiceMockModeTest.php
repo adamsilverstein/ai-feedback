@@ -56,7 +56,7 @@ class MockModeReviewService extends Review_Service {
 class ReviewServiceMockModeTest extends TestCase {
 
 	/**
-	 * Mock mode defined as false, as ai-feedback.php does in production,
+	 * Mock mode defined as false, as copydesk-ai.php does in production,
 	 * still calls the AI.
 	 */
 	public function test_mock_mode_false_calls_ai(): void {

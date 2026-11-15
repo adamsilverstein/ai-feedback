@@ -107,7 +107,7 @@ class Review_Controller extends WP_REST_Controller {
 			Logger::debug( sprintf( 'Error: Post %d not found', $post_id ) );
 			return new WP_Error(
 				'invalid_post',
-				__( 'Post not found.', 'ai-feedback' ),
+				__( 'Post not found.', 'copydesk-ai' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -116,7 +116,7 @@ class Review_Controller extends WP_REST_Controller {
 			Logger::debug( sprintf( 'Error: User lacks permission to edit post %d', $post_id ) );
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to review this post.', 'ai-feedback' ),
+				__( 'You do not have permission to review this post.', 'copydesk-ai' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -126,7 +126,7 @@ class Review_Controller extends WP_REST_Controller {
 			Logger::debug( 'Error: No blocks provided for review' );
 			return new WP_Error(
 				'no_blocks',
-				__( 'No content blocks provided for review.', 'ai-feedback' ),
+				__( 'No content blocks provided for review.', 'copydesk-ai' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -141,7 +141,7 @@ class Review_Controller extends WP_REST_Controller {
 		if ( $is_chunked && ( $block_count > $chunk_size || ( ! $is_last && $block_count !== $chunk_size ) ) ) {
 			return new WP_Error(
 				'invalid_chunk_size',
-				__( 'This review chunk has the wrong number of blocks.', 'ai-feedback' ),
+				__( 'This review chunk has the wrong number of blocks.', 'copydesk-ai' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -149,7 +149,7 @@ class Review_Controller extends WP_REST_Controller {
 		if ( $is_chunked && $chunk_total > Review_Chunks::get_max_chunks() ) {
 			return new WP_Error(
 				'too_many_blocks',
-				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'ai-feedback' ),
+				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'copydesk-ai' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -166,7 +166,7 @@ class Review_Controller extends WP_REST_Controller {
 			if ( $chunk_index > 0 ) {
 				return new WP_Error(
 					'invalid_review_chunk',
-					__( 'Invalid review chunk.', 'ai-feedback' ),
+					__( 'Invalid review chunk.', 'copydesk-ai' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -292,7 +292,7 @@ class Review_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to review posts.', 'ai-feedback' ),
+				__( 'You do not have permission to review posts.', 'copydesk-ai' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -320,12 +320,12 @@ class Review_Controller extends WP_REST_Controller {
 				'type'              => 'string',
 				'default'           => '',
 				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'Post title from the editor.', 'ai-feedback' ),
+				'description'       => __( 'Post title from the editor.', 'copydesk-ai' ),
 			),
 			'blocks'             => array(
 				'required'    => true,
 				'type'        => 'array',
-				'description' => __( 'Array of blocks with clientId, name, and content.', 'ai-feedback' ),
+				'description' => __( 'Array of blocks with clientId, name, and content.', 'copydesk-ai' ),
 				'items'       => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -374,26 +374,26 @@ class Review_Controller extends WP_REST_Controller {
 				'type'              => 'string',
 				'default'           => 'auto',
 				'sanitize_callback' => 'sanitize_text_field',
-				'description'       => __( 'Locale for feedback language.', 'ai-feedback' ),
+				'description'       => __( 'Locale for feedback language.', 'copydesk-ai' ),
 			),
 			'existing_feedback'  => array(
 				'required'    => false,
 				'type'        => 'array',
 				'default'     => array(),
-				'description' => __( 'Existing feedback from previous reviews for continuation.', 'ai-feedback' ),
+				'description' => __( 'Existing feedback from previous reviews for continuation.', 'copydesk-ai' ),
 			),
 			'review_id'          => array(
 				'required'    => false,
 				'type'        => 'string',
 				'format'      => 'uuid',
-				'description' => __( 'Review ID returned for the first chunk of a chunked review.', 'ai-feedback' ),
+				'description' => __( 'Review ID returned for the first chunk of a chunked review.', 'copydesk-ai' ),
 			),
 			'chunk_index'        => array(
 				'required'    => false,
 				'type'        => 'integer',
 				'default'     => 0,
 				'minimum'     => 0,
-				'description' => __( 'Zero-based index of this chunk in a chunked review.', 'ai-feedback' ),
+				'description' => __( 'Zero-based index of this chunk in a chunked review.', 'copydesk-ai' ),
 			),
 			'chunk_total'        => array(
 				'required'    => false,
@@ -401,14 +401,14 @@ class Review_Controller extends WP_REST_Controller {
 				'default'     => 1,
 				'minimum'     => 1,
 				'maximum'     => Review_Chunks::MAX_BLOCKS,
-				'description' => __( 'Number of chunks in a chunked review.', 'ai-feedback' ),
+				'description' => __( 'Number of chunks in a chunked review.', 'copydesk-ai' ),
 			),
 			'previous_summaries' => array(
 				'required'    => false,
 				'type'        => 'array',
 				'default'     => array(),
 				'items'       => array( 'type' => 'string' ),
-				'description' => __( 'Summaries of earlier chunks, sent with the final chunk.', 'ai-feedback' ),
+				'description' => __( 'Summaries of earlier chunks, sent with the final chunk.', 'copydesk-ai' ),
 			),
 		);
 	}

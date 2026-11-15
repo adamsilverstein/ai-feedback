@@ -199,7 +199,7 @@ test.describe('Empty State', () => {
 async function openPanel(page) {
 	const toggle = page
 		.getByRole('region', { name: 'Editor top bar' })
-		.getByRole('button', { name: 'AI Feedback' });
+		.getByRole('button', { name: 'Copydesk AI' });
 	await toggle.waitFor();
 	if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
 		await toggle.click();
