@@ -37,7 +37,7 @@ export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
 		}
 		// Announce review started
 		else if (isReviewing && !prevState.isReviewing) {
-			speak(__('Review in progress. Please wait.', 'ai-feedback'));
+			speak(__('Review in progress. Please wait.', 'copydesk-ai'));
 			prevState.isReviewing = true;
 			prevState.hasError = false;
 			prevState.reviewCompleted = false;
@@ -56,7 +56,7 @@ export default function StatusAnnouncer({ isReviewing, lastReview, error }) {
 			speak(
 				sprintf(
 					/* translators: %d: number of notes created */
-					__('Review complete. %d notes created.', 'ai-feedback'),
+					__('Review complete. %d notes created.', 'copydesk-ai'),
 					noteCount
 				)
 			);

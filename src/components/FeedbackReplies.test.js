@@ -44,7 +44,7 @@ describe('FeedbackReplies', () => {
 					},
 					{
 						id: 2,
-						author: 'AI Feedback',
+						author: 'Copydesk AI',
 						content: 'The 40% growth claim.',
 						is_ai: true,
 					},
@@ -126,7 +126,7 @@ describe('FeedbackReplies', () => {
 		};
 		const existingAiReply = {
 			id: 2,
-			author: 'AI Feedback',
+			author: 'Copydesk AI',
 			content: 'Already here.',
 			is_ai: true,
 		};
@@ -145,7 +145,7 @@ describe('FeedbackReplies', () => {
 					existingAiReply,
 					{
 						id: 3,
-						author: 'AI Feedback',
+						author: 'Copydesk AI',
 						content: 'The 40% growth claim.',
 						is_ai: true,
 					},
@@ -155,7 +155,7 @@ describe('FeedbackReplies', () => {
 
 		expect(speak).toHaveBeenCalledTimes(1);
 		expect(speak).toHaveBeenCalledWith(
-			'AI Feedback replied: The 40% growth claim.'
+			'Copydesk AI replied: The 40% growth claim.'
 		);
 	});
 
@@ -167,7 +167,7 @@ describe('FeedbackReplies', () => {
 				replies={[
 					{
 						id: 2,
-						author: 'AI Feedback',
+						author: 'Copydesk AI',
 						content: 'Already here.',
 						is_ai: true,
 					},

@@ -99,7 +99,7 @@ export default function useReplyStatus(replyId) {
 						fail(
 							__(
 								'No AI reply was scheduled for this comment.',
-								'ai-feedback'
+								'copydesk-ai'
 							)
 						);
 						return;
@@ -113,7 +113,7 @@ export default function useReplyStatus(replyId) {
 					fail(
 						__(
 							'The AI reply is taking longer than expected.',
-							'ai-feedback'
+							'copydesk-ai'
 						)
 					);
 					return;
@@ -134,7 +134,7 @@ export default function useReplyStatus(replyId) {
 					err?.message ||
 						__(
 							'Could not check the AI reply status.',
-							'ai-feedback'
+							'copydesk-ai'
 						)
 				);
 			}

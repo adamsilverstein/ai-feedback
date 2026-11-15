@@ -49,7 +49,7 @@ class Review_History {
 				'type'          => 'array',
 				'single'        => true,
 				'default'       => array(),
-				'description'   => __( 'Recent AI Feedback reviews for this post.', 'ai-feedback' ),
+				'description'   => __( 'Recent Copydesk AI reviews for this post.', 'copydesk-ai' ),
 				'auth_callback' => '__return_false',
 				'show_in_rest'  => array(
 					'schema' => array(

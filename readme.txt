@@ -1,18 +1,18 @@
-=== AI Feedback ===
+=== Copydesk AI ===
 Contributors: adamsilverstein
-Tags: ai, gutenberg, feedback, block-editor, notes
+Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
+Your AI copy editor in the block editor. Copydesk reviews your draft and leaves feedback, suggested edits and quick fixes as notes on your blocks.
 
 == Description ==
 
-The AI Feedback plugin integrates AI-powered content review directly into the WordPress block editor. It leverages the WordPress 7.0 core AI Client and Connectors API for provider-agnostic AI access, and uses the native Notes API to provide contextual, block-level feedback on your content.
+Copydesk AI is an AI agent that reviews your posts right in the block editor, the way a newspaper copy desk reviews a story before it runs. It leverages the WordPress 7.0 core AI Client and Connectors API for provider-agnostic AI access, and uses the native Notes API to provide contextual, block-level feedback on your content.
 
 = Features =
 
@@ -32,19 +32,19 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 
 = Prerequisites =
 
-WordPress 7.0 introduced the core AI Client and Connectors API. AI Feedback uses both directly — there is no longer any custom AI plumbing or separate "AI Experiments" plugin to install.
+WordPress 7.0 introduced the core AI Client and Connectors API. Copydesk AI uses both directly — there is no longer any custom AI plumbing or separate "AI Experiments" plugin to install.
 
-Before using AI Feedback, configure an AI provider:
+Before using Copydesk AI, configure an AI provider:
 
 1. In WordPress admin, go to **Settings → Connectors**.
 2. Pick a provider (Anthropic, OpenAI, Google, etc.) and add an API key, or define one as an environment variable / PHP constant.
 3. Save.
 
-= Installing AI Feedback =
+= Installing Copydesk AI =
 
-1. Upload the plugin to `/wp-content/plugins/ai-feedback/`, or install via the WordPress plugins screen.
+1. Upload the plugin to `/wp-content/plugins/copydesk-ai/`, or install via the WordPress plugins screen.
 2. Activate the plugin through the **Plugins** screen.
-3. Open any post in the block editor — the AI Feedback panel appears in the sidebar.
+3. Open any post in the block editor — the Copydesk AI panel appears in the sidebar.
 
 == Frequently Asked Questions ==
 
@@ -73,12 +73,16 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 1. A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar
 2. The Preview fix dialog showing the old and new wording
 3. A note thread with an author's reply and the AI's answer
-4. The AI Feedback Analytics screen
+4. The Copydesk AI Analytics screen
 
 == Changelog ==
 
+= 1.0.1 =
+* Renamed the plugin to Copydesk AI for the WordPress.org plugin directory. The text domain is now `copydesk-ai`.
+* Load translations for the editor script.
+
 = 1.0.0 =
-* First stable release, and the first release on WordPress.org.
+* First stable release.
 * Quick fixes: apply mechanical text changes straight from a note, with a preview of the old and new wording.
 * Quick fixes are added as Gutenberg suggestions when Suggestion Mode is on, so they can be accepted or rejected.
 * Reply to an AI note and get an AI answer in the same thread; replies run in the background via WP-Cron.
@@ -111,6 +115,9 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * Review button with loading states.
 
 == Upgrade Notice ==
+
+= 1.0.1 =
+AI Feedback is now Copydesk AI. Existing notes, settings and history carry over.
 
 = 1.0.0 =
 First stable release. Adds quick fixes, AI replies in note threads, review history, analytics and chunked reviews of long documents.

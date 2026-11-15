@@ -30,7 +30,7 @@ class Notes_Manager {
 		if ( empty( $feedback_items ) ) {
 			return new WP_Error(
 				'no_feedback',
-				__( 'No feedback items to create notes from.', 'ai-feedback' )
+				__( 'No feedback items to create notes from.', 'copydesk-ai' )
 			);
 		}
 
@@ -77,7 +77,7 @@ class Notes_Manager {
 				'note_creation_failed',
 				sprintf(
 					/* translators: %s: error messages */
-					__( 'Failed to create notes: %s', 'ai-feedback' ),
+					__( 'Failed to create notes: %s', 'copydesk-ai' ),
 					implode( ', ', $errors )
 				)
 			);
@@ -135,7 +135,7 @@ class Notes_Manager {
 			Logger::debug( 'Note creation failed - wp_insert_comment returned false' );
 			return new WP_Error(
 				'note_creation_failed',
-				__( 'Failed to create note.', 'ai-feedback' )
+				__( 'Failed to create note.', 'copydesk-ai' )
 			);
 		}
 
@@ -165,7 +165,7 @@ class Notes_Manager {
 
 		// Add suggestion if present.
 		if ( ! empty( $feedback_item['suggestion'] ) && is_string( $feedback_item['suggestion'] ) ) {
-			$content .= "\n\n" . '<em>' . __( 'Suggestion:', 'ai-feedback' ) . '</em> ';
+			$content .= "\n\n" . '<em>' . __( 'Suggestion:', 'copydesk-ai' ) . '</em> ';
 			$content .= wp_kses_post( $feedback_item['suggestion'] );
 		}
 
@@ -187,10 +187,10 @@ class Notes_Manager {
 		// Category badge.
 		if ( ! empty( $feedback_item['category'] ) ) {
 			$category_labels = array(
-				'content' => __( 'Content', 'ai-feedback' ),
-				'tone'    => __( 'Tone', 'ai-feedback' ),
-				'flow'    => __( 'Flow', 'ai-feedback' ),
-				'design'  => __( 'Design', 'ai-feedback' ),
+				'content' => __( 'Content', 'copydesk-ai' ),
+				'tone'    => __( 'Tone', 'copydesk-ai' ),
+				'flow'    => __( 'Flow', 'copydesk-ai' ),
+				'design'  => __( 'Design', 'copydesk-ai' ),
 			);
 
 			$category_label = $category_labels[ $feedback_item['category'] ] ?? $feedback_item['category'];
@@ -204,9 +204,9 @@ class Notes_Manager {
 		// Severity badge.
 		if ( ! empty( $feedback_item['severity'] ) ) {
 			$severity_labels = array(
-				'suggestion' => __( 'Suggestion', 'ai-feedback' ),
-				'important'  => __( 'Important', 'ai-feedback' ),
-				'critical'   => __( 'Critical', 'ai-feedback' ),
+				'suggestion' => __( 'Suggestion', 'copydesk-ai' ),
+				'important'  => __( 'Important', 'copydesk-ai' ),
+				'critical'   => __( 'Critical', 'copydesk-ai' ),
 			);
 
 			$severity_label = $severity_labels[ $feedback_item['severity'] ] ?? $feedback_item['severity'];

@@ -139,7 +139,7 @@ class Review_Chunks {
 		if ( $total < 2 || $total > self::get_max_chunks() ) {
 			return new WP_Error(
 				'too_many_blocks',
-				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'ai-feedback' ),
+				__( 'Post has too many blocks (max 100). Please split into smaller posts.', 'copydesk-ai' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -195,7 +195,7 @@ class Review_Chunks {
 			$this->release_lock( $user_id );
 			return new WP_Error(
 				'invalid_review_chunk',
-				__( 'This review chunk does not match an active review. Please start the review again.', 'ai-feedback' ),
+				__( 'This review chunk does not match an active review. Please start the review again.', 'copydesk-ai' ),
 				array( 'status' => 409 )
 			);
 		}
@@ -321,7 +321,7 @@ class Review_Chunks {
 	private function in_progress_error(): WP_Error {
 		return new WP_Error(
 			'review_chunk_in_progress',
-			__( 'This part of the review is already in progress.', 'ai-feedback' ),
+			__( 'This part of the review is already in progress.', 'copydesk-ai' ),
 			array( 'status' => 409 )
 		);
 	}

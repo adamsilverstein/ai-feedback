@@ -1,6 +1,6 @@
 {
-	"name": "ai-feedback",
-	"version": "1.0.0",
+	"name": "copydesk-ai",
+	"version": "1.0.1",
 	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
 	"author": "Adam Silverstein",
 	"license": "GPL-2.0-or-later",

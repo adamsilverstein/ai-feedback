@@ -36,7 +36,7 @@ test.describe('Keyboard shortcuts', () => {
 			name: 'Keyboard shortcuts',
 		});
 		await expect(
-			dialog.getByText('Show or hide the AI Feedback sidebar')
+			dialog.getByText('Show or hide the Copydesk AI sidebar')
 		).toBeVisible();
 		await expect(
 			dialog.getByText('Review the document with AI')

@@ -20,7 +20,7 @@ const USER_REPLY = {
 
 const AI_REPLY = {
 	id: AI_REPLY_ID,
-	author: 'AI Feedback',
+	author: 'Copydesk AI',
 	content: 'Thanks, then link that citation here so readers see it.',
 	is_ai: true,
 };
@@ -166,7 +166,7 @@ test.describe('Reply thread', () => {
 		await expect(aiReply).toContainText(AI_REPLY.content, {
 			timeout: 20000,
 		});
-		await expect(aiReply).toContainText('AI Feedback');
+		await expect(aiReply).toContainText('Copydesk AI');
 		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
 			0
 		);
@@ -296,7 +296,7 @@ test.describe('Reply loop', () => {
 		await expect(aiReplies.first()).toContainText(MOCK_AI_REPLY);
 		await expect(pendingRow).toHaveCount(0);
 		await expect(page.locator('#a11y-speak-polite')).toContainText(
-			'AI Feedback replied'
+			'Copydesk AI replied'
 		);
 
 		// Second round: the user answers the AI's reply in the same thread.
@@ -333,7 +333,7 @@ test.describe('Reply loop', () => {
 			.poll(() =>
 				page.evaluate(() =>
 					window.aiFeedbackPoliteLog.some((text) =>
-						text.includes('AI Feedback replied')
+						text.includes('Copydesk AI replied')
 					)
 				)
 			)

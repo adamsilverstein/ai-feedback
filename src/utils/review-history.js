@@ -32,7 +32,7 @@ export function describeChange(count, previousCount) {
 
 	const delta = count - previousCount;
 	if (delta === 0) {
-		return __('Same as previous review', 'ai-feedback');
+		return __('Same as previous review', 'copydesk-ai');
 	}
 
 	if (delta < 0) {
@@ -42,7 +42,7 @@ export function describeChange(count, previousCount) {
 				'%d fewer item than previous review',
 				'%d fewer items than previous review',
 				-delta,
-				'ai-feedback'
+				'copydesk-ai'
 			),
 			-delta
 		);
@@ -54,7 +54,7 @@ export function describeChange(count, previousCount) {
 			'%d more item than previous review',
 			'%d more items than previous review',
 			delta,
-			'ai-feedback'
+			'copydesk-ai'
 		),
 		delta
 	);
@@ -69,7 +69,7 @@ export function describeChange(count, previousCount) {
 export function formatNoteCount(count) {
 	return sprintf(
 		/* translators: %d: number of feedback items */
-		_n('%d feedback item', '%d feedback items', count, 'ai-feedback'),
+		_n('%d feedback item', '%d feedback items', count, 'copydesk-ai'),
 		count
 	);
 }

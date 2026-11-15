@@ -146,7 +146,7 @@ export default function AIFeedbackPanel() {
 		return (
 			<div className="ai-feedback-panel">
 				<PanelBody>
-					<p>{__('Loading…', 'ai-feedback')}</p>
+					<p>{__('Loading…', 'copydesk-ai')}</p>
 				</PanelBody>
 			</div>
 		);
@@ -200,7 +200,7 @@ export default function AIFeedbackPanel() {
 					{/* ID used by skip links for keyboard navigation */}
 					<div id="ai-feedback-settings">
 						<PanelBody
-							title={__('Review Settings', 'ai-feedback')}
+							title={__('Review Settings', 'copydesk-ai')}
 							initialOpen={true}
 						>
 							{showModelSelector && (
@@ -216,7 +216,7 @@ export default function AIFeedbackPanel() {
 					</div>
 
 					<PanelBody
-						title={__('Review Document', 'ai-feedback')}
+						title={__('Review Document', 'copydesk-ai')}
 						initialOpen={true}
 					>
 						{/* ID used by skip links for keyboard navigation */}
@@ -230,7 +230,7 @@ export default function AIFeedbackPanel() {
 							// Remount per review so new results open even
 							// after the panel was closed.
 							key={lastReview.review_id}
-							title={__('Last Review', 'ai-feedback')}
+							title={__('Last Review', 'copydesk-ai')}
 							initialOpen={true}
 						>
 							{!isReviewing && <TipNotice />}

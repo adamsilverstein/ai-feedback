@@ -49,8 +49,8 @@ export function PriorityBadge({ priority }) {
 	}
 
 	const labels = {
-		high: __('High priority', 'ai-feedback'),
-		medium: __('Medium priority', 'ai-feedback'),
+		high: __('High priority', 'copydesk-ai'),
+		medium: __('Medium priority', 'copydesk-ai'),
 	};
 
 	return (
@@ -73,9 +73,9 @@ export function PriorityBadge({ priority }) {
  */
 function getSeverityLabel(severity) {
 	const labels = {
-		critical: __('Critical', 'ai-feedback'),
-		important: __('Important', 'ai-feedback'),
-		suggestion: __('Suggestion', 'ai-feedback'),
+		critical: __('Critical', 'copydesk-ai'),
+		important: __('Important', 'copydesk-ai'),
+		suggestion: __('Suggestion', 'copydesk-ai'),
 	};
 	return labels[severity] || severity;
 }
@@ -111,7 +111,7 @@ function SingleFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 						role="img"
 						aria-label={sprintf(
 							/* translators: %s: severity level */
-							__('Severity: %s', 'ai-feedback'),
+							__('Severity: %s', 'copydesk-ai'),
 							getSeverityLabel(item.severity)
 						)}
 					>
@@ -122,8 +122,8 @@ function SingleFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 					{isDismissed && (
 						<span className="feedback-dismissed-label">
 							{isFixApplied
-								? __('Fix applied', 'ai-feedback')
-								: __('Dismissed', 'ai-feedback')}
+								? __('Fix applied', 'copydesk-ai')
+								: __('Dismissed', 'copydesk-ai')}
 						</span>
 					)}
 				</div>
@@ -192,7 +192,7 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 							role="img"
 							aria-label={sprintf(
 								/* translators: %s: severity level */
-								__('Severity: %s', 'ai-feedback'),
+								__('Severity: %s', 'copydesk-ai'),
 								getSeverityLabel(item.severity)
 							)}
 						>
@@ -202,7 +202,7 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 						<span className="group-title">{title}</span>
 						{isDismissed && (
 							<span className="feedback-dismissed-label">
-								{__('Dismissed', 'ai-feedback')}
+								{__('Dismissed', 'copydesk-ai')}
 							</span>
 						)}
 						<Icon
@@ -225,7 +225,7 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 
 					<div className="affected-blocks-section">
 						<h5 className="affected-blocks-heading">
-							{__('Affected blocks:', 'ai-feedback')}
+							{__('Affected blocks:', 'copydesk-ai')}
 						</h5>
 						<ul className="affected-blocks-list">
 							{item.block_ids &&
@@ -241,7 +241,7 @@ function GroupedFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 										>
 											{sprintf(
 												/* translators: %d: block number */
-												__('Block %d', 'ai-feedback'),
+												__('Block %d', 'copydesk-ai'),
 												index + 1
 											)}{' '}
 											→

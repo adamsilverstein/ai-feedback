@@ -52,13 +52,13 @@ export default function ModelSelector() {
 
 	return (
 		<SelectControl
-			label={__('AI Model', 'ai-feedback')}
+			label={__('AI Model', 'copydesk-ai')}
 			value={selectedModel}
 			options={options}
 			onChange={handleChange}
 			help={__(
 				'Select the AI model to analyze your content',
-				'ai-feedback'
+				'copydesk-ai'
 			)}
 		/>
 	);

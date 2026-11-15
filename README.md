@@ -1,4 +1,6 @@
-# AI Feedback Plugin
+# Copydesk AI
+
+Your AI copy editor, right in the block editor. (Formerly AI Feedback.)
 
 AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
 

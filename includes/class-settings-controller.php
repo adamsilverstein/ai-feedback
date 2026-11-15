@@ -181,7 +181,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_model( $model ) ) {
 				return new WP_Error(
 					'invalid_model',
-					__( 'The specified model is not available.', 'ai-feedback' ),
+					__( 'The specified model is not available.', 'copydesk-ai' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -201,7 +201,7 @@ class Settings_Controller extends WP_REST_Controller {
 						'invalid_focus_area',
 						sprintf(
 						/* translators: %s: invalid focus area */
-							__( 'Invalid focus area: %s', 'ai-feedback' ),
+							__( 'Invalid focus area: %s', 'copydesk-ai' ),
 							$area
 						),
 						array( 'status' => 400 )
@@ -221,7 +221,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_tone( $tone ) ) {
 				return new WP_Error(
 					'invalid_tone',
-					__( 'The specified tone is not available.', 'ai-feedback' ),
+					__( 'The specified tone is not available.', 'copydesk-ai' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -238,7 +238,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_locale( $locale ) ) {
 				return new WP_Error(
 					'invalid_locale',
-					__( 'The specified locale is not available.', 'ai-feedback' ),
+					__( 'The specified locale is not available.', 'copydesk-ai' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -437,23 +437,23 @@ class Settings_Controller extends WP_REST_Controller {
 		return array(
 			array(
 				'id'          => 'content',
-				'label'       => __( 'Content Quality', 'ai-feedback' ),
-				'description' => __( 'Clarity, accuracy, and completeness', 'ai-feedback' ),
+				'label'       => __( 'Content Quality', 'copydesk-ai' ),
+				'description' => __( 'Clarity, accuracy, and completeness', 'copydesk-ai' ),
 			),
 			array(
 				'id'          => 'tone',
-				'label'       => __( 'Tone & Voice', 'ai-feedback' ),
-				'description' => __( 'Consistency and audience appropriateness', 'ai-feedback' ),
+				'label'       => __( 'Tone & Voice', 'copydesk-ai' ),
+				'description' => __( 'Consistency and audience appropriateness', 'copydesk-ai' ),
 			),
 			array(
 				'id'          => 'flow',
-				'label'       => __( 'Flow & Structure', 'ai-feedback' ),
-				'description' => __( 'Logical progression and transitions', 'ai-feedback' ),
+				'label'       => __( 'Flow & Structure', 'copydesk-ai' ),
+				'description' => __( 'Logical progression and transitions', 'copydesk-ai' ),
 			),
 			array(
 				'id'          => 'design',
-				'label'       => __( 'Design & Formatting', 'ai-feedback' ),
-				'description' => __( 'Block usage and visual hierarchy', 'ai-feedback' ),
+				'label'       => __( 'Design & Formatting', 'copydesk-ai' ),
+				'description' => __( 'Block usage and visual hierarchy', 'copydesk-ai' ),
 			),
 		);
 	}
@@ -467,19 +467,19 @@ class Settings_Controller extends WP_REST_Controller {
 		return array(
 			array(
 				'id'    => 'professional',
-				'label' => __( 'Professional', 'ai-feedback' ),
+				'label' => __( 'Professional', 'copydesk-ai' ),
 			),
 			array(
 				'id'    => 'casual',
-				'label' => __( 'Casual', 'ai-feedback' ),
+				'label' => __( 'Casual', 'copydesk-ai' ),
 			),
 			array(
 				'id'    => 'academic',
-				'label' => __( 'Academic', 'ai-feedback' ),
+				'label' => __( 'Academic', 'copydesk-ai' ),
 			),
 			array(
 				'id'    => 'friendly',
-				'label' => __( 'Friendly', 'ai-feedback' ),
+				'label' => __( 'Friendly', 'copydesk-ai' ),
 			),
 		);
 	}
@@ -493,7 +493,7 @@ class Settings_Controller extends WP_REST_Controller {
 		$locales = array(
 			array(
 				'id'    => 'auto',
-				'label' => __( 'Match WordPress locale', 'ai-feedback' ),
+				'label' => __( 'Match WordPress locale', 'copydesk-ai' ),
 			),
 			array(
 				'id'    => 'en_US',
