@@ -91,23 +91,24 @@ test.describe('AI Feedback Sidebar', () => {
 			await aiFeedback.runReview();
 		});
 
-		test('shows the settings, review, and last review panels', async ({
+		test('shows the review settings and last review panels', async ({
 			page,
+			aiFeedback,
 		}) => {
 			const panel = page.locator('.ai-feedback-panel');
+			const toggles = panel.locator('.components-panel__body-toggle');
 
-			for (const title of [
-				'Review Settings',
-				'Review Document',
-				'Last Review',
-			]) {
-				await expect(
-					panel
-						.locator('.components-panel__body-toggle')
-						.filter({ hasText: title })
-				).toHaveAttribute('aria-expanded', 'true');
-			}
+			await expect(
+				toggles.filter({ hasText: 'Review Settings' })
+			).toHaveAttribute('aria-expanded', 'false');
+			await expect(
+				toggles.filter({ hasText: 'Last Review' })
+			).toHaveAttribute('aria-expanded', 'true');
+			await expect(aiFeedback.getReviewButton()).toHaveText(
+				'Review Document'
+			);
 
+			await aiFeedback.expandReviewSettings();
 			await expect(panel.getByLabel('AI Model')).toBeVisible();
 			await expect(panel.getByLabel('Feedback Language')).toBeVisible();
 			await expect(page.getByText('No reviews yet')).toBeHidden();
@@ -115,7 +116,9 @@ test.describe('AI Feedback Sidebar', () => {
 
 		test('lists every available model grouped by provider', async ({
 			page,
+			aiFeedback,
 		}) => {
+			await aiFeedback.expandReviewSettings();
 			const modelSelect = page.getByLabel('AI Model');
 			const optionLabels = await modelSelect
 				.locator('option')
@@ -134,6 +137,7 @@ test.describe('AI Feedback Sidebar', () => {
 			page,
 			aiFeedback,
 		}) => {
+			await aiFeedback.expandReviewSettings();
 			await aiFeedback.saveSetting(() =>
 				page.getByLabel('AI Model').selectOption('gpt-4o')
 			);
@@ -146,6 +150,7 @@ test.describe('AI Feedback Sidebar', () => {
 
 			await page.reload();
 			await aiFeedback.openSidebar();
+			await aiFeedback.expandReviewSettings();
 
 			await expect(page.getByLabel('AI Model')).toHaveValue('gpt-4o');
 			await expect(page.getByLabel('Feedback Language')).toHaveValue(
@@ -160,13 +165,43 @@ test.describe('AI Feedback Sidebar', () => {
 				.locator('.ai-feedback-panel')
 				.getByRole('button', { name: 'Review Settings' });
 
-			await toggle.click();
 			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 			await expect(page.getByLabel('AI Model')).toBeHidden();
 
 			await toggle.click();
 			await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 			await expect(page.getByLabel('AI Model')).toBeVisible();
+
+			await toggle.click();
+			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+			await expect(page.getByLabel('AI Model')).toBeHidden();
+		});
+
+		test('starts Review Settings collapsed when the post has a review', async ({
+			page,
+			aiFeedback,
+		}) => {
+			await page.reload();
+			await aiFeedback.openSidebar();
+
+			const panel = page.locator('.ai-feedback-panel');
+			await expect(
+				panel.locator('.ai-feedback-review-summary')
+			).toBeVisible();
+			await expect(
+				panel
+					.locator('.components-panel__body-toggle')
+					.filter({ hasText: 'Review Settings' })
+			).toHaveAttribute('aria-expanded', 'false');
+			// Only the button carries the "Review Document" label.
+			await expect(
+				panel
+					.locator('.components-panel__body-toggle')
+					.filter({ hasText: 'Review Document' })
+			).toHaveCount(0);
+			await expect(
+				panel.locator('.ai-feedback-review-summary')
+			).toBeInViewport();
 		});
 
 		test('restores the last review after a reload', async ({

@@ -183,6 +183,7 @@ test.describe('Review Workflow', () => {
 		);
 		await aiFeedback.openSidebar();
 		await aiFeedback.runReview();
+		await aiFeedback.expandReviewSettings();
 
 		try {
 			await aiFeedback.saveSetting(() =>

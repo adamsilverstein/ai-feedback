@@ -37,16 +37,10 @@ function handleSkipClick(e) {
  * @param {Object}  props                  Component props.
  * @param {boolean} props.hasResults       Whether review results are available.
  * @param {boolean} props.showModel        Whether model selector is visible.
- * @param {boolean} props.hasSettings      Whether the review settings panel is visible.
  * @param {boolean} props.hasFeedbackItems Whether individual feedback items are available.
  * @return {Element} Skip links component.
  */
-export default function SkipLinks({
-	hasResults,
-	showModel,
-	hasSettings,
-	hasFeedbackItems,
-}) {
+export default function SkipLinks({ hasResults, showModel, hasFeedbackItems }) {
 	return (
 		<nav
 			className="ai-feedback-skip-links"
@@ -61,15 +55,13 @@ export default function SkipLinks({
 					{__('Skip to model selection', 'copydesk-ai')}
 				</a>
 			)}
-			{hasSettings && (
-				<a
-					href="#ai-feedback-settings"
-					className="ai-feedback-skip-link"
-					onClick={handleSkipClick}
-				>
-					{__('Skip to review settings', 'copydesk-ai')}
-				</a>
-			)}
+			<a
+				href="#ai-feedback-settings"
+				className="ai-feedback-skip-link"
+				onClick={handleSkipClick}
+			>
+				{__('Skip to review settings', 'copydesk-ai')}
+			</a>
 			<a
 				href="#ai-feedback-review-button"
 				className="ai-feedback-skip-link"
