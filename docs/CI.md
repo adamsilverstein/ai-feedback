@@ -40,7 +40,7 @@ Runs JavaScript unit tests using Vitest.
 ### PHP Testing
 **File**: `.github/workflows/test-php.yml`
 
-Runs PHP unit tests using PHPUnit across multiple PHP versions (8.1, 8.2, 8.3).
+Runs PHP unit tests using PHPUnit on the minimum supported PHP version (8.1) and the newest (8.5). Deprecations fail the run.
 
 **Triggered on**: Pull requests and pushes when PHP or test files change
 
@@ -57,7 +57,7 @@ To require all checks to pass before merging:
    - `PHP Linting`
    - `JavaScript Unit Tests`
    - `PHP Unit Tests (8.1)` (minimum PHP version)
-   - Optionally add `PHP Unit Tests (8.2)`, `PHP Unit Tests (8.3)` for all PHP versions
+   - Optionally add `PHP Unit Tests (8.5)` for the newest PHP version
 6. Optionally enable **Require branches to be up to date before merging**
 7. Click **Create** or **Save changes**
 
