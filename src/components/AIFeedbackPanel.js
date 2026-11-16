@@ -184,7 +184,6 @@ export default function AIFeedbackPanel() {
 			<SkipLinks
 				hasResults={!!lastReview}
 				showModel={showModelSelector}
-				hasSettings
 				hasFeedbackItems={hasFeedbackItems}
 			/>
 			<WelcomeModal />
