@@ -5,7 +5,7 @@ import { PanelBody } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
-import { useEffect, useRef } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
@@ -78,6 +78,8 @@ export default function AIFeedbackPanel() {
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
+	const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+
 	// The settings sit above the progress and the results, so bring each
 	// into view when a review starts and when it finishes.
 	const wasReviewing = useRef(isReviewing);
@@ -86,6 +88,12 @@ export default function AIFeedbackPanel() {
 			return;
 		}
 		wasReviewing.current = isReviewing;
+
+		// Settings can't change a running review, so collapse them to
+		// keep the progress near the top of the sidebar.
+		if (isReviewing) {
+			setIsSettingsOpen(false);
+		}
 
 		// A failed review keeps the previous results, so show the error
 		// notice above them instead.
@@ -153,7 +161,7 @@ export default function AIFeedbackPanel() {
 	}
 
 	const showModelSelector = availableModels.length > 1;
-	const hasReviewContent = !!lastReview || isReviewing;
+	const showEmptyState = !lastReview && !isReviewing;
 	const hasFeedbackItems =
 		!!lastReview && Array.isArray(lastReview.notes)
 			? lastReview.notes.length > 0
@@ -164,7 +172,7 @@ export default function AIFeedbackPanel() {
 			<SkipLinks
 				hasResults={!!lastReview}
 				showModel={showModelSelector}
-				hasSettings={hasReviewContent}
+				hasSettings
 				hasFeedbackItems={hasFeedbackItems}
 			/>
 			<WelcomeModal />
@@ -184,66 +192,71 @@ export default function AIFeedbackPanel() {
 				</div>
 			)}
 
-			{/* EmptyState and the review panel are mutually exclusive render
-			    paths, so the REVIEW_BUTTON_ID below is in the DOM exactly
-			    once at a time and always wraps the actionable button. */}
-			{!lastReview && !isReviewing ? (
+			{showEmptyState && (
 				<EmptyState
-					onStartReview={() => handleStartReview()}
 					canReview={canReview}
 					hasContent={hasContent}
 					isSaved={isSaved}
-					reviewButtonId={REVIEW_BUTTON_ID}
 				/>
-			) : (
-				<>
-					{/* ID used by skip links for keyboard navigation */}
-					<div id="ai-feedback-settings">
-						<PanelBody
-							title={__('Review Settings', 'copydesk-ai')}
-							initialOpen={true}
-						>
-							{showModelSelector && (
-								/* ID used by skip links for keyboard navigation */
-								<div id="ai-feedback-model-select">
-									<ModelSelector />
-								</div>
-							)}
-							<LanguageSelector />
-							<ToneSelector />
-							<FocusAreaSelector />
-						</PanelBody>
-					</div>
+			)}
 
-					<PanelBody
-						title={__('Review Document', 'copydesk-ai')}
-						initialOpen={true}
-					>
+			{/* ID used by skip links for keyboard navigation */}
+			<div id="ai-feedback-settings">
+				<PanelBody
+					title={__('Review Settings', 'copydesk-ai')}
+					opened={isSettingsOpen}
+					onToggle={setIsSettingsOpen}
+				>
+					{showModelSelector && (
+						/* ID used by skip links for keyboard navigation */
+						<div id="ai-feedback-model-select">
+							<ModelSelector />
+						</div>
+					)}
+					<LanguageSelector />
+					<ToneSelector />
+					<FocusAreaSelector />
+				</PanelBody>
+			</div>
+
+			{showEmptyState ? (
+				canReview && (
+					<PanelBody>
 						{/* ID used by skip links for keyboard navigation */}
 						<div id={REVIEW_BUTTON_ID}>
 							<ReviewButton />
 						</div>
 					</PanelBody>
+				)
+			) : (
+				<PanelBody
+					title={__('Review Document', 'copydesk-ai')}
+					initialOpen={true}
+				>
+					{/* ID used by skip links for keyboard navigation */}
+					<div id={REVIEW_BUTTON_ID}>
+						<ReviewButton />
+					</div>
+				</PanelBody>
+			)}
 
-					{lastReview && (
-						<PanelBody
-							// Remount per review so new results open even
-							// after the panel was closed.
-							key={lastReview.review_id}
-							title={__('Last Review', 'copydesk-ai')}
-							initialOpen={true}
-						>
-							{!isReviewing && <TipNotice />}
-							{/* ID used by skip links for keyboard navigation */}
-							<div id={RESULTS_ID}>
-								<div className="ai-feedback-export-row">
-									<ExportReview review={lastReview} />
-								</div>
-								<ReviewSummary review={lastReview} />
-							</div>
-						</PanelBody>
-					)}
-				</>
+			{lastReview && (
+				<PanelBody
+					// Remount per review so new results open even
+					// after the panel was closed.
+					key={lastReview.review_id}
+					title={__('Last Review', 'copydesk-ai')}
+					initialOpen={true}
+				>
+					{!isReviewing && <TipNotice />}
+					{/* ID used by skip links for keyboard navigation */}
+					<div id={RESULTS_ID}>
+						<div className="ai-feedback-export-row">
+							<ExportReview review={lastReview} />
+						</div>
+						<ReviewSummary review={lastReview} />
+					</div>
+				</PanelBody>
 			)}
 
 			<ReviewHistory />

@@ -1,28 +1,22 @@
 /**
  * Empty State Component
  */
-import { Icon, Button } from '@wordpress/components';
+import { Icon } from '@wordpress/components';
 import { commentContent, pencil, check } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
 
 /**
  * EmptyState component shown when no reviews exist.
  *
- * @param {Object}   props                  Component props.
- * @param {Function} props.onStartReview    Function to start a review.
- * @param {boolean}  props.canReview        Whether a review can be started.
- * @param {boolean}  props.hasContent       Whether the post has content.
- * @param {boolean}  props.isSaved          Whether the post is saved.
- * @param {string}   [props.reviewButtonId] Optional id for the review button wrapper (used as a skip-link anchor).
+ * The review settings and button render below it in the sidebar.
+ *
+ * @param {Object}  props            Component props.
+ * @param {boolean} props.canReview  Whether a review can be started.
+ * @param {boolean} props.hasContent Whether the post has content.
+ * @param {boolean} props.isSaved    Whether the post is saved.
  * @return {Element} EmptyState component.
  */
-export default function EmptyState({
-	onStartReview,
-	canReview,
-	hasContent,
-	isSaved,
-	reviewButtonId,
-}) {
+export default function EmptyState({ canReview, hasContent, isSaved }) {
 	return (
 		<div className="ai-feedback-empty-state">
 			<div className="ai-feedback-empty-icon">
@@ -38,7 +32,7 @@ export default function EmptyState({
 				)}
 			</p>
 
-			{!canReview ? (
+			{!canReview && (
 				<div className="ai-feedback-empty-prereq">
 					<h5>{__('Before you start:', 'copydesk-ai')}</h5>
 					<ul>
@@ -58,12 +52,6 @@ export default function EmptyState({
 							</li>
 						)}
 					</ul>
-				</div>
-			) : (
-				<div id={reviewButtonId}>
-					<Button variant="primary" onClick={onStartReview}>
-						{__('Review Document', 'copydesk-ai')}
-					</Button>
 				</div>
 			)}
 		</div>

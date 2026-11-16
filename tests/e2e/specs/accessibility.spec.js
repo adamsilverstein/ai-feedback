@@ -130,14 +130,13 @@ test.describe('Accessibility', () => {
 
 		test('moves through the panel in a logical tab order', async ({
 			page,
+			aiFeedback,
 		}) => {
 			const panel = page.locator('.ai-feedback-panel');
 			const settingsToggle = panel
 				.locator('.components-panel__body-toggle')
 				.filter({ hasText: 'Review Settings' });
-			const reviewToggle = panel
-				.locator('.components-panel__body-toggle')
-				.filter({ hasText: 'Review Document' });
+			await aiFeedback.expandReviewSettings();
 
 			// Tone, focus area and help controls sit between these, so tab
 			// forward until each target is reached, in order.
@@ -145,7 +144,6 @@ test.describe('Accessibility', () => {
 			for (const target of [
 				panel.getByLabel('AI Model'),
 				panel.getByLabel('Feedback Language'),
-				reviewToggle,
 				panel.locator('#ai-feedback-review-button button'),
 			]) {
 				let presses = 0;
@@ -168,14 +166,16 @@ test.describe('Accessibility', () => {
 				.locator('.ai-feedback-panel .components-panel__body-toggle')
 				.filter({ hasText: 'Review Settings' });
 			await toggle.focus();
+			// Settings collapse once a review starts.
+			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
 			await page.keyboard.press('Enter');
-			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-			await expect(page.getByLabel('AI Model')).toBeHidden();
-
-			await page.keyboard.press('Space');
 			await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 			await expect(page.getByLabel('AI Model')).toBeVisible();
+
+			await page.keyboard.press('Space');
+			await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+			await expect(page.getByLabel('AI Model')).toBeHidden();
 		});
 
 		test('starts a review with the keyboard', async ({
@@ -221,8 +221,10 @@ test.describe('Accessibility', () => {
 
 		test('form controls show a visible focus indicator', async ({
 			page,
+			aiFeedback,
 		}) => {
 			const panel = page.locator('.ai-feedback-panel');
+			await aiFeedback.expandReviewSettings();
 			await panel
 				.locator('.components-panel__body-toggle')
 				.filter({ hasText: 'Review Settings' })

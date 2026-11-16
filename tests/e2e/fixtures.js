@@ -198,18 +198,18 @@ class AIFeedbackUtils {
 	}
 
 	/**
-	 * Expand Review Settings panel if collapsed.
+	 * Expand the Review Settings panel if collapsed. It collapses when a
+	 * review starts and starts collapsed on a post that has a review.
 	 */
 	async expandReviewSettings() {
-		const reviewSettingsButton = this.page.getByRole('button', {
-			name: 'Review Settings',
-		});
-		const isExpanded =
-			await reviewSettingsButton.getAttribute('aria-expanded');
+		const toggle = this.page
+			.locator('.ai-feedback-panel .components-panel__body-toggle')
+			.filter({ hasText: 'Review Settings' });
 
-		if (isExpanded === 'false') {
-			await reviewSettingsButton.click();
+		if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+			await toggle.click();
 		}
+		await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 	}
 
 	/**
