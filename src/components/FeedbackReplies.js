@@ -3,10 +3,11 @@
  *
  * Renders the reply thread under an AI Feedback note: existing user and AI
  * replies plus, while an AI reply is being generated, a pending row that
- * polls /replies/{id}/status for completion.
+ * polls /replies/{id}/status for completion and offers a retry when the
+ * reply is slow or fails.
  */
 import { __, sprintf } from '@wordpress/i18n';
-import { Spinner } from '@wordpress/components';
+import { Button, Spinner } from '@wordpress/components';
 import { speak } from '@wordpress/a11y';
 import { useEffect, useRef } from '@wordpress/element';
 import useReplyStatus from '../hooks/useReplyStatus';
@@ -31,11 +32,20 @@ export default function FeedbackReplies({
 	pendingReplyId = null,
 	onReplyComplete,
 }) {
-	const { status } = useReplyStatus(pendingReplyId);
+	const { status, isSlow, retry } = useReplyStatus(pendingReplyId);
 	const hasPendingSlot = Boolean(pendingReplyId);
 	const isPolling =
 		hasPendingSlot && status !== 'complete' && status !== 'failed';
 	const hasFailed = hasPendingSlot && status === 'failed';
+	const retryButton = (
+		<Button
+			variant="link"
+			className="ai-feedback-reply-retry"
+			onClick={retry}
+		>
+			{__('Try again', 'copydesk-ai')}
+		</Button>
+	);
 
 	useEffect(() => {
 		if (hasPendingSlot && status === 'complete') {
@@ -123,17 +133,26 @@ export default function FeedbackReplies({
 						<>
 							<Spinner />
 							<span className="ai-feedback-reply-content">
-								{__('AI is replying…', 'copydesk-ai')}
+								{isSlow
+									? __(
+											'This is taking longer than expected.',
+											'copydesk-ai'
+										)
+									: __('AI is replying…', 'copydesk-ai')}
 							</span>
+							{isSlow && retryButton}
 						</>
 					)}
 					{hasFailed && (
-						<span className="ai-feedback-reply-content ai-feedback-reply-error">
-							{__(
-								'The AI reply could not be generated. Reply again to retry.',
-								'copydesk-ai'
-							)}
-						</span>
+						<>
+							<span className="ai-feedback-reply-content ai-feedback-reply-error">
+								{__(
+									'The AI reply could not be generated.',
+									'copydesk-ai'
+								)}
+							</span>
+							{retryButton}
+						</>
 					)}
 				</li>
 			)}

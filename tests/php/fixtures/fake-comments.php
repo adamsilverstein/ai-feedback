@@ -97,7 +97,10 @@ if ( ! function_exists( 'get_comment_meta' ) ) {
 }
 
 if ( ! function_exists( 'update_comment_meta' ) ) {
-	function update_comment_meta( $id, $key, $value ) {
+	function update_comment_meta( $id, $key, $value, $prev_value = '' ) {
+		if ( '' !== $prev_value && ( $GLOBALS['test_comment_meta'][ (int) $id ][ $key ] ?? null ) != $prev_value ) {
+			return false; // Matches core: a compare-and-set miss returns false.
+		}
 		if ( ( $GLOBALS['test_comment_meta'][ (int) $id ][ $key ] ?? null ) === $value ) {
 			return false; // Matches core: unchanged values return false.
 		}

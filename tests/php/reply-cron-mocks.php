@@ -31,14 +31,24 @@ namespace {
 		/**
 		 * Minimal update_comment_meta mock — last-write-wins into the shared store.
 		 *
+		 * With $prev_value it only writes over a matching value, like core's
+		 * compare-and-set update.
+		 *
 		 * @param int    $comment_id Comment ID.
 		 * @param string $key        Meta key.
 		 * @param mixed  $value      Meta value.
+		 * @param mixed  $prev_value Value the stored one must match.
 		 * @return bool
 		 */
-		function update_comment_meta( $comment_id, $key, $value ) {
+		function update_comment_meta( $comment_id, $key, $value, $prev_value = '' ) {
+			if ( isset( $GLOBALS['test_before_meta_write'] ) && is_callable( $GLOBALS['test_before_meta_write'] ) ) {
+				( $GLOBALS['test_before_meta_write'] )( $comment_id, $key );
+			}
 			if ( ! isset( $GLOBALS['test_comment_meta'][ $comment_id ] ) ) {
 				$GLOBALS['test_comment_meta'][ $comment_id ] = array();
+			}
+			if ( '' !== $prev_value && ( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? null ) != $prev_value ) {
+				return false;
 			}
 			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = $value;
 			return true;
@@ -84,6 +94,75 @@ namespace {
 				'hook'      => $hook,
 				'args'      => $args,
 			);
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'wp_unschedule_event' ) ) {
+		/**
+		 * Removes a matching event from the queue.
+		 *
+		 * @param int    $timestamp
+		 * @param string $hook
+		 * @param array  $args
+		 * @return bool
+		 */
+		function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
+			foreach ( $GLOBALS['test_scheduled_events'] ?? array() as $index => $event ) {
+				if ( $event['hook'] === $hook && ( $event['args'] ?? array() ) === $args ) {
+					unset( $GLOBALS['test_scheduled_events'][ $index ] );
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'delete_comment_meta' ) ) {
+		/**
+		 * Removes a meta key from the shared store.
+		 *
+		 * @param int    $comment_id
+		 * @param string $key
+		 * @return bool
+		 */
+		function delete_comment_meta( $comment_id, $key ) {
+			unset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] );
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'add_comment_meta' ) ) {
+		/**
+		 * Adds a meta value; with $unique, fails when the key already exists.
+		 *
+		 * @param int    $comment_id
+		 * @param string $key
+		 * @param mixed  $value
+		 * @param bool   $unique
+		 * @return int|false
+		 */
+		function add_comment_meta( $comment_id, $key, $value, $unique = false ) {
+			if ( isset( $GLOBALS['test_before_meta_write'] ) && is_callable( $GLOBALS['test_before_meta_write'] ) ) {
+				( $GLOBALS['test_before_meta_write'] )( $comment_id, $key );
+			}
+			if ( $unique && isset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ) ) {
+				return false;
+			}
+			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = $value;
+			return 1;
+		}
+	}
+
+	if ( ! function_exists( 'wp_cache_delete' ) ) {
+		/**
+		 * No-op cache delete; the meta store has no cache.
+		 *
+		 * @param int|string $key
+		 * @param string     $group
+		 * @return bool
+		 */
+		function wp_cache_delete( $key, $group = '' ) {
 			return true;
 		}
 	}

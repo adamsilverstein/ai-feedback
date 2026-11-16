@@ -29,6 +29,15 @@ class Reply_Service {
 	public const AI_HTTP_TIMEOUT = 45;
 
 	/**
+	 * PHP time limit in seconds for a request that answers a reply.
+	 *
+	 * Above AI_HTTP_TIMEOUT so the AI call can finish, and below
+	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT so a retry only takes over a
+	 * request that PHP has already stopped.
+	 */
+	public const REQUEST_TIME_LIMIT = 75;
+
+	/**
 	 * Sampling temperature for replies. Slightly above reviews for a conversational tone.
 	 */
 	public const AI_TEMPERATURE = 0.4;
@@ -63,6 +72,13 @@ class Reply_Service {
 	private Notes_Manager $notes_manager;
 
 	/**
+	 * Claim token this request wrote, or null when it holds no claim.
+	 *
+	 * @var string|null
+	 */
+	private ?string $claim_token = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Prompt_Builder|null $prompt_builder Optional prompt builder (for testing).
@@ -88,10 +104,9 @@ class Reply_Service {
 	/**
 	 * Cron callback for Reply_Cron_Dispatcher::CRON_HOOK.
 	 *
-	 * Wraps handle_reply() to satisfy the void-return contract that
-	 * WordPress actions require; handle_reply() returns a value for
-	 * direct testability. Also records final status on the reply comment
-	 * so the frontend can poll for completion.
+	 * The fallback for replies the editor did not answer through process(),
+	 * such as replies posted outside the block editor. Skips a reply that a
+	 * request already claimed.
 	 *
 	 * @param  int    $comment_id Reply comment ID.
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
@@ -99,12 +114,226 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 */
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
+		if ( ! $this->claim( $comment_id, false ) ) {
+			return;
+		}
+
+		$this->generate( $comment_id, $parent_id, $post_id, $block_id );
+	}
+
+	/**
+	 * Answer a queued reply within the current request.
+	 *
+	 * Lets the editor get an answer on sites where WP-Cron does not run. The
+	 * fallback cron event is dropped once the reply is claimed.
+	 *
+	 * @param int  $comment_id Reply comment ID.
+	 * @param bool $retry      Whether to also take over a failed reply or a stale claim.
+	 * @return bool Whether this request answered the reply.
+	 */
+	public function process( int $comment_id, bool $retry = false ): bool {
+		$job = $this->get_job( $comment_id );
+		if ( null === $job ) {
+			return false;
+		}
+
+		list( $parent_id, $post_id, $block_id ) = $job;
+
+		if ( ! $this->claim( $comment_id, $retry ) ) {
+			return false;
+		}
+
+		$args      = array( $comment_id, $parent_id, $post_id, $block_id );
+		$timestamp = wp_next_scheduled( Reply_Cron_Dispatcher::CRON_HOOK, $args );
+		if ( false !== $timestamp ) {
+			wp_unschedule_event( $timestamp, Reply_Cron_Dispatcher::CRON_HOOK, $args );
+		}
+
+		$this->generate( $comment_id, $parent_id, $post_id, $block_id );
+		return true;
+	}
+
+	/**
+	 * Get the stored job for a queued reply.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return array{int, int, string}|null Parent ID, post ID and block ID, or null when the reply was never queued.
+	 */
+	private function get_job( int $comment_id ): ?array {
+		$job = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::JOB_META_KEY, true );
+		if ( ! is_array( $job ) ) {
+			return $this->rebuild_job( $comment_id );
+		}
+		if ( 3 !== count( $job ) ) {
+			return null;
+		}
+
+		list( $parent_id, $post_id, $block_id ) = array_values( $job );
+		if ( ! is_numeric( $parent_id ) || ! is_numeric( $post_id ) || ! is_string( $block_id ) ) {
+			return null;
+		}
+
+		return array( (int) $parent_id, (int) $post_id, $block_id );
+	}
+
+	/**
+	 * Rebuild the job for a reply queued before the job was stored with it.
+	 *
+	 * Only a pending or failed user reply in an AI note's thread qualifies,
+	 * matching what Reply_Detector would have queued.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return array{int, int, string}|null Parent ID, post ID and block ID, or null.
+	 */
+	private function rebuild_job( int $comment_id ): ?array {
+		$status = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		if ( 'pending' !== $status && 'failed' !== $status ) {
+			return null;
+		}
+
+		$reply = get_comment( $comment_id );
+		if ( ! is_object( $reply ) || get_comment_meta( $comment_id, 'ai_feedback', true ) ) {
+			return null;
+		}
+
+		$direct_parent = is_numeric( $reply->comment_parent ) ? (int) $reply->comment_parent : 0;
+		$post_id       = is_numeric( $reply->comment_post_ID ) ? (int) $reply->comment_post_ID : 0;
+		if ( $direct_parent <= 0 || $post_id <= 0 ) {
+			return null;
+		}
+
+		$parent_id = Reply_Detector::find_thread_root( $direct_parent );
+		if ( ! get_comment_meta( $parent_id, 'ai_feedback', true ) ) {
+			return null;
+		}
+
+		$block_id = sanitize_text_field( self::meta_string( $parent_id, 'block_id' ) );
+		if ( '' === $block_id ) {
+			return null;
+		}
+
+		return array( $parent_id, $post_id, $block_id );
+	}
+
+	/**
+	 * Claim a reply so only one request answers it.
+	 *
+	 * Moves the status from 'pending' to 'processing' with a compare-and-set
+	 * update, which only one concurrent request can win. A retry may also
+	 * claim a failed reply once Reply_Cron_Dispatcher::RETRY_COOLDOWN has
+	 * passed, or take over a stale claim. Every claim then swaps in a new
+	 * unique token with a compare-and-set, so of two racing requests only
+	 * one ends up owning the reply.
+	 *
+	 * @param int  $comment_id Reply comment ID.
+	 * @param bool $retry      Whether the user asked to retry.
+	 * @return bool Whether this request now owns the reply.
+	 */
+	private function claim( int $comment_id, bool $retry ): bool {
+		// Read the token first: a racing claim writes its claim time before its token.
+		$previous_token = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true );
+		$status         = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		$claimed_at     = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+		$now            = time();
+
+		if ( 'pending' === $status || ( $retry && 'failed' === $status ) ) {
+			if ( 'failed' === $status && is_numeric( $claimed_at ) && $now - (int) $claimed_at < Reply_Cron_Dispatcher::RETRY_COOLDOWN ) {
+				return false;
+			}
+			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing', $status ) ) {
+				return false;
+			}
+		} elseif ( ! $retry || 'processing' !== $status || ! self::is_stale_claim( $comment_id, $claimed_at, $now ) ) {
+			return false;
+		}
+
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now );
+
+		$token = wp_generate_uuid4();
+		$taken = '' === $previous_token
+			? add_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, $token, true )
+			: update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, $token, $previous_token );
+		if ( false === $taken ) {
+			// Another request claimed the reply first.
+			return false;
+		}
+
+		$this->claim_token = $token;
+		if ( $retry ) {
+			// Restart the timeout and clear the last error for the new attempt.
+			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
+			delete_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Whether a 'processing' claim is old enough for a retry to take over.
+	 *
+	 * Without a valid claim time, for a request that died mid-claim, falls
+	 * back to when the reply was queued so a fresh claim is never taken.
+	 *
+	 * @param int   $comment_id Reply comment ID.
+	 * @param mixed $claimed_at Claim time meta value.
+	 * @param int   $now        Current Unix timestamp.
+	 * @return bool
+	 */
+	private static function is_stale_claim( int $comment_id, mixed $claimed_at, int $now ): bool {
+		if ( ! is_numeric( $claimed_at ) ) {
+			$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, true );
+		}
+
+		return is_numeric( $claimed_at ) && $now - (int) $claimed_at > Reply_Cron_Dispatcher::CLAIM_TIMEOUT;
+	}
+
+	/**
+	 * Whether this request still owns its claim on a reply.
+	 *
+	 * A retry can take over a slow request's claim. Without this check both
+	 * requests would save an answer.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return bool True when the claim is still ours, or no claim was made.
+	 */
+	private function owns_claim( int $comment_id ): bool {
+		if ( null === $this->claim_token ) {
+			return true;
+		}
+
+		// Another request may have written the meta since this one cached it.
+		wp_cache_delete( $comment_id, 'comment_meta' );
+
+		return 'processing' === self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY )
+			&& self::meta_string( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY ) === $this->claim_token;
+	}
+
+	/**
+	 * Generate the AI answer for a claimed reply and record the result.
+	 *
+	 * Wraps handle_reply() and records the final status on the reply comment
+	 * so the frontend can poll for completion.
+	 *
+	 * @param  int    $comment_id Reply comment ID.
+	 * @param  int    $parent_id  Parent (original AI note) comment ID.
+	 * @param  int    $post_id    Post ID.
+	 * @param  string $block_id   Block ID from the parent note.
+	 */
+	private function generate( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
 		try {
 			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
 		} catch ( \Throwable $e ) {
 			// Record a terminal state so the frontend stops waiting.
 			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
 			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'copydesk-ai' ) );
+		} finally {
+			$this->claim_token = null;
+		}
+
+		if ( is_wp_error( $result ) && 'reply_claim_lost' === $result->get_error_code() ) {
+			// The request that took over records the result.
+			Logger::debug( sprintf( 'Reply_Service: reply %d was taken over, discarding this answer', $comment_id ) );
+			return;
 		}
 
 		// A non-positive ID means persistence silently failed. Marking that
@@ -157,6 +386,10 @@ class Reply_Service {
 		if ( '' === trim( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
 			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'copydesk-ai' ) );
+		}
+
+		if ( ! $this->owns_claim( $comment_id ) ) {
+			return new WP_Error( 'reply_claim_lost', __( 'Another request is answering this reply.', 'copydesk-ai' ) );
 		}
 
 		$feedback_item = array(

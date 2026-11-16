@@ -176,7 +176,7 @@ class Plugin {
 		$this->analytics_controller = new Analytics_Controller();
 		$this->analytics_controller->register_routes();
 
-		$this->reply_status_controller = new Reply_Status_Controller();
+		$this->reply_status_controller = new Reply_Status_Controller( $this->reply_service );
 		$this->reply_status_controller->register_routes();
 	}
 

@@ -115,7 +115,9 @@ async function mockReplyEndpoints(page, state) {
 
 	await page.route(
 		restMatch(
-			new RegExp(`^/ai-feedback/v1/replies/${USER_REPLY_ID}/status$`)
+			new RegExp(
+				`^/ai-feedback/v1/replies/${USER_REPLY_ID}/(status|process)$`
+			)
 		),
 		(route) =>
 			route.fulfill({
@@ -228,19 +230,6 @@ async function replyToNote(page, parent, content) {
 	);
 }
 
-/**
- * Run due WP-Cron events. The e2e cookie keeps the AI provider mocked.
- *
- * @param {import('@playwright/test').Page} page    Page.
- * @param {string}                          baseURL Site URL.
- */
-async function runCron(page, baseURL) {
-	const response = await page.request.get(
-		new URL('/wp-cron.php', baseURL).toString()
-	);
-	expect(response.ok()).toBe(true);
-}
-
 test.describe('Reply loop', () => {
 	// Mock mode follows the e2e cookie, not the queued event. Drain any reply a
 	// failed test left scheduled, so a later cookie-less cron run does not
@@ -251,13 +240,50 @@ test.describe('Reply loop', () => {
 			.catch(() => {});
 	});
 
-	test('replies to a note get an AI reply through WP-Cron', async ({
+	test('answers a reply without waiting for WP-Cron', async ({
 		page,
 		editor,
 		admin,
 		requestUtils,
 		aiFeedback,
-		baseURL,
+	}) => {
+		// The e2e mu-plugin turns WP-Cron off, so only the editor can trigger
+		// the answer here.
+		const post = await requestUtils.createPost({
+			title: 'Reply without cron',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40% last year.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		const noteId = review.note_ids[0];
+		expect(noteId).toBeGreaterThan(0);
+
+		await replyToNote(page, noteId, 'It is cited in paragraph three.');
+
+		const thread = page.getByRole('list', { name: 'Conversation replies' });
+		await expect(thread.locator('.ai-feedback-reply-ai')).toContainText(
+			MOCK_AI_REPLY,
+			{ timeout: 15000 }
+		);
+		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
+			0
+		);
+	});
+
+	test('each reply in a thread gets an AI reply', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
 	}) => {
 		// Create the post over REST: content added in a freshly loaded editor
 		// is sometimes lost before the save, which leaves nothing to review.
@@ -287,9 +313,6 @@ test.describe('Reply loop', () => {
 			{ timeout: 10000 }
 		);
 		const pendingRow = thread.locator('.ai-feedback-reply-pending');
-		await expect(pendingRow).toContainText('AI is replying…');
-
-		await runCron(page, baseURL);
 
 		const aiReplies = thread.locator('.ai-feedback-reply-ai');
 		await expect(aiReplies).toHaveCount(1, { timeout: 30000 });
@@ -298,16 +321,6 @@ test.describe('Reply loop', () => {
 		await expect(page.locator('#a11y-speak-polite')).toContainText(
 			'Copydesk AI replied'
 		);
-
-		// Second round: the user answers the AI's reply in the same thread.
-		await replyToNote(page, noteId, 'Linked it. Anything else?');
-
-		await expect(thread.locator('.ai-feedback-reply-user')).toHaveCount(2, {
-			timeout: 10000,
-		});
-		await expect(
-			thread.locator('.ai-feedback-reply-pending')
-		).toContainText('AI is replying…');
 
 		// Both AI replies share the mock text, so record what gets written to
 		// the live region from here on to prove the second one is announced.
@@ -323,7 +336,12 @@ test.describe('Reply loop', () => {
 			});
 		});
 
-		await runCron(page, baseURL);
+		// Second round: the user answers the AI's reply in the same thread.
+		await replyToNote(page, noteId, 'Linked it. Anything else?');
+
+		await expect(thread.locator('.ai-feedback-reply-user')).toHaveCount(2, {
+			timeout: 10000,
+		});
 
 		await expect(aiReplies).toHaveCount(2, { timeout: 30000 });
 		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(

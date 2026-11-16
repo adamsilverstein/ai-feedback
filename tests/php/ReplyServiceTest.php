@@ -277,6 +277,9 @@ class ReplyServiceTest extends TestCase {
 
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 
+		// Cron only answers a reply that is still pending.
+		$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ] = 'pending';
+
 		$service->on_reply_received( 200, 100, 42, 'abc-123' );
 
 		$this->assertSame(
@@ -301,6 +304,9 @@ class ReplyServiceTest extends TestCase {
 		);
 
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+
+		// Cron only answers a reply that is still pending.
+		$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ] = 'pending';
 
 		$service->on_reply_received( 200, 999, 42, 'abc-123' );
 
@@ -340,6 +346,9 @@ class ReplyServiceTest extends TestCase {
 		};
 
 		$service = new Reply_Service_Stub( new Prompt_Builder(), $silent_failure_notes );
+
+		// Cron only answers a reply that is still pending.
+		$GLOBALS['test_comment_meta'][200][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ] = 'pending';
 
 		$service->on_reply_received( 200, 100, 42, 'abc-123' );
 
@@ -443,6 +452,9 @@ class ReplyServiceTest extends TestCase {
 				throw new \RuntimeException( 'Provider exploded' );
 			}
 		};
+
+		// Cron only answers a reply that is still pending.
+		$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ] = 'pending';
 
 		$service->on_reply_received( 999, 100, 42, 'abc-123' );
 

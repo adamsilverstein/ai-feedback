@@ -124,7 +124,7 @@ class Reply_Detector {
 	 * @param int $comment_id Note ID.
 	 * @return int Root note ID.
 	 */
-	private static function find_thread_root( int $comment_id ): int {
+	public static function find_thread_root( int $comment_id ): int {
 		// Bounded so a corrupt parent cycle cannot loop forever.
 		for ( $depth = 0; $depth < 10; $depth++ ) {
 			$comment = get_comment( $comment_id );
