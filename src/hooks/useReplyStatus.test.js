@@ -133,11 +133,14 @@ describe('useReplyStatus', () => {
 	});
 
 	it('retries a failed reply', async () => {
-		mockApiFetch.mockResolvedValueOnce({
+		const failed = {
 			reply_id: 200,
 			status: 'failed',
 			error: 'Timed out.',
-		});
+		};
+		mockApiFetch.mockResolvedValueOnce(failed);
+		// The answer request finds the reply already failed.
+		mockProcess.mockResolvedValueOnce(failed);
 
 		const { result } = renderHook(() => useReplyStatus(200));
 		await waitFor(() => expect(result.current.status).toBe('failed'));
@@ -155,12 +158,15 @@ describe('useReplyStatus', () => {
 
 	it('blocks a retry until the server cooldown has passed', async () => {
 		vi.useFakeTimers();
-		mockApiFetch.mockResolvedValueOnce({
+		const failed = {
 			reply_id: 200,
 			status: 'failed',
 			error: 'No API key.',
 			retry_after: 6,
-		});
+		};
+		mockApiFetch.mockResolvedValueOnce(failed);
+		// The answer request finds the reply already failed.
+		mockProcess.mockResolvedValueOnce(failed);
 
 		const { result } = renderHook(() => useReplyStatus(200));
 		await act(async () => {
@@ -198,16 +204,52 @@ describe('useReplyStatus', () => {
 	});
 
 	it('allows a retry right away when the server reports no cooldown', async () => {
-		mockApiFetch.mockResolvedValueOnce({
+		const failed = {
 			reply_id: 200,
 			status: 'failed',
 			error: 'Timed out.',
-		});
+		};
+		mockApiFetch.mockResolvedValueOnce(failed);
+		// The answer request finds the reply already failed.
+		mockProcess.mockResolvedValueOnce(failed);
 
 		const { result } = renderHook(() => useReplyStatus(200));
 
 		await waitFor(() => expect(result.current.status).toBe('failed'));
 		expect(result.current.canRetry).toBe(true);
+	});
+
+	it('waits for its own answer request when a poll reports a stale failure', async () => {
+		// The poll can reach the server before the answer request claims the
+		// reply, and then reports the outcome of the previous attempt.
+		let resolveProcess;
+		mockProcess.mockReturnValueOnce(
+			new Promise((resolve) => {
+				resolveProcess = resolve;
+			})
+		);
+		mockApiFetch.mockResolvedValue({
+			reply_id: 200,
+			status: 'failed',
+			error: 'The AI reply timed out.',
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+		expect(result.current.status).toBe('pending');
+		expect(result.current.error).toBeNull();
+
+		await act(async () => {
+			resolveProcess({
+				reply_id: 200,
+				status: 'complete',
+				ai_reply_comment_id: 555,
+			});
+		});
+
+		expect(result.current.status).toBe('complete');
+		expect(result.current.aiReplyCommentId).toBe(555);
 	});
 
 	it('returns idle and does not fetch when replyId is falsy', () => {
@@ -237,11 +279,14 @@ describe('useReplyStatus', () => {
 	});
 
 	it('surfaces the error message on failed status', async () => {
-		mockApiFetch.mockResolvedValueOnce({
+		const failed = {
 			reply_id: 200,
 			status: 'failed',
 			error: 'AI request timed out.',
-		});
+		};
+		mockApiFetch.mockResolvedValueOnce(failed);
+		// The answer request finds the reply already failed.
+		mockProcess.mockResolvedValueOnce(failed);
 
 		const { result } = renderHook(() => useReplyStatus(200));
 

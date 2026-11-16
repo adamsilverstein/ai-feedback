@@ -242,7 +242,7 @@ The response field is `ai_reply_comment_id`, while the comment meta that stores 
 | 403 | `rest_forbidden` | User cannot edit the reply's post |
 | 404 | `rest_comment_invalid_id` | No comment with that ID |
 
-> **Note:** Replies posted in the block editor do not wait on WP-Cron. A reply posted elsewhere, such as over the REST API, is only answered when WP-Cron runs, so on low-traffic sites it can stay `pending` until the next visit.
+> **Note:** Replies posted in the block editor do not wait on WP-Cron. A reply posted elsewhere, such as over the REST API, is answered when WP-Cron runs. On a site where WP-Cron does not run, it is answered the next time someone opens the post in the editor, and reads as `failed` once it has been pending for 10 minutes until then.
 
 ---
 
