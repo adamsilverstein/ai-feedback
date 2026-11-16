@@ -23,6 +23,59 @@ test.describe('Keyboard shortcuts', () => {
 		await expect(panel).toBeVisible();
 	});
 
+	test('goes to the next block with feedback after a reload', async ({
+		admin,
+		editor,
+		page,
+		pageUtils,
+		aiFeedback,
+	}) => {
+		await admin.createNewPost({ title: 'Shortcut Navigation' });
+		await editor.insertBlock({
+			name: 'core/paragraph',
+			attributes: { content: 'First block.' },
+		});
+		await editor.insertBlock({
+			name: 'core/paragraph',
+			attributes: { content: 'Second block.' },
+		});
+		await editor.saveDraft();
+		await aiFeedback.openSidebar();
+		await aiFeedback.runReview();
+
+		// The note IDs in the block metadata are what survive a reload.
+		const expectNoteIds = () =>
+			expect
+				.poll(async () =>
+					(await editor.getBlocks({ full: true })).map(
+						(block) => block.attributes.metadata?.noteId > 0
+					)
+				)
+				.toEqual([true, true]);
+		await expectNoteIds();
+		await editor.saveDraft();
+		await page.reload();
+		await aiFeedback.openSidebar();
+		await expect(page.locator('.ai-feedback-review-summary')).toBeVisible();
+		await expectNoteIds();
+
+		const blocks = await editor.getBlocks({ full: true });
+		await page.evaluate(() =>
+			window.wp.data.dispatch('core/block-editor').clearSelectedBlock()
+		);
+		await pageUtils.pressKeys('access+j');
+
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					window.wp.data
+						.select('core/block-editor')
+						.getSelectedBlockClientId()
+				)
+			)
+			.toBe(blocks[0].clientId);
+	});
+
 	test('lists the shortcuts in the keyboard shortcuts help', async ({
 		admin,
 		page,
