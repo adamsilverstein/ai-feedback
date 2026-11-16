@@ -121,8 +121,6 @@ class ReviewServiceRetryTest extends TestCase
         $error = new WP_Error('invalid_api_key', 'Some unrelated message');
 
         $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
-        $reflection->setAccessible(true);
-
         $this->assertTrue($reflection->invoke($this->service, $error));
     }
 
@@ -135,8 +133,6 @@ class ReviewServiceRetryTest extends TestCase
         $error = new WP_Error('ai_request_failed', 'Invalid API key supplied');
 
         $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
-        $reflection->setAccessible(true);
-
         $this->assertTrue($reflection->invoke($this->service, $error));
     }
 
@@ -149,8 +145,6 @@ class ReviewServiceRetryTest extends TestCase
         $error = new WP_Error('http_request_failed', 'cURL error 28: timeout');
 
         $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
-        $reflection->setAccessible(true);
-
         $this->assertFalse($reflection->invoke($this->service, $error));
     }
 
@@ -164,7 +158,6 @@ class ReviewServiceRetryTest extends TestCase
     public function test_is_non_retryable_error_classifies_core_errors(WP_Error $error, bool $non_retryable): void
     {
         $reflection = new ReflectionMethod(Review_Service::class, 'is_non_retryable_error');
-
         $this->assertSame($non_retryable, $reflection->invoke($this->service, $error));
     }
 
@@ -199,8 +192,6 @@ class ReviewServiceRetryTest extends TestCase
         );
 
         $reflection = new ReflectionMethod(Review_Service::class, 'call_ai');
-        $reflection->setAccessible(true);
-
         $result = $reflection->invoke(
             $this->service,
             'prompt',

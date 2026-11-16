@@ -412,6 +412,8 @@ class ReplyProcessTest extends TestCase {
 		$data = $this->process( 200, true );
 		$this->assertSame( 0, $this->service->ai_calls, 'A retry inside the cooldown is ignored.' );
 		$this->assertSame( 'failed', $data['status'] );
+		$this->assertArrayHasKey( 'retry_after', $data, 'The ignored retry reports the time left.' );
+		$this->assertGreaterThan( 0, $data['retry_after'] );
 
 		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() - Reply_Cron_Dispatcher::RETRY_COOLDOWN );
 

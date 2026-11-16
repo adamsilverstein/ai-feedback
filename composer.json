@@ -29,7 +29,8 @@
 	"scripts": {
 		"phpcs": "vendor/bin/phpcs --standard=WordPress includes/",
 		"phpcbf": "vendor/bin/phpcbf --standard=WordPress includes/",
-		"phpstan": "vendor/bin/phpstan analyze --memory-limit 1G"
+		"phpstan": "vendor/bin/phpstan analyze --memory-limit 1G",
+		"test": "vendor/bin/phpunit"
 	},
 	"config": {
 		"allow-plugins": {

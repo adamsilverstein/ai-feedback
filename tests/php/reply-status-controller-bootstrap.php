@@ -26,6 +26,7 @@ namespace {
 			public $comment_author  = '';
 			public $comment_date    = '2026-01-01 00:00:00';
 			public $comment_date_gmt = '2026-01-01 00:00:00';
+			public $user_id         = '0';
 
 			public function __construct( $comment = null ) {
 				foreach ( (array) $comment as $key => $value ) {

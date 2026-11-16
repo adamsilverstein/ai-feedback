@@ -40,7 +40,6 @@ class PromptBuilderTest extends TestCase {
 	 */
 	private function invoke_private( string $method, array $args = array() ) {
 		$ref = new ReflectionMethod( Prompt_Builder::class, $method );
-		$ref->setAccessible( true );
 		return $ref->invokeArgs( $this->builder, $args );
 	}
 
