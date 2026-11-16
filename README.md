@@ -106,7 +106,7 @@ The Connectors API checks for credentials in this order:
 3. Database setting saved via the Connectors screen
 
 ```php
-// In wp-config.php — these take precedence over the database value.
+// In wp-config.php - these take precedence over the database value.
 define( 'ANTHROPIC_API_KEY', 'your-api-key-here' );
 define( 'OPENAI_API_KEY',    'your-api-key-here' );
 define( 'GOOGLE_API_KEY',    'your-api-key-here' );
@@ -189,7 +189,7 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 ### Project Structure
 
 ```
-ai-feedback/
+copydesk-ai/
 ├── copydesk-ai.php           # Main plugin file
 ├── includes/                  # PHP classes
 │   ├── class-plugin.php      # Bootstrap
@@ -274,7 +274,7 @@ See [docs/CI.md](docs/CI.md) for details on running checks locally and setting u
 
 - **Settings Controller**: REST API for settings management
 - **Review Service**: Orchestrates document analysis (Phase 2)
-- **Reply Service**: Handles conversational feedback (Phase 4)
+- **Reply Service**: Answers replies to AI notes, run in the background via WP-Cron
 - **Notes Manager**: Creates and manages Notes (Phase 3)
 - **Prompt Builder**: Constructs AI prompts (Phase 2)
 
@@ -294,7 +294,7 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 
 ## Project Status
 
-**Current phase:** Phase 5 (Polish & Release) — in progress. Phase 4 (Conversation Loop) is the remaining major feature and has not yet started.
+**Current release:** 1.0.1. Phases 1 to 4 are complete. Phase 5 shipped 1.0.0, with streaming and the Abilities API still to come.
 
 ### Phase 1: Foundation ✅ Complete
 - Plugin scaffold with build system
@@ -318,12 +318,12 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - [x] Note resolution tracking
 - [x] Review history display
 
-### Phase 4: Conversation Loop 🚧 Not started
-Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/131)–[#134](https://github.com/adamsilverstein/copydesk-ai/issues/134).
-- [ ] Reply detection hook (#131)
-- [ ] Context-aware reply prompts / Reply Service (#132)
-- [ ] Async reply processing (#133)
-- [ ] Conversation threading UI (#134)
+### Phase 4: Conversation Loop ✅ Complete
+Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/131)-[#134](https://github.com/adamsilverstein/copydesk-ai/issues/134).
+- [x] Reply detection hook ([#131](https://github.com/adamsilverstein/copydesk-ai/issues/131))
+- [x] Context-aware reply prompts / Reply Service ([#132](https://github.com/adamsilverstein/copydesk-ai/issues/132))
+- [x] Async reply processing ([#133](https://github.com/adamsilverstein/copydesk-ai/issues/133))
+- [x] Conversation threading UI ([#134](https://github.com/adamsilverstein/copydesk-ai/issues/134))
 
 ### Phase 5: Polish & Release 🚧 In progress
 - [x] Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions, descriptive screen reader labels
@@ -331,12 +331,10 @@ Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/1
 - [x] AI quality: few-shot examples, block-type specific instructions, multi-language support, deduplication
 - [x] Health check REST endpoint
 - [x] E2E infrastructure with Playwright
+- [x] Quick fixes, suggested edits, review history, export and usage analytics
+- [x] Release v1.0.0
 - [ ] Abilities API integration
-- [ ] Streaming responses
-- [ ] Performance optimization
-- [ ] Accessibility audit (final sweep)
-- [ ] Complete documentation
-- [ ] Release v1.0.0
+- [ ] Streaming responses ([#60](https://github.com/adamsilverstein/copydesk-ai/issues/60))
 
 ## API Documentation
 
@@ -381,25 +379,12 @@ GPL v2 or later
 
 ## Changelog
 
-### 0.1.0 (Current)
-- Plugin scaffold and build system
-- Settings UI, REST API, and data store
-- Model selection with provider grouping
-- Focus areas and tone configuration
-- Document review with AI provider integration (Anthropic, OpenAI, Gemini)
-- Prompt builder with focus-area and block-type specific instructions
-- Few-shot examples for consistent AI output
-- Multi-language feedback support
-- Feedback deduplication and grouping
-- WordPress Notes API integration (block-level comments)
-- Health check REST endpoint
-- Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions
-- Onboarding: first-run welcome modal, empty state guidance
-- E2E test infrastructure with Playwright
+See the changelog in [readme.txt](readme.txt) for release notes.
 
 ### Coming Soon
-- Phase 4: Conversational replies to AI feedback
-- Phase 5: Abilities API, streaming responses, performance optimization, final accessibility audit, complete documentation, v1.0.0 release
+- Streaming responses once the core AI Client supports them ([#60](https://github.com/adamsilverstein/copydesk-ai/issues/60))
+- Abilities API integration
+
 ---
 
 Built with ❤️ for WordPress
