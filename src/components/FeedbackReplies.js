@@ -155,6 +155,14 @@ export default function FeedbackReplies({
 								)}
 							</span>
 							{retryButton}
+							{!canRetry && (
+								<span className="ai-feedback-reply-retry-hint">
+									{__(
+										'Try again in a few seconds.',
+										'copydesk-ai'
+									)}
+								</span>
+							)}
 						</>
 					)}
 				</li>
