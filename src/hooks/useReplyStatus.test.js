@@ -61,6 +61,30 @@ describe('useReplyStatus', () => {
 		expect(result.current.error).toBeNull();
 	});
 
+	it('logs a failed answer request when debugging is on', async () => {
+		window.localStorage.setItem('AI_FEEDBACK_DEBUG', 'true');
+		const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+		const error = new Error('forbidden');
+		mockProcess.mockRejectedValueOnce(error);
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+
+		renderHook(() => useReplyStatus(200));
+
+		try {
+			await waitFor(() =>
+				expect(debug).toHaveBeenCalledWith(
+					'[AI-Feedback]',
+					'Reply process request failed',
+					200,
+					error
+				)
+			);
+		} finally {
+			debug.mockRestore();
+			window.localStorage.removeItem('AI_FEEDBACK_DEBUG');
+		}
+	});
+
 	it('flags a reply that is taking longer than expected', async () => {
 		vi.useFakeTimers();
 		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });

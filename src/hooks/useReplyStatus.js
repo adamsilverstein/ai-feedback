@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { __ } from '@wordpress/i18n';
+import { debugLog } from '../utils/debug';
 
 export const POLL_INTERVAL_MS = 2000;
 
@@ -140,7 +141,10 @@ export default function useReplyStatus(replyId) {
 					fail(response.error ?? null);
 				}
 			})
-			.catch(() => {});
+			// Polling still reports the outcome, so only log the failure.
+			.catch((err) => {
+				debugLog('Reply process request failed', replyId, err);
+			});
 
 		const poll = async () => {
 			try {
