@@ -129,7 +129,7 @@ All pull requests must pass automated checks:
 - ✅ **JavaScript Linting** - ESLint, Stylelint, Prettier
 - ✅ **PHP Linting** - PHPCS, PHPStan
 - ✅ **JavaScript Tests** - Vitest unit tests
-- ✅ **PHP Tests** - PHPUnit tests across PHP 8.1-8.3
+- ✅ **PHP Tests** - PHPUnit tests on PHP 8.1 and 8.5
 
 **Pull requests cannot be merged until all checks pass.**
 

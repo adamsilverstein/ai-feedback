@@ -82,6 +82,7 @@
 		"lint:php": "composer run phpcs && composer run phpstan",
 		"test:unit": "wp-scripts test-unit-js",
 		"test:unit:watch": "wp-scripts test-unit-js --watch",
+		"test:php": "composer run test",
 		"test:e2e": "npx playwright test --config=playwright.config.js",
 		"test:e2e:debug": "npx playwright test --config=playwright.config.js --debug",
 		"test:visual": "playwright test --config=tests/visual/playwright.config.js",

@@ -22,6 +22,7 @@ npm run build       # Production
 
 # Testing
 npm run test:unit   # JS unit tests
+composer test       # PHP unit tests
 npm run test:e2e    # Playwright e2e
 npm run lint:js     # ESLint
 npm run lint:php    # PHPCS + PHPStan
