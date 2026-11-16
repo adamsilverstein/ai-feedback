@@ -344,6 +344,33 @@ describe('suggestQuickFix', () => {
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(12, 'pending');
 	});
 
+	it("credits the markers to the note's author, not the current user", async () => {
+		// Gutenberg tints and names a marker by matching `data-author` to the
+		// note's author, and treats markers carrying the current user's id as
+		// theirs to grow or remove. AI notes are authored by user 0.
+		await suggestQuickFix(note);
+		const { content } = mocks.updateBlockAttributes.mock.calls[0][1];
+		expect(content.match(/data-author="[^"]*"/g)).toEqual([
+			'data-author="0"',
+			'data-author="0"',
+		]);
+
+		vi.clearAllMocks();
+		mocks.blocks['block-1'].attributes.content = 'We met in order to plan.';
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, record) => ({
+				...(await savedRecord(record)),
+				author: 7,
+			})
+		);
+		await suggestQuickFix(note);
+		expect(
+			mocks.updateBlockAttributes.mock.calls[0][1].content.match(
+				/data-author="[^"]*"/g
+			)
+		).toEqual(['data-author="7"', 'data-author="7"']);
+	});
+
 	it('skips the request when the fix no longer applies', async () => {
 		mocks.blocks['block-1'].attributes.content = 'We met to plan.';
 
