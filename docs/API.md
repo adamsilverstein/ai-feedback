@@ -197,7 +197,7 @@ X-WP-Nonce: {nonce}
 
 ### GET /replies/{id}/status
 
-Poll the state of an AI reply. When a user replies to an AI Feedback note, the plugin marks the reply `pending` and schedules a single `ai_feedback_generate_reply` WP-Cron event. The cron handler generates the AI response, saves it as a child note, and records the result on the user's reply.
+Poll the state of an AI reply. When a user replies to an AI Feedback note, the plugin marks the reply `pending` and schedules a single `ai_feedback_generate_reply` WP-Cron event. The editor then answers the reply right away through [`POST /replies/{id}/process`](#post-repliesidprocess), and the cron event is the fallback for replies posted outside the editor. Whichever runs first generates the AI response, saves it as a child note, and records the result on the user's reply.
 
 #### Request
 
@@ -236,7 +236,35 @@ The response field is `ai_reply_comment_id`, while the comment meta that stores 
 | 403 | `rest_forbidden` | User cannot edit the reply's post |
 | 404 | `rest_comment_invalid_id` | No comment with that ID |
 
-> **Note:** WP-Cron runs on page requests, so on low-traffic sites a reply can stay `pending` until the next visit. For reliable timing, disable `WP_CRON` and run `wp cron event run --due-now` from a system cron every minute.
+> **Note:** Replies posted in the block editor do not wait on WP-Cron. A reply posted elsewhere, such as over the REST API, is only answered when WP-Cron runs, so on low-traffic sites it can stay `pending` until the next visit.
+
+---
+
+### POST /replies/{id}/process
+
+Generate the AI answer to a pending reply within this request, so the answer does not depend on WP-Cron. The editor calls this as soon as it sees a pending reply.
+
+Each reply is answered once. The request claims the reply by moving its status from `pending` to `processing` with a compare-and-set update, so when this endpoint and the cron event race, only one of them generates an answer. A reply that is already answered or being answered is left alone.
+
+#### Request
+
+```http
+POST /wp-json/ai-feedback/v1/replies/{id}/process
+X-WP-Nonce: {nonce}
+Content-Type: application/json
+
+{ "retry": false }
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retry` | boolean | Also answer a `failed` reply, or take over a claim older than 90 seconds from a request that died. Default `false` |
+
+Same permission rules as `GET /replies/{id}/status`.
+
+#### Response
+
+The reply status, in the same shape as `GET /replies/{id}/status`. A reply that is still being answered by another request reports `pending`.
 
 ---
 

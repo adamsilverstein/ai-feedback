@@ -88,10 +88,9 @@ class Reply_Service {
 	/**
 	 * Cron callback for Reply_Cron_Dispatcher::CRON_HOOK.
 	 *
-	 * Wraps handle_reply() to satisfy the void-return contract that
-	 * WordPress actions require; handle_reply() returns a value for
-	 * direct testability. Also records final status on the reply comment
-	 * so the frontend can poll for completion.
+	 * The fallback for replies the editor did not answer through process(),
+	 * such as replies posted outside the block editor. Skips a reply that a
+	 * request already claimed.
 	 *
 	 * @param  int    $comment_id Reply comment ID.
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
@@ -99,6 +98,102 @@ class Reply_Service {
 	 * @param  string $block_id   Block ID from the parent note.
 	 */
 	public function on_reply_received( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
+		if ( ! $this->claim( $comment_id, false ) ) {
+			return;
+		}
+
+		$this->generate( $comment_id, $parent_id, $post_id, $block_id );
+	}
+
+	/**
+	 * Answer a queued reply within the current request.
+	 *
+	 * Lets the editor get an answer on sites where WP-Cron does not run. The
+	 * fallback cron event is dropped once the reply is claimed.
+	 *
+	 * @param int  $comment_id Reply comment ID.
+	 * @param bool $retry      Whether to also take over a failed reply or a stale claim.
+	 * @return bool Whether this request answered the reply.
+	 */
+	public function process( int $comment_id, bool $retry = false ): bool {
+		$job = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::JOB_META_KEY, true );
+		if ( ! is_array( $job ) || 3 !== count( $job ) ) {
+			return false;
+		}
+
+		list( $parent_id, $post_id, $block_id ) = array_values( $job );
+		if ( ! is_numeric( $parent_id ) || ! is_numeric( $post_id ) || ! is_string( $block_id ) ) {
+			return false;
+		}
+
+		if ( ! $this->claim( $comment_id, $retry ) ) {
+			return false;
+		}
+
+		$args      = array( $comment_id, (int) $parent_id, (int) $post_id, $block_id );
+		$timestamp = wp_next_scheduled( Reply_Cron_Dispatcher::CRON_HOOK, $args );
+		if ( false !== $timestamp ) {
+			wp_unschedule_event( $timestamp, Reply_Cron_Dispatcher::CRON_HOOK, $args );
+		}
+
+		$this->generate( $comment_id, (int) $parent_id, (int) $post_id, $block_id );
+		return true;
+	}
+
+	/**
+	 * Claim a reply so only one request answers it.
+	 *
+	 * Moves the status from 'pending' to 'processing' with a compare-and-set
+	 * update, which only one concurrent request can win. A retry may also
+	 * claim a failed reply, or take over a claim older than
+	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT.
+	 *
+	 * @param int  $comment_id Reply comment ID.
+	 * @param bool $retry      Whether the user asked to retry.
+	 * @return bool Whether this request now owns the reply.
+	 */
+	private function claim( int $comment_id, bool $retry ): bool {
+		$status = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		$now    = time();
+
+		if ( 'pending' === $status || ( $retry && 'failed' === $status ) ) {
+			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing', $status ) ) {
+				return false;
+			}
+		} elseif ( $retry && 'processing' === $status ) {
+			$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+			if ( ! is_numeric( $claimed_at ) || $now - (int) $claimed_at <= Reply_Cron_Dispatcher::CLAIM_TIMEOUT ) {
+				return false;
+			}
+			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, $claimed_at ) ) {
+				return false;
+			}
+		} else {
+			return false;
+		}
+
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now );
+		if ( $retry ) {
+			// Restart the timeout and clear the last error for the new attempt.
+			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
+			delete_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Generate the AI answer for a claimed reply and record the result.
+	 *
+	 * Wraps handle_reply() and records the final status on the reply comment
+	 * so the frontend can poll for completion.
+	 *
+	 * @param  int    $comment_id Reply comment ID.
+	 * @param  int    $parent_id  Parent (original AI note) comment ID.
+	 * @param  int    $post_id    Post ID.
+	 * @param  string $block_id   Block ID from the parent note.
+	 */
+	private function generate( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
 		try {
 			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
 		} catch ( \Throwable $e ) {

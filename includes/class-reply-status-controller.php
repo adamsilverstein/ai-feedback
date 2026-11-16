@@ -36,6 +36,22 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	protected $rest_base = 'replies';
 
 	/**
+	 * Reply service that answers replies for the process route.
+	 *
+	 * @var Reply_Service
+	 */
+	private Reply_Service $reply_service;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Reply_Service|null $reply_service Optional reply service (for testing).
+	 */
+	public function __construct( ?Reply_Service $reply_service = null ) {
+		$this->reply_service = $reply_service ?? new Reply_Service();
+	}
+
+	/**
 	 * Register routes.
 	 */
 	public function register_routes(): void {
@@ -53,6 +69,32 @@ class Reply_Status_Controller extends WP_REST_Controller {
 							'type'              => 'integer',
 							'required'          => true,
 							'sanitize_callback' => 'absint',
+						),
+					),
+				),
+				'schema' => array( $this, 'get_item_schema' ),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/(?P<id>\d+)/process',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'process_reply' ),
+					'permission_callback' => array( $this, 'process_reply_permissions_check' ),
+					'args'                => array(
+						'id'    => array(
+							'description'       => __( 'ID of the user reply comment.', 'copydesk-ai' ),
+							'type'              => 'integer',
+							'required'          => true,
+							'sanitize_callback' => 'absint',
+						),
+						'retry' => array(
+							'description' => __( 'Whether to retry a failed or stalled reply.', 'copydesk-ai' ),
+							'type'        => 'boolean',
+							'default'     => false,
 						),
 					),
 				),
@@ -163,7 +205,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				// Only the newest user reply matters: an older pending one has been superseded.
 				$status = self::meta_string( $id, Reply_Cron_Dispatcher::STATUS_META_KEY );
 
-				$threads[ $parent_id ]['pending_reply_id'] = 'pending' === $status ? $id : null;
+				$threads[ $parent_id ]['pending_reply_id'] = self::is_pending( $status ) ? $id : null;
 			}
 		}
 
@@ -213,29 +255,73 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * GET /replies/{id}/status
+	 * Permission check for answering a reply. Same rules as reading its status.
 	 *
-	 * Note the response uses `ai_reply_comment_id`, while the backing meta key
-	 * is Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY.
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @return bool|WP_Error
+	 */
+	public function process_reply_permissions_check( WP_REST_Request $request ): bool|WP_Error {
+		return $this->get_status_permissions_check( $request );
+	}
+
+	/**
+	 * POST /replies/{id}/process
+	 *
+	 * Generates the AI answer to a queued reply within this request, so the
+	 * editor does not depend on WP-Cron. Safe to call more than once: a reply
+	 * that is already answered or being answered is left alone. Responds
+	 * with the reply status, like GET /replies/{id}/status.
+	 *
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @return WP_REST_Response
+	 */
+	public function process_reply( WP_REST_Request $request ): WP_REST_Response {
+		$comment_id = $this->get_reply_id( $request );
+
+		// Finish the answer even if the editor navigates away mid-request.
+		ignore_user_abort( true );
+		$this->reply_service->process( $comment_id, true === $request->get_param( 'retry' ) );
+
+		return new WP_REST_Response( $this->build_status( $comment_id ), 200 );
+	}
+
+	/**
+	 * GET /replies/{id}/status
 	 *
 	 * @param  WP_REST_Request $request Request.
 	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
 	 * @return WP_REST_Response
 	 */
 	public function get_status( WP_REST_Request $request ): WP_REST_Response {
-		$comment_id = $this->get_reply_id( $request );
-		$status     = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
-		$payload    = array(
+		return new WP_REST_Response( $this->build_status( $this->get_reply_id( $request ) ), 200 );
+	}
+
+	/**
+	 * Build the status payload for a reply.
+	 *
+	 * A reply being answered ('processing') is reported as 'pending'. Note the
+	 * payload uses `ai_reply_comment_id`, while the backing meta key is
+	 * Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return array<string, mixed>
+	 */
+	private function build_status( int $comment_id ): array {
+		$status  = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		$pending = self::is_pending( $status );
+		$payload = array(
 			'reply_id' => $comment_id,
-			'status'   => in_array( $status, array( 'pending', 'complete', 'failed' ), true ) ? $status : 'unknown',
+			'status'   => $pending ? 'pending' : ( in_array( $status, array( 'complete', 'failed' ), true ) ? $status : 'unknown' ),
 		);
 
-		if ( 'pending' === $status ) {
+		if ( $pending ) {
 			$since = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, true );
 			if ( is_numeric( $since ) && time() - (int) $since > Reply_Cron_Dispatcher::PENDING_TIMEOUT ) {
 				// WP-Cron never ran the job, so stop the editor from waiting forever.
 				$payload['status'] = 'failed';
-				$payload['error']  = __( 'The AI reply timed out. Check that WP-Cron is running.', 'copydesk-ai' );
+				$payload['error']  = __( 'The AI reply timed out.', 'copydesk-ai' );
 			}
 		}
 
@@ -259,7 +345,17 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			}
 		}
 
-		return new WP_REST_Response( $payload, 200 );
+		return $payload;
+	}
+
+	/**
+	 * Whether a reply status means the AI answer is still on its way.
+	 *
+	 * @param string $status Status meta value.
+	 * @return bool
+	 */
+	private static function is_pending( string $status ): bool {
+		return 'pending' === $status || 'processing' === $status;
 	}
 
 	/**

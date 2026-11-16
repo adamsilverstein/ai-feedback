@@ -114,9 +114,9 @@ class ReplyProcessTest extends TestCase {
 		$GLOBALS['test_comment_meta']     = array(
 			100 => array( 'ai_feedback' => '1' ),
 			200 => array(
-				Reply_Cron_Dispatcher::STATUS_META_KEY        => 'pending',
+				Reply_Cron_Dispatcher::STATUS_META_KEY => 'pending',
 				Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY => time(),
-				Reply_Cron_Dispatcher::JOB_META_KEY           => array( 100, 42, 'abc-123' ),
+				Reply_Cron_Dispatcher::JOB_META_KEY    => array( 100, 42, 'abc-123' ),
 			),
 		);
 		$GLOBALS['test_scheduled_events'] = array(
@@ -160,6 +160,19 @@ class ReplyProcessTest extends TestCase {
 	}
 
 	/**
+	 * Call the process endpoint and return its payload.
+	 *
+	 * @param int  $id    Reply comment ID.
+	 * @param bool $retry Whether the user asked to retry.
+	 * @return array<mixed>
+	 */
+	private function process( int $id = 200, bool $retry = false ): array {
+		$data = $this->controller->process_reply( $this->request( $id, $retry ) )->get_data();
+		$this->assertIsArray( $data );
+		return $data;
+	}
+
+	/**
 	 * Status meta of the seeded reply.
 	 *
 	 * @return mixed
@@ -172,7 +185,7 @@ class ReplyProcessTest extends TestCase {
 	 * The endpoint answers a pending reply within the request.
 	 */
 	public function test_process_answers_pending_reply(): void {
-		$data = $this->controller->process_reply( $this->request() )->get_data();
+		$data = $this->process();
 
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
@@ -184,7 +197,7 @@ class ReplyProcessTest extends TestCase {
 	 * The fallback cron event is dropped once the editor has answered.
 	 */
 	public function test_process_unschedules_the_cron_event(): void {
-		$this->controller->process_reply( $this->request() );
+		$this->process();
 
 		$this->assertSame( array(), array_values( $GLOBALS['test_scheduled_events'] ) );
 	}
@@ -193,8 +206,8 @@ class ReplyProcessTest extends TestCase {
 	 * A second request does not answer the same reply again.
 	 */
 	public function test_process_twice_answers_once(): void {
-		$this->controller->process_reply( $this->request() );
-		$data = $this->controller->process_reply( $this->request() )->get_data();
+		$this->process();
+		$data = $this->process();
 
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
@@ -204,7 +217,7 @@ class ReplyProcessTest extends TestCase {
 	 * A late cron run does not answer a reply the endpoint already answered.
 	 */
 	public function test_cron_after_process_does_not_answer_again(): void {
-		$this->controller->process_reply( $this->request() );
+		$this->process();
 		$this->service->on_reply_received( 200, 100, 42, 'abc-123' );
 
 		$this->assertSame( 1, $this->service->ai_calls );
@@ -215,7 +228,7 @@ class ReplyProcessTest extends TestCase {
 	 */
 	public function test_process_after_cron_does_not_answer_again(): void {
 		$this->service->on_reply_received( 200, 100, 42, 'abc-123' );
-		$data = $this->controller->process_reply( $this->request() )->get_data();
+		$data = $this->process();
 
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
@@ -228,7 +241,7 @@ class ReplyProcessTest extends TestCase {
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::STATUS_META_KEY ]     = 'processing';
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY ] = time();
 
-		$data = $this->controller->process_reply( $this->request( 200, true ) )->get_data();
+		$data = $this->process( 200, true );
 		$this->service->on_reply_received( 200, 100, 42, 'abc-123' );
 
 		$this->assertSame( 0, $this->service->ai_calls );
@@ -242,10 +255,10 @@ class ReplyProcessTest extends TestCase {
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::STATUS_META_KEY ]     = 'processing';
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY ] = time() - Reply_Cron_Dispatcher::CLAIM_TIMEOUT - 1;
 
-		$this->controller->process_reply( $this->request() );
+		$this->process();
 		$this->assertSame( 0, $this->service->ai_calls, 'Only an explicit retry takes over a claim.' );
 
-		$data = $this->controller->process_reply( $this->request( 200, true ) )->get_data();
+		$data = $this->process( 200, true );
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
 	}
@@ -257,11 +270,11 @@ class ReplyProcessTest extends TestCase {
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::STATUS_META_KEY ]      = 'failed';
 		$GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ] = 'Timed out.';
 
-		$this->controller->process_reply( $this->request() );
+		$this->process();
 		$this->service->on_reply_received( 200, 100, 42, 'abc-123' );
 		$this->assertSame( 0, $this->service->ai_calls );
 
-		$data = $this->controller->process_reply( $this->request( 200, true ) )->get_data();
+		$data = $this->process( 200, true );
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
 		$this->assertArrayNotHasKey( 'error', $data );
@@ -273,7 +286,7 @@ class ReplyProcessTest extends TestCase {
 	public function test_process_ignores_reply_without_job(): void {
 		$GLOBALS['test_comment_meta'][200] = array();
 
-		$data = $this->controller->process_reply( $this->request( 200, true ) )->get_data();
+		$data = $this->process( 200, true );
 
 		$this->assertSame( 0, $this->service->ai_calls );
 		$this->assertSame( 'unknown', $data['status'] );
@@ -289,6 +302,7 @@ class ReplyProcessTest extends TestCase {
 		$request = new \WP_REST_Request();
 		$request->set_param( 'id', 200 );
 		$data = $this->controller->get_status( $request )->get_data();
+		$this->assertIsArray( $data );
 
 		$this->assertSame( 'pending', $data['status'] );
 	}

@@ -30,7 +30,8 @@ class Reply_Cron_Dispatcher {
 	/**
 	 * Comment meta key tracking reply processing state.
 	 *
-	 * Values: 'pending' | 'complete' | 'failed'.
+	 * Values: 'pending' | 'processing' | 'complete' | 'failed'. A request
+	 * claims a reply by moving it from 'pending' to 'processing'.
 	 */
 	public const STATUS_META_KEY = 'ai_feedback_reply_status';
 
@@ -48,6 +49,23 @@ class Reply_Cron_Dispatcher {
 	 * Comment meta key for when the reply was marked pending, as a Unix timestamp.
 	 */
 	public const PENDING_SINCE_META_KEY = 'ai_feedback_reply_pending_since';
+
+	/**
+	 * Comment meta key holding the reply's cron args after the comment ID:
+	 * array( parent_id, post_id, block_id ).
+	 */
+	public const JOB_META_KEY = 'ai_feedback_reply_job';
+
+	/**
+	 * Comment meta key for when a request claimed the reply, as a Unix timestamp.
+	 */
+	public const CLAIMED_AT_META_KEY = 'ai_feedback_reply_claimed_at';
+
+	/**
+	 * Seconds after which a retry may take over a claim, for a request that
+	 * died mid-generation. Longer than the AI request timeout.
+	 */
+	public const CLAIM_TIMEOUT = 90;
 
 	/**
 	 * Seconds after which a pending reply is reported as failed, for sites
@@ -96,6 +114,8 @@ class Reply_Cron_Dispatcher {
 		// and have its result overwritten.
 		update_comment_meta( $comment_id, self::STATUS_META_KEY, 'pending' );
 		update_comment_meta( $comment_id, self::PENDING_SINCE_META_KEY, time() );
+		// Lets the editor answer the reply without waiting for WP-Cron.
+		update_comment_meta( $comment_id, self::JOB_META_KEY, array( $parent_id, $post_id, $block_id ) );
 
 		$scheduled = wp_schedule_single_event( time(), self::CRON_HOOK, $args, true );
 		if ( true !== $scheduled ) {
