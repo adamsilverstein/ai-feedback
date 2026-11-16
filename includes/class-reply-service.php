@@ -196,8 +196,8 @@ class Reply_Service {
 			return null;
 		}
 
-		$direct_parent = is_numeric( $reply->comment_parent ) ? (int) $reply->comment_parent : 0;
-		$post_id       = is_numeric( $reply->comment_post_ID ) ? (int) $reply->comment_post_ID : 0;
+		$direct_parent = (int) $reply->comment_parent;
+		$post_id       = (int) $reply->comment_post_ID;
 		if ( $direct_parent <= 0 || $post_id <= 0 ) {
 			return null;
 		}
