@@ -792,6 +792,7 @@ $ai-feedback-reply-error: #cc1818;
 .ai-feedback-reply-pending {
 	display: flex;
 	flex-direction: row;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 6px;
 	background: transparent;
@@ -814,6 +815,10 @@ $ai-feedback-reply-error: #cc1818;
 
 .ai-feedback-reply-pending .ai-feedback-reply-error {
 	color: $ai-feedback-reply-error;
+	font-style: normal;
+}
+
+.ai-feedback-reply-pending .ai-feedback-reply-retry {
 	font-style: normal;
 }
 
