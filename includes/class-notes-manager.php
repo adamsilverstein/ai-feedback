@@ -169,23 +169,115 @@ class Notes_Manager {
 			$content .= wp_kses_post( $feedback_item['suggestion'] );
 		}
 
-		// Add category and severity badges.
-		$content .= "\n\n" . $this->build_badges( $feedback_item );
-
 		return $content;
+	}
+
+	/**
+	 * Adds the category and severity badges to an AI note's text.
+	 *
+	 * Badges are built from note meta at display time instead of being stored
+	 * in the note: every update of a note runs comment kses for its author,
+	 * and AI notes have no user, so their `span` classes would be stripped.
+	 * Badges stored by earlier versions, with or without their classes, are
+	 * replaced.
+	 *
+	 * Hooked to `comment_text` before `wpautop`.
+	 *
+	 * @param  mixed $text    Comment text.
+	 * @param  mixed $comment Comment object.
+	 * @return mixed Comment text with badges.
+	 */
+	public static function add_badges_to_comment_text( mixed $text, mixed $comment = null ): mixed {
+		if ( ! is_string( $text ) || ! $comment instanceof \WP_Comment ) {
+			return $text;
+		}
+		return self::with_badges( $text, $comment );
+	}
+
+	/**
+	 * Returns a note's content with its badges, for a REST response.
+	 *
+	 * @param  mixed $comment Comment object.
+	 * @return string Rendered content.
+	 */
+	private static function render_content( mixed $comment ): string {
+		if ( ! $comment instanceof \WP_Comment ) {
+			return '';
+		}
+		return wp_kses_post( self::with_badges( $comment->comment_content, $comment ) );
+	}
+
+	/**
+	 * Appends badges to an AI note's text, replacing any it stores.
+	 *
+	 * @param  string      $text    Comment text.
+	 * @param  \WP_Comment $comment Comment.
+	 * @return string Text with badges, or unchanged for other comments.
+	 */
+	private static function with_badges( string $text, \WP_Comment $comment ): string {
+		if ( 'note' !== $comment->comment_type ) {
+			return $text;
+		}
+		$meta = get_comment_meta( (int) $comment->comment_ID );
+		if ( ! is_array( $meta ) || '1' !== self::first_meta( $meta, 'ai_feedback' ) ) {
+			return $text;
+		}
+
+		$badges = self::build_badges(
+			array(
+				'category' => self::first_meta( $meta, 'feedback_category' ),
+				'severity' => self::first_meta( $meta, 'feedback_severity' ),
+			)
+		);
+		if ( '' === $badges ) {
+			return $text;
+		}
+
+		// Earlier versions stored the badges after a blank line, so only that
+		// exact ending is replaced; feedback that merely ends in the badge
+		// words is kept. The labels use the current locale, so badges stored
+		// under another site language are not matched and show twice.
+		$text   = rtrim( $text );
+		$legacy = array(
+			$badges,
+			(string) preg_replace( '/ class="[^"]*"/', '', $badges ),
+			wp_strip_all_tags( $badges ),
+		);
+		foreach ( $legacy as $stored ) {
+			if ( str_ends_with( $text, "\n\n" . $stored ) ) {
+				$text = rtrim( substr( $text, 0, -strlen( $stored ) ) );
+				break;
+			}
+		}
+
+		return $text . "\n\n" . $badges;
+	}
+
+	/**
+	 * Returns the first value of a meta key from a comment's full meta.
+	 *
+	 * @param  array<mixed> $meta All meta for a comment, from `get_comment_meta( $id )`.
+	 * @param  string       $key  Meta key.
+	 * @return string Meta value, or an empty string.
+	 */
+	private static function first_meta( array $meta, string $key ): string {
+		$values = $meta[ $key ] ?? null;
+		$value  = is_array( $values ) ? ( $values[0] ?? '' ) : '';
+		return is_string( $value ) ? $value : '';
 	}
 
 	/**
 	 * Build badges for category and severity.
 	 *
-	 * @param  array $feedback_item Feedback item.
+	 * @param  array<string, mixed> $feedback_item Feedback item.
 	 * @return string HTML badges.
 	 */
-	private function build_badges( array $feedback_item ): string {
+	private static function build_badges( array $feedback_item ): string {
 		$badges = array();
 
 		// Category badge.
-		if ( ! empty( $feedback_item['category'] ) ) {
+		$category = $feedback_item['category'] ?? '';
+		if ( is_string( $category ) && '' !== $category ) {
 			$category_labels = array(
 				'content' => __( 'Content', 'copydesk-ai' ),
 				'tone'    => __( 'Tone', 'copydesk-ai' ),
@@ -193,26 +285,27 @@ class Notes_Manager {
 				'design'  => __( 'Design', 'copydesk-ai' ),
 			);
 
-			$category_label = $category_labels[ $feedback_item['category'] ] ?? $feedback_item['category'];
+			$category_label = $category_labels[ $category ] ?? $category;
 			$badges[]       = sprintf(
 				'<span class="ai-feedback-badge ai-feedback-category-%s">%s</span>',
-				esc_attr( $feedback_item['category'] ),
+				esc_attr( $category ),
 				esc_html( $category_label )
 			);
 		}
 
 		// Severity badge.
-		if ( ! empty( $feedback_item['severity'] ) ) {
+		$severity = $feedback_item['severity'] ?? '';
+		if ( is_string( $severity ) && '' !== $severity ) {
 			$severity_labels = array(
 				'suggestion' => __( 'Suggestion', 'copydesk-ai' ),
 				'important'  => __( 'Important', 'copydesk-ai' ),
 				'critical'   => __( 'Critical', 'copydesk-ai' ),
 			);
 
-			$severity_label = $severity_labels[ $feedback_item['severity'] ] ?? $feedback_item['severity'];
+			$severity_label = $severity_labels[ $severity ] ?? $severity;
 			$badges[]       = sprintf(
 				'<span class="ai-feedback-badge ai-feedback-severity-%s">%s</span>',
-				esc_attr( $feedback_item['severity'] ),
+				esc_attr( $severity ),
 				esc_html( $severity_label )
 			);
 		}
@@ -421,7 +514,7 @@ class Notes_Manager {
 				'author_name' => $comment->comment_author,
 				'content'     => array(
 					'raw'      => $comment->comment_content,
-					'rendered' => wp_kses_post( $comment->comment_content ),
+					'rendered' => self::render_content( $comment ),
 				),
 				'date'        => $comment->comment_date,
 				'type'        => $comment->comment_type,
@@ -749,7 +842,7 @@ class Notes_Manager {
 			'author_name' => $comment->comment_author,
 			'content'     => array(
 				'raw'      => $comment->comment_content,
-				'rendered' => wp_kses_post( $comment->comment_content ),
+				'rendered' => self::render_content( $comment ),
 			),
 			'date'        => $comment->comment_date,
 			'type'        => $comment->comment_type,
