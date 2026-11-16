@@ -306,6 +306,36 @@ class ReplyProcessTest extends TestCase {
 	}
 
 	/**
+	 * A retry takes over a claim that has no claim time.
+	 */
+	public function test_retry_reclaims_claim_without_claim_time(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing' );
+
+		$data = $this->process( 200, true );
+
+		$this->assertSame( 1, $this->service->ai_calls );
+		$this->assertSame( 'complete', $data['status'] );
+	}
+
+	/**
+	 * A failed reply cannot be retried again right after its last claim.
+	 */
+	public function test_retry_of_failed_reply_waits_for_cooldown(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'failed' );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() - 1 );
+
+		$data = $this->process( 200, true );
+		$this->assertSame( 0, $this->service->ai_calls, 'A retry inside the cooldown is ignored.' );
+		$this->assertSame( 'failed', $data['status'] );
+
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() - Reply_Cron_Dispatcher::RETRY_COOLDOWN );
+
+		$data = $this->process( 200, true );
+		$this->assertSame( 1, $this->service->ai_calls );
+		$this->assertSame( 'complete', $data['status'] );
+	}
+
+	/**
 	 * A retry answers a failed reply; a plain request or cron does not.
 	 */
 	public function test_retry_answers_failed_reply(): void {

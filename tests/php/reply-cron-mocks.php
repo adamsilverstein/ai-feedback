@@ -129,6 +129,25 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'add_comment_meta' ) ) {
+		/**
+		 * Adds a meta value; with $unique, fails when the key already exists.
+		 *
+		 * @param int    $comment_id
+		 * @param string $key
+		 * @param mixed  $value
+		 * @param bool   $unique
+		 * @return int|false
+		 */
+		function add_comment_meta( $comment_id, $key, $value, $unique = false ) {
+			if ( $unique && isset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ) ) {
+				return false;
+			}
+			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = $value;
+			return 1;
+		}
+	}
+
 	if ( ! function_exists( 'wp_cache_delete' ) ) {
 		/**
 		 * No-op cache delete; the meta store has no cache.

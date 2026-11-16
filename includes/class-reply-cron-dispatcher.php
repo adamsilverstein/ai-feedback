@@ -68,6 +68,12 @@ class Reply_Cron_Dispatcher {
 	public const CLAIM_TIMEOUT = 90;
 
 	/**
+	 * Seconds after a claim before a failed reply can be retried, so repeated
+	 * retries cannot run up paid AI requests.
+	 */
+	public const RETRY_COOLDOWN = 10;
+
+	/**
 	 * Seconds after which a pending reply is reported as failed, for sites
 	 * where WP-Cron never runs.
 	 */

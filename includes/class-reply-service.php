@@ -161,27 +161,35 @@ class Reply_Service {
 	 *
 	 * Moves the status from 'pending' to 'processing' with a compare-and-set
 	 * update, which only one concurrent request can win. A retry may also
-	 * claim a failed reply, or take over a claim older than
-	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT.
+	 * claim a failed reply once Reply_Cron_Dispatcher::RETRY_COOLDOWN has
+	 * passed, or take over a claim older than
+	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT or with no claim time.
 	 *
 	 * @param int  $comment_id Reply comment ID.
 	 * @param bool $retry      Whether the user asked to retry.
 	 * @return bool Whether this request now owns the reply.
 	 */
 	private function claim( int $comment_id, bool $retry ): bool {
-		$status = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
-		$now    = time();
+		$status     = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+		$now        = time();
 
 		if ( 'pending' === $status || ( $retry && 'failed' === $status ) ) {
+			if ( 'failed' === $status && is_numeric( $claimed_at ) && $now - (int) $claimed_at < Reply_Cron_Dispatcher::RETRY_COOLDOWN ) {
+				return false;
+			}
 			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing', $status ) ) {
 				return false;
 			}
 		} elseif ( $retry && 'processing' === $status ) {
-			$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
-			if ( ! is_numeric( $claimed_at ) || $now - (int) $claimed_at <= Reply_Cron_Dispatcher::CLAIM_TIMEOUT ) {
+			// A missing or invalid claim time counts as stale, or the reply could never be retried.
+			if ( is_numeric( $claimed_at ) && $now - (int) $claimed_at <= Reply_Cron_Dispatcher::CLAIM_TIMEOUT ) {
 				return false;
 			}
-			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, $claimed_at ) ) {
+			$taken = '' === $claimed_at
+				? add_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, true )
+				: update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, $claimed_at );
+			if ( false === $taken ) {
 				return false;
 			}
 		} else {
