@@ -5,17 +5,33 @@
 /**
  * Collect the block IDs that have feedback, from review notes.
  *
- * @param {Array} notes Review notes (single or grouped).
+ * Pass `resolveBlockId` to map stored client IDs to blocks in the current
+ * editor, since client IDs change on every load. Only the first block of a
+ * group carries the note, so the other blocks are resolved without a note ID.
+ *
+ * @param {Array}                                              notes            Review notes (single or grouped).
+ * @param {(clientId: string, noteId?: number) => string|null} [resolveBlockId] Maps a stored client ID to one in this editor.
  * @return {Set<string>} Block client IDs with feedback.
  */
-export function getFeedbackBlockIds(notes = []) {
+export function getFeedbackBlockIds(notes = [], resolveBlockId = (id) => id) {
 	const ids = new Set();
+	const add = (clientId, noteId) => {
+		const id = resolveBlockId(clientId, noteId);
+		if (id) {
+			ids.add(id);
+		}
+	};
 
 	notes.forEach((note) => {
-		if (note.block_id) {
-			ids.add(note.block_id);
+		// A note whose first block can't be resolved is skipped, as "Go to
+		// block" can't reach it either. After a reload that drops the whole
+		// group, since the other block IDs are stale and have no note ID.
+		if (note.block_id || note.id) {
+			add(note.block_id, note.id);
 		}
-		(note.block_ids || []).forEach((id) => ids.add(id));
+		(note.block_ids || [])
+			.filter((id) => id !== note.block_id)
+			.forEach((id) => add(id));
 	});
 
 	return ids;

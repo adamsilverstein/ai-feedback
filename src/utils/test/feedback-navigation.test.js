@@ -18,6 +18,28 @@ describe('getFeedbackBlockIds', () => {
 		expect([...ids].sort()).toEqual(['a', 'b', 'c']);
 	});
 
+	it('resolves stale client IDs, passing the note ID for the first block', () => {
+		const current = { a: 'a', stale: null };
+		const calls = [];
+		const ids = getFeedbackBlockIds(
+			[
+				{ id: 1, block_id: 'stale' },
+				{ id: 2, block_id: 'a', is_group: true, block_ids: ['a', 'b'] },
+			],
+			(clientId, noteId) => {
+				calls.push([clientId, noteId]);
+				return noteId === 1 ? 'found' : (current[clientId] ?? null);
+			}
+		);
+
+		expect([...ids].sort()).toEqual(['a', 'found']);
+		expect(calls).toEqual([
+			['stale', 1],
+			['a', 2],
+			['b', undefined],
+		]);
+	});
+
 	it('handles missing notes', () => {
 		expect(getFeedbackBlockIds(undefined).size).toBe(0);
 	});

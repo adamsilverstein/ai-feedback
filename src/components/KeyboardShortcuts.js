@@ -15,7 +15,10 @@ import { speak } from '@wordpress/a11y';
 import { __, sprintf } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import useStartReview from '../hooks/use-start-review';
-import { navigateToBlock } from '../utils/navigate-to-block';
+import {
+	navigateToBlock,
+	resolveBlockClientId,
+} from '../utils/navigate-to-block';
 import {
 	getAdjacentFeedbackBlock,
 	getFeedbackBlockIds,
@@ -119,7 +122,10 @@ export default function KeyboardShortcuts() {
 	});
 
 	const goToFeedback = (direction) => {
-		const feedbackIds = getFeedbackBlockIds(getLastReview()?.notes);
+		const feedbackIds = getFeedbackBlockIds(
+			getLastReview()?.notes,
+			resolveBlockClientId
+		);
 		const orderedIds = getClientIdsWithDescendants();
 		const target = getAdjacentFeedbackBlock(
 			orderedIds,
