@@ -92,6 +92,16 @@ class NotesManagerBadgesTest extends TestCase {
 	}
 
 	/**
+	 * Feedback that merely ends in the badge words keeps them.
+	 */
+	public function test_keeps_feedback_ending_in_badge_words(): void {
+		$this->assertSame(
+			"This needs a Tone Critical\n\n" . self::BADGES,
+			Notes_Manager::add_badges_to_comment_text( 'This needs a Tone Critical', $this->note() )
+		);
+	}
+
+	/**
 	 * Notes the plugin did not write are left alone.
 	 */
 	public function test_ignores_other_notes(): void {

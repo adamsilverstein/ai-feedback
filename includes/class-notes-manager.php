@@ -215,21 +215,28 @@ class Notes_Manager {
 	 * @return string Text with badges, or unchanged for other comments.
 	 */
 	private static function with_badges( string $text, \WP_Comment $comment ): string {
-		$id = (int) $comment->comment_ID;
-		if ( 'note' !== $comment->comment_type || '1' !== get_comment_meta( $id, 'ai_feedback', true ) ) {
+		if ( 'note' !== $comment->comment_type ) {
+			return $text;
+		}
+		$meta = get_comment_meta( (int) $comment->comment_ID );
+		if ( ! is_array( $meta ) || '1' !== self::first_meta( $meta, 'ai_feedback' ) ) {
 			return $text;
 		}
 
 		$badges = self::build_badges(
 			array(
-				'category' => get_comment_meta( $id, 'feedback_category', true ),
-				'severity' => get_comment_meta( $id, 'feedback_severity', true ),
+				'category' => self::first_meta( $meta, 'feedback_category' ),
+				'severity' => self::first_meta( $meta, 'feedback_severity' ),
 			)
 		);
 		if ( '' === $badges ) {
 			return $text;
 		}
 
+		// Earlier versions stored the badges after a blank line, so only that
+		// exact ending is replaced; feedback that merely ends in the badge
+		// words is kept. The labels use the current locale, so badges stored
+		// under another site language are not matched and show twice.
 		$text   = rtrim( $text );
 		$legacy = array(
 			$badges,
@@ -237,13 +244,26 @@ class Notes_Manager {
 			wp_strip_all_tags( $badges ),
 		);
 		foreach ( $legacy as $stored ) {
-			if ( str_ends_with( $text, $stored ) ) {
+			if ( str_ends_with( $text, "\n\n" . $stored ) ) {
 				$text = rtrim( substr( $text, 0, -strlen( $stored ) ) );
 				break;
 			}
 		}
 
 		return $text . "\n\n" . $badges;
+	}
+
+	/**
+	 * Returns the first value of a meta key from a comment's full meta.
+	 *
+	 * @param  array<mixed> $meta All meta for a comment, from `get_comment_meta( $id )`.
+	 * @param  string       $key  Meta key.
+	 * @return string Meta value, or an empty string.
+	 */
+	private static function first_meta( array $meta, string $key ): string {
+		$values = $meta[ $key ] ?? null;
+		$value  = is_array( $values ) ? ( $values[0] ?? '' ) : '';
+		return is_string( $value ) ? $value : '';
 	}
 
 	/**

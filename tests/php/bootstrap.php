@@ -361,6 +361,10 @@ if ( ! function_exists( 'wp_list_pluck' ) ) {
 
 if ( ! function_exists( 'get_comment_meta' ) ) {
 	function get_comment_meta( $comment_id, $key = '', $single = false ) {
+		if ( '' === $key ) {
+			$meta = $GLOBALS['test_comment_meta'][ $comment_id ] ?? array();
+			return array_map( fn( $value ) => array( $value ), $meta );
+		}
 		return $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? ( $single ? '' : array() );
 	}
 }
