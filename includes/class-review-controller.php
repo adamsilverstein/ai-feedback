@@ -344,6 +344,10 @@ class Review_Controller extends WP_REST_Controller {
 							'required' => true,
 							'format'   => 'text-field',
 						),
+						'anchor'   => array(
+							'type'    => 'string',
+							'pattern' => '^[a-z0-9]{1,32}$',
+						),
 					),
 				),
 			),

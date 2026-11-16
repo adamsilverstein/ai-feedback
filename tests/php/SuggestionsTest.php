@@ -353,6 +353,19 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * Notes return the block name and anchor used to re-link them.
+		 */
+		public function test_note_fields_include_block_name_and_anchor(): void {
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ]['block_name']   = 'core/paragraph';
+			$GLOBALS['test_comment_meta'][ self::NOTE_ID ]['block_anchor'] = 'abc123';
+
+			$note = ( new Notes_Manager() )->get_notes_for_post( 42 )[0];
+
+			$this->assertSame( 'core/paragraph', $note['block_name'] );
+			$this->assertSame( 'abc123', $note['block_anchor'] );
+		}
+
+		/**
 		 * Notes report their suggestion status next to the quick fix.
 		 */
 		public function test_note_fields_include_suggestion_status(): void {

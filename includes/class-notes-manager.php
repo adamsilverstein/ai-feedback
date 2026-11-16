@@ -364,6 +364,11 @@ class Notes_Manager {
 			$meta['block_name'] = $feedback_item['block_name'];
 		}
 
+		// Lets the editor re-link the note when the block's noteId was never saved.
+		if ( ! empty( $feedback_item['block_anchor'] ) ) {
+			$meta['block_anchor'] = $feedback_item['block_anchor'];
+		}
+
 		// Add review metadata.
 		if ( ! empty( $review_data['review_id'] ) ) {
 			$meta['review_id'] = $review_data['review_id'];
@@ -520,6 +525,7 @@ class Notes_Manager {
 				'type'        => $comment->comment_type,
 				'status'      => ( '1' === $comment->comment_approved ) ? 'approved' : 'hold',
 				'block_id'    => get_comment_meta( $comment->comment_ID, 'block_id', true ),
+				'block_name'  => get_comment_meta( $comment->comment_ID, 'block_name', true ),
 				'block_index' => $this->get_int_meta( (int) $comment->comment_ID, 'block_index' ),
 				'category'    => get_comment_meta( $comment->comment_ID, 'feedback_category', true ),
 				'severity'    => get_comment_meta( $comment->comment_ID, 'feedback_severity', true ),
@@ -530,7 +536,8 @@ class Notes_Manager {
 				'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
 			);
 
-			$note += $this->get_feedback_fields( $note['id'] );
+			$note['block_anchor'] = get_comment_meta( $note['id'], 'block_anchor', true );
+			$note                += $this->get_feedback_fields( $note['id'] );
 
 			// Add grouping information if available.
 			if ( $is_group ) {
