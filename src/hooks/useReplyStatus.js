@@ -100,6 +100,8 @@ export default function useReplyStatus(replyId) {
 		let cancelled = false;
 		let finished = false;
 		let unknownPolls = 0;
+		// Whether this hook's request to answer the reply is still running.
+		let isAnswering = true;
 		let interval = POLL_INTERVAL_MS;
 		const startedAt = Date.now();
 
@@ -154,6 +156,7 @@ export default function useReplyStatus(replyId) {
 			data: { retry: attempt > 0 },
 		})
 			.then((response) => {
+				isAnswering = false;
 				if (cancelled || finished) {
 					return;
 				}
@@ -173,6 +176,7 @@ export default function useReplyStatus(replyId) {
 			})
 			// Polling still reports the outcome, so only log the failure.
 			.catch((err) => {
+				isAnswering = false;
 				debugLog('Reply process request failed', replyId, err);
 			});
 
@@ -193,6 +197,14 @@ export default function useReplyStatus(replyId) {
 					aiReplyCommentId: response?.ai_reply_comment_id ?? null,
 					error: response?.error ?? null,
 				};
+
+				// A failure seen while the answer request is running is the
+				// previous attempt's: the poll can reach the server before
+				// that request claims the reply. Its response has the outcome.
+				if (next.status === 'failed' && isAnswering) {
+					next.status = 'pending';
+					next.error = null;
+				}
 
 				if (next.status === 'unknown') {
 					unknownPolls++;

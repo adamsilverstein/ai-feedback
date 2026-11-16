@@ -85,7 +85,7 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * First stable release.
 * Quick fixes: apply mechanical text changes straight from a note, with a preview of the old and new wording.
 * Quick fixes are added as Gutenberg suggestions when Suggestion Mode is on, so they can be accepted or rejected.
-* Reply to an AI note and get an AI answer in the same thread; replies run in the background via WP-Cron.
+* Reply to an AI note and get an AI answer in the same thread; replies are answered right away in the editor, with WP-Cron as the fallback.
 * Feedback items are scored by priority, with quick actions in the sidebar.
 * Large documents are reviewed in chunks, and the sidebar updates after each part.
 * Staged progress during a review, and retries when the AI service is unavailable.

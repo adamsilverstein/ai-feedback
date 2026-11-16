@@ -68,6 +68,34 @@ class Overtaken_Reply_Service extends Counting_Reply_Service {
 }
 
 /**
+ * Reply service that runs a callback while the AI call is in flight.
+ */
+class Observing_Reply_Service extends Counting_Reply_Service {
+
+	/**
+	 * Called during the AI call.
+	 *
+	 * @var \Closure|null
+	 */
+	public ?\Closure $during = null;
+
+	/**
+	 * Run the callback, then return the canned reply.
+	 *
+	 * @param string $prompt             Prompt.
+	 * @param string $system_instruction System instruction.
+	 * @param string $model              Model.
+	 * @return string|\WP_Error
+	 */
+	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
+		if ( null !== $this->during ) {
+			( $this->during )();
+		}
+		return parent::call_ai( $prompt, $system_instruction, $model );
+	}
+}
+
+/**
  * Notes manager that pretends to save the AI reply as comment 999.
  */
 class Process_Fake_Notes_Manager extends Notes_Manager {
@@ -409,6 +437,44 @@ class ReplyProcessTest extends TestCase {
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
 		$this->assertArrayNotHasKey( 'error', $data );
+	}
+
+	/**
+	 * A reply that sat pending past the timeout, eg. one posted outside the
+	 * editor on a site without WP-Cron, is still answered.
+	 */
+	public function test_process_answers_reply_pending_past_the_timeout(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, time() - Reply_Cron_Dispatcher::PENDING_TIMEOUT - 60 );
+
+		$before = $this->controller->get_status( $this->request() )->get_data();
+		$this->assertIsArray( $before );
+		$this->assertSame( 'failed', $before['status'], 'Unclaimed, the reply reads as timed out.' );
+
+		$data = $this->process();
+
+		$this->assertSame( 1, $this->service->ai_calls );
+		$this->assertSame( 'complete', $data['status'] );
+	}
+
+	/**
+	 * Claiming a reply restarts its timeout, so it reads as pending rather
+	 * than timed out while the answer is generated.
+	 */
+	public function test_claimed_reply_pending_past_the_timeout_reports_pending(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, time() - Reply_Cron_Dispatcher::PENDING_TIMEOUT - 60 );
+
+		$service    = new Observing_Reply_Service( new Prompt_Builder(), new Process_Fake_Notes_Manager() );
+		$controller = new Reply_Status_Controller( $service );
+		$during     = null;
+
+		$service->during = function () use ( $controller, &$during ): void {
+			$during = $controller->get_status( $this->request() )->get_data();
+		};
+
+		$controller->process_reply( $this->request() );
+
+		$this->assertIsArray( $during );
+		$this->assertSame( 'pending', $during['status'] );
 	}
 
 	/**

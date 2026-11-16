@@ -259,9 +259,10 @@ class Reply_Service {
 		}
 
 		$this->claim_token = $token;
+		// Restart the timeout: a reply can sit pending past it before a request claims it.
+		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
 		if ( $retry ) {
-			// Restart the timeout and clear the last error for the new attempt.
-			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
+			// Clear the last error for the new attempt.
 			delete_comment_meta( $comment_id, Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY );
 		}
 

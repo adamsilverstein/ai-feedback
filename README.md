@@ -274,7 +274,7 @@ See [docs/CI.md](docs/CI.md) for details on running checks locally and setting u
 
 - **Settings Controller**: REST API for settings management
 - **Review Service**: Orchestrates document analysis (Phase 2)
-- **Reply Service**: Answers replies to AI notes, run in the background via WP-Cron
+- **Reply Service**: Answers replies to AI notes, right away in the editor with WP-Cron as the fallback
 - **Notes Manager**: Creates and manages Notes (Phase 3)
 - **Prompt Builder**: Constructs AI prompts (Phase 2)
 
