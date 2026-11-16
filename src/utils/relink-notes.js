@@ -3,8 +3,8 @@
  *
  * A review stores each note's ID in its block's `metadata.noteId`, which only
  * reaches the database when the post is saved. Reloading first leaves the
- * notes orphaned, so they are matched back to blocks by the anchor saved
- * with each note.
+ * notes orphaned, so they are matched back to blocks by the anchor and block
+ * name saved with each note.
  */
 import { extractBlockData } from './block-utils';
 
@@ -28,13 +28,29 @@ function collectLinks(blocks, linked, free) {
 }
 
 /**
- * Match orphaned notes to blocks with the same anchor.
+ * Key notes and blocks by block name and anchor.
+ *
+ * @param {string} name   Block name.
+ * @param {string} anchor Block anchor.
+ * @return {string} Match key.
+ */
+const matchKey = (name, anchor) => `${name}\n${anchor}`;
+
+/**
+ * Match orphaned notes to blocks with the same block name and anchor.
  *
  * Only top-level notes are linked, and only to blocks that have no note yet.
- * When several blocks share an anchor, notes take them in document order.
+ *
+ * A review creates one top-level note per block, so several notes from one
+ * review with the same key belong to different blocks with identical text.
+ * Notes from an older review of the same text were replaced by the newer
+ * review, so only the latest review's notes are linked for each key. When a
+ * key matches more free blocks than notes, the right block is unknown and
+ * the notes stay unlinked, since a wrong link is worse than none.
  *
  * @param {Array}    blocks Editor blocks.
- * @param {Object[]} notes  AI notes for the post, with `parent` and `block_anchor`.
+ * @param {Object[]} notes  AI notes for the post, with `parent`, `block_name`,
+ *                          `block_anchor` and `review_id`.
  * @return {Object} Map of block clientId to note ID.
  */
 export function getNoteRelinks(blocks, notes) {
@@ -42,26 +58,49 @@ export function getNoteRelinks(blocks, notes) {
 	const free = [];
 	collectLinks(blocks, linked, free);
 
-	const anchors = new Map(
-		extractBlockData(blocks).map((block) => [block.clientId, block.anchor])
+	const keys = new Map(
+		extractBlockData(blocks).map((block) => [
+			block.clientId,
+			matchKey(block.name, block.anchor),
+		])
 	);
 
-	const relinks = {};
-	const orphans = notes
-		.filter(
-			(note) => !note.parent && note.block_anchor && !linked.has(note.id)
-		)
+	const anchored = notes
+		.filter((note) => !note.parent && note.block_anchor && note.block_name)
 		.sort((a, b) => a.id - b.id);
 
-	for (const note of orphans) {
-		const block = free.find(
-			({ clientId }) =>
-				!relinks[clientId] &&
-				anchors.get(clientId) === note.block_anchor
+	// The newest note for a key, linked or not, belongs to the latest review.
+	const latestReview = new Map();
+	for (const note of anchored) {
+		latestReview.set(
+			matchKey(note.block_name, note.block_anchor),
+			note.review_id
 		);
-		if (block) {
-			relinks[block.clientId] = note.id;
+	}
+
+	const orphansByKey = new Map();
+	for (const note of anchored) {
+		const key = matchKey(note.block_name, note.block_anchor);
+		if (linked.has(note.id) || note.review_id !== latestReview.get(key)) {
+			continue;
 		}
+		if (!orphansByKey.has(key)) {
+			orphansByKey.set(key, []);
+		}
+		orphansByKey.get(key).push(note);
+	}
+
+	const relinks = {};
+	for (const [key, orphans] of orphansByKey) {
+		const candidates = free.filter(
+			({ clientId }) => keys.get(clientId) === key
+		);
+		if (candidates.length > orphans.length) {
+			continue;
+		}
+		candidates.forEach(({ clientId }, index) => {
+			relinks[clientId] = orphans[index].id;
+		});
 	}
 
 	return relinks;

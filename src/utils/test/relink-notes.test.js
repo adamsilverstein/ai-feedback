@@ -16,7 +16,9 @@ const paragraph = (clientId, text, metadata) => ({
 const note = (id, text, extra = {}) => ({
 	id,
 	parent: 0,
+	block_name: 'core/paragraph',
 	block_anchor: getBlockAnchor('core/paragraph', text),
+	review_id: 'review-1',
 	...extra,
 });
 
@@ -92,5 +94,49 @@ describe('getNoteRelinks', () => {
 		const blocks = [paragraph('a', 'Edited.')];
 
 		expect(getNoteRelinks(blocks, [note(10, 'Original.')])).toEqual({});
+	});
+
+	it('requires the same block name', () => {
+		const blocks = [paragraph('a', 'First.')];
+		const notes = [
+			note(10, 'First.', { block_name: 'core/heading' }),
+			note(11, 'First.', { block_name: '' }),
+		];
+
+		expect(getNoteRelinks(blocks, notes)).toEqual({});
+	});
+
+	it('leaves notes from an older review of the same text', () => {
+		const blocks = [
+			paragraph('a', 'Same.', { noteId: 30 }),
+			paragraph('b', 'Same.'),
+		];
+		const notes = [
+			note(20, 'Same.', { review_id: 'review-1' }),
+			note(30, 'Same.', { review_id: 'review-2' }),
+		];
+
+		expect(getNoteRelinks(blocks, notes)).toEqual({});
+	});
+
+	it('links the latest review when an older one covered the same text', () => {
+		const blocks = [paragraph('a', 'First.')];
+		const notes = [
+			note(10, 'First.', { review_id: 'review-1' }),
+			note(20, 'First.', { review_id: 'review-2' }),
+		];
+
+		expect(getNoteRelinks(blocks, notes)).toEqual({ a: 20 });
+	});
+
+	it('leaves notes when more blocks than notes share the text', () => {
+		const blocks = [
+			paragraph('a', 'Same.'),
+			paragraph('b', 'Same.'),
+			paragraph('c', 'Other.'),
+		];
+		const notes = [note(20, 'Same.'), note(21, 'Other.')];
+
+		expect(getNoteRelinks(blocks, notes)).toEqual({ c: 21 });
 	});
 });

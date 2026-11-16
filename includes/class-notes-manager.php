@@ -430,6 +430,7 @@ class Notes_Manager {
 				'type'        => $comment->comment_type,
 				'status'      => ( '1' === $comment->comment_approved ) ? 'approved' : 'hold',
 				'block_id'    => get_comment_meta( $comment->comment_ID, 'block_id', true ),
+				'block_name'  => get_comment_meta( $comment->comment_ID, 'block_name', true ),
 				'block_index' => $this->get_int_meta( (int) $comment->comment_ID, 'block_index' ),
 				'category'    => get_comment_meta( $comment->comment_ID, 'feedback_category', true ),
 				'severity'    => get_comment_meta( $comment->comment_ID, 'feedback_severity', true ),
