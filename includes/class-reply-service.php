@@ -132,28 +132,87 @@ class Reply_Service {
 	 * @return bool Whether this request answered the reply.
 	 */
 	public function process( int $comment_id, bool $retry = false ): bool {
-		$job = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::JOB_META_KEY, true );
-		if ( ! is_array( $job ) || 3 !== count( $job ) ) {
+		$job = $this->get_job( $comment_id );
+		if ( null === $job ) {
 			return false;
 		}
 
-		list( $parent_id, $post_id, $block_id ) = array_values( $job );
-		if ( ! is_numeric( $parent_id ) || ! is_numeric( $post_id ) || ! is_string( $block_id ) ) {
-			return false;
-		}
+		list( $parent_id, $post_id, $block_id ) = $job;
 
 		if ( ! $this->claim( $comment_id, $retry ) ) {
 			return false;
 		}
 
-		$args      = array( $comment_id, (int) $parent_id, (int) $post_id, $block_id );
+		$args      = array( $comment_id, $parent_id, $post_id, $block_id );
 		$timestamp = wp_next_scheduled( Reply_Cron_Dispatcher::CRON_HOOK, $args );
 		if ( false !== $timestamp ) {
 			wp_unschedule_event( $timestamp, Reply_Cron_Dispatcher::CRON_HOOK, $args );
 		}
 
-		$this->generate( $comment_id, (int) $parent_id, (int) $post_id, $block_id );
+		$this->generate( $comment_id, $parent_id, $post_id, $block_id );
 		return true;
+	}
+
+	/**
+	 * Get the stored job for a queued reply.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return array{int, int, string}|null Parent ID, post ID and block ID, or null when the reply was never queued.
+	 */
+	private function get_job( int $comment_id ): ?array {
+		$job = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::JOB_META_KEY, true );
+		if ( ! is_array( $job ) ) {
+			return $this->rebuild_job( $comment_id );
+		}
+		if ( 3 !== count( $job ) ) {
+			return null;
+		}
+
+		list( $parent_id, $post_id, $block_id ) = array_values( $job );
+		if ( ! is_numeric( $parent_id ) || ! is_numeric( $post_id ) || ! is_string( $block_id ) ) {
+			return null;
+		}
+
+		return array( (int) $parent_id, (int) $post_id, $block_id );
+	}
+
+	/**
+	 * Rebuild the job for a reply queued before the job was stored with it.
+	 *
+	 * Only a pending or failed user reply in an AI note's thread qualifies,
+	 * matching what Reply_Detector would have queued.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return array{int, int, string}|null Parent ID, post ID and block ID, or null.
+	 */
+	private function rebuild_job( int $comment_id ): ?array {
+		$status = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		if ( 'pending' !== $status && 'failed' !== $status ) {
+			return null;
+		}
+
+		$reply = get_comment( $comment_id );
+		if ( ! is_object( $reply ) || get_comment_meta( $comment_id, 'ai_feedback', true ) ) {
+			return null;
+		}
+
+		$direct_parent = is_numeric( $reply->comment_parent ) ? (int) $reply->comment_parent : 0;
+		$post_id       = is_numeric( $reply->comment_post_ID ) ? (int) $reply->comment_post_ID : 0;
+		if ( $direct_parent <= 0 || $post_id <= 0 ) {
+			return null;
+		}
+
+		$parent_id = Reply_Detector::find_thread_root( $direct_parent );
+		if ( ! get_comment_meta( $parent_id, 'ai_feedback', true ) ) {
+			return null;
+		}
+
+		$block_id = sanitize_text_field( self::meta_string( $parent_id, 'block_id' ) );
+		if ( '' === $block_id ) {
+			return null;
+		}
+
+		return array( $parent_id, $post_id, $block_id );
 	}
 
 	/**

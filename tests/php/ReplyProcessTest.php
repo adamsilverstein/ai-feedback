@@ -18,6 +18,7 @@ require_once dirname( __DIR__, 2 ) . '/includes/class-reply-cron-dispatcher.php'
 require_once __DIR__ . '/reply-cron-mocks.php';
 require_once __DIR__ . '/reply-status-controller-bootstrap.php';
 require_once __DIR__ . '/reply-service-mocks.php';
+require_once dirname( __DIR__, 2 ) . '/includes/class-reply-detector.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-service.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-status-controller.php';
 
@@ -139,7 +140,10 @@ class ReplyProcessTest extends TestCase {
 			),
 		);
 		$GLOBALS['test_comment_meta']     = array(
-			100 => array( 'ai_feedback' => '1' ),
+			100 => array(
+				'ai_feedback' => '1',
+				'block_id'    => 'abc-123',
+			),
 			200 => array(
 				Reply_Cron_Dispatcher::STATUS_META_KEY => 'pending',
 				Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY => time(),
@@ -363,6 +367,32 @@ class ReplyProcessTest extends TestCase {
 		$this->assertSame( 0, $this->service->ai_calls );
 		$this->assertSame( 'unknown', $data['status'] );
 		$this->assertSame( array(), $GLOBALS['test_comment_meta'][200] );
+	}
+
+	/**
+	 * A reply queued before the job meta existed is answered from the comment itself.
+	 */
+	public function test_process_rebuilds_job_for_reply_queued_before_upgrade(): void {
+		delete_comment_meta( 200, Reply_Cron_Dispatcher::JOB_META_KEY );
+
+		$data = $this->process();
+
+		$this->assertSame( 1, $this->service->ai_calls );
+		$this->assertSame( 'complete', $data['status'] );
+		$this->assertFalse( wp_next_scheduled( Reply_Cron_Dispatcher::CRON_HOOK, array( 200, 100, 42, 'abc-123' ) ), 'The rebuilt job matches the cron event.' );
+	}
+
+	/**
+	 * Without job meta, only a reply in an AI note's thread is answered.
+	 */
+	public function test_process_does_not_rebuild_job_outside_ai_thread(): void {
+		delete_comment_meta( 200, Reply_Cron_Dispatcher::JOB_META_KEY );
+		delete_comment_meta( 100, 'ai_feedback' );
+
+		$data = $this->process( 200, true );
+
+		$this->assertSame( 0, $this->service->ai_calls );
+		$this->assertSame( 'pending', $data['status'] );
 	}
 
 	/**
