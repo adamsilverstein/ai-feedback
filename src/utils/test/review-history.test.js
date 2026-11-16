@@ -1,8 +1,90 @@
 /**
  * Internal dependencies
  */
-import { describe, it, expect } from 'vitest';
-import { describeChange, formatNoteCount } from '../review-history';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { getSettings, setSettings } from '@wordpress/date';
+import {
+	describeChange,
+	formatNoteCount,
+	formatReviewDate,
+	getReviewTime,
+} from '../review-history';
+
+const originalSettings = getSettings();
+const originalTZ = process.env.TZ;
+
+/**
+ * Set the site timezone and the browser's.
+ *
+ * @param {Object} timezone Site timezone settings.
+ * @param {string} browser  Browser timezone.
+ */
+function setTimezones(timezone, browser) {
+	process.env.TZ = browser;
+	setSettings({
+		...originalSettings,
+		formats: { ...originalSettings.formats, datetime: 'Y-m-d H:i' },
+		timezone: { ...originalSettings.timezone, string: '', ...timezone },
+	});
+}
+
+const SITE_UTC = { offset: 0, offsetFormatted: '', string: '' };
+const SITE_NEW_YORK = { offset: -5, string: 'America/New_York' };
+
+describe('formatReviewDate', () => {
+	afterEach(() => {
+		process.env.TZ = originalTZ;
+		setSettings(originalSettings);
+	});
+
+	beforeEach(() => {
+		setTimezones(SITE_UTC, 'America/Los_Angeles');
+	});
+
+	it('returns nothing without a timestamp', () => {
+		expect(formatReviewDate('')).toBe('');
+	});
+
+	it('shows a UTC timestamp in the site timezone, not the browser one', () => {
+		expect(formatReviewDate('2026-11-14T04:46:00+00:00')).toBe(
+			'2026-11-14 04:46'
+		);
+	});
+
+	it('treats a legacy timestamp without an offset as site time', () => {
+		expect(formatReviewDate('2026-11-14 04:46:00')).toBe(
+			'2026-11-14 04:46'
+		);
+	});
+
+	it('converts to a named site timezone', () => {
+		setTimezones(SITE_NEW_YORK, 'Asia/Tokyo');
+		expect(formatReviewDate('2026-11-14T04:46:00+00:00')).toBe(
+			'2026-11-13 23:46'
+		);
+		expect(formatReviewDate('2026-11-13 23:46:00')).toBe(
+			'2026-11-13 23:46'
+		);
+	});
+});
+
+describe('getReviewTime', () => {
+	afterEach(() => {
+		process.env.TZ = originalTZ;
+		setSettings(originalSettings);
+	});
+
+	it('compares legacy and UTC timestamps as the same instant', () => {
+		setTimezones(SITE_NEW_YORK, 'America/Los_Angeles');
+		expect(getReviewTime('2026-11-13 23:46:00')).toBe(
+			getReviewTime('2026-11-14T04:46:00+00:00')
+		);
+	});
+
+	it('returns 0 without a timestamp', () => {
+		expect(getReviewTime('')).toBe(0);
+	});
+});
 
 describe('describeChange', () => {
 	it('returns nothing for the oldest review', () => {
