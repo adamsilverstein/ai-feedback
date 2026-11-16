@@ -140,10 +140,7 @@ class Suggestions {
 		}
 
 		$ids = array();
-		foreach ( is_array( $notes ) ? $notes : array() as $note ) {
-			if ( ! $note instanceof \WP_Comment ) {
-				continue;
-			}
+		foreach ( $notes as $note ) {
 			$note_id = (int) $note->comment_ID;
 			$created = strtotime( $note->comment_date_gmt . ' UTC' );
 			if (

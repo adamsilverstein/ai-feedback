@@ -210,8 +210,8 @@ class Reply_Service {
 		);
 
 		$thread = array();
-		foreach ( is_array( $siblings ) ? array_reverse( $siblings ) : array() as $sibling ) {
-			if ( ! is_object( $sibling ) || (int) $sibling->comment_ID === $comment_id ) {
+		foreach ( array_reverse( $siblings ) as $sibling ) {
+			if ( (int) $sibling->comment_ID === $comment_id ) {
 				continue;
 			}
 			$thread[] = array(

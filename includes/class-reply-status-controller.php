@@ -128,10 +128,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 
 		$ai_note_ids = array();
 		$replies     = array();
-		foreach ( is_array( $comments ) ? $comments : array() as $comment ) {
-			if ( ! is_object( $comment ) ) {
-				continue;
-			}
+		foreach ( $comments as $comment ) {
 			$id = (int) $comment->comment_ID;
 			if ( get_comment_meta( $id, 'ai_feedback', true ) && 0 === (int) $comment->comment_parent ) {
 				$ai_note_ids[ $id ] = true;

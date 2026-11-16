@@ -74,7 +74,7 @@ class Analytics {
 		$model    = is_string( $review['model'] ?? null ) ? substr( sanitize_text_field( $review['model'] ), 0, 100 ) : '';
 		$model    = '' !== $model ? $model : 'unknown';
 		$feedback = is_numeric( $review['note_count'] ?? null ) ? (int) $review['note_count'] : 0;
-		$user_id  = (string) get_current_user_id();
+		$user_id  = get_current_user_id();
 
 		++$day['reviews'];
 		$day['feedback']         += $feedback;
@@ -109,7 +109,7 @@ class Analytics {
 	 */
 	public static function forget_user( int $user_id ): int {
 		$days    = self::get_days();
-		$key     = (string) $user_id;
+		$key     = $user_id;
 		$removed = 0;
 
 		foreach ( $days as $date => $day ) {
@@ -174,7 +174,7 @@ class Analytics {
 			);
 		}
 
-		$key   = (string) $user->ID;
+		$key   = $user->ID;
 		$items = array();
 		foreach ( self::get_days() as $date => $day ) {
 			if ( empty( $day['users'][ $key ] ) ) {
@@ -226,7 +226,7 @@ class Analytics {
 	 * Summarize usage for a period.
 	 *
 	 * @param  string $period One of the PERIODS keys.
-	 * @return array{period: string, total_reviews: int, total_feedback: int, avg_feedback: float, by_model: array<string, int>, by_severity: array<string, int>, by_category: array<string, int>, by_day: list<array{date: string, reviews: int, feedback: int}>, top_users: list<array{user_id: int, name: string, reviews: int}>}
+	 * @return array{period: string, total_reviews: int, total_feedback: int, avg_feedback: float, by_model: array<array-key, int>, by_severity: array<array-key, int>, by_category: array<array-key, int>, by_day: list<array{date: string, reviews: int, feedback: int}>, top_users: list<array{user_id: int, name: string, reviews: int}>}
 	 */
 	public static function get_summary( string $period = '30days' ): array {
 		if ( ! isset( self::PERIODS[ $period ] ) ) {
@@ -281,7 +281,7 @@ class Analytics {
 	/**
 	 * Read the stored daily buckets, discarding anything malformed.
 	 *
-	 * @return array<string, array{reviews: int, feedback: int, models: array<string, int>, users: array<string, int>, severity: array<string, int>, category: array<string, int>}>
+	 * @return array<string, array{reviews: int, feedback: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}>
 	 */
 	public static function get_days(): array {
 		$stored = get_option( self::OPTION_KEY, array() );
@@ -311,7 +311,7 @@ class Analytics {
 	/**
 	 * An empty daily bucket.
 	 *
-	 * @return array{reviews: int, feedback: int, models: array<string, int>, users: array<string, int>, severity: array<string, int>, category: array<string, int>}
+	 * @return array{reviews: int, feedback: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}
 	 */
 	private static function empty_day(): array {
 		return array(
@@ -327,9 +327,9 @@ class Analytics {
 	/**
 	 * Add a count map into another, ignoring non-numeric values.
 	 *
-	 * @param  array<string, int> $totals Running totals.
-	 * @param  mixed              $counts Counts to add.
-	 * @return array<string, int>
+	 * @param  array<array-key, int> $totals Running totals. Numeric keys, such as user IDs, are stored as ints.
+	 * @param  mixed                 $counts Counts to add.
+	 * @return array<array-key, int>
 	 */
 	private static function add_counts( array $totals, mixed $counts ): array {
 		if ( ! is_array( $counts ) ) {
@@ -340,7 +340,6 @@ class Analytics {
 			if ( ! is_numeric( $count ) ) {
 				continue;
 			}
-			$key            = (string) $key;
 			$totals[ $key ] = ( $totals[ $key ] ?? 0 ) + (int) $count;
 		}
 
@@ -367,8 +366,8 @@ class Analytics {
 	/**
 	 * Users with the most reviews.
 	 *
-	 * @param  array<string, int> $users Map of user ID to review count.
-	 * @param  int                $limit Number of users to return.
+	 * @param  array<int, int> $users Map of user ID to review count.
+	 * @param  int             $limit Number of users to return.
 	 * @return list<array{user_id: int, name: string, reviews: int}>
 	 */
 	private static function top_users( array $users, int $limit ): array {

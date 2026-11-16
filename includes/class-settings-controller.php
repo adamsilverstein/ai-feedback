@@ -414,18 +414,15 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return object|null Registry, or null when the AI Client is unavailable.
 	 */
 	protected function get_provider_registry(): ?object {
-		$get_registry = array( '\WordPress\AiClient\AiClient', 'defaultRegistry' );
-		if ( ! is_callable( $get_registry ) ) {
+		if ( ! class_exists( \WordPress\AiClient\AiClient::class ) ) {
 			return null;
 		}
 
 		try {
-			$registry = call_user_func( $get_registry );
+			return \WordPress\AiClient\AiClient::defaultRegistry();
 		} catch ( \Throwable $e ) {
 			return null;
 		}
-
-		return is_object( $registry ) ? $registry : null;
 	}
 
 	/**
