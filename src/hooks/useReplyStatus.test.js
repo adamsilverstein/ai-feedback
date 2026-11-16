@@ -4,20 +4,129 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
+// Status polls go to mockApiFetch, requests to answer the reply to mockProcess.
 const mockApiFetch = vi.fn();
+const mockProcess = vi.fn();
 vi.mock('@wordpress/api-fetch', () => ({
-	default: (args) => mockApiFetch(args),
+	default: (args) =>
+		args.method === 'POST' ? mockProcess(args) : mockApiFetch(args),
 }));
 
 import useReplyStatus, {
 	MAX_PENDING_MS,
 	MAX_POLL_INTERVAL_MS,
 	MAX_UNKNOWN_POLLS,
+	SLOW_REPLY_MS,
 } from './useReplyStatus';
 
 describe('useReplyStatus', () => {
 	beforeEach(() => {
 		mockApiFetch.mockReset();
+		mockProcess.mockReset();
+		// By default the answer request is still running.
+		mockProcess.mockReturnValue(new Promise(() => {}));
+	});
+
+	it('asks the server to answer the reply without waiting for cron', async () => {
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+		mockProcess.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'complete',
+			ai_reply_comment_id: 555,
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await waitFor(() => expect(result.current.status).toBe('complete'));
+		expect(result.current.aiReplyCommentId).toBe(555);
+		expect(mockProcess).toHaveBeenCalledTimes(1);
+		expect(mockProcess).toHaveBeenCalledWith({
+			path: '/ai-feedback/v1/replies/200/process',
+			method: 'POST',
+			data: { retry: false },
+		});
+	});
+
+	it('keeps polling when the answer request fails', async () => {
+		mockProcess.mockRejectedValueOnce(new Error('gateway timeout'));
+		mockApiFetch.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'pending',
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await waitFor(() => expect(mockProcess).toHaveBeenCalledTimes(1));
+		expect(result.current.status).toBe('pending');
+		expect(result.current.error).toBeNull();
+	});
+
+	it('flags a reply that is taking longer than expected', async () => {
+		vi.useFakeTimers();
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await act(async () => {
+			await Promise.resolve();
+		});
+		expect(result.current.isSlow).toBe(false);
+
+		await act(async () => {
+			vi.advanceTimersByTime(SLOW_REPLY_MS);
+		});
+
+		expect(result.current.isSlow).toBe(true);
+		expect(result.current.status).toBe('pending');
+
+		vi.useRealTimers();
+	});
+
+	it('retries the answer with the retry flag and resets the slow state', async () => {
+		vi.useFakeTimers();
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await act(async () => {
+			vi.advanceTimersByTime(SLOW_REPLY_MS);
+		});
+		expect(result.current.isSlow).toBe(true);
+
+		await act(async () => {
+			result.current.retry();
+		});
+
+		expect(result.current.isSlow).toBe(false);
+		expect(mockProcess).toHaveBeenCalledTimes(2);
+		expect(mockProcess).toHaveBeenLastCalledWith({
+			path: '/ai-feedback/v1/replies/200/process',
+			method: 'POST',
+			data: { retry: true },
+		});
+
+		vi.useRealTimers();
+	});
+
+	it('retries a failed reply', async () => {
+		mockApiFetch.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'failed',
+			error: 'Timed out.',
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+		await waitFor(() => expect(result.current.status).toBe('failed'));
+
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+		await act(async () => {
+			result.current.retry();
+		});
+
+		await waitFor(() => expect(result.current.status).toBe('pending'));
+		expect(mockProcess).toHaveBeenLastCalledWith(
+			expect.objectContaining({ data: { retry: true } })
+		);
 	});
 
 	it('returns idle and does not fetch when replyId is falsy', () => {

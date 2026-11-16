@@ -2,13 +2,19 @@
  * Tests for FeedbackReplies component.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { speak } from '@wordpress/a11y';
 
 // Drive the polling hook's status directly.
 let mockStatus = 'pending';
+let mockIsSlow = false;
+const mockRetry = vi.fn();
 vi.mock('../hooks/useReplyStatus', () => ({
-	default: () => ({ status: mockStatus }),
+	default: () => ({
+		status: mockStatus,
+		isSlow: mockIsSlow,
+		retry: mockRetry,
+	}),
 }));
 
 vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
@@ -17,6 +23,11 @@ vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 // full WP components bundle into the test runtime.
 vi.mock('@wordpress/components', () => ({
 	Spinner: () => <span data-testid="wp-spinner" />,
+	Button: ({ children, onClick }) => (
+		<button type="button" onClick={onClick}>
+			{children}
+		</button>
+	),
 }));
 
 import FeedbackReplies from './FeedbackReplies';
@@ -24,7 +35,38 @@ import FeedbackReplies from './FeedbackReplies';
 describe('FeedbackReplies', () => {
 	beforeEach(() => {
 		mockStatus = 'pending';
+		mockIsSlow = false;
+		mockRetry.mockClear();
 		speak.mockClear();
+	});
+
+	it('offers a retry when the reply is taking longer than expected', () => {
+		mockIsSlow = true;
+		render(<FeedbackReplies replies={[]} pendingReplyId={42} />);
+
+		expect(screen.getByTestId('wp-spinner')).toBeInTheDocument();
+		expect(
+			screen.getByText('This is taking longer than expected.')
+		).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+		expect(mockRetry).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not offer a retry while the reply is on time', () => {
+		render(<FeedbackReplies replies={[]} pendingReplyId={42} />);
+
+		expect(
+			screen.queryByRole('button', { name: 'Try again' })
+		).not.toBeInTheDocument();
+	});
+
+	it('offers a retry when generation fails', () => {
+		mockStatus = 'failed';
+		render(<FeedbackReplies replies={[]} pendingReplyId={42} />);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+		expect(mockRetry).toHaveBeenCalledTimes(1);
 	});
 
 	it('renders nothing when there are no replies and no pending reply', () => {

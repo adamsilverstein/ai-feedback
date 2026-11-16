@@ -251,6 +251,44 @@ test.describe('Reply loop', () => {
 			.catch(() => {});
 	});
 
+	test('answers a reply without waiting for WP-Cron', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		// The e2e mu-plugin turns WP-Cron off, so only the editor can trigger
+		// the answer here.
+		const post = await requestUtils.createPost({
+			title: 'Reply without cron',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40% last year.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		const noteId = review.note_ids[0];
+		expect(noteId).toBeGreaterThan(0);
+
+		await replyToNote(page, noteId, 'It is cited in paragraph three.');
+
+		const thread = page.getByRole('list', { name: 'Conversation replies' });
+		await expect(thread.locator('.ai-feedback-reply-ai')).toContainText(
+			MOCK_AI_REPLY,
+			{ timeout: 15000 }
+		);
+		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
+			0
+		);
+	});
+
 	test('replies to a note get an AI reply through WP-Cron', async ({
 		page,
 		editor,

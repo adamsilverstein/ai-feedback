@@ -31,14 +31,21 @@ namespace {
 		/**
 		 * Minimal update_comment_meta mock — last-write-wins into the shared store.
 		 *
+		 * With $prev_value it only writes over a matching value, like core's
+		 * compare-and-set update.
+		 *
 		 * @param int    $comment_id Comment ID.
 		 * @param string $key        Meta key.
 		 * @param mixed  $value      Meta value.
+		 * @param mixed  $prev_value Value the stored one must match.
 		 * @return bool
 		 */
-		function update_comment_meta( $comment_id, $key, $value ) {
+		function update_comment_meta( $comment_id, $key, $value, $prev_value = '' ) {
 			if ( ! isset( $GLOBALS['test_comment_meta'][ $comment_id ] ) ) {
 				$GLOBALS['test_comment_meta'][ $comment_id ] = array();
+			}
+			if ( '' !== $prev_value && ( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? null ) != $prev_value ) {
+				return false;
 			}
 			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = $value;
 			return true;
@@ -84,6 +91,40 @@ namespace {
 				'hook'      => $hook,
 				'args'      => $args,
 			);
+			return true;
+		}
+	}
+
+	if ( ! function_exists( 'wp_unschedule_event' ) ) {
+		/**
+		 * Removes a matching event from the queue.
+		 *
+		 * @param int    $timestamp
+		 * @param string $hook
+		 * @param array  $args
+		 * @return bool
+		 */
+		function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
+			foreach ( $GLOBALS['test_scheduled_events'] ?? array() as $index => $event ) {
+				if ( $event['hook'] === $hook && ( $event['args'] ?? array() ) === $args ) {
+					unset( $GLOBALS['test_scheduled_events'][ $index ] );
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	if ( ! function_exists( 'delete_comment_meta' ) ) {
+		/**
+		 * Removes a meta key from the shared store.
+		 *
+		 * @param int    $comment_id
+		 * @param string $key
+		 * @return bool
+		 */
+		function delete_comment_meta( $comment_id, $key ) {
+			unset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] );
 			return true;
 		}
 	}
