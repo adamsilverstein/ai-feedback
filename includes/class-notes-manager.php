@@ -533,12 +533,8 @@ class Notes_Manager {
 		);
 
 		$note_ids = array( $thread_id );
-		if ( is_array( $replies ) ) {
-			foreach ( $replies as $reply ) {
-				if ( $reply instanceof \WP_Comment ) {
-					$note_ids[] = (int) $reply->comment_ID;
-				}
-			}
+		foreach ( $replies as $reply ) {
+			$note_ids[] = (int) $reply->comment_ID;
 		}
 
 		foreach ( $note_ids as $note_id ) {
