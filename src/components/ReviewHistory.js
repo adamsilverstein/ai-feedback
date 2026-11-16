@@ -15,6 +15,7 @@ import {
 	describeChange,
 	formatReviewDate,
 	formatNoteCount,
+	getReviewISODate,
 } from '../utils/review-history';
 
 const SEVERITIES = ['critical', 'important', 'suggestion'];
@@ -193,7 +194,7 @@ export default function ReviewHistory() {
 						>
 							<time
 								className="ai-feedback-history-date"
-								dateTime={entry.timestamp}
+								dateTime={getReviewISODate(entry.timestamp)}
 							>
 								{formatReviewDate(entry.timestamp)}
 							</time>

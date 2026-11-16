@@ -25,6 +25,31 @@ export function getReviewTime(timestamp) {
 }
 
 /**
+ * Parse a review timestamp.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @return {Date|null} Date, or null for a missing or unparseable timestamp.
+ */
+function parseReviewDate(timestamp) {
+	if (!timestamp) {
+		return null;
+	}
+	const date = getDate(timestamp);
+	return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Get a review timestamp as an ISO 8601 UTC string, for a datetime attribute.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @return {string} ISO 8601 string, or an empty string if it can't be parsed.
+ */
+export function getReviewISODate(timestamp) {
+	const date = parseReviewDate(timestamp);
+	return date ? date.toISOString() : '';
+}
+
+/**
  * Format a review timestamp for display in the site timezone.
  *
  * @param {string} timestamp Review timestamp.
@@ -32,13 +57,11 @@ export function getReviewTime(timestamp) {
  * @return {string} Formatted date.
  */
 export function formatReviewDate(timestamp, format) {
-	if (!timestamp) {
+	const date = parseReviewDate(timestamp);
+	if (!date) {
 		return '';
 	}
-	return dateI18n(
-		format || getDateSettings().formats.datetime,
-		getDate(timestamp)
-	);
+	return dateI18n(format || getDateSettings().formats.datetime, date);
 }
 
 /**

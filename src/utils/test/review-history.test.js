@@ -7,6 +7,7 @@ import {
 	describeChange,
 	formatNoteCount,
 	formatReviewDate,
+	getReviewISODate,
 	getReviewTime,
 } from '../review-history';
 
@@ -45,6 +46,10 @@ describe('formatReviewDate', () => {
 		expect(formatReviewDate('')).toBe('');
 	});
 
+	it('returns nothing for an unparseable timestamp', () => {
+		expect(formatReviewDate('garbage')).toBe('');
+	});
+
 	it('shows a UTC timestamp in the site timezone, not the browser one', () => {
 		expect(formatReviewDate('2026-11-14T04:46:00+00:00')).toBe(
 			'2026-11-14 04:46'
@@ -65,6 +70,32 @@ describe('formatReviewDate', () => {
 		expect(formatReviewDate('2026-11-13 23:46:00')).toBe(
 			'2026-11-13 23:46'
 		);
+	});
+});
+
+describe('getReviewISODate', () => {
+	afterEach(() => {
+		process.env.TZ = originalTZ;
+		setSettings(originalSettings);
+	});
+
+	it('returns a UTC timestamp as ISO 8601', () => {
+		setTimezones(SITE_NEW_YORK, 'Asia/Tokyo');
+		expect(getReviewISODate('2026-11-14T04:46:00+00:00')).toBe(
+			'2026-11-14T04:46:00.000Z'
+		);
+	});
+
+	it('reads a legacy timestamp as site time', () => {
+		setTimezones(SITE_NEW_YORK, 'Asia/Tokyo');
+		expect(getReviewISODate('2026-11-13 23:46:00')).toBe(
+			'2026-11-14T04:46:00.000Z'
+		);
+	});
+
+	it('returns nothing for a missing or unparseable timestamp', () => {
+		expect(getReviewISODate('')).toBe('');
+		expect(getReviewISODate('garbage')).toBe('');
 	});
 });
 
