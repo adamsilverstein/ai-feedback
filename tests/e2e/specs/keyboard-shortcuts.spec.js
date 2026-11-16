@@ -63,17 +63,19 @@ test.describe('Keyboard shortcuts', () => {
 		await page.evaluate(() =>
 			window.wp.data.dispatch('core/block-editor').clearSelectedBlock()
 		);
-		await pageUtils.pressKeys('access+j');
+		const selectedBlock = () =>
+			page.evaluate(() =>
+				window.wp.data
+					.select('core/block-editor')
+					.getSelectedBlockClientId()
+			);
 
-		await expect
-			.poll(() =>
-				page.evaluate(() =>
-					window.wp.data
-						.select('core/block-editor')
-						.getSelectedBlockClientId()
-				)
-			)
-			.toBe(blocks[0].clientId);
+		await pageUtils.pressKeys('access+j');
+		await expect.poll(selectedBlock).toBe(blocks[0].clientId);
+
+		// From the first block, "previous" wraps around to the last one.
+		await pageUtils.pressKeys('access+k');
+		await expect.poll(selectedBlock).toBe(blocks[1].clientId);
 	});
 
 	test('lists the shortcuts in the keyboard shortcuts help', async ({
