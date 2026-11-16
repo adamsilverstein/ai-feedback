@@ -822,6 +822,11 @@ $ai-feedback-reply-error: #cc1818;
 	font-style: normal;
 }
 
+.ai-feedback-reply-pending .ai-feedback-reply-retry-hint {
+	font-size: 12px;
+	font-style: normal;
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: more) {
 

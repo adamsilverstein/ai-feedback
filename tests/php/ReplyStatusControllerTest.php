@@ -148,6 +148,68 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * A failed reply inside the retry cooldown reports the seconds left.
+	 */
+	public function test_status_failed_in_cooldown_includes_retry_after(): void {
+		$GLOBALS['test_comment_meta'] = array(
+			200 => array(
+				Reply_Cron_Dispatcher::STATUS_META_KEY     => 'failed',
+				Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY => time() - 4,
+			),
+		);
+
+		$data = $this->controller
+			->get_status( $this->request( 200 ) )
+			->get_data();
+
+		$this->assertIsArray( $data );
+		$this->assertSame( 'failed', $data['status'] );
+		$this->assertGreaterThan( 0, $data['retry_after'] );
+		$this->assertLessThanOrEqual( Reply_Cron_Dispatcher::RETRY_COOLDOWN - 4, $data['retry_after'] );
+	}
+
+	/**
+	 * A failed reply past the retry cooldown has no retry_after.
+	 */
+	public function test_status_failed_after_cooldown_omits_retry_after(): void {
+		$GLOBALS['test_comment_meta'] = array(
+			200 => array(
+				Reply_Cron_Dispatcher::STATUS_META_KEY     => 'failed',
+				Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY => time() - Reply_Cron_Dispatcher::RETRY_COOLDOWN,
+			),
+		);
+
+		$data = $this->controller
+			->get_status( $this->request( 200 ) )
+			->get_data();
+
+		$this->assertIsArray( $data );
+		$this->assertSame( 'failed', $data['status'] );
+		$this->assertArrayNotHasKey( 'retry_after', $data );
+	}
+
+	/**
+	 * A reply that is not failed never reports retry_after.
+	 */
+	public function test_status_pending_omits_retry_after(): void {
+		$GLOBALS['test_comment_meta'] = array(
+			200 => array(
+				Reply_Cron_Dispatcher::STATUS_META_KEY        => 'processing',
+				Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY => time(),
+				Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY    => time(),
+			),
+		);
+
+		$data = $this->controller
+			->get_status( $this->request( 200 ) )
+			->get_data();
+
+		$this->assertIsArray( $data );
+		$this->assertSame( 'pending', $data['status'] );
+		$this->assertArrayNotHasKey( 'retry_after', $data );
+	}
+
+	/**
 	 * Complete status without a stored reply ID is reported as failed.
 	 */
 	public function test_status_complete_without_reply_id_reports_failed(): void {
@@ -212,7 +274,7 @@ class ReplyStatusControllerTest extends TestCase {
 		$schema = $this->controller->get_item_schema();
 
 		$this->assertSame(
-			array( 'reply_id', 'status', 'ai_reply_comment_id', 'error' ),
+			array( 'reply_id', 'status', 'ai_reply_comment_id', 'error', 'retry_after' ),
 			array_keys( $schema['properties'] )
 		);
 	}
