@@ -189,7 +189,7 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 ### Project Structure
 
 ```
-ai-feedback/
+copydesk-ai/
 ├── copydesk-ai.php           # Main plugin file
 ├── includes/                  # PHP classes
 │   ├── class-plugin.php      # Bootstrap
