@@ -75,4 +75,22 @@ class NotesManagerMetaTest extends TestCase {
 		$this->assertSame( 'Abrupt transition', $meta['feedback_title'] );
 		$this->assertArrayNotHasKey( 'feedback_suggestion', $meta );
 	}
+
+	/**
+	 * The block anchor is stored so the editor can re-link the note.
+	 */
+	public function test_stores_block_anchor(): void {
+		$meta = $this->build_note_meta(
+			array(
+				'block_id'     => 'block-1',
+				'block_anchor' => '1x2y3z',
+				'category'     => 'flow',
+				'severity'     => 'important',
+				'title'        => 'Abrupt transition',
+				'feedback'     => 'The section jumps topics.',
+			)
+		);
+
+		$this->assertSame( '1x2y3z', $meta['block_anchor'] );
+	}
 }

@@ -132,6 +132,7 @@ class Response_Parser {
 					'name'    => $block['name'] ?? '',
 					'index'   => $index,
 					'content' => is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '',
+					'anchor'  => $this->get_block_anchor( $block ),
 				);
 				Logger::debug(
 					sprintf(
@@ -344,12 +345,24 @@ class Response_Parser {
 	}
 
 	/**
+	 * Read the anchor the editor sent for a block.
+	 *
+	 * @param  mixed $block Block from the review request.
+	 * @return string Anchor, or an empty string when missing or malformed.
+	 */
+	private function get_block_anchor( mixed $block ): string {
+		$anchor = is_array( $block ) ? ( $block['anchor'] ?? null ) : null;
+
+		return is_string( $anchor ) && 1 === preg_match( '/^[a-z0-9]{1,32}$/', $anchor ) ? $anchor : '';
+	}
+
+	/**
 	 * Validate and sanitize a single feedback item, enriching it with block metadata when available.
 	 *
 	 * Ensures the item contains a valid `block_id` present in `$valid_block_ids`, includes the required
 	 * fields (`category`, `severity`, `title`, `feedback`), and that `category` and `severity` are
 	 * allowed values. When valid, returns a sanitized array containing `block_id`, `category`, `severity`,
-	 * `title`, and `feedback`; includes `block_name` and `block_index` from `$block_info` when available,
+	 * `title`, and `feedback`; includes `block_name`, `block_index` and `block_anchor` from `$block_info` when available,
 	 * and includes a sanitized `suggestion` if provided.
 	 *
 	 * @param  mixed $item            Feedback item data.
@@ -413,6 +426,12 @@ class Response_Parser {
 		if ( isset( $block_info[ $block_id ] ) ) {
 			$validated['block_name']  = $block_info[ $block_id ]['name'] ?? '';
 			$validated['block_index'] = $block_info[ $block_id ]['index'] ?? 0;
+
+			$info   = is_string( $block_id ) ? $block_info[ $block_id ] : null;
+			$anchor = is_array( $info ) ? ( $info['anchor'] ?? '' ) : '';
+			if ( is_string( $anchor ) && '' !== $anchor ) {
+				$validated['block_anchor'] = $anchor;
+			}
 			Logger::debug(
 				sprintf(
 					'Enriched feedback item with block_name=%s, block_index=%d',

@@ -271,6 +271,11 @@ class Notes_Manager {
 			$meta['block_name'] = $feedback_item['block_name'];
 		}
 
+		// Lets the editor re-link the note when the block's noteId was never saved.
+		if ( ! empty( $feedback_item['block_anchor'] ) ) {
+			$meta['block_anchor'] = $feedback_item['block_anchor'];
+		}
+
 		// Add review metadata.
 		if ( ! empty( $review_data['review_id'] ) ) {
 			$meta['review_id'] = $review_data['review_id'];
@@ -435,7 +440,8 @@ class Notes_Manager {
 				'is_resolved' => $this->is_note_resolved( $comment->comment_ID ),
 			);
 
-			$note += $this->get_feedback_fields( $note['id'] );
+			$note['block_anchor'] = get_comment_meta( $note['id'], 'block_anchor', true );
+			$note                += $this->get_feedback_fields( $note['id'] );
 
 			// Add grouping information if available.
 			if ( $is_group ) {
