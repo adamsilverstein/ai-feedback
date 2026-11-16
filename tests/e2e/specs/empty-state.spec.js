@@ -84,6 +84,86 @@ test.describe('Empty State', () => {
 		});
 	});
 
+	test.describe('review settings', () => {
+		test.afterEach(async ({ requestUtils }) => {
+			// Focus areas are stored as an option, so reset them.
+			await requestUtils.rest({
+				path: '/ai-feedback/v1/settings',
+				method: 'POST',
+				data: { default_focus_areas: ['content', 'tone', 'flow'] },
+			});
+		});
+
+		test('sends focus areas chosen before the first review', async ({
+			page,
+			editor,
+			aiFeedback,
+		}) => {
+			await aiFeedback.createAndSavePost(
+				{ title: 'First Review', content: 'Content to review.' },
+				{ editor }
+			);
+			await aiFeedback.openSidebar();
+
+			const panel = page.locator('.ai-feedback-panel');
+			await expect(panel.getByText('No reviews yet')).toBeVisible();
+			await expect(
+				panel
+					.locator('.components-panel__body-toggle')
+					.filter({ hasText: 'Review Settings' })
+			).toHaveAttribute('aria-expanded', 'true');
+
+			await aiFeedback.saveSetting(() =>
+				panel.getByLabel('Design & Formatting').check()
+			);
+			await aiFeedback.saveSetting(() =>
+				panel.getByLabel('Flow & Structure').uncheck()
+			);
+
+			const response = await aiFeedback.runReview();
+			expect(response.request().postDataJSON().focus_areas).toEqual([
+				'content',
+				'tone',
+				'design',
+			]);
+		});
+
+		test('keeps the review progress in view once a review starts', async ({
+			page,
+			editor,
+			aiFeedback,
+		}) => {
+			await page.setViewportSize({ width: 1280, height: 720 });
+			await aiFeedback.createAndSavePost(
+				{ title: 'Progress', content: 'Content to review.' },
+				{ editor }
+			);
+			await aiFeedback.openSidebar();
+
+			let releaseReview;
+			const reviewHeld = new Promise((resolve) => {
+				releaseReview = resolve;
+			});
+			await aiFeedback.routeREST('/review', async (route) => {
+				await reviewHeld;
+				await route.continue();
+			});
+
+			await aiFeedback.getReviewButton().click();
+
+			const progress = page
+				.locator('.ai-feedback-panel')
+				.getByRole('progressbar', { name: 'Review progress' });
+			await expect(progress).toBeVisible();
+			await expect(progress).toBeInViewport();
+
+			releaseReview();
+			await expect(
+				page.locator('.ai-feedback-review-summary')
+			).toBeVisible();
+		});
+	});
+
 	test.skip('shows Review Document button when post is saved with content', async ({
 		admin,
 		page,

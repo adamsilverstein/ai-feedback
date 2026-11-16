@@ -169,6 +169,33 @@ test.describe('AI Feedback Sidebar', () => {
 			await expect(page.getByLabel('AI Model')).toBeVisible();
 		});
 
+		test('starts Review Settings collapsed when the post has a review', async ({
+			page,
+			aiFeedback,
+		}) => {
+			await page.reload();
+			await aiFeedback.openSidebar();
+
+			const panel = page.locator('.ai-feedback-panel');
+			await expect(
+				panel.locator('.ai-feedback-review-summary')
+			).toBeVisible();
+			await expect(
+				panel
+					.locator('.components-panel__body-toggle')
+					.filter({ hasText: 'Review Settings' })
+			).toHaveAttribute('aria-expanded', 'false');
+			// Only the button carries the "Review Document" label.
+			await expect(
+				panel
+					.locator('.components-panel__body-toggle')
+					.filter({ hasText: 'Review Document' })
+			).toHaveCount(0);
+			await expect(
+				panel.locator('.ai-feedback-review-summary')
+			).toBeInViewport();
+		});
+
 		test('restores the last review after a reload', async ({
 			page,
 			aiFeedback,
