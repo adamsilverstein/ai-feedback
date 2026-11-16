@@ -13,6 +13,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
 import { _n, sprintf } from '@wordpress/i18n';
 import { getNoteRelinks } from '../utils/relink-notes';
+import { debugLog } from '../utils/debug';
 
 /**
  * Note relinker component.
@@ -25,6 +26,8 @@ export default function NoteRelinker() {
 		const editor = select(editorStore);
 		return {
 			postId: editor.getCurrentPostId(),
+			// Unstable, but core uses it too. Waiting avoids matching against
+			// the empty block list the editor starts with.
 			isReady:
 				editor.__unstableIsEditorReady() && !editor.isEditedPostNew(),
 		};
@@ -64,11 +67,16 @@ export default function NoteRelinker() {
 						},
 					};
 				}
-				registry
-					.dispatch(blockEditorStore)
-					.updateBlockAttributes(clientIds, attributes, {
+				const blockEditorActions = registry.dispatch(blockEditorStore);
+				// Keep the re-link out of undo history, so Ctrl+Z can't drop it.
+				blockEditorActions.__unstableMarkNextChangeAsNotPersistent();
+				blockEditorActions.updateBlockAttributes(
+					clientIds,
+					attributes,
+					{
 						uniqueByBlock: true,
-					});
+					}
+				);
 
 				registry.dispatch(noticesStore).createInfoNotice(
 					sprintf(
@@ -84,8 +92,9 @@ export default function NoteRelinker() {
 					{ type: 'snackbar', id: 'ai-feedback-notes-relinked' }
 				);
 			})
-			.catch(() => {
+			.catch((error) => {
 				// Notes stay unlinked; the Notes panel still lists them.
+				debugLog('Could not re-link notes:', error);
 			});
 
 		return () => {
