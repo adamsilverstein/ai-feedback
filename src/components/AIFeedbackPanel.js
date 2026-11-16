@@ -78,7 +78,19 @@ export default function AIFeedbackPanel() {
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
-	const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+	// Open settings before the first review, then keep them out of the
+	// way of the results.
+	const [isSettingsOpen, setIsSettingsOpen] = useState(!lastReview);
+
+	// A saved review loads after the sidebar renders, so collapse the
+	// settings when one arrives.
+	const hadReview = useRef(!!lastReview);
+	useEffect(() => {
+		if (lastReview && !hadReview.current) {
+			setIsSettingsOpen(false);
+		}
+		hadReview.current = !!lastReview;
+	}, [lastReview]);
 
 	// The settings sit above the progress and the results, so bring each
 	// into view when a review starts and when it finishes.
@@ -219,20 +231,9 @@ export default function AIFeedbackPanel() {
 				</PanelBody>
 			</div>
 
-			{showEmptyState ? (
-				canReview && (
-					<PanelBody>
-						{/* ID used by skip links for keyboard navigation */}
-						<div id={REVIEW_BUTTON_ID}>
-							<ReviewButton />
-						</div>
-					</PanelBody>
-				)
-			) : (
-				<PanelBody
-					title={__('Review Document', 'copydesk-ai')}
-					initialOpen={true}
-				>
+			{/* The empty state lists what is missing in place of the button. */}
+			{(canReview || !showEmptyState) && (
+				<PanelBody>
 					{/* ID used by skip links for keyboard navigation */}
 					<div id={REVIEW_BUTTON_ID}>
 						<ReviewButton />

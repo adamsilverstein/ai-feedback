@@ -128,7 +128,7 @@ You can change these in the plugin sidebar within the block editor.
 
 1. Open a post in the block editor
 2. Click the **AI Feedback** icon in the toolbar (or open from "Options" menu)
-3. Adjust settings if needed:
+3. Adjust settings if needed under **Review Settings**, which starts collapsed once the post has a review:
    - Select AI model
    - Choose focus areas
    - Set target tone
