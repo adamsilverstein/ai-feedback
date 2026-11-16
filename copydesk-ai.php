@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Copydesk AI
- * Plugin URI: https://github.com/adamsilverstein/ai-feedback
+ * Plugin URI: https://github.com/adamsilverstein/copydesk-ai
  * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 7.0's core AI Client and Notes feature.
  * Version: 1.0.1
  * Requires at least: 7.0

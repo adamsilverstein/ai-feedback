@@ -43,8 +43,8 @@ Before using AI Feedback, configure an AI provider:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/ai-feedback.git
-cd ai-feedback
+git clone https://github.com/adamsilverstein/copydesk-ai.git
+cd copydesk-ai
 ```
 
 ### 2. Install Dependencies
@@ -319,7 +319,7 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - [x] Review history display
 
 ### Phase 4: Conversation Loop 🚧 Not started
-Tracked in issues [#131](https://github.com/adamsilverstein/ai-feedback/issues/131)–[#134](https://github.com/adamsilverstein/ai-feedback/issues/134).
+Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/131)–[#134](https://github.com/adamsilverstein/copydesk-ai/issues/134).
 - [ ] Reply detection hook (#131)
 - [ ] Context-aware reply prompts / Reply Service (#132)
 - [ ] Async reply processing (#133)
@@ -375,7 +375,7 @@ GPL v2 or later
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ai-feedback/issues)
+- **Issues**: [GitHub Issues](https://github.com/adamsilverstein/copydesk-ai/issues)
 - **Documentation**: [docs/](docs/)
 - **WordPress**: Requires 7.0+
 
