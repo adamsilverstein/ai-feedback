@@ -79,9 +79,21 @@ describe('FeedbackReplies', () => {
 
 		const button = screen.getByRole('button', { name: 'Try again' });
 		expect(button).toBeDisabled();
+		expect(
+			screen.getByText('Try again in a few seconds.')
+		).toBeInTheDocument();
 
 		fireEvent.click(button);
 		expect(mockRetry).not.toHaveBeenCalled();
+	});
+
+	it('shows no cooldown hint once a retry is allowed', () => {
+		mockStatus = 'failed';
+		render(<FeedbackReplies replies={[]} pendingReplyId={42} />);
+
+		expect(
+			screen.queryByText('Try again in a few seconds.')
+		).not.toBeInTheDocument();
 	});
 
 	it('renders nothing when there are no replies and no pending reply', () => {
