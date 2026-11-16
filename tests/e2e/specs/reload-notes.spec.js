@@ -80,8 +80,18 @@ test.describe('Notes after reloading an unsaved review', () => {
 		const review = await response.json();
 		const [noteId] = review.note_ids;
 
-		// Save the link, then reload; the saved link stays as it was.
+		// Save the link, then reload; the saved link stays as it was. Wait
+		// for the save request, since saveDraft() can return before it ends.
+		const saved = page.waitForResponse(
+			(saveResponse) =>
+				saveResponse.request().method() === 'POST' &&
+				/wp(\/|%2F)v2(\/|%2F)posts(\/|%2F)\d+(&|\?|$)/.test(
+					saveResponse.url()
+				) &&
+				saveResponse.ok()
+		);
 		await editor.saveDraft();
+		await saved;
 		await page.reload();
 		await editor.canvas
 			.locator('body > *')

@@ -20,6 +20,26 @@ export function extractTextContent(innerHTML) {
 }
 
 /**
+ * Fingerprint a block's text so a note can find the block again after a
+ * reload, when its clientId has changed.
+ *
+ * @param {string} name    Block name.
+ * @param {string} content Block text content.
+ * @return {string} FNV-1a hash of the name and content, in base 36.
+ */
+/* eslint-disable no-bitwise -- FNV-1a needs 32-bit integer math. */
+export function getBlockAnchor(name, content) {
+	const text = `${name}\n${content}`;
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < text.length; index++) {
+		hash ^= text.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return (hash >>> 0).toString(36);
+}
+/* eslint-enable no-bitwise */
+
+/**
  * Recursively extract blocks with their clientIds and content.
  *
  * @param {Array} blocks Array of blocks from the editor.
@@ -41,6 +61,7 @@ export function extractBlockData(blocks) {
 				clientId: block.clientId,
 				name: block.name,
 				content: content.trim(),
+				anchor: getBlockAnchor(block.name, content.trim()),
 			});
 		}
 
