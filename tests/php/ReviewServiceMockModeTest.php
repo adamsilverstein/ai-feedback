@@ -13,7 +13,9 @@ namespace AI_Feedback\Tests;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Notes_Manager;
 use AI_Feedback\Review_Service;
+use ReflectionProperty;
 use WP_Error;
 
 /**
@@ -49,6 +51,24 @@ class MockModeReviewService extends Review_Service {
 }
 
 /**
+ * Notes manager that skips note creation.
+ */
+class NoNotesManager extends Notes_Manager {
+
+	/**
+	 * Fail note creation so the review returns without touching comments.
+	 *
+	 * @param  array<int, array<string, mixed>> $feedback_items Feedback items.
+	 * @param  int                              $post_id        Post ID.
+	 * @param  array<string, mixed>             $review_data    Review data.
+	 * @return array<string, mixed>|WP_Error Always an error.
+	 */
+	public function create_notes_from_feedback( array $feedback_items, int $post_id, array $review_data = array() ): array|WP_Error {
+		return new WP_Error( 'skipped', 'Notes skipped.' );
+	}
+}
+
+/**
  * Test cases for mock mode in review_document().
  */
 #[RunTestsInSeparateProcesses]
@@ -80,5 +100,33 @@ class ReviewServiceMockModeTest extends TestCase {
 		$this->assertSame( 1, $service->ai_calls );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'invalid_request', $result->get_error_code() );
+	}
+
+	/**
+	 * The review timestamp is saved in UTC with an explicit offset, so the
+	 * editor can show it in the site timezone whatever the browser's is.
+	 */
+	public function test_review_timestamp_is_utc_with_offset(): void {
+		define( 'AI_FEEDBACK_MOCK_MODE', true );
+		$GLOBALS['test_now'] = gmmktime( 4, 46, 0, 11, 14, 2026 );
+		$service             = new MockModeReviewService();
+		( new ReflectionProperty( Review_Service::class, 'notes_manager' ) )->setValue( $service, new NoNotesManager() );
+
+		$result = $service->review_document(
+			1,
+			array(
+				'post_title' => 'Timestamp',
+				'blocks'     => array(
+					array(
+						'clientId' => 'block-1',
+						'name'     => 'core/paragraph',
+						'content'  => 'Revenue grew 40% last year.',
+					),
+				),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( '2026-11-14T04:46:00+00:00', $result['timestamp'] );
 	}
 }

@@ -1,21 +1,67 @@
 /**
  * Review history helpers.
  */
-import { dateI18n, getSettings as getDateSettings } from '@wordpress/date';
+import {
+	dateI18n,
+	getDate,
+	getSettings as getDateSettings,
+} from '@wordpress/date';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
+/*
+ * Review timestamps are ISO 8601 with a UTC offset. Older entries are MySQL
+ * datetimes in site time, so they go through getDate(), which reads a string
+ * without an offset in the site timezone rather than the browser's.
+ */
+
 /**
- * Format a stored MySQL timestamp (site time) for display.
+ * Get a review timestamp in milliseconds, for sorting.
  *
- * @param {string} timestamp MySQL datetime string.
+ * @param {string} timestamp Review timestamp.
+ * @return {number} Milliseconds since the epoch, or 0 without a timestamp.
+ */
+export function getReviewTime(timestamp) {
+	return (timestamp && getDate(timestamp).getTime()) || 0;
+}
+
+/**
+ * Parse a review timestamp.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @return {Date|null} Date, or null for a missing or unparseable timestamp.
+ */
+function parseReviewDate(timestamp) {
+	if (!timestamp) {
+		return null;
+	}
+	const date = getDate(timestamp);
+	return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Get a review timestamp as an ISO 8601 UTC string, for a datetime attribute.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @return {string} ISO 8601 string, or an empty string if it can't be parsed.
+ */
+export function getReviewISODate(timestamp) {
+	const date = parseReviewDate(timestamp);
+	return date ? date.toISOString() : '';
+}
+
+/**
+ * Format a review timestamp for display in the site timezone.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @param {string} format    PHP-style date format. Defaults to the site datetime format.
  * @return {string} Formatted date.
  */
-export function formatReviewDate(timestamp) {
-	if (!timestamp) {
+export function formatReviewDate(timestamp, format) {
+	const date = parseReviewDate(timestamp);
+	if (!date) {
 		return '';
 	}
-	const { formats } = getDateSettings();
-	return dateI18n(formats.datetime, timestamp);
+	return dateI18n(format || getDateSettings().formats.datetime, date);
 }
 
 /**

@@ -1,12 +1,14 @@
 /**
  * Internal dependencies
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { getSettings, setSettings } from '@wordpress/date';
 import reducer, {
 	initialState,
 	TYPES,
 	MAX_HISTORY_ENTRIES,
 	toHistoryEntry,
+	mergeHistory,
 } from '../reducer';
 import { getReviewHistory, getHistoryReview } from '../selectors';
 
@@ -117,6 +119,34 @@ describe('review history store', () => {
 
 		expect(getHistoryReview(state, 42, 'a').review_id).toBe('a');
 		expect(getHistoryReview(state, 7, 'a')).toBeUndefined();
+	});
+});
+
+describe('mergeHistory', () => {
+	const originalSettings = getSettings();
+
+	afterEach(() => {
+		setSettings(originalSettings);
+	});
+
+	it('orders legacy site time and UTC timestamps by when they ran', () => {
+		setSettings({
+			...originalSettings,
+			timezone: {
+				...originalSettings.timezone,
+				offset: -5,
+				string: 'America/New_York',
+			},
+		});
+		// 01:00 in New York is 06:00 UTC, an hour after the UTC entry.
+		const merged = mergeHistory([
+			{ review_id: 'utc', timestamp: '2026-11-14T05:00:00+00:00' },
+			{ review_id: 'legacy', timestamp: '2026-11-14 01:00:00' },
+		]);
+		expect(merged.map((entry) => entry.review_id)).toEqual([
+			'legacy',
+			'utc',
+		]);
 	});
 });
 

@@ -280,6 +280,8 @@ class Notes_Manager {
 			$meta['ai_model'] = $review_data['model'];
 		}
 
+		// ISO 8601 UTC, or a MySQL site time datetime on older notes. Note
+		// responses return comment_date (site time) as created_at instead.
 		if ( ! empty( $review_data['timestamp'] ) ) {
 			$meta['created_at'] = $review_data['timestamp'];
 		}

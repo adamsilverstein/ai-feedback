@@ -46,3 +46,18 @@ add_filter(
 	10,
 	3
 );
+
+// Let tests set a UTC offset site timezone through the settings endpoint.
+add_action(
+	'rest_api_init',
+	static function (): void {
+		register_setting(
+			'general',
+			'gmt_offset',
+			array(
+				'type'         => 'number',
+				'show_in_rest' => true,
+			)
+		);
+	}
+);
