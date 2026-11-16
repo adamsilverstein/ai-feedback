@@ -27,6 +27,7 @@ X-WP-Nonce: {nonce}
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `post_id` | integer | Yes | The post ID to review |
+| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content` and an optional `anchor` |
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
@@ -34,6 +35,10 @@ X-WP-Nonce: {nonce}
 | `chunk_total` | integer | No | Number of parts in the review (default: `1`) |
 | `review_id` | string | No | Review ID returned for part 0, required for later parts |
 | `previous_summaries` | array | No | Summary text of earlier parts, sent with the last part |
+
+**Block anchors:**
+
+Each block may carry an `anchor`: a hash of its block name and text content, matching `^[a-z0-9]{1,32}$`. The editor computes it with `getBlockAnchor()` in `src/utils/block-utils.js`. It is stored on the block's note as `block_anchor` meta, so the editor can re-link the note to its block after a reload, when the block's `clientId` has changed and its `metadata.noteId` was never saved. Malformed anchors fail validation; missing ones store no anchor.
 
 **Chunked reviews:**
 
@@ -421,6 +426,47 @@ X-WP-Nonce: {nonce}
   "pages": 1
 }
 ```
+
+---
+
+### GET /notes/post/{post_id}
+
+Returns the notes on a post. Requires `edit_post` on the post.
+
+#### Request
+
+```http
+GET /wp-json/ai-feedback/v1/notes/post/{post_id}?ai_only=true
+X-WP-Nonce: {nonce}
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ai_only` | boolean | No | Only return notes created by AI reviews |
+
+#### Response
+
+```json
+{
+  "notes": [
+    {
+      "id": 123,
+      "parent": 0,
+      "block_id": "abc-123",
+      "block_name": "core/paragraph",
+      "block_index": 2,
+      "block_anchor": "1x2y3z",
+      "review_id": "550e8400-e29b-41d4-a716-446655440000",
+      "category": "tone",
+      "severity": "suggestion",
+      "title": "Wordy phrase"
+    }
+  ],
+  "total": 1
+}
+```
+
+Notes have more fields than shown. `block_name` and `block_anchor` are `""` for notes created before they were stored. The editor uses them, with `review_id`, to re-link top-level notes to their blocks after an unsaved reload: a note is only re-linked to a block with the same name and anchor, only the latest review's notes are used for each anchor, and nothing is linked when more blocks than notes share an anchor.
 
 ---
 
