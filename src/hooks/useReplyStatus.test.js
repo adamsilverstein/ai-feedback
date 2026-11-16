@@ -16,6 +16,7 @@ import useReplyStatus, {
 	MAX_PENDING_MS,
 	MAX_POLL_INTERVAL_MS,
 	MAX_UNKNOWN_POLLS,
+	RETRY_COOLDOWN_BUFFER_MS,
 	SLOW_REPLY_MS,
 } from './useReplyStatus';
 
@@ -176,7 +177,9 @@ describe('useReplyStatus', () => {
 		expect(result.current.canRetry).toBe(false);
 
 		await act(async () => {
-			await vi.advanceTimersByTimeAsync(5999);
+			await vi.advanceTimersByTimeAsync(
+				6000 + RETRY_COOLDOWN_BUFFER_MS - 1
+			);
 		});
 		expect(result.current.canRetry).toBe(false);
 

@@ -41,6 +41,12 @@ export const MAX_PENDING_MS = 10 * 60 * 1000;
 export const MAX_UNKNOWN_POLLS = 5;
 
 /**
+ * Extra wait on top of the server's `retry_after`, which is in whole seconds,
+ * so the button is not enabled just before the server would accept a retry.
+ */
+export const RETRY_COOLDOWN_BUFFER_MS = 500;
+
+/**
  * Build the state for a reply that is still being generated.
  *
  * @param {number|null} id Reply ID.
@@ -119,12 +125,19 @@ export default function useReplyStatus(replyId) {
 				isSlow: false,
 				canRetry: seconds <= 0,
 			});
+			clearTimeout(cooldownTimeoutRef.current);
 			if (seconds > 0) {
-				cooldownTimeoutRef.current = setTimeout(() => {
-					if (!cancelled) {
-						setState((current) => ({ ...current, canRetry: true }));
-					}
-				}, seconds * 1000);
+				cooldownTimeoutRef.current = setTimeout(
+					() => {
+						if (!cancelled) {
+							setState((current) => ({
+								...current,
+								canRetry: true,
+							}));
+						}
+					},
+					seconds * 1000 + RETRY_COOLDOWN_BUFFER_MS
+				);
 			}
 		};
 
