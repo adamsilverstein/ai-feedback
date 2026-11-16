@@ -167,7 +167,7 @@ class Reply_Service {
 			'review_id' => 'reply-' . $comment_id,
 			'post_id'   => $post_id,
 			'model'     => $model,
-			'timestamp' => current_time( 'mysql' ),
+			'timestamp' => current_time( 'c', true ),
 		);
 
 		return $this->notes_manager->add_reply_to_thread( $feedback_item, $post_id, $parent_id, $review_data );

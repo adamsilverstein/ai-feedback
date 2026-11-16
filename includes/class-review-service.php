@@ -238,12 +238,13 @@ class Review_Service {
 		// Chunks of one review share the ID created for the first chunk.
 		$review_id = is_string( $options['review_id'] ?? null ) && '' !== $options['review_id'] ? $options['review_id'] : wp_generate_uuid4();
 
-		// Build review data.
+		// Build review data. The timestamp is UTC with an explicit offset so
+		// the editor can show it in the site timezone.
 		$review_data = array(
 			'review_id' => $review_id,
 			'post_id'   => $post_id,
 			'model'     => $model,
-			'timestamp' => current_time( 'mysql' ),
+			'timestamp' => current_time( 'c', true ),
 		);
 
 		// Create WordPress Notes from feedback.
