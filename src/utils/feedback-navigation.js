@@ -23,6 +23,9 @@ export function getFeedbackBlockIds(notes = [], resolveBlockId = (id) => id) {
 	};
 
 	notes.forEach((note) => {
+		// A note whose first block can't be resolved is skipped, as "Go to
+		// block" can't reach it either. After a reload that drops the whole
+		// group, since the other block IDs are stale and have no note ID.
 		if (note.block_id || note.id) {
 			add(note.block_id, note.id);
 		}
