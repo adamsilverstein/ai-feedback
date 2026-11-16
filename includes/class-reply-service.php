@@ -29,6 +29,15 @@ class Reply_Service {
 	public const AI_HTTP_TIMEOUT = 45;
 
 	/**
+	 * PHP time limit in seconds for a request that answers a reply.
+	 *
+	 * Above AI_HTTP_TIMEOUT so the AI call can finish, and below
+	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT so a retry only takes over a
+	 * request that PHP has already stopped.
+	 */
+	public const REQUEST_TIME_LIMIT = 75;
+
+	/**
 	 * Sampling temperature for replies. Slightly above reviews for a conversational tone.
 	 */
 	public const AI_TEMPERATURE = 0.4;

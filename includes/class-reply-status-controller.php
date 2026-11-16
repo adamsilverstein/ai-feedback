@@ -282,9 +282,26 @@ class Reply_Status_Controller extends WP_REST_Controller {
 
 		// Finish the answer even if the editor navigates away mid-request.
 		ignore_user_abort( true );
+		self::raise_time_limit( Reply_Service::REQUEST_TIME_LIMIT );
 		$this->reply_service->process( $comment_id, true === $request->get_param( 'retry' ) );
 
 		return new WP_REST_Response( $this->build_status( $comment_id ), 200 );
+	}
+
+	/**
+	 * Raise the PHP time limit so a slow AI call is not cut off mid-answer.
+	 *
+	 * Never lowers an existing limit, and leaves an unlimited one alone.
+	 *
+	 * @param int $seconds Minimum time limit in seconds.
+	 */
+	private static function raise_time_limit( int $seconds ): void {
+		$current = (int) ini_get( 'max_execution_time' );
+		if ( 0 === $current || $current >= $seconds || ! function_exists( 'set_time_limit' ) ) {
+			return;
+		}
+
+		set_time_limit( $seconds );
 	}
 
 	/**
@@ -313,7 +330,12 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		$pending = self::is_pending( $status );
 		$payload = array(
 			'reply_id' => $comment_id,
-			'status'   => $pending ? 'pending' : ( in_array( $status, array( 'complete', 'failed' ), true ) ? $status : 'unknown' ),
+			'status'   => match ( true ) {
+				$pending                => 'pending',
+				'complete' === $status,
+				'failed' === $status    => $status,
+				default                 => 'unknown',
+			},
 		);
 
 		if ( $pending ) {
