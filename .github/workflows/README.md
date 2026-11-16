@@ -50,7 +50,7 @@ Runs PHP unit tests using PHPUnit across multiple PHP versions.
 **Tests run**:
 - PHPUnit tests on PHP 8.1 and 8.5
 
-**Triggered on**: Pull requests and pushes when PHP or test files change
+**Triggered on**: Every pull request and push to `main` or `develop`, so it is safe to mark as a required check
 
 ## Setting Up Branch Protection
 

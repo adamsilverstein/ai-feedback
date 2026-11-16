@@ -42,7 +42,7 @@ Runs JavaScript unit tests using Vitest.
 
 Runs PHP unit tests using PHPUnit on the minimum supported PHP version (8.1) and the newest (8.5). Deprecations fail the run.
 
-**Triggered on**: Pull requests and pushes when PHP or test files change
+**Triggered on**: Every pull request and push to `main` or `develop`, so it is safe to mark as a required check
 
 ## Setting Up Branch Protection
 
