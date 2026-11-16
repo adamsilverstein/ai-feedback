@@ -5,6 +5,7 @@
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getFeedbackContent } from './feedback-content';
+import { formatReviewDate } from './review-history';
 
 export const SEVERITIES = ['critical', 'important', 'suggestion'];
 
@@ -131,7 +132,9 @@ export function generateMarkdownReport(review, postTitle) {
 	)}\n\n`;
 
 	if (review.timestamp) {
-		md += `**${__('Date:', 'copydesk-ai')}** ${review.timestamp}\n`;
+		md += `**${__('Date:', 'copydesk-ai')}** ${formatReviewDate(
+			review.timestamp
+		)}\n`;
 	}
 	if (review.model) {
 		md += `**${__('Model:', 'copydesk-ai')}** ${review.model}\n`;
@@ -256,9 +259,7 @@ export function getExportFilename(review, extension) {
 	const id = String(review?.review_id || 'review')
 		.replace(/[^a-z0-9-]/gi, '')
 		.slice(0, 8);
-	const date = String(review?.timestamp || '')
-		.slice(0, 10)
-		.replace(/[^0-9-]/g, '');
+	const date = formatReviewDate(String(review?.timestamp || ''), 'Y-m-d');
 	return (
 		['copydesk-ai', date, id].filter(Boolean).join('-') + `.${extension}`
 	);

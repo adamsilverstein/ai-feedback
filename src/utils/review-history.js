@@ -1,21 +1,44 @@
 /**
  * Review history helpers.
  */
-import { dateI18n, getSettings as getDateSettings } from '@wordpress/date';
+import {
+	dateI18n,
+	getDate,
+	getSettings as getDateSettings,
+} from '@wordpress/date';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
+/*
+ * Review timestamps are ISO 8601 with a UTC offset. Older entries are MySQL
+ * datetimes in site time, so they go through getDate(), which reads a string
+ * without an offset in the site timezone rather than the browser's.
+ */
+
 /**
- * Format a stored MySQL timestamp (site time) for display.
+ * Get a review timestamp in milliseconds, for sorting.
  *
- * @param {string} timestamp MySQL datetime string.
+ * @param {string} timestamp Review timestamp.
+ * @return {number} Milliseconds since the epoch, or 0 without a timestamp.
+ */
+export function getReviewTime(timestamp) {
+	return (timestamp && getDate(timestamp).getTime()) || 0;
+}
+
+/**
+ * Format a review timestamp for display in the site timezone.
+ *
+ * @param {string} timestamp Review timestamp.
+ * @param {string} format    PHP-style date format. Defaults to the site datetime format.
  * @return {string} Formatted date.
  */
-export function formatReviewDate(timestamp) {
+export function formatReviewDate(timestamp, format) {
 	if (!timestamp) {
 		return '';
 	}
-	const { formats } = getDateSettings();
-	return dateI18n(formats.datetime, timestamp);
+	return dateI18n(
+		format || getDateSettings().formats.datetime,
+		getDate(timestamp)
+	);
 }
 
 /**

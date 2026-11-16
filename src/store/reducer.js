@@ -2,6 +2,7 @@
  * Store reducer.
  */
 import { STAGE_PREPARING } from './review-stages';
+import { getReviewTime } from '../utils/review-history';
 
 /**
  * Initial state.
@@ -103,7 +104,7 @@ export function mergeHistory(entries) {
 			seen.add(entry.review_id);
 			return true;
 		})
-		.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+		.sort((a, b) => getReviewTime(b.timestamp) - getReviewTime(a.timestamp))
 		.slice(0, MAX_HISTORY_ENTRIES);
 }
 
