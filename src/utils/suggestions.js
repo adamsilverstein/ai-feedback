@@ -236,6 +236,10 @@ export async function suggestQuickFix(note) {
 
 	const current = getBlockContent(note.block_id);
 	// Gutenberg's sanitize callback stores '' for a payload it rejects.
+	// Markers carry the note's author (0 for AI notes): Gutenberg tints and
+	// names markers by matching it, and lets a user grow or remove markers
+	// carrying their own id, so the reviewer's id would let their edits
+	// rewrite the AI's suggestion.
 	const updated =
 		!!saved?.meta?._wp_suggestion &&
 		current &&
