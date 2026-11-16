@@ -24,8 +24,6 @@ class NotesManagerMetaTest extends TestCase {
 	 */
 	private function build_note_meta( array $feedback_item ): array {
 		$method = new ReflectionMethod( Notes_Manager::class, 'build_note_meta' );
-		$method->setAccessible( true );
-
 		/** @var array<string, mixed> $meta */
 		$meta = $method->invoke( new Notes_Manager(), $feedback_item, array( 'review_id' => 'abc' ) );
 
