@@ -5,11 +5,12 @@ import { PanelBody } from '@wordpress/components';
 import { useSelect, useDispatch } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import { store as blockEditorStore } from '@wordpress/block-editor';
-import { useEffect, useRef, useState } from '@wordpress/element';
+import { useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 import { isPostSaved } from '../utils/post-status';
+import useSettingsOpen from '../hooks/use-settings-open';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -78,19 +79,10 @@ export default function AIFeedbackPanel() {
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
 
-	// Open settings before the first review, then keep them out of the
-	// way of the results.
-	const [isSettingsOpen, setIsSettingsOpen] = useState(!lastReview);
-
-	// A saved review loads after the sidebar renders, so collapse the
-	// settings when one arrives.
-	const hadReview = useRef(!!lastReview);
-	useEffect(() => {
-		if (lastReview && !hadReview.current) {
-			setIsSettingsOpen(false);
-		}
-		hadReview.current = !!lastReview;
-	}, [lastReview]);
+	const [isSettingsOpen, setIsSettingsOpen] = useSettingsOpen(
+		lastReview,
+		isReviewing
+	);
 
 	// The settings sit above the progress and the results, so bring each
 	// into view when a review starts and when it finishes.
@@ -100,12 +92,6 @@ export default function AIFeedbackPanel() {
 			return;
 		}
 		wasReviewing.current = isReviewing;
-
-		// Settings can't change a running review, so collapse them to
-		// keep the progress near the top of the sidebar.
-		if (isReviewing) {
-			setIsSettingsOpen(false);
-		}
 
 		// A failed review keeps the previous results, so show the error
 		// notice above them instead.
