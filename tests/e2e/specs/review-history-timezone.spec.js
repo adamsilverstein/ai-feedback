@@ -12,7 +12,11 @@ const { test, expect } = require('../fixtures');
 async function updateSettings(page, settings) {
 	await page.evaluate(
 		(data) =>
-			window.wp.apiFetch({ path: '/wp/v2/settings', method: 'POST', data }),
+			window.wp.apiFetch({
+				path: '/wp/v2/settings',
+				method: 'POST',
+				data,
+			}),
 		settings
 	);
 }

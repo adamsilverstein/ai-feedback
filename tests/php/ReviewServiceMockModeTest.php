@@ -61,7 +61,7 @@ class NoNotesManager extends Notes_Manager {
 	 * @param  array<int, array<string, mixed>> $feedback_items Feedback items.
 	 * @param  int                              $post_id        Post ID.
 	 * @param  array<string, mixed>             $review_data    Review data.
-	 * @return WP_Error Always an error.
+	 * @return array<string, mixed>|WP_Error Always an error.
 	 */
 	public function create_notes_from_feedback( array $feedback_items, int $post_id, array $review_data = array() ): array|WP_Error {
 		return new WP_Error( 'skipped', 'Notes skipped.' );
