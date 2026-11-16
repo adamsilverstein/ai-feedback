@@ -129,6 +129,19 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_cache_delete' ) ) {
+		/**
+		 * No-op cache delete; the meta store has no cache.
+		 *
+		 * @param int|string $key
+		 * @param string     $group
+		 * @return bool
+		 */
+		function wp_cache_delete( $key, $group = '' ) {
+			return true;
+		}
+	}
+
 	if ( ! function_exists( 'add_action' ) ) {
 		/**
 		 * add_action mock that records registrations in $GLOBALS['test_added_actions'].

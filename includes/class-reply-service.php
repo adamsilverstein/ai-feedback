@@ -72,6 +72,13 @@ class Reply_Service {
 	private Notes_Manager $notes_manager;
 
 	/**
+	 * Claim timestamp this request wrote, or null when it holds no claim.
+	 *
+	 * @var int|null
+	 */
+	private ?int $claimed_at = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Prompt_Builder|null $prompt_builder Optional prompt builder (for testing).
@@ -182,6 +189,7 @@ class Reply_Service {
 		}
 
 		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now );
+		$this->claimed_at = $now;
 		if ( $retry ) {
 			// Restart the timeout and clear the last error for the new attempt.
 			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
@@ -189,6 +197,29 @@ class Reply_Service {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether this request still owns its claim on a reply.
+	 *
+	 * A retry can take over a slow request's claim. Without this check both
+	 * requests would save an answer.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return bool True when the claim is still ours, or no claim was made.
+	 */
+	private function owns_claim( int $comment_id ): bool {
+		if ( null === $this->claimed_at ) {
+			return true;
+		}
+
+		// Another request may have written the meta since this one cached it.
+		wp_cache_delete( $comment_id, 'comment_meta' );
+		$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+
+		return 'processing' === self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY )
+			&& is_numeric( $claimed_at )
+			&& (int) $claimed_at === $this->claimed_at;
 	}
 
 	/**
@@ -209,6 +240,14 @@ class Reply_Service {
 			// Record a terminal state so the frontend stops waiting.
 			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
 			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'copydesk-ai' ) );
+		} finally {
+			$this->claimed_at = null;
+		}
+
+		if ( is_wp_error( $result ) && 'reply_claim_lost' === $result->get_error_code() ) {
+			// The request that took over records the result.
+			Logger::debug( sprintf( 'Reply_Service: reply %d was taken over, discarding this answer', $comment_id ) );
+			return;
 		}
 
 		// A non-positive ID means persistence silently failed. Marking that
@@ -261,6 +300,10 @@ class Reply_Service {
 		if ( '' === trim( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
 			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'copydesk-ai' ) );
+		}
+
+		if ( ! $this->owns_claim( $comment_id ) ) {
+			return new WP_Error( 'reply_claim_lost', __( 'Another request is answering this reply.', 'copydesk-ai' ) );
 		}
 
 		$feedback_item = array(

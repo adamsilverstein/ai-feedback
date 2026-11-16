@@ -48,9 +48,35 @@ class Counting_Reply_Service extends Reply_Service {
 }
 
 /**
+ * Reply service whose AI call is overtaken by a retry from another request.
+ */
+class Overtaken_Reply_Service extends Counting_Reply_Service {
+
+	/**
+	 * Simulate a retry taking over the claim while the AI call runs.
+	 *
+	 * @param string $prompt             Prompt.
+	 * @param string $system_instruction System instruction.
+	 * @param string $model              Model.
+	 * @return string|\WP_Error
+	 */
+	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() + 100 );
+		return parent::call_ai( $prompt, $system_instruction, $model );
+	}
+}
+
+/**
  * Notes manager that pretends to save the AI reply as comment 999.
  */
 class Process_Fake_Notes_Manager extends Notes_Manager {
+
+	/**
+	 * Number of replies saved.
+	 *
+	 * @var int
+	 */
+	public int $saved = 0;
 
 	/**
 	 * Pretend to save the reply.
@@ -62,6 +88,7 @@ class Process_Fake_Notes_Manager extends Notes_Manager {
 	 * @return int|\WP_Error
 	 */
 	public function add_reply_to_thread( array $feedback_item, int $post_id, int $parent_id, array $review_data = array() ): int|\WP_Error {
+		++$this->saved;
 		return 999;
 	}
 }
@@ -261,6 +288,21 @@ class ReplyProcessTest extends TestCase {
 		$data = $this->process( 200, true );
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
+	}
+
+	/**
+	 * A slow request does not save its answer once a retry has taken over.
+	 */
+	public function test_overtaken_request_does_not_save_answer(): void {
+		$notes   = new Process_Fake_Notes_Manager();
+		$service = new Overtaken_Reply_Service( new Prompt_Builder(), $notes );
+
+		$this->assertTrue( $service->process( 200 ) );
+
+		$this->assertSame( 1, $service->ai_calls );
+		$this->assertSame( 0, $notes->saved, 'The overtaken request must not save a second answer.' );
+		$this->assertSame( 'processing', $this->reply_status(), 'The status is left to the request that took over.' );
+		$this->assertSame( '', get_comment_meta( 200, Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY, true ) );
 	}
 
 	/**
