@@ -375,7 +375,7 @@ GPL v2 or later
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/ai-feedback/issues)
+- **Issues**: [GitHub Issues](https://github.com/adamsilverstein/copydesk-ai/issues)
 - **Documentation**: [docs/](docs/)
 - **WordPress**: Requires 7.0+
 
