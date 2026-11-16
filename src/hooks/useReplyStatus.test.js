@@ -153,6 +153,63 @@ describe('useReplyStatus', () => {
 		);
 	});
 
+	it('blocks a retry until the server cooldown has passed', async () => {
+		vi.useFakeTimers();
+		mockApiFetch.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'failed',
+			error: 'No API key.',
+			retry_after: 6,
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(0);
+		});
+		expect(result.current.status).toBe('failed');
+		expect(result.current.canRetry).toBe(false);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(5999);
+		});
+		expect(result.current.canRetry).toBe(false);
+
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(1);
+		});
+		expect(result.current.status).toBe('failed');
+		expect(result.current.canRetry).toBe(true);
+
+		vi.useRealTimers();
+	});
+
+	it('blocks a retry the server ignored during the cooldown', async () => {
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+		mockProcess.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'failed',
+			retry_after: 3,
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await waitFor(() => expect(result.current.status).toBe('failed'));
+		expect(result.current.canRetry).toBe(false);
+	});
+
+	it('allows a retry right away when the server reports no cooldown', async () => {
+		mockApiFetch.mockResolvedValueOnce({
+			reply_id: 200,
+			status: 'failed',
+			error: 'Timed out.',
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		await waitFor(() => expect(result.current.status).toBe('failed'));
+		expect(result.current.canRetry).toBe(true);
+	});
+
 	it('returns idle and does not fetch when replyId is falsy', () => {
 		const { result } = renderHook(() => useReplyStatus(null));
 		expect(result.current.status).toBe('idle');

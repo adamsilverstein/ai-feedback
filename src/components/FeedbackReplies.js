@@ -32,7 +32,7 @@ export default function FeedbackReplies({
 	pendingReplyId = null,
 	onReplyComplete,
 }) {
-	const { status, isSlow, retry } = useReplyStatus(pendingReplyId);
+	const { status, isSlow, canRetry, retry } = useReplyStatus(pendingReplyId);
 	const hasPendingSlot = Boolean(pendingReplyId);
 	const isPolling =
 		hasPendingSlot && status !== 'complete' && status !== 'failed';
@@ -42,6 +42,9 @@ export default function FeedbackReplies({
 			variant="link"
 			className="ai-feedback-reply-retry"
 			onClick={retry}
+			// The server ignores a retry right after a failed attempt.
+			disabled={!canRetry}
+			accessibleWhenDisabled
 		>
 			{__('Try again', 'copydesk-ai')}
 		</Button>

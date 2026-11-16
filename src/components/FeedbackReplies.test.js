@@ -8,11 +8,13 @@ import { speak } from '@wordpress/a11y';
 // Drive the polling hook's status directly.
 let mockStatus = 'pending';
 let mockIsSlow = false;
+let mockCanRetry = true;
 const mockRetry = vi.fn();
 vi.mock('../hooks/useReplyStatus', () => ({
 	default: () => ({
 		status: mockStatus,
 		isSlow: mockIsSlow,
+		canRetry: mockCanRetry,
 		retry: mockRetry,
 	}),
 }));
@@ -23,8 +25,8 @@ vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 // full WP components bundle into the test runtime.
 vi.mock('@wordpress/components', () => ({
 	Spinner: () => <span data-testid="wp-spinner" />,
-	Button: ({ children, onClick }) => (
-		<button type="button" onClick={onClick}>
+	Button: ({ children, onClick, disabled }) => (
+		<button type="button" onClick={onClick} disabled={disabled}>
 			{children}
 		</button>
 	),
@@ -36,6 +38,7 @@ describe('FeedbackReplies', () => {
 	beforeEach(() => {
 		mockStatus = 'pending';
 		mockIsSlow = false;
+		mockCanRetry = true;
 		mockRetry.mockClear();
 		speak.mockClear();
 	});
@@ -67,6 +70,18 @@ describe('FeedbackReplies', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 		expect(mockRetry).toHaveBeenCalledTimes(1);
+	});
+
+	it('disables the retry during the server cooldown', () => {
+		mockStatus = 'failed';
+		mockCanRetry = false;
+		render(<FeedbackReplies replies={[]} pendingReplyId={42} />);
+
+		const button = screen.getByRole('button', { name: 'Try again' });
+		expect(button).toBeDisabled();
+
+		fireEvent.click(button);
+		expect(mockRetry).not.toHaveBeenCalled();
 	});
 
 	it('renders nothing when there are no replies and no pending reply', () => {

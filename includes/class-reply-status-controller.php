@@ -362,9 +362,29 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			if ( '' !== $error ) {
 				$payload['error'] = $error;
 			}
+
+			$retry_after = self::retry_after( $comment_id );
+			if ( $retry_after > 0 ) {
+				$payload['retry_after'] = $retry_after;
+			}
 		}
 
 		return $payload;
+	}
+
+	/**
+	 * Seconds until a failed reply can be retried.
+	 *
+	 * @param int $comment_id Reply comment ID.
+	 * @return int Seconds left in the retry cooldown, or 0 when a retry would run.
+	 */
+	private static function retry_after( int $comment_id ): int {
+		$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+		if ( ! is_numeric( $claimed_at ) ) {
+			return 0;
+		}
+
+		return max( 0, (int) $claimed_at + Reply_Cron_Dispatcher::RETRY_COOLDOWN - time() );
 	}
 
 	/**
@@ -407,6 +427,11 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				'error'               => array(
 					'description' => __( 'Error message. Present when failed.', 'copydesk-ai' ),
 					'type'        => 'string',
+					'readonly'    => true,
+				),
+				'retry_after'         => array(
+					'description' => __( 'Seconds until a failed reply can be retried. Present while a retry would be ignored.', 'copydesk-ai' ),
+					'type'        => 'integer',
 					'readonly'    => true,
 				),
 			),

@@ -231,6 +231,7 @@ X-WP-Nonce: {nonce}
 | `status` | string | `pending`, `complete`, `failed`, or `unknown` (no reply was scheduled for this comment) |
 | `ai_reply_comment_id` | integer | The generated AI reply note. Present when `complete` |
 | `error` | string | Why generation failed. Present when `failed` |
+| `retry_after` | integer | Seconds until a retry will run. Present when `failed` and the last attempt was under 10 seconds ago |
 
 The response field is `ai_reply_comment_id`, while the comment meta that stores it is `ai_feedback_reply_comment_id`.
 
@@ -264,6 +265,8 @@ Content-Type: application/json
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `retry` | boolean | Also answer a `failed` reply, or take over a claim older than 90 seconds from a request that died. Default `false` |
+
+A retry within 10 seconds of the last attempt is ignored, since each attempt is a paid AI request. The response then stays `failed` and `retry_after` says how long to wait.
 
 Same permission rules as `GET /replies/{id}/status`.
 

@@ -6,6 +6,9 @@
  * WP-Cron, and polls /replies/{id}/status until it lands. Polling stops once
  * the server reports a terminal state (`complete` or `failed`), when it gives
  * up, or when the component unmounts.
+ *
+ * The server ignores a retry for a few seconds after a failed attempt, and
+ * reports the time left as `retry_after`. `canRetry` is false until then.
  */
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
@@ -50,15 +53,17 @@ function initialState(id) {
 		aiReplyCommentId: null,
 		error: null,
 		isSlow: false,
+		canRetry: true,
 	};
 }
 
 /**
  * @param {number|null} replyId User reply comment ID to poll for, or null/0 to disable.
- * @return {{status: string, aiReplyCommentId: number | null, error: string | null, isSlow: boolean, retry: () => void}}
+ * @return {{status: string, aiReplyCommentId: number | null, error: string | null, isSlow: boolean, canRetry: boolean, retry: () => void}}
  *         Current reply status. `status` is one of `idle | pending | complete | failed | unknown`.
- *         `isSlow` is true once a pending reply has waited SLOW_REPLY_MS, and
- *         `retry()` asks the server to try again.
+ *         `isSlow` is true once a pending reply has waited SLOW_REPLY_MS,
+ *         `retry()` asks the server to try again, and `canRetry` is false
+ *         while the server would ignore a retry.
  */
 export default function useReplyStatus(replyId) {
 	const [state, setState] = useState(() => initialState(replyId));
@@ -69,6 +74,7 @@ export default function useReplyStatus(replyId) {
 	// Track active timers so unmount/deps change can cancel them cleanly.
 	const timeoutRef = useRef(null);
 	const slowTimeoutRef = useRef(null);
+	const cooldownTimeoutRef = useRef(null);
 
 	const retry = useCallback(
 		() =>
@@ -99,15 +105,25 @@ export default function useReplyStatus(replyId) {
 			slowTimeoutRef.current = null;
 		};
 
-		const fail = (error) => {
+		// `retryAfter` is how many seconds the server will ignore a retry for.
+		const fail = (error, retryAfter = 0) => {
 			stop();
+			const seconds = Number(retryAfter) || 0;
 			setState({
 				id: replyId,
 				status: 'failed',
 				aiReplyCommentId: null,
 				error,
 				isSlow: false,
+				canRetry: seconds <= 0,
 			});
+			if (seconds > 0) {
+				cooldownTimeoutRef.current = setTimeout(() => {
+					if (!cancelled) {
+						setState((current) => ({ ...current, canRetry: true }));
+					}
+				}, seconds * 1000);
+			}
 		};
 
 		slowTimeoutRef.current = setTimeout(() => {
@@ -136,9 +152,10 @@ export default function useReplyStatus(replyId) {
 						aiReplyCommentId: response.ai_reply_comment_id ?? null,
 						error: null,
 						isSlow: false,
+						canRetry: true,
 					});
 				} else if (response?.status === 'failed') {
-					fail(response.error ?? null);
+					fail(response.error ?? null, response.retry_after);
 				}
 			})
 			// Polling still reports the outcome, so only log the failure.
@@ -195,12 +212,15 @@ export default function useReplyStatus(replyId) {
 					setState((current) => ({
 						...next,
 						isSlow: current.isSlow,
+						canRetry: true,
 					}));
 					timeoutRef.current = setTimeout(poll, interval);
 					interval = Math.min(interval * 2, MAX_POLL_INTERVAL_MS);
+				} else if (next.status === 'failed') {
+					fail(next.error, response?.retry_after);
 				} else {
 					stop();
-					setState({ ...next, isSlow: false });
+					setState({ ...next, isSlow: false, canRetry: true });
 				}
 			} catch (err) {
 				if (cancelled || finished) {
@@ -222,15 +242,17 @@ export default function useReplyStatus(replyId) {
 			cancelled = true;
 			clearTimeout(timeoutRef.current);
 			clearTimeout(slowTimeoutRef.current);
+			clearTimeout(cooldownTimeoutRef.current);
 			timeoutRef.current = null;
 			slowTimeoutRef.current = null;
+			cooldownTimeoutRef.current = null;
 		};
 	}, [replyId, attempt]);
 
 	// Until the effect resets state for a new ID, report the new ID as pending
 	// rather than leaking the previous reply's result for a render.
 	const current = state.id === replyId ? state : initialState(replyId);
-	const { status, aiReplyCommentId, error, isSlow } = current;
+	const { status, aiReplyCommentId, error, isSlow, canRetry } = current;
 
-	return { status, aiReplyCommentId, error, isSlow, retry };
+	return { status, aiReplyCommentId, error, isSlow, canRetry, retry };
 }
