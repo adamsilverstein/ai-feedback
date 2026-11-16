@@ -41,6 +41,9 @@ namespace {
 		 * @return bool
 		 */
 		function update_comment_meta( $comment_id, $key, $value, $prev_value = '' ) {
+			if ( isset( $GLOBALS['test_before_meta_write'] ) && is_callable( $GLOBALS['test_before_meta_write'] ) ) {
+				( $GLOBALS['test_before_meta_write'] )( $comment_id, $key );
+			}
 			if ( ! isset( $GLOBALS['test_comment_meta'][ $comment_id ] ) ) {
 				$GLOBALS['test_comment_meta'][ $comment_id ] = array();
 			}
@@ -140,6 +143,9 @@ namespace {
 		 * @return int|false
 		 */
 		function add_comment_meta( $comment_id, $key, $value, $unique = false ) {
+			if ( isset( $GLOBALS['test_before_meta_write'] ) && is_callable( $GLOBALS['test_before_meta_write'] ) ) {
+				( $GLOBALS['test_before_meta_write'] )( $comment_id, $key );
+			}
 			if ( $unique && isset( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ) ) {
 				return false;
 			}

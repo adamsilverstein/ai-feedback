@@ -54,7 +54,7 @@ class Counting_Reply_Service extends Reply_Service {
 class Overtaken_Reply_Service extends Counting_Reply_Service {
 
 	/**
-	 * Simulate a retry taking over the claim while the AI call runs.
+	 * Simulate a retry taking over the claim in the same second, while the AI call runs.
 	 *
 	 * @param string $prompt             Prompt.
 	 * @param string $system_instruction System instruction.
@@ -62,7 +62,7 @@ class Overtaken_Reply_Service extends Counting_Reply_Service {
 	 * @return string|\WP_Error
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
-		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() + 100 );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, 'rival-token' );
 		return parent::call_ai( $prompt, $system_instruction, $model );
 	}
 }
@@ -171,7 +171,8 @@ class ReplyProcessTest extends TestCase {
 			$GLOBALS['test_options'],
 			$GLOBALS['test_comments'],
 			$GLOBALS['test_comment_meta'],
-			$GLOBALS['test_scheduled_events']
+			$GLOBALS['test_scheduled_events'],
+			$GLOBALS['test_before_meta_write']
 		);
 		parent::tearDown();
 	}
@@ -314,11 +315,63 @@ class ReplyProcessTest extends TestCase {
 	 */
 	public function test_retry_reclaims_claim_without_claim_time(): void {
 		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing' );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, time() - Reply_Cron_Dispatcher::CLAIM_TIMEOUT - 1 );
 
 		$data = $this->process( 200, true );
 
 		$this->assertSame( 1, $this->service->ai_calls );
 		$this->assertSame( 'complete', $data['status'] );
+	}
+
+	/**
+	 * A retry right after a fresh claim that has no claim time yet does not take over.
+	 */
+	public function test_retry_does_not_take_over_fresh_claim_without_claim_time(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing' );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, 'first-token' );
+
+		$data = $this->process( 200, true );
+
+		$this->assertSame( 0, $this->service->ai_calls );
+		$this->assertSame( 'pending', $data['status'] );
+		$this->assertSame( 'first-token', get_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true ) );
+	}
+
+	/**
+	 * Of two takeovers racing in the same second, only the first to swap the token owns the claim.
+	 */
+	public function test_racing_takeovers_only_one_wins(): void {
+		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing' );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, time() - Reply_Cron_Dispatcher::CLAIM_TIMEOUT - 1 );
+		update_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, 'stale-token' );
+
+		// The rival request swaps the token between this request's read and its write.
+		$GLOBALS['test_before_meta_write'] = static function ( int $comment_id, string $key ): void {
+			if ( Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY === $key ) {
+				unset( $GLOBALS['test_before_meta_write'] );
+				update_comment_meta( $comment_id, $key, 'rival-token' );
+			}
+		};
+
+		$this->assertFalse( $this->service->process( 200, true ) );
+		$this->assertSame( 0, $this->service->ai_calls );
+		$this->assertSame( 'rival-token', get_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true ) );
+	}
+
+	/**
+	 * Each claim stores a new unique token.
+	 */
+	public function test_claims_store_unique_tokens(): void {
+		$this->process();
+		$first = get_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true );
+
+		update_comment_meta( 200, Reply_Cron_Dispatcher::STATUS_META_KEY, 'pending' );
+		$this->process();
+		$second = get_comment_meta( 200, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true );
+
+		$this->assertIsString( $first );
+		$this->assertNotSame( '', $first );
+		$this->assertNotSame( $first, $second );
 	}
 
 	/**

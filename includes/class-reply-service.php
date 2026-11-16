@@ -72,11 +72,11 @@ class Reply_Service {
 	private Notes_Manager $notes_manager;
 
 	/**
-	 * Claim timestamp this request wrote, or null when it holds no claim.
+	 * Claim token this request wrote, or null when it holds no claim.
 	 *
-	 * @var int|null
+	 * @var string|null
 	 */
-	private ?int $claimed_at = null;
+	private ?string $claim_token = null;
 
 	/**
 	 * Constructor.
@@ -221,17 +221,20 @@ class Reply_Service {
 	 * Moves the status from 'pending' to 'processing' with a compare-and-set
 	 * update, which only one concurrent request can win. A retry may also
 	 * claim a failed reply once Reply_Cron_Dispatcher::RETRY_COOLDOWN has
-	 * passed, or take over a claim older than
-	 * Reply_Cron_Dispatcher::CLAIM_TIMEOUT or with no claim time.
+	 * passed, or take over a stale claim. Every claim then swaps in a new
+	 * unique token with a compare-and-set, so of two racing requests only
+	 * one ends up owning the reply.
 	 *
 	 * @param int  $comment_id Reply comment ID.
 	 * @param bool $retry      Whether the user asked to retry.
 	 * @return bool Whether this request now owns the reply.
 	 */
 	private function claim( int $comment_id, bool $retry ): bool {
-		$status     = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
-		$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
-		$now        = time();
+		// Read the token first: a racing claim writes its claim time before its token.
+		$previous_token = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, true );
+		$status         = self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+		$claimed_at     = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
+		$now            = time();
 
 		if ( 'pending' === $status || ( $retry && 'failed' === $status ) ) {
 			if ( 'failed' === $status && is_numeric( $claimed_at ) && $now - (int) $claimed_at < Reply_Cron_Dispatcher::RETRY_COOLDOWN ) {
@@ -240,23 +243,22 @@ class Reply_Service {
 			if ( ! update_comment_meta( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY, 'processing', $status ) ) {
 				return false;
 			}
-		} elseif ( $retry && 'processing' === $status ) {
-			// A missing or invalid claim time counts as stale, or the reply could never be retried.
-			if ( is_numeric( $claimed_at ) && $now - (int) $claimed_at <= Reply_Cron_Dispatcher::CLAIM_TIMEOUT ) {
-				return false;
-			}
-			$taken = '' === $claimed_at
-				? add_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, true )
-				: update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now, $claimed_at );
-			if ( false === $taken ) {
-				return false;
-			}
-		} else {
+		} elseif ( ! $retry || 'processing' !== $status || ! self::is_stale_claim( $comment_id, $claimed_at, $now ) ) {
 			return false;
 		}
 
 		update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, $now );
-		$this->claimed_at = $now;
+
+		$token = wp_generate_uuid4();
+		$taken = '' === $previous_token
+			? add_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, $token, true )
+			: update_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY, $token, $previous_token );
+		if ( false === $taken ) {
+			// Another request claimed the reply first.
+			return false;
+		}
+
+		$this->claim_token = $token;
 		if ( $retry ) {
 			// Restart the timeout and clear the last error for the new attempt.
 			update_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, $now );
@@ -264,6 +266,25 @@ class Reply_Service {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether a 'processing' claim is old enough for a retry to take over.
+	 *
+	 * Without a valid claim time, for a request that died mid-claim, falls
+	 * back to when the reply was queued so a fresh claim is never taken.
+	 *
+	 * @param int   $comment_id Reply comment ID.
+	 * @param mixed $claimed_at Claim time meta value.
+	 * @param int   $now        Current Unix timestamp.
+	 * @return bool
+	 */
+	private static function is_stale_claim( int $comment_id, mixed $claimed_at, int $now ): bool {
+		if ( ! is_numeric( $claimed_at ) ) {
+			$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY, true );
+		}
+
+		return is_numeric( $claimed_at ) && $now - (int) $claimed_at > Reply_Cron_Dispatcher::CLAIM_TIMEOUT;
 	}
 
 	/**
@@ -276,17 +297,15 @@ class Reply_Service {
 	 * @return bool True when the claim is still ours, or no claim was made.
 	 */
 	private function owns_claim( int $comment_id ): bool {
-		if ( null === $this->claimed_at ) {
+		if ( null === $this->claim_token ) {
 			return true;
 		}
 
 		// Another request may have written the meta since this one cached it.
 		wp_cache_delete( $comment_id, 'comment_meta' );
-		$claimed_at = get_comment_meta( $comment_id, Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY, true );
 
 		return 'processing' === self::meta_string( $comment_id, Reply_Cron_Dispatcher::STATUS_META_KEY )
-			&& is_numeric( $claimed_at )
-			&& (int) $claimed_at === $this->claimed_at;
+			&& self::meta_string( $comment_id, Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY ) === $this->claim_token;
 	}
 
 	/**
@@ -308,7 +327,7 @@ class Reply_Service {
 			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
 			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'copydesk-ai' ) );
 		} finally {
-			$this->claimed_at = null;
+			$this->claim_token = null;
 		}
 
 		if ( is_wp_error( $result ) && 'reply_claim_lost' === $result->get_error_code() ) {

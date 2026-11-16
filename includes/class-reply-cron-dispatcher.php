@@ -62,6 +62,11 @@ class Reply_Cron_Dispatcher {
 	public const CLAIMED_AT_META_KEY = 'ai_feedback_reply_claimed_at';
 
 	/**
+	 * Comment meta key holding a unique token for the request that owns the claim.
+	 */
+	public const CLAIM_TOKEN_META_KEY = 'ai_feedback_reply_claim_token';
+
+	/**
 	 * Seconds after which a retry may take over a claim, for a request that
 	 * died mid-generation. Longer than the AI request timeout.
 	 */
