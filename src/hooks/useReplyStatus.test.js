@@ -16,6 +16,7 @@ import useReplyStatus, {
 	MAX_PENDING_MS,
 	MAX_POLL_INTERVAL_MS,
 	MAX_UNKNOWN_POLLS,
+	POLL_INTERVAL_MS,
 	RETRY_COOLDOWN_BUFFER_MS,
 	SLOW_REPLY_MS,
 } from './useReplyStatus';
@@ -253,6 +254,40 @@ describe('useReplyStatus', () => {
 
 		expect(result.current.status).toBe('complete');
 		expect(result.current.aiReplyCommentId).toBe(555);
+	});
+
+	it('reports a failure polled after its answer request was rejected', async () => {
+		vi.useFakeTimers();
+		let rejectProcess;
+		mockProcess.mockReturnValueOnce(
+			new Promise((resolve, reject) => {
+				rejectProcess = reject;
+			})
+		);
+		mockApiFetch.mockResolvedValue({
+			reply_id: 200,
+			status: 'failed',
+			error: 'The AI reply timed out.',
+		});
+
+		const { result } = renderHook(() => useReplyStatus(200));
+
+		try {
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(0);
+			});
+			expect(result.current.status).toBe('pending');
+
+			await act(async () => {
+				rejectProcess(new Error('gateway timeout'));
+				await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+			});
+
+			expect(result.current.status).toBe('failed');
+			expect(result.current.error).toBe('The AI reply timed out.');
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('returns idle and does not fetch when replyId is falsy', () => {
