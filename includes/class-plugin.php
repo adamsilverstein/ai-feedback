@@ -138,6 +138,9 @@ class Plugin {
 		Analytics_Page::init();
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
+		// Show note badges from meta, before wpautop wraps them in a paragraph.
+		add_filter( 'comment_text', array( Notes_Manager::class, 'add_badges_to_comment_text' ), 1, 2 );
+
 		// Add custom avatar for AI Feedback comments/notes.
 		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
 

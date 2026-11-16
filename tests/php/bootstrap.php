@@ -68,6 +68,18 @@ if (! function_exists('esc_html__') ) {
     }
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_attr' ) ) {
+	function esc_attr( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
 // Mock WP REST classes if not available.
 if ( ! class_exists( 'WP_REST_Controller' ) ) {
 	class WP_REST_Controller {
