@@ -92,6 +92,9 @@ test.describe('Note badges', () => {
 		for (const badge of badges) {
 			expect(after.content.rendered).toContain(badge);
 		}
+		expect(
+			after.content.rendered.match(/ai-feedback-badge /g)
+		).toHaveLength(2);
 
 		// A provisional decision or a reopen puts the note back on hold.
 		await saveNoteStatus(page, noteId, 'hold');
