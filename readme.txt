@@ -4,7 +4,7 @@ Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -77,6 +77,17 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 
 == Changelog ==
 
+= 1.0.2 =
+* AI replies to notes are now answered from the editor, so they no longer depend on WP-Cron.
+* The Try again button waits out the short retry cooldown after a failed AI reply, with a hint next to it.
+* Replies that were left waiting are answered when the post is next opened in the editor.
+* AI suggestion markers stay credited to the note's author.
+* Note badges are kept when a note's status is saved.
+* AI notes are re-linked to their blocks after reloading an unsaved post.
+* The next and previous feedback shortcuts work after a reload.
+* Review settings show before the first review and collapse after it.
+* Review History shows times in the site timezone.
+
 = 1.0.1 =
 * Renamed the plugin to Copydesk AI for the WordPress.org plugin directory. The text domain is now `copydesk-ai`.
 * Load translations for the editor script.
@@ -115,6 +126,9 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * Review button with loading states.
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+AI replies to notes no longer depend on WP-Cron, plus fixes for suggestions, note badges and review history.
 
 = 1.0.1 =
 AI Feedback is now Copydesk AI. The plugin now installs to a `copydesk-ai` folder, so if you installed AI Feedback from GitHub, deactivate and delete that copy before activating this one. Existing notes, settings and history carry over.
