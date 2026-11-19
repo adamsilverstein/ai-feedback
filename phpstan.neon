@@ -13,9 +13,6 @@ parameters:
     ignoreErrors:
         - '#Constant [A-Z_]+ not found\.#'
         -
-            message: '#If condition is always false\.#'
-            path: copydesk-ai.php
-        -
             message: '#Right side of && is always false\.#'
             paths:
                 - includes/class-review-service.php
