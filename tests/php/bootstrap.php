@@ -11,6 +11,7 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 // Manually load plugin classes (WordPress filename convention).
 $includes_dir = dirname(__DIR__, 2) . '/includes/';
 require_once $includes_dir . 'class-logger.php';
+require_once $includes_dir . 'class-user-preferences.php';
 require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-response-parser.php';
 require_once $includes_dir . 'class-notes-manager.php';

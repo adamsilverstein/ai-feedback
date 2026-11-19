@@ -88,6 +88,35 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * The reply uses the model its author picked, over the site default.
+	 */
+	public function test_handle_reply_uses_reply_authors_model_preference(): void {
+		$GLOBALS['test_comments'] = array(
+			100 => (object) array(
+				'comment_ID'      => 100,
+				'comment_content' => 'Add a source.',
+				'comment_author'  => 'AI Feedback',
+			),
+			200 => (object) array(
+				'comment_ID'      => 200,
+				'comment_content' => 'Which one?',
+				'comment_author'  => 'Jane',
+				'comment_parent'  => 100,
+				'user_id'         => '7',
+			),
+		);
+
+		$GLOBALS['test_options']   = array( 'ai_feedback_default_model' => 'claude-sonnet-4' );
+		$GLOBALS['test_user_meta'] = array( 7 => array( 'ai_feedback_default_model' => 'gpt-4o' ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 200, 100, 42, 'abc-123' );
+		unset( $GLOBALS['test_user_meta'] );
+
+		$this->assertSame( 'gpt-4o', $service->captured_model );
+	}
+
+	/**
 	 * End-to-end: context built, prompt generated, AI reply persisted.
 	 */
 	public function test_handle_reply_persists_ai_reply_as_thread_child(): void {

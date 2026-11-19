@@ -118,8 +118,8 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Get the saved default model, falling back when it is no longer offered
-	 * (such as a retired model ID).
+	 * Get the user's saved model, or the site default, falling back when it
+	 * is no longer offered (such as a retired model ID).
 	 *
 	 * The fallback is the plugin default, or the first offered model when a
 	 * filter removed the plugin default from the list.
@@ -127,11 +127,17 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return string Model ID.
 	 */
 	private function get_default_model(): string {
-		$model     = get_option( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL );
 		$available = wp_list_pluck( $this->get_available_models(), 'id' );
 
-		if ( is_string( $model ) && in_array( $model, $available, true ) ) {
-			return $model;
+		// The user's own choice wins over the site default.
+		$saved = array(
+			User_Preferences::get( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL ),
+			get_option( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL ),
+		);
+		foreach ( $saved as $model ) {
+			if ( is_string( $model ) && in_array( $model, $available, true ) ) {
+				return $model;
+			}
 		}
 
 		if ( in_array( AI_FEEDBACK_DEFAULT_MODEL, $available, true ) || empty( $available ) ) {
@@ -143,7 +149,7 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Get settings.
+	 * Get settings: the current user's preferences over the site defaults.
 	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
@@ -151,9 +157,9 @@ class Settings_Controller extends WP_REST_Controller {
 	public function get_settings( WP_REST_Request $request ) {
 		$settings = array(
 			'default_model'         => $this->get_default_model(),
-			'default_focus_areas'   => get_option( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
-			'default_tone'          => get_option( 'ai_feedback_default_tone', 'professional' ),
-			'feedback_locale'       => get_option( 'ai_feedback_feedback_locale', 'auto' ),
+			'default_focus_areas'   => User_Preferences::get( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
+			'default_tone'          => User_Preferences::get( 'ai_feedback_default_tone', 'professional' ),
+			'feedback_locale'       => User_Preferences::get( 'ai_feedback_feedback_locale', 'auto' ),
 			'available_models'      => $this->get_available_models(),
 			'available_focus_areas' => $this->get_available_focus_areas(),
 			'available_tones'       => $this->get_available_tones(),
@@ -167,11 +173,15 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Update settings.
 	 *
+	 * Saves the current user's preferences, or the site defaults when `scope`
+	 * is `site`.
+	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function update_settings( WP_REST_Request $request ) {
 		$updated = array();
+		$save    = 'site' === $request->get_param( 'scope' ) ? 'update_option' : array( User_Preferences::class, 'set' );
 
 		// Update default model if provided.
 		if ( $request->has_param( 'default_model' ) ) {
@@ -186,7 +196,7 @@ class Settings_Controller extends WP_REST_Controller {
 				);
 			}
 
-			update_option( 'ai_feedback_default_model', $model );
+			$save( 'ai_feedback_default_model', $model );
 			$updated['default_model'] = $model;
 		}
 
@@ -209,7 +219,7 @@ class Settings_Controller extends WP_REST_Controller {
 				}
 			}
 
-			update_option( 'ai_feedback_default_focus_areas', $focus_areas );
+			$save( 'ai_feedback_default_focus_areas', $focus_areas );
 			$updated['default_focus_areas'] = $focus_areas;
 		}
 
@@ -226,7 +236,7 @@ class Settings_Controller extends WP_REST_Controller {
 				);
 			}
 
-			update_option( 'ai_feedback_default_tone', $tone );
+			$save( 'ai_feedback_default_tone', $tone );
 			$updated['default_tone'] = $tone;
 		}
 
@@ -243,7 +253,7 @@ class Settings_Controller extends WP_REST_Controller {
 				);
 			}
 
-			update_option( 'ai_feedback_feedback_locale', $locale );
+			$save( 'ai_feedback_feedback_locale', $locale );
 			$updated['feedback_locale'] = $locale;
 		}
 
@@ -263,10 +273,24 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Check permissions for updating settings.
 	 *
-	 * @return bool
+	 * Users who can edit posts may save their own preferences. Changing the
+	 * site defaults requires `manage_options`.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return bool|WP_Error
 	 */
-	public function update_settings_permissions_check(): bool {
-		return current_user_can( 'edit_posts' );
+	public function update_settings_permissions_check( WP_REST_Request $request ): bool|WP_Error {
+		$capability = 'site' === $request->get_param( 'scope' ) ? 'manage_options' : 'edit_posts';
+
+		if ( ! current_user_can( $capability ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to change these settings.', 'copydesk-ai' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -276,6 +300,12 @@ class Settings_Controller extends WP_REST_Controller {
 	 */
 	private function get_update_settings_args(): array {
 		return array(
+			'scope'               => array(
+				'description' => __( 'Whether to save the current user\'s preferences or the site defaults.', 'copydesk-ai' ),
+				'type'        => 'string',
+				'enum'        => array( 'user', 'site' ),
+				'default'     => 'user',
+			),
 			'default_model'       => array(
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
