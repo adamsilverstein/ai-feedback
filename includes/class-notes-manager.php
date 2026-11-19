@@ -446,21 +446,49 @@ class Notes_Manager {
 	 * @return array Array of notes.
 	 */
 	public function get_notes_by_review( string $review_id ): array {
-		$args = array(
-			'type'       => 'note',
-			'status'     => 'all',
-			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-			'meta_query' => array(
-				array(
-					'key'   => 'review_id',
-					'value' => $review_id,
+		return $this->format_notes( $this->query_notes_by_review( $review_id ) );
+	}
+
+	/**
+	 * Get the IDs of the posts a review's notes belong to.
+	 *
+	 * @param  string $review_id Review ID.
+	 * @return int[] Unique post IDs, empty when the review has no notes.
+	 */
+	public function get_post_ids_by_review( string $review_id ): array {
+		$post_ids = array();
+
+		foreach ( $this->query_notes_by_review( $review_id ) as $comment ) {
+			$post_ids[] = (int) $comment->comment_post_ID;
+		}
+
+		return array_values( array_unique( $post_ids ) );
+	}
+
+	/**
+	 * Query the notes a review created.
+	 *
+	 * @param  string $review_id Review ID.
+	 * @return \WP_Comment[] Notes.
+	 */
+	private function query_notes_by_review( string $review_id ): array {
+		if ( '' === $review_id ) {
+			return array();
+		}
+
+		return get_comments(
+			array(
+				'type'       => 'note',
+				'status'     => 'all',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+				'meta_query' => array(
+					array(
+						'key'   => 'review_id',
+						'value' => $review_id,
+					),
 				),
-			),
+			)
 		);
-
-		$comments = get_comments( $args );
-
-		return $this->format_notes( $comments );
 	}
 
 	/**
