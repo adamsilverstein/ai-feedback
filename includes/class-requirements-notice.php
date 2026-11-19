@@ -154,7 +154,7 @@ class Requirements_Notice {
 
 		printf(
 			'<div class="notice notice-error"><p>%s</p></div>',
-			wp_kses_post( $message )
+			wp_kses( $message, array( 'a' => array( 'href' => true ) ) )
 		);
 	}
 }
