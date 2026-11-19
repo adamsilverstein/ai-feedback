@@ -34,11 +34,11 @@ registerPlugin('ai-feedback', {
 					target="ai-feedback-sidebar"
 					icon={icon}
 				>
-					{__('Copydesk AI', 'copydesk-ai')}
+					{__('Fresh Eyes', 'fresh-eyes')}
 				</PluginSidebarMoreMenuItem>
 				<PluginSidebar
 					name="ai-feedback-sidebar"
-					title={__('Copydesk AI', 'copydesk-ai')}
+					title={__('Fresh Eyes', 'fresh-eyes')}
 					icon={icon}
 				>
 					<AIFeedbackPanel />

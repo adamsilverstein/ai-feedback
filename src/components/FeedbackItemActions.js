@@ -44,7 +44,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 		} catch (error) {
 			createErrorNotice(
 				error?.message ||
-					__('Could not update the feedback item.', 'copydesk-ai'),
+					__('Could not update the feedback item.', 'fresh-eyes'),
 				{ type: 'snackbar' }
 			);
 			return false;
@@ -57,12 +57,12 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 		if (!(await updateDismissed(true))) {
 			return;
 		}
-		createSuccessNotice(__('Feedback dismissed.', 'copydesk-ai'), {
+		createSuccessNotice(__('Feedback dismissed.', 'fresh-eyes'), {
 			type: 'snackbar',
 			id: `ai-feedback-dismissed-${item.id}`,
 			actions: [
 				{
-					label: __('Undo', 'copydesk-ai'),
+					label: __('Undo', 'fresh-eyes'),
 					onClick: () => updateDismissed(false),
 				},
 			],
@@ -87,7 +87,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 						onClick={() => onNavigate(item.block_id)}
 						className="go-to-block-button"
 					>
-						{__('Go to block', 'copydesk-ai')}
+						{__('Go to block', 'fresh-eyes')}
 					</Button>
 				)}
 				{canDismiss && (
@@ -104,7 +104,7 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 										/* translators: %s: feedback title */
 										__(
 											'Restore feedback: %s',
-											'copydesk-ai'
+											'fresh-eyes'
 										),
 										title
 									)
@@ -112,15 +112,15 @@ export default function FeedbackItemActions({ item, title, onNavigate }) {
 										/* translators: %s: feedback title */
 										__(
 											'Dismiss feedback: %s',
-											'copydesk-ai'
+											'fresh-eyes'
 										),
 										title
 									)
 						}
 					>
 						{isDismissed
-							? __('Restore', 'copydesk-ai')
-							: __('Dismiss', 'copydesk-ai')}
+							? __('Restore', 'fresh-eyes')
+							: __('Dismiss', 'fresh-eyes')}
 					</Button>
 				)}
 			</div>

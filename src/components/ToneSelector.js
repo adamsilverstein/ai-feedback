@@ -17,19 +17,19 @@ import { STORE_NAME } from '../store';
 const getToneHelp = () => ({
 	professional: __(
 		'Clear and authoritative. Best for business content and documentation.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	casual: __(
 		'Conversational and friendly. Best for blogs and social media.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	academic: __(
 		'Scholarly and precise. Best for research and educational content.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	friendly: __(
 		'Warm and engaging. Best for community and customer content.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 });
 
@@ -84,7 +84,7 @@ export default function ToneSelector() {
 
 	return (
 		<SelectControl
-			label={__('Target Tone', 'copydesk-ai')}
+			label={__('Target Tone', 'fresh-eyes')}
 			value={draftTone}
 			options={options}
 			onChange={handleChange}
@@ -93,7 +93,7 @@ export default function ToneSelector() {
 				toneDescription ||
 				__(
 					'The tone the AI will evaluate your content against.',
-					'copydesk-ai'
+					'fresh-eyes'
 				)
 			}
 		/>

@@ -2,9 +2,9 @@ parameters:
     level: 5
     paths:
         - includes/
-        - copydesk-ai.php
+        - fresh-eyes.php
     scanFiles:
-        - copydesk-ai.php
+        - fresh-eyes.php
     bootstrapFiles:
         - phpstan-stubs.php
     excludePaths:

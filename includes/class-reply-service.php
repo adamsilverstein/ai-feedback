@@ -326,7 +326,7 @@ class Reply_Service {
 		} catch ( \Throwable $e ) {
 			// Record a terminal state so the frontend stops waiting.
 			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
-			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'copydesk-ai' ) );
+			$result = new WP_Error( 'reply_failed', __( 'The AI reply failed unexpectedly.', 'fresh-eyes' ) );
 		} finally {
 			$this->claim_token = null;
 		}
@@ -340,7 +340,7 @@ class Reply_Service {
 		// A non-positive ID means persistence silently failed. Marking that
 		// 'complete' would leave the frontend waiting on a reply that does not exist.
 		if ( ! is_wp_error( $result ) && $result <= 0 ) {
-			$result = new WP_Error( 'reply_not_saved', __( 'The AI reply could not be saved.', 'copydesk-ai' ) );
+			$result = new WP_Error( 'reply_not_saved', __( 'The AI reply could not be saved.', 'fresh-eyes' ) );
 		}
 
 		if ( is_wp_error( $result ) ) {
@@ -388,11 +388,11 @@ class Reply_Service {
 
 		if ( '' === trim( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
-			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'copydesk-ai' ) );
+			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'fresh-eyes' ) );
 		}
 
 		if ( ! $this->owns_claim( $comment_id ) ) {
-			return new WP_Error( 'reply_claim_lost', __( 'Another request is answering this reply.', 'copydesk-ai' ) );
+			return new WP_Error( 'reply_claim_lost', __( 'Another request is answering this reply.', 'fresh-eyes' ) );
 		}
 
 		$feedback_item = array(
@@ -656,7 +656,7 @@ class Reply_Service {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
-				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'copydesk-ai' )
+				__( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'fresh-eyes' )
 			);
 		}
 
@@ -677,7 +677,7 @@ class Reply_Service {
 			Logger::debug( sprintf( 'Reply_Service: AI request threw %s: %s', get_class( $e ), $e->getMessage() ) );
 			return new WP_Error(
 				'ai_request_failed',
-				__( 'The AI reply request failed unexpectedly. Please try again.', 'copydesk-ai' )
+				__( 'The AI reply request failed unexpectedly. Please try again.', 'fresh-eyes' )
 			);
 		} finally {
 			remove_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );

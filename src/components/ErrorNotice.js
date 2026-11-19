@@ -37,7 +37,7 @@ function getErrorAction(error, retries, onRetry) {
 				rel="noopener noreferrer"
 				className="ai-feedback-error-action"
 			>
-				{__('Open Connectors Settings', 'copydesk-ai')}
+				{__('Open Connectors Settings', 'fresh-eyes')}
 			</Button>
 		);
 	}
@@ -45,10 +45,7 @@ function getErrorAction(error, retries, onRetry) {
 	if (kind === 'rate_limit') {
 		return (
 			<p className="ai-feedback-error-help">
-				{__(
-					'Please wait before making another request.',
-					'copydesk-ai'
-				)}
+				{__('Please wait before making another request.', 'fresh-eyes')}
 			</p>
 		);
 	}
@@ -71,8 +68,7 @@ function getErrorAction(error, retries, onRetry) {
  */
 export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 	const message =
-		error.message ||
-		__('The review could not be completed.', 'copydesk-ai');
+		error.message || __('The review could not be completed.', 'fresh-eyes');
 
 	return (
 		<Notice
@@ -82,7 +78,7 @@ export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 			className="ai-feedback-error-notice"
 			spokenMessage={sprintf(
 				/* translators: %s: error message */
-				__('Error: %s', 'copydesk-ai'),
+				__('Error: %s', 'fresh-eyes'),
 				message
 			)}
 		>
@@ -90,7 +86,7 @@ export default function ErrorNotice({ error, onRemove, retries = 0, onRetry }) {
 				<div className="ai-feedback-error-message">{message}</div>
 				{error.code && (
 					<div className="ai-feedback-error-code">
-						{__('Error code:', 'copydesk-ai')} {error.code}
+						{__('Error code:', 'fresh-eyes')} {error.code}
 					</div>
 				)}
 				{getErrorAction(error, retries, onRetry)}

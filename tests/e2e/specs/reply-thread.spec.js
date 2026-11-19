@@ -20,7 +20,7 @@ const USER_REPLY = {
 
 const AI_REPLY = {
 	id: AI_REPLY_ID,
-	author: 'Copydesk AI',
+	author: 'Fresh Eyes',
 	content: 'Thanks, then link that citation here so readers see it.',
 	is_ai: true,
 };
@@ -168,7 +168,7 @@ test.describe('Reply thread', () => {
 		await expect(aiReply).toContainText(AI_REPLY.content, {
 			timeout: 20000,
 		});
-		await expect(aiReply).toContainText('Copydesk AI');
+		await expect(aiReply).toContainText('Fresh Eyes');
 		await expect(thread.locator('.ai-feedback-reply-pending')).toHaveCount(
 			0
 		);
@@ -319,7 +319,7 @@ test.describe('Reply loop', () => {
 		await expect(aiReplies.first()).toContainText(MOCK_AI_REPLY);
 		await expect(pendingRow).toHaveCount(0);
 		await expect(page.locator('#a11y-speak-polite')).toContainText(
-			'Copydesk AI replied'
+			'Fresh Eyes replied'
 		);
 
 		// Both AI replies share the mock text, so record what gets written to
@@ -351,7 +351,7 @@ test.describe('Reply loop', () => {
 			.poll(() =>
 				page.evaluate(() =>
 					window.aiFeedbackPoliteLog.some((text) =>
-						text.includes('Copydesk AI replied')
+						text.includes('Fresh Eyes replied')
 					)
 				)
 			)

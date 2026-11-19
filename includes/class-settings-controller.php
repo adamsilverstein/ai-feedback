@@ -191,7 +191,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_model( $model ) ) {
 				return new WP_Error(
 					'invalid_model',
-					__( 'The specified model is not available.', 'copydesk-ai' ),
+					__( 'The specified model is not available.', 'fresh-eyes' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -211,7 +211,7 @@ class Settings_Controller extends WP_REST_Controller {
 						'invalid_focus_area',
 						sprintf(
 						/* translators: %s: invalid focus area */
-							__( 'Invalid focus area: %s', 'copydesk-ai' ),
+							__( 'Invalid focus area: %s', 'fresh-eyes' ),
 							$area
 						),
 						array( 'status' => 400 )
@@ -231,7 +231,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_tone( $tone ) ) {
 				return new WP_Error(
 					'invalid_tone',
-					__( 'The specified tone is not available.', 'copydesk-ai' ),
+					__( 'The specified tone is not available.', 'fresh-eyes' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -248,7 +248,7 @@ class Settings_Controller extends WP_REST_Controller {
 			if ( ! $this->is_valid_locale( $locale ) ) {
 				return new WP_Error(
 					'invalid_locale',
-					__( 'The specified locale is not available.', 'copydesk-ai' ),
+					__( 'The specified locale is not available.', 'fresh-eyes' ),
 					array( 'status' => 400 )
 				);
 			}
@@ -285,7 +285,7 @@ class Settings_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( $capability ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to change these settings.', 'copydesk-ai' ),
+				__( 'You do not have permission to change these settings.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}
@@ -301,7 +301,7 @@ class Settings_Controller extends WP_REST_Controller {
 	private function get_update_settings_args(): array {
 		return array(
 			'scope'               => array(
-				'description' => __( 'Whether to save the current user\'s preferences or the site defaults.', 'copydesk-ai' ),
+				'description' => __( 'Whether to save the current user\'s preferences or the site defaults.', 'fresh-eyes' ),
 				'type'        => 'string',
 				'enum'        => array( 'user', 'site' ),
 				'default'     => 'user',
@@ -464,23 +464,23 @@ class Settings_Controller extends WP_REST_Controller {
 		return array(
 			array(
 				'id'          => 'content',
-				'label'       => __( 'Content Quality', 'copydesk-ai' ),
-				'description' => __( 'Clarity, accuracy, and completeness', 'copydesk-ai' ),
+				'label'       => __( 'Content Quality', 'fresh-eyes' ),
+				'description' => __( 'Clarity, accuracy, and completeness', 'fresh-eyes' ),
 			),
 			array(
 				'id'          => 'tone',
-				'label'       => __( 'Tone & Voice', 'copydesk-ai' ),
-				'description' => __( 'Consistency and audience appropriateness', 'copydesk-ai' ),
+				'label'       => __( 'Tone & Voice', 'fresh-eyes' ),
+				'description' => __( 'Consistency and audience appropriateness', 'fresh-eyes' ),
 			),
 			array(
 				'id'          => 'flow',
-				'label'       => __( 'Flow & Structure', 'copydesk-ai' ),
-				'description' => __( 'Logical progression and transitions', 'copydesk-ai' ),
+				'label'       => __( 'Flow & Structure', 'fresh-eyes' ),
+				'description' => __( 'Logical progression and transitions', 'fresh-eyes' ),
 			),
 			array(
 				'id'          => 'design',
-				'label'       => __( 'Design & Formatting', 'copydesk-ai' ),
-				'description' => __( 'Block usage and visual hierarchy', 'copydesk-ai' ),
+				'label'       => __( 'Design & Formatting', 'fresh-eyes' ),
+				'description' => __( 'Block usage and visual hierarchy', 'fresh-eyes' ),
 			),
 		);
 	}
@@ -494,19 +494,19 @@ class Settings_Controller extends WP_REST_Controller {
 		return array(
 			array(
 				'id'    => 'professional',
-				'label' => __( 'Professional', 'copydesk-ai' ),
+				'label' => __( 'Professional', 'fresh-eyes' ),
 			),
 			array(
 				'id'    => 'casual',
-				'label' => __( 'Casual', 'copydesk-ai' ),
+				'label' => __( 'Casual', 'fresh-eyes' ),
 			),
 			array(
 				'id'    => 'academic',
-				'label' => __( 'Academic', 'copydesk-ai' ),
+				'label' => __( 'Academic', 'fresh-eyes' ),
 			),
 			array(
 				'id'    => 'friendly',
-				'label' => __( 'Friendly', 'copydesk-ai' ),
+				'label' => __( 'Friendly', 'fresh-eyes' ),
 			),
 		);
 	}
@@ -520,7 +520,7 @@ class Settings_Controller extends WP_REST_Controller {
 		$locales = array(
 			array(
 				'id'    => 'auto',
-				'label' => __( 'Match WordPress locale', 'copydesk-ai' ),
+				'label' => __( 'Match WordPress locale', 'fresh-eyes' ),
 			),
 			array(
 				'id'    => 'en_US',

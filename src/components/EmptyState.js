@@ -23,32 +23,32 @@ export default function EmptyState({ canReview, hasContent, isSaved }) {
 				<Icon icon={commentContent} size={48} />
 			</div>
 
-			<h4>{__('No reviews yet', 'copydesk-ai')}</h4>
+			<h4>{__('No reviews yet', 'fresh-eyes')}</h4>
 
 			<p className="ai-feedback-empty-description">
 				{__(
 					'Get AI-powered feedback on your writing to improve clarity, tone, and structure.',
-					'copydesk-ai'
+					'fresh-eyes'
 				)}
 			</p>
 
 			{!canReview && (
 				<div className="ai-feedback-empty-prereq">
-					<h5>{__('Before you start:', 'copydesk-ai')}</h5>
+					<h5>{__('Before you start:', 'fresh-eyes')}</h5>
 					<ul>
 						{!hasContent && (
 							<li>
 								<Icon icon={pencil} size={16} />
 								{__(
 									'Add some content to your post',
-									'copydesk-ai'
+									'fresh-eyes'
 								)}
 							</li>
 						)}
 						{!isSaved && (
 							<li>
 								<Icon icon={check} size={16} />
-								{__('Save your post as a draft', 'copydesk-ai')}
+								{__('Save your post as a draft', 'fresh-eyes')}
 							</li>
 						)}
 					</ul>

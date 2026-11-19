@@ -27,9 +27,9 @@ const SEVERITIES = ['critical', 'important', 'suggestion'];
  */
 function getSeverityLabels() {
 	return {
-		critical: __('Critical', 'copydesk-ai'),
-		important: __('Important', 'copydesk-ai'),
-		suggestion: __('Suggestion', 'copydesk-ai'),
+		critical: __('Critical', 'fresh-eyes'),
+		important: __('Important', 'fresh-eyes'),
+		suggestion: __('Suggestion', 'fresh-eyes'),
 	};
 }
 
@@ -77,7 +77,7 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 		<Modal
 			title={sprintf(
 				/* translators: %s: review date */
-				__('Review from %s', 'copydesk-ai'),
+				__('Review from %s', 'fresh-eyes'),
 				formatReviewDate(entry.timestamp)
 			)}
 			onRequestClose={onClose}
@@ -91,7 +91,7 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 			{entry.model && (
 				<p className="model-used">
 					<em>
-						{__('Reviewed with:', 'copydesk-ai')}{' '}
+						{__('Reviewed with:', 'fresh-eyes')}{' '}
 						<ModelName id={entry.model} />
 					</em>
 				</p>
@@ -100,14 +100,14 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 			{isLoading && <Spinner />}
 
 			{!isLoading && review === null && (
-				<p>{__('Could not load this review.', 'copydesk-ai')}</p>
+				<p>{__('Could not load this review.', 'fresh-eyes')}</p>
 			)}
 
 			{entry.notes_failed && (
 				<p className="description">
 					{__(
 						'Notes could not be created for this review.',
-						'copydesk-ai'
+						'fresh-eyes'
 					)}
 				</p>
 			)}
@@ -119,7 +119,7 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 					<p className="description">
 						{__(
 							'The notes from this review are no longer available.',
-							'copydesk-ai'
+							'fresh-eyes'
 						)}
 					</p>
 				)}
@@ -131,7 +131,7 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 							<RawHTML>{note.content?.rendered || ''}</RawHTML>
 							{note.is_resolved && (
 								<p className="ai-feedback-history-resolved">
-									{__('Resolved', 'copydesk-ai')}
+									{__('Resolved', 'fresh-eyes')}
 								</p>
 							)}
 						</li>
@@ -172,7 +172,7 @@ export default function ReviewHistory() {
 
 	return (
 		<PanelBody
-			title={__('Review History', 'copydesk-ai')}
+			title={__('Review History', 'fresh-eyes')}
 			initialOpen={false}
 			className="ai-feedback-review-history"
 		>
@@ -221,11 +221,11 @@ export default function ReviewHistory() {
 								onClick={() => openReview(entry)}
 								aria-label={sprintf(
 									/* translators: %s: review date */
-									__('View review from %s', 'copydesk-ai'),
+									__('View review from %s', 'fresh-eyes'),
 									formatReviewDate(entry.timestamp)
 								)}
 							>
-								{__('View', 'copydesk-ai')}
+								{__('View', 'fresh-eyes')}
 							</Button>
 						</li>
 					);

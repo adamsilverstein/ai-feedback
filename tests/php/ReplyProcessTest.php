@@ -154,7 +154,7 @@ class ReplyProcessTest extends TestCase {
 					'comment_ID'      => '100',
 					'comment_post_ID' => '42',
 					'comment_content' => 'Cite the 40% figure.',
-					'comment_author'  => 'Copydesk AI',
+					'comment_author'  => 'Fresh Eyes',
 				)
 			),
 			200 => new \WP_Comment(

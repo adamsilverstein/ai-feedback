@@ -79,7 +79,7 @@ class Analytics_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view Copydesk AI analytics.', 'copydesk-ai' ),
+				__( 'You do not have permission to view Fresh Eyes analytics.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}

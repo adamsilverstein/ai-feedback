@@ -46,7 +46,7 @@ export default function FeedbackReplies({
 			disabled={!canRetry}
 			accessibleWhenDisabled
 		>
-			{__('Try again', 'copydesk-ai')}
+			{__('Try again', 'fresh-eyes')}
 		</Button>
 	);
 
@@ -81,7 +81,7 @@ export default function FeedbackReplies({
 				speak(
 					sprintf(
 						/* translators: %s: AI reply text. */
-						__('Copydesk AI replied: %s', 'copydesk-ai'),
+						__('Fresh Eyes replied: %s', 'fresh-eyes'),
 						reply.content
 					)
 				);
@@ -97,7 +97,7 @@ export default function FeedbackReplies({
 	return (
 		<ul
 			className="ai-feedback-replies"
-			aria-label={__('Conversation replies', 'copydesk-ai')}
+			aria-label={__('Conversation replies', 'fresh-eyes')}
 		>
 			{replies.map((reply) => (
 				<li
@@ -111,7 +111,7 @@ export default function FeedbackReplies({
 				>
 					<span className="ai-feedback-reply-author">
 						{reply.is_ai
-							? __('Copydesk AI', 'copydesk-ai')
+							? __('Fresh Eyes', 'fresh-eyes')
 							: reply.author}
 					</span>
 					<span className="ai-feedback-reply-content">
@@ -139,9 +139,9 @@ export default function FeedbackReplies({
 								{isSlow
 									? __(
 											'This is taking longer than expected.',
-											'copydesk-ai'
+											'fresh-eyes'
 										)
-									: __('AI is replying…', 'copydesk-ai')}
+									: __('AI is replying…', 'fresh-eyes')}
 							</span>
 							{isSlow && retryButton}
 						</>
@@ -151,7 +151,7 @@ export default function FeedbackReplies({
 							<span className="ai-feedback-reply-content ai-feedback-reply-error">
 								{__(
 									'The AI reply could not be generated.',
-									'copydesk-ai'
+									'fresh-eyes'
 								)}
 							</span>
 							{retryButton}
@@ -159,7 +159,7 @@ export default function FeedbackReplies({
 								<span className="ai-feedback-reply-retry-hint">
 									{__(
 										'Try again in a few seconds.',
-										'copydesk-ai'
+										'fresh-eyes'
 									)}
 								</span>
 							)}

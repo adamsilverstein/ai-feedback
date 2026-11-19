@@ -1,4 +1,4 @@
-=== Copydesk AI ===
+=== Fresh Eyes: AI Editorial Feedback ===
 Contributors: adamsilverstein
 Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
@@ -8,11 +8,11 @@ Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Your AI copy editor in the block editor. Copydesk reviews your draft and leaves feedback, suggested edits and quick fixes as notes on your blocks.
+A fresh pair of eyes on your draft: AI feedback, suggested edits and quick fixes, left as notes on your blocks in the editor.
 
 == Description ==
 
-Copydesk AI is an AI agent that reviews your posts right in the block editor, the way a newspaper copy desk reviews a story before it runs. It leverages the WordPress 7.0 core AI Client and Connectors API for provider-agnostic AI access, and uses the native Notes API to provide contextual, block-level feedback on your content.
+Fresh Eyes is an AI agent that reviews your posts right in the block editor, like a fresh pair of eyes on a story before it runs. It leverages the WordPress 7.0 core AI Client and Connectors API for provider-agnostic AI access, and uses the native Notes API to provide contextual, block-level feedback on your content.
 
 = Features =
 
@@ -32,19 +32,19 @@ Copydesk AI is an AI agent that reviews your posts right in the block editor, th
 
 = Prerequisites =
 
-WordPress 7.0 introduced the core AI Client and Connectors API. Copydesk AI uses both directly — there is no longer any custom AI plumbing or separate "AI Experiments" plugin to install.
+WordPress 7.0 introduced the core AI Client and Connectors API. Fresh Eyes uses both directly — there is no longer any custom AI plumbing or separate "AI Experiments" plugin to install.
 
-Before using Copydesk AI, configure an AI provider:
+Before using Fresh Eyes, configure an AI provider:
 
 1. In WordPress admin, go to **Settings → Connectors**.
 2. Pick a provider (Anthropic, OpenAI, Google, etc.) and add an API key, or define one as an environment variable / PHP constant.
 3. Save.
 
-= Installing Copydesk AI =
+= Installing Fresh Eyes =
 
-1. Upload the plugin to `/wp-content/plugins/copydesk-ai/`, or install via the WordPress plugins screen.
+1. Upload the plugin to `/wp-content/plugins/fresh-eyes/`, or install via the WordPress plugins screen.
 2. Activate the plugin through the **Plugins** screen.
-3. Open any post in the block editor — the Copydesk AI panel appears in the sidebar.
+3. Open any post in the block editor — the Fresh Eyes panel appears in the sidebar.
 
 == Frequently Asked Questions ==
 
@@ -73,7 +73,7 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 1. A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar
 2. The Preview fix dialog showing the old and new wording
 3. A note thread with an author's reply and the AI's answer
-4. The Copydesk AI Analytics screen
+4. The Fresh Eyes Analytics screen
 
 == Changelog ==
 
@@ -142,7 +142,7 @@ Now requires WordPress 7.0+ and PHP 8.1+. AI provider credentials are read from 
 == Development ==
 
 The plugin is actively developed on GitHub:
-https://github.com/adamsilverstein/copydesk-ai
+https://github.com/adamsilverstein/fresh-eyes
 
 Contributions are welcome.
 

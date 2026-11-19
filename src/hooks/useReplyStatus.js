@@ -212,7 +212,7 @@ export default function useReplyStatus(replyId) {
 						fail(
 							__(
 								'No AI reply was scheduled for this comment.',
-								'copydesk-ai'
+								'fresh-eyes'
 							)
 						);
 						return;
@@ -226,7 +226,7 @@ export default function useReplyStatus(replyId) {
 					fail(
 						__(
 							'The AI reply is taking longer than expected.',
-							'copydesk-ai'
+							'fresh-eyes'
 						)
 					);
 					return;
@@ -253,10 +253,7 @@ export default function useReplyStatus(replyId) {
 				}
 				fail(
 					err?.message ||
-						__(
-							'Could not check the AI reply status.',
-							'copydesk-ai'
-						)
+						__('Could not check the AI reply status.', 'fresh-eyes')
 				);
 			}
 		};

@@ -114,7 +114,7 @@ class Plugin {
 	 * @return string The AI Feedback comment author name.
 	 */
 	public static function get_ai_feedback_author(): string {
-		return __( 'Copydesk AI', 'copydesk-ai' );
+		return __( 'Fresh Eyes', 'fresh-eyes' );
 	}
 
 	/**
@@ -207,7 +207,7 @@ class Plugin {
 			true
 		);
 
-		wp_set_script_translations( 'ai-feedback-editor', 'copydesk-ai' );
+		wp_set_script_translations( 'ai-feedback-editor', 'fresh-eyes' );
 
 		// Enqueue styles.
 		wp_enqueue_style(
@@ -277,9 +277,9 @@ class Plugin {
 		$comment = $id_or_email;
 
 		// Check if this is an AI Feedback comment.
-		// Method 1: Check the comment author name (current translated or legacy untranslated).
+		// Method 1: Check the comment author name (current translated, or a name from before a rename).
 		$is_ai_feedback = ( self::get_ai_feedback_author() === $comment->comment_author )
-		|| ( 'AI Feedback' === $comment->comment_author ); // Backward compatibility with untranslated strings.
+		|| in_array( $comment->comment_author, array( 'Copydesk AI', 'AI Feedback' ), true );
 
 		// Method 2: Check comment meta for ai_feedback flag.
 		if ( ! $is_ai_feedback && $comment->comment_ID ) {

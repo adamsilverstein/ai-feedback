@@ -20,19 +20,19 @@ export function getReviewStages() {
 	return [
 		{
 			key: STAGE_PREPARING,
-			label: __('Gathering earlier feedback…', 'copydesk-ai'),
+			label: __('Gathering earlier feedback…', 'fresh-eyes'),
 			start: 5,
 			end: 15,
 		},
 		{
 			key: STAGE_ANALYZING,
-			label: __('AI is analyzing your content…', 'copydesk-ai'),
+			label: __('AI is analyzing your content…', 'fresh-eyes'),
 			start: 20,
 			end: 85,
 		},
 		{
 			key: STAGE_ATTACHING,
-			label: __('Attaching notes to blocks…', 'copydesk-ai'),
+			label: __('Attaching notes to blocks…', 'fresh-eyes'),
 			start: 90,
 			end: 100,
 		},

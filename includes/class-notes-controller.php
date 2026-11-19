@@ -250,7 +250,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $post ) {
 			return new WP_Error(
 				'invalid_post',
-				__( 'Post not found.', 'copydesk-ai' ),
+				__( 'Post not found.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -299,7 +299,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $note || 'note' !== $note->comment_type ) {
 			return new WP_Error(
 				'invalid_note',
-				__( 'Note not found.', 'copydesk-ai' ),
+				__( 'Note not found.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -309,7 +309,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $success ) {
 			return new WP_Error(
 				'resolve_failed',
-				__( 'Failed to resolve note.', 'copydesk-ai' ),
+				__( 'Failed to resolve note.', 'fresh-eyes' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -342,7 +342,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $note || 'note' !== $note->comment_type ) {
 			return new WP_Error(
 				'invalid_note',
-				__( 'Note not found.', 'copydesk-ai' ),
+				__( 'Note not found.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -352,7 +352,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $success ) {
 			return new WP_Error(
 				'unresolve_failed',
-				__( 'Failed to unresolve note.', 'copydesk-ai' ),
+				__( 'Failed to unresolve note.', 'fresh-eyes' ),
 				array( 'status' => 500 )
 			);
 		}
@@ -407,7 +407,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $post ) {
 			return new WP_Error(
 				'invalid_post',
-				__( 'Post not found.', 'copydesk-ai' ),
+				__( 'Post not found.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -453,7 +453,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $post ) {
 			return new WP_Error(
 				'invalid_post',
-				__( 'Post not found.', 'copydesk-ai' ),
+				__( 'Post not found.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -481,7 +481,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( 'edit_posts' ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view notes.', 'copydesk-ai' ),
+				__( 'You do not have permission to view notes.', 'fresh-eyes' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -492,7 +492,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view notes for this post.', 'copydesk-ai' ),
+				__( 'You do not have permission to view notes for this post.', 'fresh-eyes' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -515,7 +515,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to update notes.', 'copydesk-ai' ),
+				__( 'You do not have permission to update notes.', 'fresh-eyes' ),
 				array( 'status' => 403 )
 			);
 		}
@@ -533,7 +533,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $this->can_edit_review_posts( $request ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view notes for this review.', 'copydesk-ai' ),
+				__( 'You do not have permission to view notes for this review.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}
@@ -554,7 +554,7 @@ class Notes_Controller extends WP_REST_Controller {
 		if ( ! $this->can_edit_review_posts( $request ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to delete notes for this review.', 'copydesk-ai' ),
+				__( 'You do not have permission to delete notes for this review.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}

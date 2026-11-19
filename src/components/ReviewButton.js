@@ -64,7 +64,7 @@ export default function ReviewButton() {
 			// eslint-disable-next-line no-console
 			console.warn('No content blocks found to review');
 			createWarningNotice(
-				__('No content blocks found to review.', 'copydesk-ai'),
+				__('No content blocks found to review.', 'fresh-eyes'),
 				{ type: 'snackbar' }
 			);
 			return;
@@ -100,12 +100,12 @@ export default function ReviewButton() {
 				isBusy={isReviewing}
 			>
 				{isReviewing
-					? __('Reviewing…', 'copydesk-ai')
-					: __('Review Document', 'copydesk-ai')}
+					? __('Reviewing…', 'fresh-eyes')
+					: __('Review Document', 'fresh-eyes')}
 			</Button>
 			{!isReviewing && isUnsaved && (
 				<p className="description">
-					{__('Save your post first to enable review', 'copydesk-ai')}
+					{__('Save your post first to enable review', 'fresh-eyes')}
 				</p>
 			)}
 			{isReviewing && (

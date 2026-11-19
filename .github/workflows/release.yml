@@ -38,14 +38,14 @@ jobs:
             - name: Create plugin zip
               run: |
                   npm run plugin-zip
-                  unzip -q copydesk-ai.zip -d dist
+                  unzip -q fresh-eyes.zip -d dist
 
             - name: Check the tag matches the plugin version
               if: github.event_name == 'release'
               env:
                   TAG: ${{ github.event.release.tag_name }}
               run: |
-                  version=$(grep -m1 '^ \* Version:' copydesk-ai.php | awk '{print $3}')
+                  version=$(grep -m1 '^ \* Version:' fresh-eyes.php | awk '{print $3}')
                   stable=$(grep -m1 '^Stable tag:' readme.txt | awk '{print $3}')
                   if [ "${TAG#v}" != "$version" ] || [ "$version" != "$stable" ]; then
                       echo "::error::Tag $TAG, plugin Version $version and Stable tag $stable must match."
@@ -55,15 +55,15 @@ jobs:
             - name: Save the zip as a workflow artifact
               uses: actions/upload-artifact@v7
               with:
-                  name: copydesk-ai
-                  path: copydesk-ai.zip
+                  name: fresh-eyes
+                  path: fresh-eyes.zip
 
             - name: Upload zip to the release
               if: github.event_name == 'release'
               env:
                   GH_TOKEN: ${{ github.token }}
                   TAG: ${{ github.event.release.tag_name }}
-              run: gh release upload "$TAG" copydesk-ai.zip --clobber
+              run: gh release upload "$TAG" fresh-eyes.zip --clobber
 
             - name: Deploy to WordPress.org
               if: github.event_name == 'release' && env.HAS_SVN_CREDENTIALS == 'true'
@@ -71,6 +71,6 @@ jobs:
               env:
                   SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
                   SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
-                  SLUG: copydesk-ai
-                  BUILD_DIR: dist/copydesk-ai
+                  SLUG: fresh-eyes
+                  BUILD_DIR: dist/fresh-eyes
                   ASSETS_DIR: .wordpress-org

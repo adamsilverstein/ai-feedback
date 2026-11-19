@@ -42,15 +42,15 @@ export function getShortcuts() {
 		{
 			name: 'ai-feedback/review',
 			category: 'global',
-			description: __('Review the document with AI', 'copydesk-ai'),
+			description: __('Review the document with AI', 'fresh-eyes'),
 			keyCombination: { modifier: 'access', character: 'r' },
 		},
 		{
 			name: 'ai-feedback/toggle-sidebar',
 			category: 'global',
 			description: __(
-				'Show or hide the Copydesk AI sidebar',
-				'copydesk-ai'
+				'Show or hide the Fresh Eyes sidebar',
+				'fresh-eyes'
 			),
 			keyCombination: { modifier: 'access', character: 'f' },
 		},
@@ -59,7 +59,7 @@ export function getShortcuts() {
 			category: 'global',
 			description: __(
 				'Go to the next block with AI feedback',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 			keyCombination: { modifier: 'access', character: 'j' },
 		},
@@ -68,7 +68,7 @@ export function getShortcuts() {
 			category: 'global',
 			description: __(
 				'Go to the previous block with AI feedback',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 			keyCombination: { modifier: 'access', character: 'k' },
 		},
@@ -135,7 +135,7 @@ export default function KeyboardShortcuts() {
 		);
 
 		if (!target) {
-			speak(__('No blocks with AI feedback.', 'copydesk-ai'));
+			speak(__('No blocks with AI feedback.', 'fresh-eyes'));
 			return;
 		}
 
@@ -145,7 +145,7 @@ export default function KeyboardShortcuts() {
 		speak(
 			sprintf(
 				/* translators: 1: position of the block, 2: number of blocks with feedback */
-				__('Block with AI feedback, %1$d of %2$d.', 'copydesk-ai'),
+				__('Block with AI feedback, %1$d of %2$d.', 'fresh-eyes'),
 				candidates.indexOf(target) + 1,
 				candidates.length
 			)

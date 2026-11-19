@@ -53,7 +53,7 @@ class NotesManagerBadgesTest extends TestCase {
 		$note->comment_type     = $type;
 		$note->comment_post_ID  = '1';
 		$note->comment_parent   = '0';
-		$note->comment_author   = 'Copydesk AI';
+		$note->comment_author   = 'Fresh Eyes';
 		$note->comment_content  = '';
 		$note->comment_date     = '2026-01-01 00:00:00';
 		$note->comment_approved = '0';

@@ -1,6 +1,6 @@
-# Copydesk AI
+# Fresh Eyes: AI Editorial Feedback
 
-Your AI copy editor, right in the block editor. (Formerly AI Feedback.)
+A fresh pair of eyes on your draft, right in the block editor. (Formerly Copydesk AI and AI Feedback.)
 
 AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
 
@@ -43,8 +43,8 @@ Before using AI Feedback, configure an AI provider:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/adamsilverstein/copydesk-ai.git
-cd copydesk-ai
+git clone https://github.com/adamsilverstein/fresh-eyes.git
+cd fresh-eyes
 ```
 
 ### 2. Install Dependencies
@@ -189,8 +189,8 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 ### Project Structure
 
 ```
-copydesk-ai/
-├── copydesk-ai.php           # Main plugin file
+fresh-eyes/
+├── fresh-eyes.php           # Main plugin file
 ├── includes/                  # PHP classes
 │   ├── class-plugin.php      # Bootstrap
 │   ├── class-settings-controller.php
@@ -319,11 +319,11 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 - [x] Review history display
 
 ### Phase 4: Conversation Loop ✅ Complete
-Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/131)-[#134](https://github.com/adamsilverstein/copydesk-ai/issues/134).
-- [x] Reply detection hook ([#131](https://github.com/adamsilverstein/copydesk-ai/issues/131))
-- [x] Context-aware reply prompts / Reply Service ([#132](https://github.com/adamsilverstein/copydesk-ai/issues/132))
-- [x] Async reply processing ([#133](https://github.com/adamsilverstein/copydesk-ai/issues/133))
-- [x] Conversation threading UI ([#134](https://github.com/adamsilverstein/copydesk-ai/issues/134))
+Tracked in issues [#131](https://github.com/adamsilverstein/fresh-eyes/issues/131)-[#134](https://github.com/adamsilverstein/fresh-eyes/issues/134).
+- [x] Reply detection hook ([#131](https://github.com/adamsilverstein/fresh-eyes/issues/131))
+- [x] Context-aware reply prompts / Reply Service ([#132](https://github.com/adamsilverstein/fresh-eyes/issues/132))
+- [x] Async reply processing ([#133](https://github.com/adamsilverstein/fresh-eyes/issues/133))
+- [x] Conversation threading UI ([#134](https://github.com/adamsilverstein/fresh-eyes/issues/134))
 
 ### Phase 5: Polish & Release 🚧 In progress
 - [x] Accessibility: skip links, visible focus indicators, WCAG AA color contrast, ARIA live regions, descriptive screen reader labels
@@ -334,7 +334,7 @@ Tracked in issues [#131](https://github.com/adamsilverstein/copydesk-ai/issues/1
 - [x] Quick fixes, suggested edits, review history, export and usage analytics
 - [x] Release v1.0.0
 - [ ] Abilities API integration
-- [ ] Streaming responses ([#60](https://github.com/adamsilverstein/copydesk-ai/issues/60))
+- [ ] Streaming responses ([#60](https://github.com/adamsilverstein/fresh-eyes/issues/60))
 
 ## API Documentation
 
@@ -373,7 +373,7 @@ GPL v2 or later
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/adamsilverstein/copydesk-ai/issues)
+- **Issues**: [GitHub Issues](https://github.com/adamsilverstein/fresh-eyes/issues)
 - **Documentation**: [docs/](docs/)
 - **WordPress**: Requires 7.0+
 
@@ -382,7 +382,7 @@ GPL v2 or later
 See the changelog in [readme.txt](readme.txt) for release notes.
 
 ### Coming Soon
-- Streaming responses once the core AI Client supports them ([#60](https://github.com/adamsilverstein/copydesk-ai/issues/60))
+- Streaming responses once the core AI Client supports them ([#60](https://github.com/adamsilverstein/fresh-eyes/issues/60))
 - Abilities API integration
 
 ---

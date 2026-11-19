@@ -39,8 +39,8 @@ class Analytics_Page {
 	 */
 	public static function add_page(): void {
 		$hook = add_options_page(
-			__( 'Copydesk AI Analytics', 'copydesk-ai' ),
-			__( 'Copydesk AI Analytics', 'copydesk-ai' ),
+			__( 'Fresh Eyes Analytics', 'fresh-eyes' ),
+			__( 'Fresh Eyes Analytics', 'fresh-eyes' ),
 			'manage_options',
 			self::SLUG,
 			array( self::class, 'render' )
@@ -55,7 +55,7 @@ class Analytics_Page {
 	public static function render(): void {
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Copydesk AI Analytics', 'copydesk-ai' ); ?></h1>
+			<h1><?php esc_html_e( 'Fresh Eyes Analytics', 'fresh-eyes' ); ?></h1>
 			<div id="ai-feedback-analytics-root"></div>
 		</div>
 		<?php
@@ -71,7 +71,7 @@ class Analytics_Page {
 			return;
 		}
 
-		$plugin_file = dirname( __DIR__ ) . '/copydesk-ai.php';
+		$plugin_file = dirname( __DIR__ ) . '/fresh-eyes.php';
 		$asset_file  = dirname( __DIR__ ) . '/build/analytics.asset.php';
 		if ( ! file_exists( $asset_file ) ) {
 			return;
@@ -92,7 +92,7 @@ class Analytics_Page {
 			$version,
 			true
 		);
-		wp_set_script_translations( 'ai-feedback-analytics', 'copydesk-ai' );
+		wp_set_script_translations( 'ai-feedback-analytics', 'fresh-eyes' );
 
 		wp_enqueue_style(
 			'ai-feedback-analytics',

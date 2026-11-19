@@ -111,7 +111,7 @@ class Requirements_Notice {
 			case 'wp':
 				return sprintf(
 					/* translators: 1: required WordPress version, 2: URL of the WordPress updates screen */
-					__( 'Copydesk AI requires WordPress %1$s or higher. <a href="%2$s">Update WordPress</a> to use this plugin.', 'copydesk-ai' ),
+					__( 'Fresh Eyes requires WordPress %1$s or higher. <a href="%2$s">Update WordPress</a> to use this plugin.', 'fresh-eyes' ),
 					self::MIN_WP_VERSION,
 					esc_url( network_admin_url( 'update-core.php' ) )
 				);
@@ -119,7 +119,7 @@ class Requirements_Notice {
 			case 'php':
 				return sprintf(
 					/* translators: 1: required PHP version, 2: URL of the Update PHP help page */
-					__( 'Copydesk AI requires PHP %1$s or higher. <a href="%2$s">Learn more about updating PHP</a>.', 'copydesk-ai' ),
+					__( 'Fresh Eyes requires PHP %1$s or higher. <a href="%2$s">Learn more about updating PHP</a>.', 'fresh-eyes' ),
 					self::MIN_PHP_VERSION,
 					esc_url( wp_get_update_php_url() )
 				);
@@ -127,7 +127,7 @@ class Requirements_Notice {
 			case 'ai_client':
 				return sprintf(
 					/* translators: %s: URL of the WordPress updates screen */
-					__( 'Copydesk AI requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'copydesk-ai' ),
+					__( 'Fresh Eyes requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'fresh-eyes' ),
 					esc_url( network_admin_url( 'update-core.php' ) )
 				);
 		}

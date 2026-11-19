@@ -85,7 +85,7 @@ class AIFeedbackUtils {
 
 		// The sidebar is pinned to the top bar by default. Wait for the
 		// toggle so a freshly loaded editor is not mistaken for a closed one.
-		const toggle = topBar.getByRole('button', { name: 'Copydesk AI' });
+		const toggle = topBar.getByRole('button', { name: 'Fresh Eyes' });
 		await toggle.waitFor({ state: 'visible' });
 		if ((await toggle.getAttribute('aria-pressed')) !== 'true') {
 			await toggle.click();
@@ -105,7 +105,7 @@ class AIFeedbackUtils {
 
 		// Handle welcome modal behavior
 		const welcomeModal = this.page.getByRole('dialog', {
-			name: /Welcome to Copydesk AI|Copydesk AI Setup Required/,
+			name: /Welcome to Fresh Eyes|Fresh Eyes Setup Required/,
 		});
 
 		// Wait for either the modal or sidebar content to be ready
