@@ -31,6 +31,7 @@ class RequirementsNoticeTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		$this->checked_caps                = array();
+		$GLOBALS['test_added_actions']     = array();
 		$GLOBALS['test_current_screen_id'] = 'plugins';
 		$GLOBALS['test_current_user_can']  = function ( string $capability ): bool {
 			$this->checked_caps[] = $capability;
@@ -42,7 +43,7 @@ class RequirementsNoticeTest extends TestCase {
 	 * Reset the globals the mocks read.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_current_screen_id'], $GLOBALS['test_current_user_can'] );
+		unset( $GLOBALS['test_current_screen_id'], $GLOBALS['test_current_user_can'], $GLOBALS['test_added_actions'] );
 		parent::tearDown();
 	}
 
@@ -193,5 +194,61 @@ class RequirementsNoticeTest extends TestCase {
 	public function test_no_notice_without_a_known_requirement(): void {
 		$this->assertSame( '', $this->render( '' ) );
 		$this->assertSame( '', $this->render( 'unknown' ) );
+	}
+
+	/**
+	 * Hooks recorded by the add_action mock.
+	 *
+	 * @return array<int, array{hook: string, callback: callable}>
+	 */
+	private function added_actions(): array {
+		$actions = array();
+		foreach ( (array) ( $GLOBALS['test_added_actions'] ?? array() ) as $action ) {
+			if ( is_array( $action ) && is_string( $action['hook'] ?? null ) && is_callable( $action['callback'] ?? null ) ) {
+				$actions[] = array(
+					'hook'     => $action['hook'],
+					'callback' => $action['callback'],
+				);
+			}
+		}
+		return $actions;
+	}
+
+	/**
+	 * The network admin fires its own hook, so the notice is registered on both.
+	 */
+	public function test_notice_is_registered_for_site_and_network_admin(): void {
+		Requirements_Notice::register( 'wp' );
+
+		$this->assertSame(
+			array( 'admin_notices', 'network_admin_notices' ),
+			array_column( $this->added_actions(), 'hook' )
+		);
+	}
+
+	/**
+	 * The registered callbacks print the notice for the requirement they were given.
+	 */
+	public function test_registered_callbacks_print_the_notice(): void {
+		$GLOBALS['test_current_screen_id'] = 'plugins-network';
+		Requirements_Notice::register( 'php' );
+
+		$actions = $this->added_actions();
+		$this->assertCount( 2, $actions );
+
+		foreach ( $actions as $action ) {
+			ob_start();
+			$action['callback']();
+			$this->assertStringContainsString( 'requires PHP 8.1 or higher', (string) ob_get_clean(), $action['hook'] );
+		}
+	}
+
+	/**
+	 * Nothing is hooked when every requirement is met.
+	 */
+	public function test_nothing_is_registered_when_requirements_are_met(): void {
+		Requirements_Notice::register( '' );
+
+		$this->assertSame( array(), $this->added_actions() );
 	}
 }

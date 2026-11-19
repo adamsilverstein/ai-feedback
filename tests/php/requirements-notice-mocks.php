@@ -72,3 +72,23 @@ if ( ! function_exists( 'esc_url' ) ) {
 		return htmlspecialchars( $url, ENT_QUOTES );
 	}
 }
+
+if ( ! function_exists( 'add_action' ) ) {
+	/**
+	 * Mock add_action; records registrations in $GLOBALS['test_added_actions'].
+	 *
+	 * @param string   $hook          Hook name.
+	 * @param callable $callback      Callback.
+	 * @param int      $priority      Priority.
+	 * @param int      $accepted_args Accepted argument count.
+	 * @return bool Always true.
+	 */
+	function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+		$GLOBALS['test_added_actions'][] = array(
+			'hook'          => $hook,
+			'callback'      => $callback,
+			'accepted_args' => $accepted_args,
+		);
+		return true;
+	}
+}

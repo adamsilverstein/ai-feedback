@@ -76,12 +76,7 @@ function init(): void {
 	);
 
 	if ( '' !== $unmet ) {
-		add_action(
-			'admin_notices',
-			static function () use ( $unmet ): void {
-				Requirements_Notice::render( $unmet );
-			}
-		);
+		Requirements_Notice::register( $unmet );
 		return;
 	}
 

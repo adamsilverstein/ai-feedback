@@ -61,6 +61,26 @@ class Requirements_Notice {
 	}
 
 	/**
+	 * Show the notice for an unmet requirement.
+	 *
+	 * The network admin fires its own notices hook in place of `admin_notices`.
+	 *
+	 * @param string $requirement Requirement key from get_unmet_requirement().
+	 */
+	public static function register( string $requirement ): void {
+		if ( '' === $requirement ) {
+			return;
+		}
+
+		$render = static function () use ( $requirement ): void {
+			self::render( $requirement );
+		};
+
+		add_action( 'admin_notices', $render );
+		add_action( 'network_admin_notices', $render );
+	}
+
+	/**
 	 * Whether the current user can resolve the requirement from this screen.
 	 *
 	 * @param string $requirement Requirement key from get_unmet_requirement().
