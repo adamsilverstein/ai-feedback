@@ -68,22 +68,15 @@ if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 /**
  * Initialize the plugin.
  */
-function init() {
-	// Check WordPress version.
-	if ( version_compare( get_bloginfo( 'version' ), '7.0', '<' ) ) {
-		add_action( 'admin_notices', __NAMESPACE__ . '\\display_version_notice' );
-		return;
-	}
+function init(): void {
+	$unmet = Requirements_Notice::get_unmet_requirement(
+		get_bloginfo( 'version' ),
+		PHP_VERSION,
+		function_exists( 'wp_ai_client_prompt' )
+	);
 
-	// Check PHP version.
-	if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
-		add_action( 'admin_notices', __NAMESPACE__ . '\\display_php_version_notice' );
-		return;
-	}
-
-	// Verify the core AI Client is available (introduced in WordPress 7.0).
-	if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
-		add_action( 'admin_notices', __NAMESPACE__ . '\\display_ai_client_notice' );
+	if ( '' !== $unmet ) {
+		Requirements_Notice::register( $unmet );
 		return;
 	}
 
@@ -91,60 +84,6 @@ function init() {
 	Plugin::get_instance();
 }
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\init' );
-
-/**
- * Display WordPress version notice.
- */
-function display_version_notice() {
-	?>
-	<div class="notice notice-error">
-		<p>
-	<?php
-	printf(
-				/* translators: %s: required WordPress version */
-		esc_html__( 'Copydesk AI requires WordPress %s or higher.', 'copydesk-ai' ),
-		'7.0'
-	);
-	?>
-		</p>
-	</div>
-	<?php
-}
-
-/**
- * Display PHP version notice.
- */
-function display_php_version_notice() {
-	?>
-	<div class="notice notice-error">
-		<p>
-	<?php
-	printf(
-				/* translators: %s: required PHP version */
-		esc_html__( 'Copydesk AI requires PHP %s or higher.', 'copydesk-ai' ),
-		'8.1'
-	);
-	?>
-		</p>
-	</div>
-	<?php
-}
-
-/**
- * Display core AI Client unavailable notice.
- */
-function display_ai_client_notice() {
-	$message = sprintf(
-		/* translators: %s: URL of the WordPress updates screen */
-		__( 'Copydesk AI requires the WordPress core AI Client (introduced in WordPress 7.0). <a href="%s">Update WordPress</a> to use this plugin.', 'copydesk-ai' ),
-		esc_url( admin_url( 'update-core.php' ) )
-	);
-	?>
-	<div class="notice notice-error">
-		<p><?php echo wp_kses_post( $message ); ?></p>
-	</div>
-	<?php
-}
 
 /**
  * Plugin activation hook.
