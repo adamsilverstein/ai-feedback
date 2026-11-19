@@ -297,6 +297,17 @@ class Review_Controller extends WP_REST_Controller {
 			);
 		}
 
+		// A missing post is reported as a 404 by the callback.
+		$post_id = $request->get_param( 'post_id' );
+		$post_id = is_numeric( $post_id ) ? (int) $post_id : 0;
+		if ( $post_id && get_post( $post_id ) && ! current_user_can( 'edit_post', $post_id ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to review this post.', 'copydesk-ai' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		return true;
 	}
 
