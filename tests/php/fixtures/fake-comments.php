@@ -83,7 +83,7 @@ if ( ! function_exists( 'get_comments' ) ) {
 					if ( isset( $args['type'] ) && $comment->comment_type !== $args['type'] ) {
 						return false;
 					}
-					return true;
+					return ai_feedback_test_matches_meta_query( $comment, $args );
 				}
 			)
 		);

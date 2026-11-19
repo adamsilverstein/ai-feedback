@@ -11,6 +11,7 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 // Manually load plugin classes (WordPress filename convention).
 $includes_dir = dirname(__DIR__, 2) . '/includes/';
 require_once $includes_dir . 'class-logger.php';
+require_once $includes_dir . 'class-user-preferences.php';
 require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-response-parser.php';
 require_once $includes_dir . 'class-notes-manager.php';
@@ -366,6 +367,41 @@ if ( ! function_exists( 'get_comment_meta' ) ) {
 			return array_map( fn( $value ) => array( $value ), $meta );
 		}
 		return $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? ( $single ? '' : array() );
+	}
+}
+
+if ( ! function_exists( 'ai_feedback_test_matches_meta_query' ) ) {
+	/**
+	 * Whether a fake comment matches the equality clauses of a `meta_query`.
+	 *
+	 * Shared by the get_comments mocks. Clauses with a `compare` are ignored.
+	 *
+	 * @param  object               $comment Comment.
+	 * @param  array<string, mixed> $args    get_comments arguments.
+	 * @return bool
+	 */
+	function ai_feedback_test_matches_meta_query( object $comment, array $args ): bool {
+		$clauses = is_array( $args['meta_query'] ?? null ) ? $args['meta_query'] : array();
+		foreach ( $clauses as $clause ) {
+			if ( ! is_array( $clause ) || ! isset( $clause['key'], $clause['value'] ) || isset( $clause['compare'] ) ) {
+				continue;
+			}
+			$value = $GLOBALS['test_comment_meta'][ (int) $comment->comment_ID ][ $clause['key'] ] ?? null;
+			if ( ! is_scalar( $value ) || (string) $value !== (string) $clause['value'] ) {
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_delete_comment' ) ) {
+	function wp_delete_comment( $comment_id, $force_delete = false ) {
+		if ( ! isset( $GLOBALS['test_comments'][ (int) $comment_id ] ) ) {
+			return false;
+		}
+		unset( $GLOBALS['test_comments'][ (int) $comment_id ], $GLOBALS['test_comment_meta'][ (int) $comment_id ] );
+		return true;
 	}
 }
 

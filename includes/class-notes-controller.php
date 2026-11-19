@@ -85,7 +85,7 @@ class Notes_Controller extends WP_REST_Controller {
 				array(
 					'methods'             => WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_review_notes' ),
-					'permission_callback' => array( $this, 'get_notes_permissions_check' ),
+					'permission_callback' => array( $this, 'get_review_notes_permissions_check' ),
 					'args'                => array(
 						'review_id' => array(
 							'required'          => true,
@@ -486,9 +486,10 @@ class Notes_Controller extends WP_REST_Controller {
 			);
 		}
 
-		// If getting notes for a specific post, check post permissions.
+		// Every route using this check names a post, so require access to it.
 		$post_id = $request->get_param( 'post_id' );
-		if ( $post_id && ! current_user_can( 'edit_post', $post_id ) ) {
+		$post_id = is_numeric( $post_id ) ? (int) $post_id : 0;
+		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
 				__( 'You do not have permission to view notes for this post.', 'copydesk-ai' ),
@@ -523,19 +524,65 @@ class Notes_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Check permissions for deleting notes.
+	 * Check permissions for getting a review's notes.
 	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return bool|WP_Error
 	 */
-	public function delete_notes_permissions_check( WP_REST_Request $request ) {
-		// User must be able to delete posts.
-		if ( ! current_user_can( 'delete_posts' ) ) {
+	public function get_review_notes_permissions_check( WP_REST_Request $request ): bool|WP_Error {
+		if ( ! $this->can_edit_review_posts( $request ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to delete notes.', 'copydesk-ai' ),
-				array( 'status' => 403 )
+				__( 'You do not have permission to view notes for this review.', 'copydesk-ai' ),
+				array( 'status' => rest_authorization_required_code() )
 			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check permissions for deleting a review's notes.
+	 *
+	 * Core deletes a note with `edit_comment`, which maps to `edit_post` on
+	 * the note's post.
+	 *
+	 * @param  WP_REST_Request $request Request object.
+	 * @return bool|WP_Error
+	 */
+	public function delete_notes_permissions_check( WP_REST_Request $request ): bool|WP_Error {
+		if ( ! $this->can_edit_review_posts( $request ) ) {
+			return new WP_Error(
+				'rest_forbidden',
+				__( 'You do not have permission to delete notes for this review.', 'copydesk-ai' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Whether the user can edit every post the requested review left notes on.
+	 *
+	 * An unknown review ID is refused like a review on a post the user cannot
+	 * edit, so the response does not reveal which review IDs exist.
+	 *
+	 * @param  WP_REST_Request $request Request with a `review_id` parameter.
+	 * @return bool True when the review has notes and the user can edit all of their posts.
+	 */
+	private function can_edit_review_posts( WP_REST_Request $request ): bool {
+		$review_id = $request->get_param( 'review_id' );
+		$post_ids  = is_string( $review_id ) ? $this->notes_manager->get_post_ids_by_review( $review_id ) : array();
+
+		if ( array() === $post_ids ) {
+			return false;
+		}
+
+		foreach ( $post_ids as $post_id ) {
+			if ( ! current_user_can( 'edit_post', $post_id ) ) {
+				return false;
+			}
 		}
 
 		return true;

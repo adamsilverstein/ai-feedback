@@ -69,7 +69,7 @@ namespace {
 		 * get_comments mock over $GLOBALS['test_comments'].
 		 *
 		 * Honors `parent`, `type` (comment_type defaults to 'note' when unset),
-		 * `number`, and the direction of an `orderby` array. comment_ID stands
+		 * equality `meta_query` clauses, `number`, and the direction of an `orderby` array. comment_ID stands
 		 * in for comment_date as the chronological key.
 		 *
 		 * @param array $args Query args.
@@ -88,6 +88,9 @@ namespace {
 					continue;
 				}
 				if ( null !== $type && ( $comment->comment_type ?? 'note' ) !== $type ) {
+					continue;
+				}
+				if ( ! ai_feedback_test_matches_meta_query( $comment, $args ) ) {
 					continue;
 				}
 				$matches[] = $comment;

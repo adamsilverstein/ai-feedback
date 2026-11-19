@@ -376,7 +376,9 @@ class Reply_Service {
 
 		$prompt             = $this->prompt_builder->build_reply_prompt( $context );
 		$system_instruction = $this->prompt_builder->get_reply_system_instruction();
-		$model              = self::option_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL );
+		$reply              = get_comment( $comment_id );
+		$user_id            = is_object( $reply ) ? self::author_id( $reply ) : 0;
+		$model              = self::preference_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL, $user_id );
 
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
@@ -443,6 +445,8 @@ class Reply_Service {
 			)
 		);
 
+		$user_id = self::author_id( $reply );
+
 		$thread = array();
 		foreach ( array_reverse( $siblings ) as $sibling ) {
 			if ( (int) $sibling->comment_ID === $comment_id ) {
@@ -471,8 +475,8 @@ class Reply_Service {
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
 			'thread'            => $thread,
 			'user_reply'        => $reply->comment_content,
-			'target_tone'       => self::option_string( 'ai_feedback_default_tone', 'professional' ),
-			'locale'            => self::option_string( 'ai_feedback_feedback_locale', get_locale() ),
+			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
+			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
 		);
 	}
 
@@ -606,14 +610,27 @@ class Reply_Service {
 	}
 
 	/**
-	 * Read a string option value.
+	 * Get the ID of the user who wrote a comment.
+	 *
+	 * @param object $comment Comment.
+	 * @return int User ID, or 0 when the comment has no user.
+	 */
+	private static function author_id( object $comment ): int {
+		$user_id = get_object_vars( $comment )['user_id'] ?? 0;
+		return is_numeric( $user_id ) ? (int) $user_id : 0;
+	}
+
+	/**
+	 * Read a string preference of the user who wrote the reply, falling back
+	 * to the site default.
 	 *
 	 * @param string $name          Option name.
-	 * @param string $default_value Value used when the option is missing or not a string.
+	 * @param string $default_value Value used when the preference is missing or not a string.
+	 * @param int    $user_id       ID of the reply's author.
 	 * @return string
 	 */
-	private static function option_string( string $name, string $default_value ): string {
-		$value = get_option( $name, $default_value );
+	private static function preference_string( string $name, string $default_value, int $user_id ): string {
+		$value = User_Preferences::get( $name, $default_value, $user_id );
 		return is_string( $value ) && '' !== $value ? $value : $default_value;
 	}
 

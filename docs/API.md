@@ -361,7 +361,11 @@ X-WP-Nonce: {nonce}
 
 ### POST /settings
 
-Update AI Feedback settings.
+Save the current user's review preferences. Each user has their own model, focus areas, tone and language, stored in user meta. Requires `edit_posts`.
+
+Send `scope: "site"` to change the site defaults instead, which apply to users who have not picked a value. This requires `manage_options`.
+
+`GET /settings` returns the user's own value for each setting, falling back to the site default and then the plugin default.
 
 #### Request
 
@@ -375,9 +379,11 @@ X-WP-Nonce: {nonce}
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
+| `scope` | string | No | `user` (default) saves the current user's preferences. `site` saves the site defaults and requires `manage_options` |
 | `default_model` | string | No | Default AI model ID |
 | `default_focus_areas` | array | No | Default focus areas |
 | `default_tone` | string | No | Default target tone |
+| `feedback_locale` | string | No | Feedback language, or `auto` |
 
 **Example Request:**
 
@@ -402,7 +408,7 @@ Returns the updated settings object (same format as GET /settings).
 | 400 | `invalid_model` | Model ID is not valid |
 | 400 | `invalid_focus_area` | Focus area is not valid |
 | 400 | `invalid_tone` | Tone is not valid |
-| 403 | `forbidden` | User cannot manage settings |
+| 403 | `rest_forbidden` | User cannot edit posts, or sent `scope: "site"` without `manage_options` |
 
 ---
 
@@ -547,6 +553,18 @@ X-WP-Nonce: {nonce}
   "deleted": true
 }
 ```
+
+### GET /notes/review/{review_id}
+
+Returns the notes a review created. Requires `edit_post` on every post the review's notes belong to.
+
+### DELETE /notes/review/{review_id}
+
+Permanently deletes the notes a review created. Requires `edit_post` on every post the review's notes belong to, matching how core lets a user delete a note.
+
+Both routes answer `403 rest_forbidden` for a review ID with no notes, the same as for a review on a post the user cannot edit, so the response does not reveal which review IDs exist.
+
+---
 
 ### GET /history/post/{post_id}
 
