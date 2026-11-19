@@ -15,7 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Explains an unmet requirement on the Plugins and Updates screens.
  *
- * Avoids syntax newer than PHP 7.4 so the PHP version notice itself can load.
+ * Keep this class and the main plugin file to syntax PHP 7.4 can parse,
+ * otherwise the PHP version notice cannot load on the sites that need it.
  */
 class Requirements_Notice {
 
