@@ -130,7 +130,7 @@ class History_Controller extends WP_REST_Controller {
 		if ( null === $entry ) {
 			return new WP_Error(
 				'review_not_found',
-				__( 'Review not found in this post\'s history.', 'copydesk-ai' ),
+				__( 'Review not found in this post\'s history.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -172,7 +172,7 @@ class History_Controller extends WP_REST_Controller {
 		if ( $post_id && ! get_post( $post_id ) ) {
 			return new WP_Error(
 				'rest_post_invalid_id',
-				__( 'Invalid post ID.', 'copydesk-ai' ),
+				__( 'Invalid post ID.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -180,7 +180,7 @@ class History_Controller extends WP_REST_Controller {
 		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view the review history for this post.', 'copydesk-ai' ),
+				__( 'You do not have permission to view the review history for this post.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}

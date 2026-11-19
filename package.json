@@ -1,5 +1,5 @@
 {
-	"name": "copydesk-ai",
+	"name": "fresh-eyes",
 	"version": "1.0.2",
 	"description": "AI-powered editorial feedback for WordPress Gutenberg editor",
 	"author": "Adam Silverstein",
@@ -12,20 +12,20 @@
 		"editorial",
 		"block-editor"
 	],
-	"homepage": "https://github.com/adamsilverstein/copydesk-ai#readme",
+	"homepage": "https://github.com/adamsilverstein/fresh-eyes#readme",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/adamsilverstein/copydesk-ai.git"
+		"url": "https://github.com/adamsilverstein/fresh-eyes.git"
 	},
 	"bugs": {
-		"url": "https://github.com/adamsilverstein/copydesk-ai/issues"
+		"url": "https://github.com/adamsilverstein/fresh-eyes/issues"
 	},
 	"engines": {
 		"node": ">=22.0.0",
 		"npm": ">=9.0.0"
 	},
 	"files": [
-		"copydesk-ai.php",
+		"fresh-eyes.php",
 		"includes/",
 		"build/",
 		"assets/",

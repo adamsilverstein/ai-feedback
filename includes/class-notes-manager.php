@@ -30,7 +30,7 @@ class Notes_Manager {
 		if ( empty( $feedback_items ) ) {
 			return new WP_Error(
 				'no_feedback',
-				__( 'No feedback items to create notes from.', 'copydesk-ai' )
+				__( 'No feedback items to create notes from.', 'fresh-eyes' )
 			);
 		}
 
@@ -77,7 +77,7 @@ class Notes_Manager {
 				'note_creation_failed',
 				sprintf(
 					/* translators: %s: error messages */
-					__( 'Failed to create notes: %s', 'copydesk-ai' ),
+					__( 'Failed to create notes: %s', 'fresh-eyes' ),
 					implode( ', ', $errors )
 				)
 			);
@@ -135,7 +135,7 @@ class Notes_Manager {
 			Logger::debug( 'Note creation failed - wp_insert_comment returned false' );
 			return new WP_Error(
 				'note_creation_failed',
-				__( 'Failed to create note.', 'copydesk-ai' )
+				__( 'Failed to create note.', 'fresh-eyes' )
 			);
 		}
 
@@ -165,7 +165,7 @@ class Notes_Manager {
 
 		// Add suggestion if present.
 		if ( ! empty( $feedback_item['suggestion'] ) && is_string( $feedback_item['suggestion'] ) ) {
-			$content .= "\n\n" . '<em>' . __( 'Suggestion:', 'copydesk-ai' ) . '</em> ';
+			$content .= "\n\n" . '<em>' . __( 'Suggestion:', 'fresh-eyes' ) . '</em> ';
 			$content .= wp_kses_post( $feedback_item['suggestion'] );
 		}
 
@@ -279,10 +279,10 @@ class Notes_Manager {
 		$category = $feedback_item['category'] ?? '';
 		if ( is_string( $category ) && '' !== $category ) {
 			$category_labels = array(
-				'content' => __( 'Content', 'copydesk-ai' ),
-				'tone'    => __( 'Tone', 'copydesk-ai' ),
-				'flow'    => __( 'Flow', 'copydesk-ai' ),
-				'design'  => __( 'Design', 'copydesk-ai' ),
+				'content' => __( 'Content', 'fresh-eyes' ),
+				'tone'    => __( 'Tone', 'fresh-eyes' ),
+				'flow'    => __( 'Flow', 'fresh-eyes' ),
+				'design'  => __( 'Design', 'fresh-eyes' ),
 			);
 
 			$category_label = $category_labels[ $category ] ?? $category;
@@ -297,9 +297,9 @@ class Notes_Manager {
 		$severity = $feedback_item['severity'] ?? '';
 		if ( is_string( $severity ) && '' !== $severity ) {
 			$severity_labels = array(
-				'suggestion' => __( 'Suggestion', 'copydesk-ai' ),
-				'important'  => __( 'Important', 'copydesk-ai' ),
-				'critical'   => __( 'Critical', 'copydesk-ai' ),
+				'suggestion' => __( 'Suggestion', 'fresh-eyes' ),
+				'important'  => __( 'Important', 'fresh-eyes' ),
+				'critical'   => __( 'Critical', 'fresh-eyes' ),
 			);
 
 			$severity_label = $severity_labels[ $severity ] ?? $severity;

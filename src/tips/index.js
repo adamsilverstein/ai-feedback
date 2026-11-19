@@ -76,11 +76,11 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			minReviews: 1,
 			content: __(
 				'Tip: Each piece of feedback is saved as a Note on its block. Select a block with a note icon to read, reply to, or resolve it.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 			action: {
 				type: 'select-first-note',
-				label: __('Show first note', 'copydesk-ai'),
+				label: __('Show first note', 'fresh-eyes'),
 			},
 		},
 		{
@@ -88,7 +88,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			minReviews: 2,
 			content: __(
 				'Tip: When a review leaves notes, reply to them or resolve them before reviewing again. The next review takes your replies and open notes into account.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 		},
 		{
@@ -97,7 +97,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			isAvailable: ({ focusAreaCount }) => focusAreaCount > 1,
 			content: __(
 				'Tip: Pick Focus Areas under Review Settings to get more targeted feedback on what matters to you.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 		},
 		{
@@ -106,7 +106,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			isAvailable: ({ toneCount }) => toneCount > 0,
 			content: __(
 				'Tip: Set a Target Tone under Review Settings to match your audience. Suggestions will be tailored to it.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 		},
 		{
@@ -115,7 +115,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			isAvailable: ({ modelCount }) => modelCount > 1,
 			content: __(
 				'Tip: Different AI models have different strengths. Try another model from Review Settings for a fresh perspective.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 		},
 		{
@@ -123,7 +123,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 			minReviews: 7,
 			content: __(
 				'Tip: Use the Feedback Language setting under Review Settings to get feedback in a different language.',
-				'copydesk-ai'
+				'fresh-eyes'
 			),
 		},
 		{
@@ -134,7 +134,7 @@ export function getTips({ reviewShortcut = '' } = {}) {
 				/* translators: %s: keyboard shortcut, e.g. Shift+Alt+R. */
 				__(
 					'Tip: Press %s to start a review from anywhere in the editor, even with the sidebar closed.',
-					'copydesk-ai'
+					'fresh-eyes'
 				),
 				reviewShortcut
 			),

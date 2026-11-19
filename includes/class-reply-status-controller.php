@@ -65,7 +65,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 					'permission_callback' => array( $this, 'get_status_permissions_check' ),
 					'args'                => array(
 						'id' => array(
-							'description'       => __( 'ID of the user reply comment.', 'copydesk-ai' ),
+							'description'       => __( 'ID of the user reply comment.', 'fresh-eyes' ),
 							'type'              => 'integer',
 							'required'          => true,
 							'sanitize_callback' => 'absint',
@@ -86,13 +86,13 @@ class Reply_Status_Controller extends WP_REST_Controller {
 					'permission_callback' => array( $this, 'process_reply_permissions_check' ),
 					'args'                => array(
 						'id'    => array(
-							'description'       => __( 'ID of the user reply comment.', 'copydesk-ai' ),
+							'description'       => __( 'ID of the user reply comment.', 'fresh-eyes' ),
 							'type'              => 'integer',
 							'required'          => true,
 							'sanitize_callback' => 'absint',
 						),
 						'retry' => array(
-							'description' => __( 'Whether to retry a failed or stalled reply.', 'copydesk-ai' ),
+							'description' => __( 'Whether to retry a failed or stalled reply.', 'fresh-eyes' ),
 							'type'        => 'boolean',
 							'default'     => false,
 						),
@@ -112,7 +112,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 					'permission_callback' => array( $this, 'get_threads_permissions_check' ),
 					'args'                => array(
 						'post' => array(
-							'description'       => __( 'ID of the post whose Copydesk AI reply threads to list.', 'copydesk-ai' ),
+							'description'       => __( 'ID of the post whose Fresh Eyes reply threads to list.', 'fresh-eyes' ),
 							'type'              => 'integer',
 							'required'          => true,
 							'sanitize_callback' => 'absint',
@@ -135,7 +135,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		if ( $post_id <= 0 || ! current_user_can( 'edit_post', $post_id ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to view these conversations.', 'copydesk-ai' ),
+				__( 'You do not have permission to view these conversations.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}
@@ -235,7 +235,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		if ( ! $comment || 'note' !== $comment->comment_type ) {
 			return new WP_Error(
 				'rest_comment_invalid_id',
-				__( 'Invalid reply ID.', 'copydesk-ai' ),
+				__( 'Invalid reply ID.', 'fresh-eyes' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -243,7 +243,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		if ( ! current_user_can( 'edit_post', (int) $comment->comment_post_ID ) ) {
 			return new WP_Error(
 				'rest_forbidden',
-				__( 'You do not have permission to access reply status.', 'copydesk-ai' ),
+				__( 'You do not have permission to access reply status.', 'fresh-eyes' ),
 				array( 'status' => rest_authorization_required_code() )
 			);
 		}
@@ -340,7 +340,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			if ( is_numeric( $since ) && time() - (int) $since > Reply_Cron_Dispatcher::PENDING_TIMEOUT ) {
 				// WP-Cron never ran the job, so stop the editor from waiting forever.
 				$payload['status'] = 'failed';
-				$payload['error']  = __( 'The AI reply timed out.', 'copydesk-ai' );
+				$payload['error']  = __( 'The AI reply timed out.', 'fresh-eyes' );
 			}
 		}
 
@@ -353,7 +353,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			} else {
 				// Complete without a reply ID cannot be rendered; report it as a failure.
 				$payload['status'] = 'failed';
-				$payload['error']  = __( 'The AI reply could not be found.', 'copydesk-ai' );
+				$payload['error']  = __( 'The AI reply could not be found.', 'fresh-eyes' );
 			}
 		}
 
@@ -409,28 +409,28 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			'type'       => 'object',
 			'properties' => array(
 				'reply_id'            => array(
-					'description' => __( 'ID of the user reply comment.', 'copydesk-ai' ),
+					'description' => __( 'ID of the user reply comment.', 'fresh-eyes' ),
 					'type'        => 'integer',
 					'readonly'    => true,
 				),
 				'status'              => array(
-					'description' => __( 'Processing state of the AI reply.', 'copydesk-ai' ),
+					'description' => __( 'Processing state of the AI reply.', 'fresh-eyes' ),
 					'type'        => 'string',
 					'enum'        => array( 'unknown', 'pending', 'complete', 'failed' ),
 					'readonly'    => true,
 				),
 				'ai_reply_comment_id' => array(
-					'description' => __( 'ID of the generated AI reply comment. Present when complete.', 'copydesk-ai' ),
+					'description' => __( 'ID of the generated AI reply comment. Present when complete.', 'fresh-eyes' ),
 					'type'        => 'integer',
 					'readonly'    => true,
 				),
 				'error'               => array(
-					'description' => __( 'Error message. Present when failed.', 'copydesk-ai' ),
+					'description' => __( 'Error message. Present when failed.', 'fresh-eyes' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
 				'retry_after'         => array(
-					'description' => __( 'Seconds until a failed reply can be retried. Present while a retry would be ignored.', 'copydesk-ai' ),
+					'description' => __( 'Seconds until a failed reply can be retried. Present while a retry would be ignored.', 'fresh-eyes' ),
 					'type'        => 'integer',
 					'readonly'    => true,
 				),

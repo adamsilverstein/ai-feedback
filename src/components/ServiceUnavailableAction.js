@@ -67,7 +67,7 @@ export default function ServiceUnavailableAction({ error, retries, onRetry }) {
 			<p className="ai-feedback-error-help">
 				{__(
 					'Add some content and save the post, then run the review again.',
-					'copydesk-ai'
+					'fresh-eyes'
 				)}
 			</p>
 		);
@@ -83,13 +83,13 @@ export default function ServiceUnavailableAction({ error, retries, onRetry }) {
 								'Retrying automatically in %d second.',
 								'Retrying automatically in %d seconds.',
 								retryAfter,
-								'copydesk-ai'
+								'fresh-eyes'
 							),
 							retryAfter
 						)
 					: __(
 							'The AI service is still unavailable. Try again in a few minutes.',
-							'copydesk-ai'
+							'fresh-eyes'
 						)}
 			</p>
 			<Button
@@ -97,7 +97,7 @@ export default function ServiceUnavailableAction({ error, retries, onRetry }) {
 				onClick={retry}
 				className="ai-feedback-error-action"
 			>
-				{__('Retry now', 'copydesk-ai')}
+				{__('Retry now', 'fresh-eyes')}
 			</Button>
 			{isAutoRetrying && (
 				<Button
@@ -105,7 +105,7 @@ export default function ServiceUnavailableAction({ error, retries, onRetry }) {
 					onClick={() => setIsCancelled(true)}
 					className="ai-feedback-error-action"
 				>
-					{__('Cancel automatic retry', 'copydesk-ai')}
+					{__('Cancel automatic retry', 'fresh-eyes')}
 				</Button>
 			)}
 		</>

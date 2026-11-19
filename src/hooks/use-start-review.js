@@ -27,7 +27,7 @@ export default function useStartReview() {
 		const feedback = registry.select(STORE_NAME);
 
 		if (feedback.isReviewing()) {
-			speak(__('A review is already in progress.', 'copydesk-ai'));
+			speak(__('A review is already in progress.', 'fresh-eyes'));
 			return;
 		}
 
@@ -39,7 +39,7 @@ export default function useStartReview() {
 			editor.getEditedPostAttribute('status') === 'auto-draft'
 		) {
 			createWarningNotice(
-				__('Save your post first to enable review.', 'copydesk-ai'),
+				__('Save your post first to enable review.', 'fresh-eyes'),
 				{ type: 'snackbar' }
 			);
 			return;
@@ -51,7 +51,7 @@ export default function useStartReview() {
 
 		if (blocks.length === 0) {
 			createWarningNotice(
-				__('No content blocks found to review.', 'copydesk-ai'),
+				__('No content blocks found to review.', 'fresh-eyes'),
 				{ type: 'snackbar' }
 			);
 			return;

@@ -85,7 +85,7 @@ export default function NoteRelinker() {
 							'Reattached %d AI note to its block. Save the post to keep it attached.',
 							'Reattached %d AI notes to their blocks. Save the post to keep them attached.',
 							clientIds.length,
-							'copydesk-ai'
+							'fresh-eyes'
 						),
 						clientIds.length
 					),

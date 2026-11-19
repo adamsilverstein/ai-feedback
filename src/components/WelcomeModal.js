@@ -71,7 +71,7 @@ export default function WelcomeModal() {
 				}
 				setStatusError(
 					error.message ||
-						__('Failed to check AI client status', 'copydesk-ai')
+						__('Failed to check AI client status', 'fresh-eyes')
 				);
 				setIsOpen(true);
 				setIsLoading(false);
@@ -109,7 +109,7 @@ export default function WelcomeModal() {
 	if (statusError) {
 		return (
 			<Modal
-				title={__('Welcome to Copydesk AI', 'copydesk-ai')}
+				title={__('Welcome to Fresh Eyes', 'fresh-eyes')}
 				onRequestClose={() => setIsOpen(false)}
 				className="ai-feedback-welcome-modal"
 			>
@@ -121,7 +121,7 @@ export default function WelcomeModal() {
 						variant="secondary"
 						onClick={() => setIsOpen(false)}
 					>
-						{__('Close', 'copydesk-ai')}
+						{__('Close', 'fresh-eyes')}
 					</Button>
 				</div>
 			</Modal>
@@ -133,16 +133,16 @@ export default function WelcomeModal() {
 	if (setupRequired) {
 		const message = !aiClientAvailable
 			? __(
-					'Copydesk AI requires the WordPress 7.0 core AI Client. Update WordPress to continue.',
-					'copydesk-ai'
+					'Fresh Eyes requires the WordPress 7.0 core AI Client. Update WordPress to continue.',
+					'fresh-eyes'
 				)
 			: __(
-					'Copydesk AI uses the WordPress core AI Client. Configure an AI provider in Settings → Connectors before continuing.',
-					'copydesk-ai'
+					'Fresh Eyes uses the WordPress core AI Client. Configure an AI provider in Settings → Connectors before continuing.',
+					'fresh-eyes'
 				);
 		return (
 			<Modal
-				title={__('Copydesk AI Setup Required', 'copydesk-ai')}
+				title={__('Fresh Eyes Setup Required', 'fresh-eyes')}
 				onRequestClose={() => setIsOpen(false)}
 				className="ai-feedback-welcome-modal"
 			>
@@ -152,14 +152,14 @@ export default function WelcomeModal() {
 					</Notice>
 
 					<div className="ai-feedback-welcome-prereq">
-						<h3>{__('To get started:', 'copydesk-ai')}</h3>
+						<h3>{__('To get started:', 'fresh-eyes')}</h3>
 						<ol className="ai-feedback-welcome-steps">
 							<li>
 								<Icon icon={pencil} />
 								<span>
 									{__(
 										'Open Settings → Connectors in WordPress admin',
-										'copydesk-ai'
+										'fresh-eyes'
 									)}
 								</span>
 							</li>
@@ -168,7 +168,7 @@ export default function WelcomeModal() {
 								<span>
 									{__(
 										'Configure an AI provider (Anthropic, OpenAI, or Google)',
-										'copydesk-ai'
+										'fresh-eyes'
 									)}
 								</span>
 							</li>
@@ -176,8 +176,8 @@ export default function WelcomeModal() {
 								<Icon icon={commentContent} />
 								<span>
 									{__(
-										'Return here to start using Copydesk AI',
-										'copydesk-ai'
+										'Return here to start using Fresh Eyes',
+										'fresh-eyes'
 									)}
 								</span>
 							</li>
@@ -191,13 +191,13 @@ export default function WelcomeModal() {
 							target="_blank"
 							rel="noopener noreferrer"
 						>
-							{__('Open Connectors Settings', 'copydesk-ai')}
+							{__('Open Connectors Settings', 'fresh-eyes')}
 						</Button>
 						<Button
 							variant="secondary"
 							onClick={() => setIsOpen(false)}
 						>
-							{__('Close', 'copydesk-ai')}
+							{__('Close', 'fresh-eyes')}
 						</Button>
 					</div>
 				</div>
@@ -208,7 +208,7 @@ export default function WelcomeModal() {
 	// Normal welcome modal when AI client is available.
 	return (
 		<Modal
-			title={__('Welcome to Copydesk AI', 'copydesk-ai')}
+			title={__('Welcome to Fresh Eyes', 'fresh-eyes')}
 			onRequestClose={dismiss}
 			className="ai-feedback-welcome-modal"
 		>
@@ -216,11 +216,11 @@ export default function WelcomeModal() {
 				<p className="ai-feedback-welcome-intro">
 					{__(
 						'Get AI-powered editorial feedback on your content right in the editor.',
-						'copydesk-ai'
+						'fresh-eyes'
 					)}
 				</p>
 
-				<h3>{__('Get started in 3 steps:', 'copydesk-ai')}</h3>
+				<h3>{__('Get started in 3 steps:', 'fresh-eyes')}</h3>
 
 				<ul className="ai-feedback-welcome-steps">
 					<li>
@@ -228,14 +228,14 @@ export default function WelcomeModal() {
 						<span>
 							{__(
 								'Write your content in the editor',
-								'copydesk-ai'
+								'fresh-eyes'
 							)}
 						</span>
 					</li>
 					<li>
 						<Icon icon={check} />
 						<span>
-							{__('Save your post as a draft', 'copydesk-ai')}
+							{__('Save your post as a draft', 'fresh-eyes')}
 						</span>
 					</li>
 					<li>
@@ -243,7 +243,7 @@ export default function WelcomeModal() {
 						<span>
 							{__(
 								'Click "Review Document" to get AI feedback',
-								'copydesk-ai'
+								'fresh-eyes'
 							)}
 						</span>
 					</li>
@@ -251,15 +251,15 @@ export default function WelcomeModal() {
 
 				<div className="ai-feedback-welcome-actions">
 					<Button variant="primary" onClick={dismiss}>
-						{__('Get Started', 'copydesk-ai')}
+						{__('Get Started', 'fresh-eyes')}
 					</Button>
 					<Button
 						variant="link"
-						href="https://github.com/adamsilverstein/copydesk-ai#readme"
+						href="https://github.com/adamsilverstein/fresh-eyes#readme"
 						target="_blank"
 						rel="noopener noreferrer"
 					>
-						{__('Learn More', 'copydesk-ai')}
+						{__('Learn More', 'fresh-eyes')}
 					</Button>
 				</div>
 			</div>

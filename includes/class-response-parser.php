@@ -152,7 +152,7 @@ class Response_Parser {
 			if ( $validate_schema ) {
 				return new \WP_Error(
 					'invalid_json',
-					__( 'Could not extract valid JSON from AI response.', 'copydesk-ai' )
+					__( 'Could not extract valid JSON from AI response.', 'fresh-eyes' )
 				);
 			}
 			return array(
@@ -170,7 +170,7 @@ class Response_Parser {
 					'json_parse_error',
 					sprintf(
 					/* translators: %s: JSON error message */
-						__( 'JSON parse error: %s', 'copydesk-ai' ),
+						__( 'JSON parse error: %s', 'fresh-eyes' ),
 						json_last_error_msg()
 					)
 				);
@@ -201,7 +201,7 @@ class Response_Parser {
 			if ( $validate_schema ) {
 				return new \WP_Error(
 					'invalid_format',
-					__( 'Response does not contain expected feedback format.', 'copydesk-ai' )
+					__( 'Response does not contain expected feedback format.', 'fresh-eyes' )
 				);
 			}
 			return array(
@@ -661,7 +661,7 @@ class Response_Parser {
 		if ( ! is_array( $data ) ) {
 			$errors->add(
 				'invalid_type',
-				__( 'Response must be a JSON object.', 'copydesk-ai' ),
+				__( 'Response must be a JSON object.', 'fresh-eyes' ),
 				array( 'path' => '$' )
 			);
 			return $errors;
@@ -671,13 +671,13 @@ class Response_Parser {
 		if ( ! isset( $data['feedback'] ) ) {
 			$errors->add(
 				'missing_field',
-				__( 'Response must contain a "feedback" array.', 'copydesk-ai' ),
+				__( 'Response must contain a "feedback" array.', 'fresh-eyes' ),
 				array( 'path' => '$.feedback' )
 			);
 		} elseif ( ! is_array( $data['feedback'] ) ) {
 			$errors->add(
 				'invalid_type',
-				__( 'The "feedback" field must be an array.', 'copydesk-ai' ),
+				__( 'The "feedback" field must be an array.', 'fresh-eyes' ),
 				array( 'path' => '$.feedback' )
 			);
 		} else {
@@ -699,7 +699,7 @@ class Response_Parser {
 		if ( isset( $data['summary'] ) && ! is_string( $data['summary'] ) ) {
 			$errors->add(
 				'invalid_type',
-				__( 'The "summary" field must be a string.', 'copydesk-ai' ),
+				__( 'The "summary" field must be a string.', 'fresh-eyes' ),
 				array( 'path' => '$.summary' )
 			);
 		}
@@ -733,7 +733,7 @@ class Response_Parser {
 				'invalid_type',
 				sprintf(
 				/* translators: %d: item index */
-					__( 'Feedback item %d must be an object.', 'copydesk-ai' ),
+					__( 'Feedback item %d must be an object.', 'fresh-eyes' ),
 					$index
 				),
 				array( 'path' => $path )
@@ -748,7 +748,7 @@ class Response_Parser {
 					'missing_field',
 					sprintf(
 					/* translators: 1: field name, 2: item index */
-						__( 'Feedback item %2$d is missing required field "%1$s".', 'copydesk-ai' ),
+						__( 'Feedback item %2$d is missing required field "%1$s".', 'fresh-eyes' ),
 						$field,
 						$index
 					),
@@ -759,7 +759,7 @@ class Response_Parser {
 					'invalid_type',
 					sprintf(
 					/* translators: 1: field name, 2: item index */
-						__( 'Field "%1$s" in feedback item %2$d must be a string.', 'copydesk-ai' ),
+						__( 'Field "%1$s" in feedback item %2$d must be a string.', 'fresh-eyes' ),
 						$field,
 						$index
 					),
@@ -775,7 +775,7 @@ class Response_Parser {
 					'invalid_enum',
 					sprintf(
 					/* translators: 1: invalid value, 2: valid values, 3: item index */
-						__( 'Invalid category "%1$s" in item %3$d. Must be one of: %2$s.', 'copydesk-ai' ),
+						__( 'Invalid category "%1$s" in item %3$d. Must be one of: %2$s.', 'fresh-eyes' ),
 						$item['category'],
 						implode( ', ', self::VALID_CATEGORIES ),
 						$index
@@ -792,7 +792,7 @@ class Response_Parser {
 					'invalid_enum',
 					sprintf(
 					/* translators: 1: invalid value, 2: valid values, 3: item index */
-						__( 'Invalid severity "%1$s" in item %3$d. Must be one of: %2$s.', 'copydesk-ai' ),
+						__( 'Invalid severity "%1$s" in item %3$d. Must be one of: %2$s.', 'fresh-eyes' ),
 						$item['severity'],
 						implode( ', ', self::VALID_SEVERITIES ),
 						$index
@@ -810,7 +810,7 @@ class Response_Parser {
 				'invalid_type',
 				sprintf(
 				/* translators: %d: item index */
-					__( 'Field "suggestion" in feedback item %d must be a string.', 'copydesk-ai' ),
+					__( 'Field "suggestion" in feedback item %d must be a string.', 'fresh-eyes' ),
 					$index
 				),
 				array( 'path' => $path . '.suggestion' )
@@ -916,7 +916,7 @@ class Response_Parser {
 				$group['is_group'] = true;
 				$group['title']    = sprintf(
 					/* translators: 1: original title, 2: occurrence count */
-					__( '%1$s (%2$d occurrences)', 'copydesk-ai' ),
+					__( '%1$s (%2$d occurrences)', 'fresh-eyes' ),
 					$group['original_title'],
 					$group['count']
 				);

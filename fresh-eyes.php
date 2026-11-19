@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name: Copydesk AI
- * Plugin URI: https://github.com/adamsilverstein/copydesk-ai
+ * Plugin Name: Fresh Eyes: AI Editorial Feedback
+ * Plugin URI: https://github.com/adamsilverstein/fresh-eyes
  * Description: AI-powered editorial feedback in the Gutenberg editor using WordPress 7.0's core AI Client and Notes feature.
  * Version: 1.0.2
  * Requires at least: 7.0
@@ -10,7 +10,7 @@
  * Author URI: https://wordpress.org/profiles/adamsilverstein/
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: copydesk-ai
+ * Text Domain: fresh-eyes
  *
  * @package AI_Feedback
  */

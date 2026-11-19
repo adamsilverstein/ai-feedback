@@ -17,19 +17,19 @@ import { STORE_NAME } from '../store';
 const getFocusAreaHelp = () => ({
 	content: __(
 		'Checks grammar, spelling, clarity, and factual accuracy.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	tone: __(
 		'Analyzes voice consistency, formality level, and audience fit.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	flow: __(
 		'Reviews logical progression, transitions, and paragraph structure.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 	design: __(
 		'Evaluates formatting, headings, lists, and visual hierarchy.',
-		'copydesk-ai'
+		'fresh-eyes'
 	),
 });
 
@@ -101,11 +101,11 @@ export default function FocusAreaSelector() {
 
 	return (
 		<fieldset className="ai-feedback-focus-areas">
-			<legend>{__('Focus Areas', 'copydesk-ai')}</legend>
+			<legend>{__('Focus Areas', 'fresh-eyes')}</legend>
 			<p className="description">
 				{__(
 					'Select which aspects of your content to review. At least one is required.',
-					'copydesk-ai'
+					'fresh-eyes'
 				)}
 			</p>
 			{availableFocusAreas.map((area) => (

@@ -333,7 +333,7 @@ export async function suggestQuickFixes(notes) {
 					'%d AI edit was added as a suggestion. Save the post to keep it.',
 					'%d AI edits were added as suggestions. Save the post to keep them.',
 					added,
-					'copydesk-ai'
+					'fresh-eyes'
 				),
 				added
 			),

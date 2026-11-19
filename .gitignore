@@ -1,7 +1,7 @@
 vendor/
 node_modules/
 build/
-/ai-feedback.zip
+/*.zip
 .phpunit.cache/
 artifacts/
 test-results/

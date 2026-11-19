@@ -14,7 +14,6 @@ vi.mock('@wordpress/data', () => ({
 }));
 
 vi.mock('@wordpress/components', () => ({
-	// eslint-disable-next-line jsx-a11y/label-has-associated-control
 	SelectControl: ({ label, value, options, onChange, help }) => (
 		<label htmlFor={`sel-${label}`}>
 			{label}

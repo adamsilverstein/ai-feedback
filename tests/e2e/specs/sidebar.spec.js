@@ -28,7 +28,7 @@ test.describe('AI Feedback Sidebar', () => {
 
 		const toolbarButton = page
 			.getByRole('region', { name: 'Editor top bar' })
-			.getByRole('button', { name: 'Copydesk AI' });
+			.getByRole('button', { name: 'Fresh Eyes' });
 		await expect(toolbarButton).toHaveAttribute('aria-pressed', 'true');
 
 		await toolbarButton.click();

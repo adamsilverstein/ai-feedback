@@ -264,8 +264,8 @@ Register plugin capabilities for discoverability and AI agent integration:
 ```php
 add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'ai-feedback/review-document', array(
-        'label'       => __( 'Review Document with AI', 'copydesk-ai' ),
-        'description' => __( 'Analyze document content and provide editorial feedback', 'copydesk-ai' ),
+        'label'       => __( 'Review Document with AI', 'fresh-eyes' ),
+        'description' => __( 'Analyze document content and provide editorial feedback', 'fresh-eyes' ),
         'category'    => 'content',
         'input_schema' => array(
             'type'       => 'object',
@@ -655,7 +655,7 @@ class Review_Controller extends WP_REST_Controller {
         if ( ! current_user_can( 'edit_post', $post_id ) ) {
             return new WP_Error(
                 'rest_forbidden',
-                __( 'You do not have permission to review this post.', 'copydesk-ai' ),
+                __( 'You do not have permission to review this post.', 'fresh-eyes' ),
                 array( 'status' => 403 )
             );
         }
