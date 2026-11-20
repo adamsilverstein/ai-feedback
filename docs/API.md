@@ -244,9 +244,9 @@ The current user must be able to edit the post.
 | Type | Fields | Description |
 |------|--------|-------------|
 | `replace_text` | `find`, `replace` | Plain text find and replace. `find` appears exactly once in the block, as with a review's `quick_fix` |
-| `rewrite_block` | `content`, `original` | New text for the whole block, with inline formatting only (`a`, `b`, `br`, `code`, `em`, `i`, `s`, `strong`, `sub`, `sup`). `original` is the block text the AI saw, so the editor can tell once the edit is outdated. Only for blocks with a rich text `content` attribute |
+| `rewrite_block` | `content`, `original` | New text for the whole block, with inline formatting only (`a`, `b`, `br`, `code`, `em`, `i`, `s`, `strong`, `sub`, `sup`). `original` is the block text the AI saw, so the editor can tell once the edit is outdated. Only for blocks with a rich text `content` attribute whose text has no links, formatting or line breaks, since the AI only sees plain text and a rewrite would drop them |
 
-Invalid edits are dropped on the server and the reply posts without one. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
+Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
 ---
 
