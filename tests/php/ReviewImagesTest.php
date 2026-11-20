@@ -253,6 +253,29 @@ class ReviewImagesTest extends TestCase {
 	}
 
 	/**
+	 * Images stop once their total would pass MAX_TOTAL_BYTES.
+	 */
+	public function test_total_size_limit(): void {
+		$size = (int) ( Review_Images::MAX_TOTAL_BYTES / 2 ) - 10;
+		file_put_contents( $this->uploads . '/2026/11/big.png', str_repeat( 'x', $size ) );
+		$GLOBALS['test_attachments'][20] = array(
+			'file' => '2026/11/big.png',
+			'mime' => 'image/png',
+		);
+		$GLOBALS['test_posts'][20]       = new \WP_Post(
+			(object) array(
+				'ID'        => 20,
+				'post_type' => 'attachment',
+			)
+		);
+		$big = static fn ( string $id ): array => self::image( $id, 20, 'http://example.com/wp-content/uploads/2026/11/big.png' );
+
+		$images = ( new Review_Images() )->collect( array( $big( 'a' ), $big( 'b' ), $big( 'c' ) ) );
+
+		$this->assertSame( array( 'a', 'b' ), array_column( $images, 'block_id' ) );
+	}
+
+	/**
 	 * Run a review that proposes alt text for the image.
 	 *
 	 * @param  string               $model     Model ID.

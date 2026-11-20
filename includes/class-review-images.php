@@ -32,6 +32,13 @@ class Review_Images {
 	public const MAX_BYTES = 1572864;
 
 	/**
+	 * Largest total of image files sent with one request, in bytes, so a
+	 * request stays well under provider and proxy body limits once base64
+	 * encoded.
+	 */
+	public const MAX_TOTAL_BYTES = 3145728;
+
+	/**
 	 * Image types sent.
 	 */
 	public const MIME_TYPES = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' );
@@ -57,6 +64,7 @@ class Review_Images {
 		 */
 		$max    = max( 0, (int) apply_filters( 'ai_feedback_max_review_images', self::MAX_IMAGES ) );
 		$images = array();
+		$total  = 0;
 
 		foreach ( $blocks as $block ) {
 			if ( count( $images ) >= $max ) {
@@ -78,9 +86,10 @@ class Review_Images {
 				continue;
 			}
 			$data = $this->read_file( $file['path'] );
-			if ( null === $data ) {
+			if ( null === $data || $total + strlen( $data ) > self::MAX_TOTAL_BYTES ) {
 				continue;
 			}
+			$total += strlen( $data );
 
 			$images[] = array(
 				'block_id' => $block['clientId'],
