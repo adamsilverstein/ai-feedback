@@ -8,6 +8,7 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Fresh_Eyes_User;
 use AI_Feedback\Mentions;
 
 /**
@@ -19,8 +20,75 @@ class MentionsTest extends TestCase {
 	 * Reset filter and capability overrides.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_user_can'] );
+		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_user_can'], $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		Fresh_Eyes_User::reset_cache();
 		parent::tearDown();
+	}
+
+	/**
+	 * Read the completer chip cases shared with src/utils/test/mentions.test.js.
+	 *
+	 * @param string $key `mentions` or `others`.
+	 * @return array<int, array{string, int}>
+	 */
+	private static function chip_cases( string $key ): array {
+		$cases = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/mention-cases.json' ), true );
+		return array_map( static fn ( string $content ): array => array( $content, (int) $cases['chips']['userId'] ), $cases['chips'][ $key ] );
+	}
+
+	/**
+	 * Notes holding a completer chip for the Fresh Eyes user.
+	 *
+	 * @return array<int, array{string, int}>
+	 */
+	public static function chip_mentions(): array {
+		return self::chip_cases( 'mentions' );
+	}
+
+	/**
+	 * A completer chip for the Fresh Eyes user is a mention, whatever name it shows.
+	 *
+	 * @dataProvider chip_mentions
+	 *
+	 * @param string $content Note content.
+	 * @param int    $user_id Fresh Eyes user ID.
+	 */
+	public function test_detects_user_chip( string $content, int $user_id ): void {
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = $user_id;
+		Fresh_Eyes_User::reset_cache();
+
+		$this->assertTrue( Mentions::has_user_chip( $content ) );
+		$this->assertTrue( Mentions::mentions_fresh_eyes( $content ) );
+
+		// Without the user, the chip is only its text.
+		unset( $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		Fresh_Eyes_User::reset_cache();
+		$this->assertFalse( Mentions::has_user_chip( $content ) );
+	}
+
+	/**
+	 * Notes with a chip for someone else, or a chip that is quoted or not a chip.
+	 *
+	 * @return array<int, array{string, int}>
+	 */
+	public static function chip_others(): array {
+		return self::chip_cases( 'others' );
+	}
+
+	/**
+	 * Only the completer's chip for the Fresh Eyes user, in the note's own text, counts.
+	 *
+	 * @dataProvider chip_others
+	 *
+	 * @param string $content Note content.
+	 * @param int    $user_id Fresh Eyes user ID.
+	 */
+	public function test_ignores_other_chips( string $content, int $user_id ): void {
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = $user_id;
+		Fresh_Eyes_User::reset_cache();
+
+		$this->assertFalse( Mentions::has_user_chip( $content ) );
+		$this->assertFalse( Mentions::mentions_fresh_eyes( $content ) );
 	}
 
 	/**
@@ -190,6 +258,8 @@ class MentionsTest extends TestCase {
 			'unquoted'                  => array( '<a href=//evil.example/x>this</a>' ),
 			'single quotes'             => array( "<a href='//evil.example/x'>this</a>" ),
 			'slash before attribute'    => array( '<a/href="//evil.example/x">this</a>' ),
+			'after a double quote'      => array( '<a title="x"href="//evil.example/x">this</a>' ),
+			'after a single quote'      => array( "<a title='x'href='//evil.example/x'>this</a>" ),
 			'uppercase attribute'       => array( '<a HREF="//evil.example/x">this</a>' ),
 			'relative path'             => array( '<a href="/wp-admin/x">this</a>' ),
 			'script scheme'             => array( '<a href="javascript:alert(1)">this</a>' ),
@@ -214,6 +284,20 @@ class MentionsTest extends TestCase {
 		);
 
 		$this->assertTrue( Mentions::edit_has_unsourced_url( $edit, '<p>Read <a href="https://good.example/x">this</a>.</p>' ) );
+	}
+
+	/**
+	 * A link named inside another attribute's value is not a source.
+	 */
+	public function test_link_inside_another_attribute_is_not_a_source(): void {
+		$edit = array(
+			'type'    => 'rewrite_block',
+			'content' => '<a href="/new">go</a>',
+		);
+
+		$this->assertTrue( Mentions::edit_has_unsourced_url( $edit, "<span title='href=\"/new\"'>text</span>" ) );
+		$this->assertSame( array(), Mentions::find_link_attributes( "<span title='href=\"/new\"'>text</span>" ) );
+		$this->assertFalse( Mentions::edit_has_unsourced_url( $edit, '<p><a href="/new">go</a></p>' ) );
 	}
 
 	/**

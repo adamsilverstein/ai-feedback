@@ -8,8 +8,8 @@
  * for sources gets an answer with a made-up link. Suggestion Mode is off in
  * wp-env, so the edit shows as Preview and Apply in the sidebar.
  *
- * Fresh Eyes is not a WordPress user, so the notes `@` completer does not
- * list it; the tests type the handle as text, as an author would.
+ * These tests type the handle as text. Picking Fresh Eyes from the notes
+ * `@` completer is covered in fresh-eyes-user.spec.js.
  */
 const { test, expect } = require('../fixtures');
 
