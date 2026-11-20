@@ -33,6 +33,12 @@ import {
 } from '@wordpress/blocks';
 import { create, slice, toHTMLString } from '@wordpress/rich-text';
 import { toHtml } from './quick-fix';
+import {
+	fromSourceHTML,
+	readSource,
+	readValue,
+	toSourceHTML,
+} from './source-newlines';
 import { excerpt, getBlockText, getBlockTexts } from './block-action';
 
 /**
@@ -379,16 +385,33 @@ export function getBlockChangeState(selectors, change, clientId) {
 }
 
 /**
+ * Read a block's text for a split, with its source newlines marked so the
+ * halves keep them as written.
+ *
+ * @param {Object} block Block.
+ * @return {{value: Object, marker: (string|null), text: string, map: number[]}} Marked value, its marker, and the normalized text with its map.
+ */
+function readForSplit(block) {
+	const { value, marker } = readSource(toHtml(block?.attributes?.content));
+	return {
+		value,
+		marker,
+		...normalizeWithMap(readValue(value, marker).text),
+	};
+}
+
+/**
  * Slice a rich text value between offsets of its normalized text.
  *
- * @param {Object}   value Rich text value.
- * @param {number[]} map   Normalized to raw offsets, from normalizeWithMap().
- * @param {number}   start Normalized start.
- * @param {number}   end   Normalized end.
+ * @param {Object}      value  Rich text value.
+ * @param {string|null} marker Its source newline marker.
+ * @param {number[]}    map    Normalized to raw offsets, from normalizeWithMap().
+ * @param {number}      start  Normalized start.
+ * @param {number}      end    Normalized end.
  * @return {string} HTML of the slice, with its formatting.
  */
-function sliceHtml(value, map, start, end) {
-	return toHTMLString({ value: slice(value, map[start], map[end]) });
+function sliceHtml(value, marker, map, start, end) {
+	return toSourceHTML(slice(value, map[start], map[end]), marker);
 }
 
 /**
@@ -420,8 +443,7 @@ function holdsObject(value, start, end) {
  * @return {{lead: string, items: string[]}|null} HTML of the introduction ('' for none) and of each item, or null when the items don't match.
  */
 export function getListSplit(block, items) {
-	const value = getValue(block);
-	const { text, map } = normalizeWithMap(value.text);
+	const { value, marker, text, map } = readForSplit(block);
 	const match = matchListItems(text, items.map(normalize));
 	if (!match) {
 		return null;
@@ -445,10 +467,10 @@ export function getListSplit(block, items) {
 	return {
 		lead:
 			leadEnd > leadStart
-				? sliceHtml(value, map, leadStart, leadEnd)
+				? sliceHtml(value, marker, map, leadStart, leadEnd)
 				: '',
 		items: match.items.map(([start, end]) =>
-			sliceHtml(value, map, start, end)
+			sliceHtml(value, marker, map, start, end)
 		),
 	};
 }
@@ -461,15 +483,14 @@ export function getListSplit(block, items) {
  * @return {[string, string]|null} HTML of both halves, or null when the split no longer applies.
  */
 export function getParagraphSplit(block, after) {
-	const value = getValue(block);
-	const { text, map } = normalizeWithMap(value.text);
+	const { value, marker, text, map } = readForSplit(block);
 	const end = findSplit(text, normalize(after));
 	if (end === -1 || holdsObject(value, map[end], map[end + 1])) {
 		return null;
 	}
 	return [
-		sliceHtml(value, map, 0, end),
-		sliceHtml(value, map, end + 1, text.length),
+		sliceHtml(value, marker, map, 0, end),
+		sliceHtml(value, marker, map, end + 1, text.length),
 	];
 }
 
@@ -586,6 +607,9 @@ export function buildReplacementBlocks(block, change) {
 	const metadata = block.attributes?.metadata;
 	const withMetadata = (attributes) =>
 		metadata ? { ...attributes, metadata } : attributes;
+	// Each new block reads its HTML as the editor would on load, so a
+	// source newline stays a newline instead of becoming a line break.
+	const toContent = (html) => fromSourceHTML(block.attributes?.content, html);
 
 	try {
 		if (change.type === 'split') {
@@ -608,10 +632,13 @@ export function buildReplacementBlocks(block, change) {
 						...rest,
 						anchor,
 						dropCap,
-						content: halves[0],
+						content: toContent(halves[0]),
 					})
 				),
-				createBlock('core/paragraph', { ...rest, content: halves[1] }),
+				createBlock('core/paragraph', {
+					...rest,
+					content: toContent(halves[1]),
+				}),
 			];
 		}
 
@@ -634,14 +661,16 @@ export function buildReplacementBlocks(block, change) {
 					...(anchor && !split.lead ? { anchor } : {}),
 				}),
 				split.items.map((content) =>
-					createBlock('core/list-item', { content })
+					createBlock('core/list-item', {
+						content: toContent(content),
+					})
 				)
 			);
 			return split.lead
 				? [
 						createBlock('core/paragraph', {
 							...paragraph,
-							content: split.lead,
+							content: toContent(split.lead),
 						}),
 						list,
 					]
