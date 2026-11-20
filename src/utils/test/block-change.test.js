@@ -39,9 +39,10 @@ beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/list')) {
 		registerCoreBlocks();
 	}
-	// The editor adds `metadata`, which holds a note's link, and `anchor`
-	// to blocks through hooks. Packages here each bundle their own hooks, so
-	// they are added by hand.
+	// The editor adds `metadata`, which holds a note's link, `anchor`,
+	// `className` and the color and typography attributes to blocks through
+	// hooks. Packages here each bundle their own hooks, so they are added by
+	// hand.
 	for (const name of ['core/paragraph', 'core/heading', 'core/list']) {
 		const settings = getBlockType(name);
 		if (!settings.attributes.metadata) {
@@ -52,6 +53,12 @@ beforeAll(() => {
 					...settings.attributes,
 					metadata: { type: 'object' },
 					anchor: { type: 'string' },
+					className: { type: 'string' },
+					style: { type: 'object' },
+					fontSize: { type: 'string' },
+					textColor: { type: 'string' },
+					backgroundColor: { type: 'string' },
+					gradient: { type: 'string' },
 				},
 			});
 		}
@@ -407,7 +414,8 @@ describe('split', () => {
 		);
 		expect(first.attributes.metadata).toEqual(NOTE);
 		expect(second.attributes.metadata).toBeUndefined();
-		expect(second.attributes.dropCap).toBe(true);
+		// A drop cap belongs to the first half only.
+		expect(second.attributes.dropCap).toBe(false);
 		expect(getBlockChangeState(selectors, change, firstId).state).toBe(
 			'applied'
 		);
@@ -635,5 +643,82 @@ describe('anchors', () => {
 		const [list] = selectors.getBlocks();
 		expect(list.name).toBe('core/list');
 		expect(list.attributes.anchor).toBe('requirements');
+	});
+});
+
+describe('block styling', () => {
+	const styled = {
+		className: 'is-callout',
+		fontSize: 'large',
+		textColor: 'accent',
+		backgroundColor: 'base',
+		style: {
+			color: { text: '#123456' },
+			typography: { fontSize: '20px', lineHeight: '1.8' },
+			spacing: { margin: { top: '2rem' } },
+		},
+	};
+
+	it('carries the styling core carries over to the list, and keeps it on the introduction', () => {
+		const paragraph = createBlock('core/paragraph', {
+			content: 'You need Node and npm.',
+			...styled,
+		});
+		const { selectors, actions } = setUp([paragraph]);
+
+		applyBlockChange(
+			selectors,
+			actions,
+			{
+				type: 'transform',
+				to: 'core/list',
+				items: ['Node', 'npm'],
+				ordered: false,
+			},
+			paragraph.clientId
+		);
+
+		const [lead, list] = selectors.getBlocks();
+		expect(lead.attributes).toMatchObject(styled);
+		// As core's transforms: class name, font size and colors, but not
+		// other styles such as spacing or line height.
+		expect(list.attributes).toMatchObject({
+			className: 'is-callout',
+			fontSize: 'large',
+			textColor: 'accent',
+			backgroundColor: 'base',
+			style: {
+				color: { text: '#123456' },
+				typography: { fontSize: '20px' },
+			},
+		});
+		expect(list.attributes.style.spacing).toBeUndefined();
+		expect(list.attributes.style.typography.lineHeight).toBeUndefined();
+	});
+
+	it('keeps a drop cap on the first half of a split only', () => {
+		const paragraph = createBlock('core/paragraph', {
+			content: 'One idea. Another idea.',
+			dropCap: true,
+			className: 'is-callout',
+		});
+		const { selectors, actions } = setUp([paragraph]);
+
+		applyBlockChange(
+			selectors,
+			actions,
+			{
+				type: 'split',
+				after: 'One idea.',
+				next: 'Another idea.',
+				next_length: 13,
+			},
+			paragraph.clientId
+		);
+
+		const [first, second] = selectors.getBlocks();
+		expect(first.attributes.dropCap).toBe(true);
+		expect(second.attributes.dropCap).toBe(false);
+		expect(second.attributes.className).toBe('is-callout');
 	});
 });

@@ -25,7 +25,12 @@
  * they work with any registry.
  */
 import { __, sprintf } from '@wordpress/i18n';
-import { createBlock, switchToBlockType } from '@wordpress/blocks';
+import {
+	createBlock,
+	getBlockSupport,
+	hasBlockSupport,
+	switchToBlockType,
+} from '@wordpress/blocks';
 import { create, slice, toHTMLString } from '@wordpress/rich-text';
 import { toHtml } from './quick-fix';
 import { excerpt, getBlockText } from './block-action';
@@ -485,6 +490,89 @@ function getAttributeUpdates(change) {
 }
 
 /**
+ * Attribute paths core's transforms carry from a block to the block it
+ * becomes, per block support, as the block editor's `addTransforms` filters
+ * on `blocks.switchToBlockType.transformedBlock` do.
+ */
+const CARRIED_STYLES = [
+	{
+		isSupported: (name) => hasBlockSupport(name, 'typography.fontSize'),
+		paths: [['fontSize'], ['style', 'typography', 'fontSize']],
+	},
+	{
+		isSupported: (name) => {
+			const color = getBlockSupport(name, 'color');
+			return !!color && color.text !== false;
+		},
+		paths: [['textColor'], ['style', 'color', 'text']],
+	},
+	{
+		isSupported: (name) => {
+			const color = getBlockSupport(name, 'color');
+			return !!color && color.background !== false;
+		},
+		paths: [['backgroundColor'], ['style', 'color', 'background']],
+	},
+	{
+		isSupported: (name) => !!getBlockSupport(name, 'color')?.gradients,
+		paths: [['gradient'], ['style', 'color', 'gradient']],
+	},
+	{
+		isSupported: (name) => !!getBlockSupport(name, 'color')?.link,
+		paths: [['style', 'elements', 'link', 'color', 'text']],
+	},
+];
+
+/**
+ * The styling a block keeps when it becomes another block type: its class
+ * name, font size and colors where the new type supports them, like core's
+ * own transforms. Other styles, such as spacing, are not carried, as in core.
+ *
+ * @param {Object} attributes Source block's attributes.
+ * @param {string} name       Target block type.
+ * @return {Object} Attributes to give the new block.
+ */
+export function getCarriedStyles(attributes, name) {
+	let carried = {};
+	if (
+		attributes.className &&
+		hasBlockSupport(name, 'customClassName', true)
+	) {
+		carried.className = attributes.className;
+	}
+	for (const { isSupported, paths } of CARRIED_STYLES) {
+		if (!isSupported(name)) {
+			continue;
+		}
+		for (const path of paths) {
+			const value = path.reduce(
+				(object, key) => object?.[key],
+				attributes
+			);
+			if (value !== undefined && value !== null && value !== '') {
+				carried = setPath(carried, path, value);
+			}
+		}
+	}
+	return carried;
+}
+
+/**
+ * Set a value at a path in an object, without changing the object.
+ *
+ * @param {Object}        object Object.
+ * @param {string[]}      path   Keys.
+ * @param {string|Object} value  Value.
+ * @return {Object} New object.
+ */
+function setPath(object, [key, ...rest], value) {
+	return {
+		...object,
+		[key]: rest.length ? setPath(object[key] || {}, rest, value) : value,
+	};
+}
+
+/**
  * Build the blocks a transform or split replaces the note's block with.
  *
  * The note's link (`metadata`) stays on the block that carries its text:
@@ -505,11 +593,23 @@ export function buildReplacementBlocks(block, change) {
 			if (!halves) {
 				return null;
 			}
-			const { metadata: _meta, anchor, ...rest } = block.attributes;
+			// The second half keeps the paragraph's styling, but not its
+			// anchor, note link or drop cap, which belong to the first.
+			const {
+				metadata: _meta,
+				anchor,
+				dropCap,
+				...rest
+			} = block.attributes;
 			return [
 				createBlock(
 					'core/paragraph',
-					withMetadata({ ...rest, anchor, content: halves[0] })
+					withMetadata({
+						...rest,
+						anchor,
+						dropCap,
+						content: halves[0],
+					})
 				),
 				createBlock('core/paragraph', { ...rest, content: halves[1] }),
 			];
@@ -520,11 +620,16 @@ export function buildReplacementBlocks(block, change) {
 			if (!split) {
 				return null;
 			}
-			// Links to the paragraph's anchor go to its introduction, or the list.
-			const anchor = block.attributes?.anchor;
+			// Links to the paragraph's anchor go to its introduction, or the
+			// list. The introduction is still the paragraph, so it keeps all
+			// of its attributes but the note link; the list gets the styling
+			// core's own paragraph to list transform carries over.
+			const { metadata: _meta, ...paragraph } = block.attributes;
+			const anchor = paragraph.anchor;
 			const list = createBlock(
 				'core/list',
 				withMetadata({
+					...getCarriedStyles(paragraph, 'core/list'),
 					ordered: !!change.ordered,
 					...(anchor && !split.lead ? { anchor } : {}),
 				}),
@@ -535,8 +640,8 @@ export function buildReplacementBlocks(block, change) {
 			return split.lead
 				? [
 						createBlock('core/paragraph', {
+							...paragraph,
 							content: split.lead,
-							...(anchor ? { anchor } : {}),
 						}),
 						list,
 					]
