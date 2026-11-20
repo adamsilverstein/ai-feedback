@@ -95,6 +95,9 @@ function activate() {
 	add_option( 'ai_feedback_default_tone', 'professional' );
 	add_option( 'ai_feedback_version', AI_FEEDBACK_VERSION );
 
+	// The user the Notes `@` completer offers as Fresh Eyes.
+	Fresh_Eyes_User::ensure();
+
 	// Flush rewrite rules.
 	flush_rewrite_rules();
 }
