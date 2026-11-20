@@ -477,4 +477,30 @@ class PromptBuilderTest extends TestCase {
 		$this->assertStringContainsString( '"quick_fix": { "find":', $prompt );
 		$this->assertStringContainsString( 'copied exactly', $prompt );
 	}
+	/**
+	 * Test the prompt describes the optional block_action field, listing
+	 * the insertable blocks.
+	 */
+	public function test_prompt_describes_block_action(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'test-1',
+				'name'     => 'core/paragraph',
+				'content'  => 'Test content.',
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringContainsString( '{ "type": "move", "target_block_id": "<another block_id from the document>", "position": "before|after" }', $prompt );
+		$this->assertStringContainsString( '{ "type": "remove" } deletes the block', $prompt );
+		$this->assertStringContainsString( '{ "name": "core/heading", "level": 2, "content": "text" }', $prompt );
+		$this->assertStringContainsString( '"items": [ "text", "text" ]', $prompt );
+
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_insertable_blocks' => array( 'core/paragraph' ) );
+		$prompt                         = $this->builder->build_review_prompt( $blocks );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertStringNotContainsString( '"name": "core/heading"', $prompt );
+	}
 }

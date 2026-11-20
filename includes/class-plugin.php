@@ -222,13 +222,14 @@ class Plugin {
 			'ai-feedback-editor',
 			'aiFeedbackData',
 			array(
-				'restUrl'            => rest_url( 'ai-feedback/v1' ),
-				'nonce'              => wp_create_nonce( 'wp_rest' ),
-				'version'            => AI_FEEDBACK_VERSION,
-				'pluginUrl'          => AI_FEEDBACK_PLUGIN_URL,
-				'connectorsUrl'      => admin_url( 'options-general.php?page=connectors' ),
-				'suggestions'        => Suggestions::is_available(),
-				'priorityThresholds' => array(
+				'restUrl'               => rest_url( 'ai-feedback/v1' ),
+				'nonce'                 => wp_create_nonce( 'wp_rest' ),
+				'version'               => AI_FEEDBACK_VERSION,
+				'pluginUrl'             => AI_FEEDBACK_PLUGIN_URL,
+				'connectorsUrl'         => admin_url( 'options-general.php?page=connectors' ),
+				'suggestions'           => Suggestions::is_available(),
+				'structuralSuggestions' => Suggestions::is_structural_available(),
+				'priorityThresholds'    => array(
 					'high'   => Response_Parser::PRIORITY_HIGH_THRESHOLD,
 					'medium' => Response_Parser::PRIORITY_MEDIUM_THRESHOLD,
 				),

@@ -118,3 +118,91 @@ add_filter(
 	10,
 	2
 );
+
+// A review of a post holding the structural fixture text proposes one of
+// each structural edit: move "The real opening" above "Background", remove
+// "This repeats section two" and add a heading above "Next steps".
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		$ids = array();
+		foreach ( $blocks as $block ) {
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			foreach ( array( 'Background', 'The real opening', 'This repeats section two', 'Next steps' ) as $start ) {
+				if ( str_starts_with( $content, $start ) ) {
+					$ids[ $start ] = $block['clientId'] ?? '';
+				}
+			}
+		}
+		if ( 4 !== count( $ids ) ) {
+			return $response;
+		}
+
+		$item = static fn ( string $block_id, string $title, array $action ): array => array(
+			'block_id'     => $block_id,
+			'category'     => 'flow',
+			'severity'     => 'important',
+			'title'        => $title,
+			'feedback'     => 'The structure could be clearer.',
+			'suggestion'   => 'Restructure this part.',
+			'block_action' => $action,
+		);
+
+		$response['feedback'] = array(
+			$item(
+				$ids['The real opening'],
+				'Lead with the real opening',
+				array(
+					'type'            => 'move',
+					'target_block_id' => $ids['Background'],
+					'position'        => 'before',
+				)
+			),
+			$item( $ids['This repeats section two'], 'Cut the repetition', array( 'type' => 'remove' ) ),
+			$item(
+				$ids['Next steps'],
+				'Add a heading',
+				array(
+					'type'     => 'insert',
+					'position' => 'before',
+					'block'    => array(
+						'name'    => 'core/heading',
+						'level'   => 3,
+						'content' => 'How to try it',
+					),
+				)
+			),
+		);
+
+		return $response;
+	},
+	10,
+	2
+);
+
+// A reply asking to move the block moves it above the first nearby block.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/move it/i', $asked[1] )
+			|| ! str_contains( $prompt, "\n- [b1] " )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply' => 'Moved it to the top.',
+				'edit'  => array(
+					'type'            => 'move_block',
+					'target_block_id' => 'b1',
+					'position'        => 'before',
+				),
+			)
+		);
+	},
+	20,
+	2
+);

@@ -27,7 +27,7 @@ X-WP-Nonce: {nonce}
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `post_id` | integer | Yes | The post ID to review |
-| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content` and an optional `anchor` |
+| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content`, an optional `anchor`, and for an inner block its parent's `clientId` as `parent` |
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
@@ -61,6 +61,24 @@ sequenceDiagram
     Editor->>API: blocks 41-50, chunk 2 of 3, review_id, previous_summaries
     API-->>Editor: notes, whole-document summary_text
 ```
+
+**Structural edits:**
+
+A note can carry a `block_action`: a change to the document's structure the author can accept or reject, instead of a `quick_fix`. It is stored as JSON in the note's `feedback_block_action` comment meta and returned on each note (null when there is none):
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `remove_block` | | Remove the note's block |
+| `move_block` | `position`, `target_block_id`, `target_name`, `target_text` | Move the note's block `before` or `after` another reviewed block. The target is kept by client ID, block name and the first 80 characters of its text, so the editor can find it again after a reload |
+| `insert_block` | `position`, `block` | Add a block `before` or `after` the note's block. `block` is `{ "name": "core/paragraph", "content" }`, `{ "name": "core/heading", "content", "level" }` (2-6) or `{ "name": "core/list", "items", "ordered" }` (up to 20 items) |
+
+The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_id", "position" }` and `{ "type": "insert", "position", "block" }`. `Response_Parser` drops any that fail validation and keeps the note: the target must be one of the blocks in the same request (so a chunked review only moves within its part), a block can't move next to itself, next to one of its own inner blocks (found through `parent`), or to where it already is, a review gets at most one per block, inserted blocks must be on the allow-list (`ai_feedback_insertable_blocks`), and inserted text may only hold inline formatting and goes through `wp_kses()`. Groups of similar notes have none.
+
+The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”" or "Remove this block and the 2 blocks inside it". Apply is a single undo step. An edit whose block or move target is gone shows as outdated, a move next to one of the block's own inner blocks is never offered, and a removal that would take a block linked to another note with it is not offered.
+
+With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
+
+Known limitation: the plugin can't tell whether the editor is in Gutenberg's Edit or Suggest intent. Gutenberg only exposes that through a private selector (`getEditorIntent()`) and nothing in the page reflects it. In Suggest intent, Gutenberg's own capture may record a suggested move a second time, as a pending move by the current user. Run reviews in Edit intent when Suggestion Mode is on.
 
 **Example Request:**
 
@@ -247,9 +265,11 @@ The current user must be able to edit the post.
 | `replace_text` | `find`, `replace` | Plain text find and replace. `find` appears exactly once in the block, as with a review's `quick_fix` |
 | `rewrite_block` | `content`, `original` | New text for the whole block, with inline formatting only (`a`, `b`, `br`, `code`, `em`, `i`, `s`, `strong`, `sub`, `sup`). `original` is the block text the AI saw, so the editor can tell once the edit is outdated. Only for blocks with a rich text `content` attribute whose text has no links, formatting or line breaks, since the AI only sees plain text and a rewrite would drop them |
 
+| `remove_block`, `move_block`, `insert_block` | See [structural edits](#post-review) | A structural edit. The reply prompt lists up to five blocks on each side of the note's block, at the same level, as `b1`, `b2` and so on, and the note's block as `this`; a move names its target by that reference. The server has no client IDs, so `target_block_id` is empty and the editor finds the target by name and text |
+
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
-`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
+`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix` or `block_action` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
 Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
 
@@ -924,6 +944,35 @@ Choose which blocks an AI reply may rewrite as a whole (`rewrite_block` edits). 
 ```php
 add_filter( 'ai_feedback_reply_can_rewrite_block', function( bool $supported, string $block_name ): bool {
     return 'core/code' === $block_name ? false : $supported;
+}, 10, 2 );
+```
+
+#### `ai_feedback_insertable_blocks`
+
+Choose which block types a structural edit may insert. By default `core/paragraph`, `core/heading` and `core/list`. The editor builds any other type from its text as the `content` attribute, so only add types with a rich text `content` attribute.
+
+```php
+add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
+    return array_diff( $blocks, array( 'core/list' ) );
+} );
+```
+
+#### `ai_feedback_use_structural_suggestions`
+
+Turn structural suggestions in Suggestion Mode on or off. By default on when Suggestion Mode is available and Gutenberg ships `gutenberg_strip_pending_structural_suggestions()`.
+
+```php
+add_filter( 'ai_feedback_use_structural_suggestions', '__return_false' );
+```
+
+#### `ai_feedback_mock_review`
+
+Change the review response used in `AI_FEEDBACK_MOCK_MODE`, for example to test structural edits.
+
+```php
+add_filter( 'ai_feedback_mock_review', function( array $response, array $blocks ): array {
+    $response['feedback'][0]['block_action'] = array( 'type' => 'remove' );
+    return $response;
 }, 10, 2 );
 ```
 

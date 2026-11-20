@@ -45,6 +45,19 @@ vi.mock('./QuickFix', () => ({
 	),
 }));
 
+// BlockAction pulls in the block editor too.
+vi.mock('./BlockAction', () => ({
+	default: ({ item, action, noteId, isSuperseded }) => (
+		<div
+			data-testid="block-action"
+			data-note={item.id}
+			data-owner={noteId}
+			data-edit={action.type}
+			data-superseded={isSuperseded ? 'yes' : 'no'}
+		/>
+	),
+}));
+
 // QuickReplies posts through core-data; record where it would show instead.
 vi.mock('./QuickReplies', () => ({
 	default: ({ note, replies }) => (
@@ -379,6 +392,75 @@ describe('FeedbackReplies', () => {
 		});
 	});
 
+	describe('structural edits', () => {
+		const move = {
+			type: 'move_block',
+			position: 'before',
+			target_block_id: '',
+			target_name: 'core/heading',
+			target_text: 'Intro',
+		};
+		const replies = [
+			{
+				id: 302,
+				author: 'Fresh Eyes',
+				content: 'Moved it.',
+				is_ai: true,
+				edit: move,
+				revision: 2,
+			},
+		];
+
+		it('shows a structural reply edit with Preview and Apply, not as a text edit', () => {
+			render(
+				<FeedbackReplies
+					replies={replies}
+					note={{
+						id: 300,
+						block_id: 'block-1',
+						block_action: { type: 'remove_block' },
+					}}
+				/>
+			);
+
+			expect(screen.queryByTestId('reply-edit')).not.toBeInTheDocument();
+			expect(screen.getByTestId('block-action').dataset).toMatchObject({
+				note: '300',
+				owner: '302',
+				edit: 'move_block',
+				superseded: 'no',
+			});
+			expect(
+				screen.getByText('Revised suggestion (2)')
+			).toBeInTheDocument();
+		});
+
+		it('marks a structural edit superseded by a newer one', () => {
+			render(
+				<FeedbackReplies
+					replies={[
+						{ ...replies[0], revision: 1 },
+						{
+							id: 304,
+							author: 'Fresh Eyes',
+							content: 'Cut it.',
+							is_ai: true,
+							edit: { type: 'remove_block' },
+							revision: 2,
+						},
+					]}
+					note={{ id: 300, block_id: 'block-1' }}
+				/>
+			);
+
+			expect(
+				screen
+					.getAllByTestId('block-action')
+					.map((node) => node.dataset.superseded)
+			).toEqual(['yes', 'no']);
+		});
+	});
+
 	describe('quick replies', () => {
 		const aiReply = {
 			id: 302,
@@ -445,6 +527,17 @@ describe('FeedbackReplies', () => {
 				<FeedbackReplies
 					replies={[]}
 					note={{ ...note, quick_fix: { find: 'a', replace: 'b' } }}
+				/>
+			);
+
+			expect(screen.getByTestId('quick-replies')).toBeInTheDocument();
+		});
+
+		it('follow the note itself while its structural edit waits on the author', () => {
+			render(
+				<FeedbackReplies
+					replies={[]}
+					note={{ ...note, block_action: { type: 'remove_block' } }}
 				/>
 			);
 

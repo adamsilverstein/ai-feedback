@@ -15,8 +15,9 @@ import { speak } from '@wordpress/a11y';
 import { useEffect, useRef } from '@wordpress/element';
 import useReplyStatus from '../hooks/useReplyStatus';
 import QuickFix from './QuickFix';
+import BlockAction from './BlockAction';
 import QuickReplies from './QuickReplies';
-import { isReplyEdit } from '../utils/is-reply-edit';
+import { isBlockAction, isReplyEdit } from '../utils/is-reply-edit';
 import { getRevisionLabel, getSupersededOwnerIds } from '../utils/revisions';
 
 /**
@@ -108,7 +109,9 @@ export default function FeedbackReplies({
 		!note.is_resolved &&
 		!note.is_group &&
 		!hasPendingSlot &&
-		(lastReply ? lastReply.is_ai : !note.parent && !!note.quick_fix);
+		(lastReply
+			? lastReply.is_ai
+			: !note.parent && !!(note.quick_fix || note.block_action));
 
 	if (replies.length === 0 && !hasPendingSlot && !showQuickReplies) {
 		return null;
@@ -147,7 +150,18 @@ export default function FeedbackReplies({
 							</span>
 						)}
 						{reply.is_ai &&
+							isBlockAction(reply.edit) &&
+							note?.block_id && (
+								<BlockAction
+									item={note}
+									action={reply.edit}
+									noteId={reply.id}
+									isSuperseded={superseded.includes(reply.id)}
+								/>
+							)}
+						{reply.is_ai &&
 							isReplyEdit(reply.edit) &&
+							!isBlockAction(reply.edit) &&
 							note?.block_id && (
 								<QuickFix
 									item={note}

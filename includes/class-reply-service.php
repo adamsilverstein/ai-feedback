@@ -54,6 +54,12 @@ class Reply_Service {
 	public const MAX_THREAD_ENTRIES = 20;
 
 	/**
+	 * Blocks listed on each side of the note's block in a reply prompt, so
+	 * a reply can move the block next to one of them.
+	 */
+	public const NEARBY_BLOCKS = 5;
+
+	/**
 	 * Reply returned instead of calling the AI when AI_FEEDBACK_MOCK_MODE is on.
 	 *
 	 * Filterable through `ai_feedback_mock_reply`, so tests can return an edit.
@@ -400,7 +406,8 @@ class Reply_Service {
 		}
 
 		$block_content = is_string( $context['block_content'] ?? null ) ? $context['block_content'] : '';
-		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ) );
+		$targets       = is_array( $context['block_targets'] ?? null ) ? $context['block_targets'] : array();
+		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ), $targets );
 		if ( null === $parsed && ! $this->response_parser->is_readable_reply( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI reply could not be read.' );
 			return new WP_Error( 'ai_unreadable_reply', __( 'The AI reply could not be read. Please try again.', 'fresh-eyes' ) );
@@ -494,7 +501,8 @@ class Reply_Service {
 		}
 		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
 
-		$block      = $this->find_note_block( $post_id, $parent_id );
+		$located    = $this->locate_note_block( $post_id, $parent_id );
+		$block      = $located['block'] ?? null;
 		$block_type = self::meta_string( $parent_id, 'block_name' );
 		if ( '' === $block_type && null !== $block && is_string( $block['blockName'] ?? null ) ) {
 			$block_type = $block['blockName'];
@@ -504,6 +512,7 @@ class Reply_Service {
 		// the editor leaves it once a new edit supersedes that suggestion.
 		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
 		$block_content = null !== $block ? self::html_text( $block_html ) : '';
+		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
 			'block_content'     => $block_content,
@@ -521,7 +530,9 @@ class Reply_Service {
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
 			'thread'            => $thread,
-			'pending_edit'      => $this->find_pending_edit( $edits, $block_content ),
+			'nearby_blocks'     => $nearby,
+			'block_targets'     => self::get_block_targets( $nearby ),
+			'pending_edit'      => $this->find_pending_edit( $edits, $block_content, $located ),
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
@@ -537,13 +548,19 @@ class Reply_Service {
 	 *
 	 * @param int $parent_id Root note ID.
 	 * @param int $post_id   Post ID.
-	 * @return list<array{id: int, edit: array<string, string>}> Note ID and edit.
+	 * @return list<array{id: int, edit: array<string, mixed>}> Note ID and edit.
 	 */
 	private function get_thread_edits( int $parent_id, int $post_id ): array {
 		$edits = array();
 
-		$quick_fix = $this->notes_manager->decode_quick_fix( get_comment_meta( $parent_id, 'feedback_quick_fix', true ) );
-		if ( null !== $quick_fix ) {
+		$block_action = Notes_Manager::decode_block_action( get_comment_meta( $parent_id, Notes_Manager::BLOCK_ACTION_META_KEY, true ) );
+		$quick_fix    = $this->notes_manager->decode_quick_fix( get_comment_meta( $parent_id, 'feedback_quick_fix', true ) );
+		if ( null !== $block_action ) {
+			$edits[] = array(
+				'id'   => $parent_id,
+				'edit' => $block_action,
+			);
+		} elseif ( null !== $quick_fix ) {
 			$edits[] = array(
 				'id'   => $parent_id,
 				'edit' => array( 'type' => 'replace_text' ) + $quick_fix,
@@ -587,13 +604,17 @@ class Reply_Service {
 	 * suggestion or the block text no longer matches it, for example
 	 * because the author applied it.
 	 *
-	 * @param list<array{id: int, edit: array<string, string>}> $edits         Edits in the thread, oldest first.
-	 * @param string                                            $block_content Block text without pending suggestions.
-	 * @return array<string, string>|null Pending edit, or null.
+	 * A structural edit is pending while the note's block is in the post
+	 * and the post does not already read as the edit would leave it.
+	 *
+	 * @param list<array{id: int, edit: array<string, mixed>}> $edits         Edits in the thread, oldest first.
+	 * @param string                                           $block_content Block text without pending suggestions.
+	 * @param array<string, mixed>|null                        $located       Note's block and its siblings, from locate_note_block().
+	 * @return array<string, mixed>|null Pending edit, or null.
 	 */
-	private function find_pending_edit( array $edits, string $block_content ): ?array {
+	private function find_pending_edit( array $edits, string $block_content, ?array $located = null ): ?array {
 		$latest = end( $edits );
-		if ( false === $latest || '' === $block_content ) {
+		if ( false === $latest ) {
 			return null;
 		}
 
@@ -602,7 +623,111 @@ class Reply_Service {
 			return null;
 		}
 
+		if ( Response_Parser::is_block_action( $latest['edit'] ) ) {
+			return null !== $located && ! self::is_block_action_applied( $latest['edit'], $located ) ? $latest['edit'] : null;
+		}
+
+		if ( '' === $block_content ) {
+			return null;
+		}
+
 		return $this->response_parser->edit_applies( $latest['edit'], $block_content ) ? $latest['edit'] : null;
+	}
+
+	/**
+	 * Whether the saved post already reads as a structural edit would leave
+	 * it: the block sits next to its move target, or the inserted block is
+	 * already next to it. A removed block is never found, so it is never
+	 * applied here.
+	 *
+	 * @param array<string, mixed> $edit    Structural edit.
+	 * @param array<string, mixed> $located Note's block and its siblings, from locate_note_block().
+	 * @return bool
+	 */
+	private static function is_block_action_applied( array $edit, array $located ): bool {
+		$siblings = is_array( $located['siblings'] ?? null ) ? array_values( $located['siblings'] ) : array();
+		$index    = is_int( $located['index'] ?? null ) ? $located['index'] : 0;
+		$step     = 'before' === ( $edit['position'] ?? null ) ? 1 : -1;
+		$type     = $edit['type'] ?? null;
+
+		if ( 'move_block' === $type ) {
+			// Moving before a block leaves that block right after this one.
+			$neighbor = $siblings[ $index + $step ] ?? null;
+			$text     = is_string( $edit['target_text'] ?? null ) ? $edit['target_text'] : '';
+			return is_array( $neighbor ) && '' !== $text
+				&& ( $edit['target_name'] ?? null ) === ( $neighbor['blockName'] ?? null )
+				&& Response_Parser::matches_target_text( self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) ), $text );
+		}
+
+		if ( 'insert_block' === $type ) {
+			// A block inserted before this one sits right before it.
+			$neighbor = $siblings[ $index - $step ] ?? null;
+			$block    = is_array( $edit['block'] ?? null ) ? $edit['block'] : array();
+			$text     = is_array( $block['items'] ?? null )
+				? implode( ' ', array_filter( $block['items'], 'is_string' ) )
+				: ( is_string( $block['content'] ?? null ) ? $block['content'] : '' );
+			$attrs    = is_array( $neighbor ) && is_array( $neighbor['attrs'] ?? null ) ? $neighbor['attrs'] : array();
+			return is_array( $neighbor )
+				&& ( $block['name'] ?? null ) === ( $neighbor['blockName'] ?? null )
+				// A heading's level and a list's type are part of the edit; both blocks default to an h2 and a bulleted list.
+				&& ( $block['level'] ?? 2 ) === ( $attrs['level'] ?? 2 )
+				&& ( $block['ordered'] ?? false ) === ( $attrs['ordered'] ?? false )
+				&& self::html_text( $text ) === self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) );
+		}
+
+		return false;
+	}
+
+	/**
+	 * List the blocks around the note's block for the reply prompt.
+	 *
+	 * Up to NEARBY_BLOCKS on each side, at the same level, each with a short
+	 * reference the AI uses to name it. The note's block is listed as
+	 * Response_Parser::REPLY_SELF_REF.
+	 *
+	 * @param list<array<mixed>> $siblings Blocks at the note's block's level.
+	 * @param int                $index    Position of the note's block in `$siblings`.
+	 * @return list<array{ref: string, name: string, text: string, index: int}> Nearby blocks.
+	 */
+	private static function get_nearby_blocks( array $siblings, int $index ): array {
+		$nearby = array();
+		$first  = max( 0, $index - self::NEARBY_BLOCKS );
+		$last   = min( count( $siblings ) - 1, $index + self::NEARBY_BLOCKS );
+		$number = 0;
+		for ( $position = $first; $position <= $last; $position++ ) {
+			$block = $siblings[ $position ] ?? null;
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+			$nearby[] = array(
+				'ref'   => $position === $index ? Response_Parser::REPLY_SELF_REF : 'b' . ( ++$number ),
+				'name'  => is_string( $block['blockName'] ?? null ) ? $block['blockName'] : '',
+				'text'  => self::html_text( self::strip_suggestion_markers( self::get_block_html( $block ) ) ),
+				'index' => $position,
+			);
+		}
+
+		return $nearby;
+	}
+
+	/**
+	 * Key nearby blocks by reference, as Response_Parser::parse_reply()
+	 * expects. Their client IDs are not known on the server.
+	 *
+	 * @param list<array{ref: string, name: string, text: string, index: int}> $nearby Nearby blocks.
+	 * @return array<string, array{client_id: string, name: string, text: string, index: int}> Targets keyed by reference.
+	 */
+	private static function get_block_targets( array $nearby ): array {
+		$targets = array();
+		foreach ( $nearby as $entry ) {
+			$targets[ $entry['ref'] ] = array(
+				'client_id' => '',
+				'name'      => $entry['name'],
+				'text'      => $entry['text'],
+				'index'     => $entry['index'],
+			);
+		}
+		return $targets;
 	}
 
 	/**
@@ -726,9 +851,9 @@ class Reply_Service {
 	 *
 	 * @param int $post_id Post ID.
 	 * @param int $note_id Root note ID.
-	 * @return array<mixed>|null Parsed block, or null when the post or block is missing.
+	 * @return array{block: array<mixed>, siblings: list<array<mixed>>, index: int}|null Parsed block with its siblings and position, or null when the post or block is missing.
 	 */
-	private function find_note_block( int $post_id, int $note_id ): ?array {
+	private function locate_note_block( int $post_id, int $note_id ): ?array {
 		$post = get_post( $post_id );
 		if ( null === $post || '' === $post->post_content ) {
 			return null;
@@ -740,20 +865,30 @@ class Reply_Service {
 	/**
 	 * Depth-first search for the block whose `metadata.noteId` matches.
 	 *
+	 * Whitespace between blocks parses as nameless blocks, which are left
+	 * out of the siblings.
+	 *
 	 * @param array<mixed> $blocks  Parsed blocks.
 	 * @param int          $note_id Root note ID.
-	 * @return array<mixed>|null Matching block, or null.
+	 * @return array{block: array<mixed>, siblings: list<array<mixed>>, index: int}|null Matching block with its siblings and position, or null.
 	 */
 	private static function search_blocks( array $blocks, int $note_id ): ?array {
-		foreach ( $blocks as $block ) {
-			if ( ! is_array( $block ) ) {
-				continue;
-			}
+		$siblings = array_values(
+			array_filter(
+				$blocks,
+				static fn ( mixed $block ): bool => is_array( $block ) && is_string( $block['blockName'] ?? null )
+			)
+		);
 
+		foreach ( $siblings as $index => $block ) {
 			$attrs    = is_array( $block['attrs'] ?? null ) ? $block['attrs'] : array();
 			$metadata = is_array( $attrs['metadata'] ?? null ) ? $attrs['metadata'] : array();
 			if ( self::links_note( $metadata['noteId'] ?? null, $note_id ) ) {
-				return $block;
+				return array(
+					'block'    => $block,
+					'siblings' => $siblings,
+					'index'    => $index,
+				);
 			}
 
 			if ( is_array( $block['innerBlocks'] ?? null ) ) {

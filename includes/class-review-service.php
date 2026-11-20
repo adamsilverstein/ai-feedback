@@ -641,7 +641,18 @@ class Review_Service {
 			'feedback' => $feedback,
 		);
 
-		return wp_json_encode( $response );
+		/**
+		 * Filters the mock review response used when AI_FEEDBACK_MOCK_MODE is on.
+		 *
+		 * Lets tests return feedback the built-in mock does not, such as
+		 * structural edits.
+		 *
+		 * @param array<string, mixed> $response Mock response, with `summary` and `feedback`.
+		 * @param array<mixed>         $blocks   Blocks being reviewed.
+		 */
+		$response = apply_filters( 'ai_feedback_mock_review', $response, $blocks );
+
+		return (string) wp_json_encode( $response );
 	}
 
 	/**

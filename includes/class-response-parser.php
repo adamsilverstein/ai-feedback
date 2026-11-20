@@ -69,6 +69,47 @@ class Response_Parser {
 	);
 
 	/**
+	 * Structural edits: removing the note's block, moving it next to another
+	 * block, or inserting a new block next to it.
+	 */
+	public const BLOCK_ACTION_TYPES = array( 'remove_block', 'move_block', 'insert_block' );
+
+	/**
+	 * Short names a review's `block_action` may use for the structural types.
+	 */
+	private const BLOCK_ACTION_ALIASES = array(
+		'remove' => 'remove_block',
+		'move'   => 'move_block',
+		'insert' => 'insert_block',
+	);
+
+	/**
+	 * Reference the reply prompt uses for the note's own block among the
+	 * blocks a structural edit may point at.
+	 */
+	public const REPLY_SELF_REF = 'this';
+
+	/**
+	 * Block types an `insert_block` edit may add, unless filtered.
+	 */
+	public const DEFAULT_INSERTABLE_BLOCKS = array( 'core/paragraph', 'core/heading', 'core/list' );
+
+	/**
+	 * Maximum length of an inserted block's text, and of each list item.
+	 */
+	public const MAX_INSERT_LENGTH = 1000;
+
+	/**
+	 * Maximum number of items in an inserted list.
+	 */
+	public const MAX_INSERT_LIST_ITEMS = 20;
+
+	/**
+	 * Length of the target block text kept with a move, to find and name it.
+	 */
+	public const MAX_TARGET_TEXT_LENGTH = 80;
+
+	/**
 	 * Maximum character lengths for feedback fields.
 	 */
 	public const FIELD_MAX_LENGTHS = array(
@@ -158,6 +199,7 @@ class Response_Parser {
 					'name'    => $block['name'] ?? '',
 					'index'   => $index,
 					'content' => is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '',
+					'parent'  => is_array( $block ) && is_string( $block['parent'] ?? null ) ? $block['parent'] : '',
 					'anchor'  => $this->get_block_anchor( $block ),
 				);
 				Logger::debug(
@@ -237,9 +279,10 @@ class Response_Parser {
 		}
 
 		// Parse and validate each feedback item.
-		$parsed = array();
+		$parsed   = array();
+		$actioned = array();
 		foreach ( $feedback_items as $item ) {
-			$validated = $this->validate_feedback_item( $item, $valid_block_ids, $block_info );
+			$validated = $this->validate_feedback_item( $item, $valid_block_ids, $block_info, $actioned );
 			if ( $validated ) {
 				$validated['priority'] = $this->calculate_priority( $validated );
 				$parsed[]              = $validated;
@@ -391,12 +434,13 @@ class Response_Parser {
 	 * `title`, and `feedback`; includes `block_name`, `block_index` and `block_anchor` from `$block_info` when available,
 	 * and includes a sanitized `suggestion` if provided.
 	 *
-	 * @param  mixed $item            Feedback item data.
-	 * @param  array $valid_block_ids Map of valid block IDs.
-	 * @param  array $block_info      Map of block IDs to their info (name, index).
+	 * @param  mixed              $item            Feedback item data.
+	 * @param  array<mixed>       $valid_block_ids Map of valid block IDs.
+	 * @param  array<mixed>       $block_info      Map of block IDs to their info (name, index).
+	 * @param  array<string, int> $actioned        Blocks that already have a structural edit in this review, updated here.
 	 * @return array<string, mixed>|null Array of validated and sanitized fields on success, `null` if the item is invalid.
 	 */
-	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array() ): ?array {
+	private function validate_feedback_item( $item, array $valid_block_ids, array $block_info = array(), array &$actioned = array() ): ?array {
 		// Must be an array.
 		if ( ! is_array( $item ) ) {
 			Logger::debug( 'Feedback item is not an array, skipping' );
@@ -482,7 +526,288 @@ class Response_Parser {
 			}
 		}
 
+		// Optional structural edit, at most one per block in a review. It
+		// replaces any quick fix, so the note proposes a single change.
+		if ( isset( $item['block_action'] ) && is_string( $block_id ) && ! isset( $actioned[ $block_id ] ) ) {
+			$action = $this->validate_block_action( $item['block_action'], $block_id, self::get_review_targets( $block_info ) );
+			if ( null !== $action ) {
+				$validated['block_action'] = $action;
+				$actioned[ $block_id ]     = 1;
+				unset( $validated['quick_fix'] );
+			}
+		}
+
 		return $validated;
+	}
+
+	/**
+	 * Blocks a review's structural edits may point at: the reviewed blocks,
+	 * which in a chunked review are only the blocks of that chunk.
+	 *
+	 * @param  array<mixed> $block_info Map of block IDs to their info.
+	 * @return array<string, array{client_id: string, name: string, text: string, index: int, parent: string}> Targets keyed by block ID.
+	 */
+	private static function get_review_targets( array $block_info ): array {
+		$targets = array();
+		foreach ( $block_info as $id => $info ) {
+			if ( ! is_array( $info ) ) {
+				continue;
+			}
+			$targets[ (string) $id ] = array(
+				'client_id' => (string) $id,
+				'name'      => is_string( $info['name'] ?? null ) ? $info['name'] : '',
+				'text'      => is_string( $info['content'] ?? null ) ? $info['content'] : '',
+				'index'     => is_int( $info['index'] ?? null ) ? $info['index'] : 0,
+				'parent'    => is_string( $info['parent'] ?? null ) ? $info['parent'] : '',
+			);
+		}
+		return $targets;
+	}
+
+	/**
+	 * The allow-list of block types an `insert_block` edit may add.
+	 *
+	 * @return list<string> Block names.
+	 */
+	public static function get_insertable_blocks(): array {
+		/**
+		 * Filters the block types an AI edit may insert.
+		 *
+		 * The editor builds paragraphs, headings and lists, and any other
+		 * block type with a rich text `content` attribute from its text.
+		 *
+		 * @param list<string> $blocks Block names.
+		 */
+		$blocks = apply_filters( 'ai_feedback_insertable_blocks', self::DEFAULT_INSERTABLE_BLOCKS );
+
+		return array_values( array_filter( (array) $blocks, 'is_string' ) );
+	}
+
+	/**
+	 * Validate a structural edit: remove the note's block, move it next to
+	 * another block, or insert a new block next to it.
+	 *
+	 * `$targets` lists the blocks the AI was shown, keyed by the ID it was
+	 * told to use, and must include the note's own block. A move keeps the
+	 * target's client ID (when known), name and the start of its text, so
+	 * the editor can find it again and name it. Inserted text may only hold
+	 * inline formatting and is run through wp_kses().
+	 *
+	 * @param  mixed        $action   Structural edit from the AI response.
+	 * @param  string       $block_id ID of the note's block in `$targets`.
+	 * @param  array<mixed> $targets  Blocks the edit may point at, each with `client_id`, `name`, `text` and `index`.
+	 * @return array<string, mixed>|null Sanitized edit with a `type` from BLOCK_ACTION_TYPES, or null if unusable.
+	 */
+	public function validate_block_action( mixed $action, string $block_id, array $targets ): ?array {
+		if ( ! is_array( $action ) || ! is_array( $targets[ $block_id ] ?? null ) ) {
+			return null;
+		}
+
+		$type = $action['type'] ?? null;
+		$type = is_string( $type ) ? ( self::BLOCK_ACTION_ALIASES[ $type ] ?? $type ) : null;
+
+		if ( 'remove_block' === $type ) {
+			return array( 'type' => 'remove_block' );
+		}
+
+		$position = $action['position'] ?? null;
+		if ( ! in_array( $position, array( 'before', 'after' ), true ) ) {
+			return null;
+		}
+
+		if ( 'move_block' === $type ) {
+			$target_id = $action['target_block_id'] ?? null;
+			if ( ! is_string( $target_id ) || $target_id === $block_id || ! is_array( $targets[ $target_id ] ?? null ) ) {
+				return null;
+			}
+			$target = $targets[ $target_id ];
+			$self   = $targets[ $block_id ];
+
+			// A block can't move next to one of its own inner blocks.
+			if ( self::is_inside( $target_id, $block_id, $targets ) ) {
+				return null;
+			}
+
+			// Moving a block before the sibling after it, or after the
+			// sibling before it, leaves it where it is. Indexes count the
+			// reviewed blocks in document order, nested ones included, so
+			// only blocks with the same parent are compared; the editor
+			// checks the actual siblings before applying anything.
+			$offset      = self::int_value( $target['index'] ?? null ) - self::int_value( $self['index'] ?? null );
+			$same_parent = ( $target['parent'] ?? '' ) === ( $self['parent'] ?? '' );
+			if ( $same_parent && ( ( 'before' === $position && 1 === $offset ) || ( 'after' === $position && -1 === $offset ) ) ) {
+				return null;
+			}
+
+			return array(
+				'type'            => 'move_block',
+				'position'        => $position,
+				'target_block_id' => is_string( $target['client_id'] ?? null ) ? sanitize_text_field( $target['client_id'] ) : '',
+				'target_name'     => is_string( $target['name'] ?? null ) ? sanitize_text_field( $target['name'] ) : '',
+				'target_text'     => self::excerpt( is_string( $target['text'] ?? null ) ? $target['text'] : '' ),
+			);
+		}
+
+		if ( 'insert_block' !== $type ) {
+			return null;
+		}
+
+		$block = self::validate_inserted_block( $action['block'] ?? null );
+
+		return null === $block ? null : array(
+			'type'     => 'insert_block',
+			'position' => $position,
+			'block'    => $block,
+		);
+	}
+
+	/**
+	 * Whether a block sits inside another, following `parent` through the
+	 * targets. Each block is visited at most once, so a parent loop in
+	 * crafted input ends.
+	 *
+	 * @param  string       $block_id    Block to start from.
+	 * @param  string       $ancestor_id Possible ancestor.
+	 * @param  array<mixed> $targets     Targets keyed by block ID, each with an optional `parent`.
+	 * @return bool
+	 */
+	private static function is_inside( string $block_id, string $ancestor_id, array $targets ): bool {
+		$seen    = array();
+		$current = $block_id;
+		while ( ! isset( $seen[ $current ] ) ) {
+			$seen[ $current ] = true;
+			$entry            = $targets[ $current ] ?? null;
+			$parent           = is_array( $entry ) && is_string( $entry['parent'] ?? null ) ? $entry['parent'] : '';
+			if ( '' === $parent ) {
+				return false;
+			}
+			if ( $parent === $ancestor_id ) {
+				return true;
+			}
+			$current = $parent;
+		}
+		return false;
+	}
+
+	/**
+	 * Validate the block an `insert_block` edit adds.
+	 *
+	 * @param  mixed $block Block from the AI response: `name`, and `content` or, for a list, `items`.
+	 * @return array<string, mixed>|null Sanitized block, or null if unusable.
+	 */
+	private static function validate_inserted_block( mixed $block ): ?array {
+		if ( ! is_array( $block ) ) {
+			return null;
+		}
+
+		$name = $block['name'] ?? null;
+		if ( ! is_string( $name ) || ! in_array( $name, self::get_insertable_blocks(), true ) ) {
+			return null;
+		}
+
+		if ( 'core/list' === $name ) {
+			$items = $block['items'] ?? null;
+			if ( ! is_array( $items ) || array() === $items || count( $items ) > self::MAX_INSERT_LIST_ITEMS ) {
+				return null;
+			}
+			$clean = array();
+			foreach ( $items as $item ) {
+				$text = self::sanitize_inserted_text( $item );
+				if ( null === $text ) {
+					return null;
+				}
+				$clean[] = $text;
+			}
+			return array(
+				'name'    => $name,
+				'items'   => $clean,
+				'ordered' => true === ( $block['ordered'] ?? false ),
+			);
+		}
+
+		$content = self::sanitize_inserted_text( $block['content'] ?? null );
+		if ( null === $content ) {
+			return null;
+		}
+
+		$validated = array(
+			'name'    => $name,
+			'content' => $content,
+		);
+		if ( 'core/heading' === $name ) {
+			$level              = $block['level'] ?? 2;
+			$validated['level'] = is_int( $level ) && $level >= 2 && $level <= 6 ? $level : 2;
+		}
+
+		return $validated;
+	}
+
+	/**
+	 * Sanitize the text of an inserted block.
+	 *
+	 * Like a rewrite, it may only hold inline formatting; other markup drops
+	 * the edit rather than being stripped.
+	 *
+	 * @param  mixed $text Text from the AI response.
+	 * @return string|null Sanitized text, or null if unusable.
+	 */
+	private static function sanitize_inserted_text( mixed $text ): ?string {
+		if ( ! is_string( $text ) || mb_strlen( $text ) > self::MAX_INSERT_LENGTH || ! self::has_only_inline_tags( $text ) ) {
+			return null;
+		}
+
+		$text = trim( wp_kses( $text, self::REWRITE_ALLOWED_TAGS ) );
+		return '' === trim( wp_strip_all_tags( $text ) ) ? null : $text;
+	}
+
+	/**
+	 * Shorten block text to the part kept with a move.
+	 *
+	 * @param  string $text Block text.
+	 * @return string Whitespace-collapsed text, at most MAX_TARGET_TEXT_LENGTH characters.
+	 */
+	private static function excerpt( string $text ): string {
+		// Block text is plain text, so text that looks like a tag is kept:
+		// the editor compares it literally.
+		return mb_substr( self::normalize_text( $text ), 0, self::MAX_TARGET_TEXT_LENGTH );
+	}
+
+	/**
+	 * Whether a block's text is the one a move's `target_text` was kept from.
+	 *
+	 * The kept text is the whole text when it is shorter than the excerpt
+	 * length, so it must match exactly; otherwise the block's text must
+	 * start with it. Matches matchesTargetText() in src/utils/block-action.js.
+	 *
+	 * @param  string $block_text  Whitespace-collapsed block text.
+	 * @param  string $target_text Kept target text.
+	 * @return bool
+	 */
+	public static function matches_target_text( string $block_text, string $target_text ): bool {
+		$block_text = self::normalize_text( $block_text );
+		return mb_strlen( $target_text ) < self::MAX_TARGET_TEXT_LENGTH
+			? $block_text === $target_text
+			: str_starts_with( $block_text, $target_text );
+	}
+
+	/**
+	 * Read an integer, treating anything else as zero.
+	 *
+	 * @param  mixed $value Value.
+	 * @return int
+	 */
+	private static function int_value( mixed $value ): int {
+		return is_int( $value ) ? $value : 0;
+	}
+
+	/**
+	 * Whether an edit is a structural one.
+	 *
+	 * @param  array<mixed> $edit Edit.
+	 * @return bool
+	 */
+	public static function is_block_action( array $edit ): bool {
+		return in_array( $edit['type'] ?? null, self::BLOCK_ACTION_TYPES, true );
 	}
 
 	/**
@@ -568,12 +893,15 @@ class Response_Parser {
 	 * that is not JSON is used as prose with no edit. An invalid edit is
 	 * dropped and the prose still posts.
 	 *
-	 * @param  string $response      Raw AI response.
-	 * @param  string $block_content Plain text of the note's block, as the AI saw it.
-	 * @param  bool   $can_rewrite   Whether the block can take a `rewrite_block` edit.
-	 * @return array{reply: string, edit: array<string, string>|null}|null Parsed reply, or null when it has no text.
+	 * @param  string       $response      Raw AI response.
+	 * @param  string       $block_content Plain text of the note's block, as the AI saw it.
+	 * @param  bool         $can_rewrite   Whether the block can take a `rewrite_block` edit.
+	 * @param  array<mixed> $targets       Blocks a structural edit may point at, keyed by the
+	 *                                     reference the AI was shown, including the note's own
+	 *                                     block under REPLY_SELF_REF. Empty to allow no structural edit.
+	 * @return array{reply: string, edit: array<string, mixed>|null}|null Parsed reply, or null when it has no text.
 	 */
-	public function parse_reply( string $response, string $block_content, bool $can_rewrite ): ?array {
+	public function parse_reply( string $response, string $block_content, bool $can_rewrite, array $targets = array() ): ?array {
 		$data = $this->decode_reply_json( $response );
 
 		if ( null === $data ) {
@@ -585,7 +913,7 @@ class Response_Parser {
 			);
 		}
 
-		$edit  = $this->validate_reply_edit( $data['edit'] ?? null, $block_content, $can_rewrite );
+		$edit  = $this->validate_reply_edit( $data['edit'] ?? null, $block_content, $can_rewrite, $targets );
 		$reply = is_string( $data['reply'] ?? null ) ? trim( $data['reply'] ) : '';
 
 		if ( '' === $reply ) {
@@ -675,17 +1003,25 @@ class Response_Parser {
 	 * formatting; any other markup drops the edit. An edit naming another
 	 * block is dropped.
 	 *
-	 * @param  mixed  $edit          Edit from the AI response.
-	 * @param  string $block_content Plain text of the note's block, as the AI saw it.
-	 * @param  bool   $can_rewrite   Whether the block can take a `rewrite_block` edit.
-	 * @return array<string, string>|null Sanitized edit, or null if unusable.
+	 * A structural edit (`remove_block`, `move_block` or `insert_block`) is
+	 * checked by validate_block_action() against `$targets`.
+	 *
+	 * @param  mixed        $edit          Edit from the AI response.
+	 * @param  string       $block_content Plain text of the note's block, as the AI saw it.
+	 * @param  bool         $can_rewrite   Whether the block can take a `rewrite_block` edit.
+	 * @param  array<mixed> $targets       Blocks a structural edit may point at, see parse_reply().
+	 * @return array<string, mixed>|null Sanitized edit, or null if unusable.
 	 */
-	public function validate_reply_edit( mixed $edit, string $block_content, bool $can_rewrite ): ?array {
+	public function validate_reply_edit( mixed $edit, string $block_content, bool $can_rewrite, array $targets = array() ): ?array {
 		if ( ! is_array( $edit ) || isset( $edit['block_id'] ) ) {
 			return null;
 		}
 
 		$type = $edit['type'] ?? null;
+
+		if ( is_string( $type ) && ( in_array( $type, self::BLOCK_ACTION_TYPES, true ) || isset( self::BLOCK_ACTION_ALIASES[ $type ] ) ) ) {
+			return $this->validate_block_action( $edit, self::REPLY_SELF_REF, $targets );
+		}
 
 		if ( 'replace_text' === $type ) {
 			// A missing replacement is not a deletion; only an empty string is.
@@ -731,18 +1067,21 @@ class Response_Parser {
 	 * appears exactly once, and a `rewrite_block` edit while the block still
 	 * reads as the text it was written for.
 	 *
-	 * @param  array<string, string> $edit          Edit, as decoded by Notes_Manager.
-	 * @param  string                $block_content Plain text of the block.
+	 * Structural edits are not checked here; Reply_Service checks them
+	 * against the post's blocks.
+	 *
+	 * @param  array<string, mixed> $edit          Edit, as decoded by Notes_Manager.
+	 * @param  string               $block_content Plain text of the block.
 	 * @return bool
 	 */
 	public function edit_applies( array $edit, string $block_content ): bool {
 		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
-			return isset( $edit['original'] ) && '' !== trim( $block_content )
+			return is_string( $edit['original'] ?? null ) && '' !== trim( $block_content )
 				&& self::normalize_text( $edit['original'] ) === self::normalize_text( $block_content );
 		}
 
 		$find = $edit['find'] ?? '';
-		return '' !== $find && 1 === $this->count_quick_fix_matches( $find, $block_content );
+		return is_string( $find ) && '' !== $find && 1 === $this->count_quick_fix_matches( $find, $block_content );
 	}
 
 	/**
@@ -1153,8 +1492,9 @@ class Response_Parser {
 		// Mark items that became groups and update their titles.
 		foreach ( $groups as &$group ) {
 			if ( $group['count'] > 1 ) {
-				// A quick fix targets one block, so it can't apply to a group.
-				unset( $group['quick_fix'] );
+				// A quick fix or structural edit targets one block, so it
+				// can't apply to a group.
+				unset( $group['quick_fix'], $group['block_action'] );
 				$group['is_group'] = true;
 				$group['title']    = sprintf(
 					/* translators: 1: original title, 2: occurrence count */

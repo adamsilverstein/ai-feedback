@@ -15,6 +15,8 @@ import { store as blocksStore } from '@wordpress/blocks';
 import { STORE_NAME } from '../store';
 import { getRichTextAttributeKey } from '../utils/quick-fix';
 import { isEditApplied } from '../utils/reply-edit';
+import { isBlockAction } from '../utils/is-reply-edit';
+import { findNoteBlock, getBlockActionState } from '../utils/block-action';
 import useRequestReply from '../hooks/useRequestReply';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import {
@@ -46,6 +48,19 @@ export default function QuickReplies({ note, replies }) {
 			if (latestOwnerId === null) {
 				return false;
 			}
+			// A structural edit is judged by the blocks, as in BlockAction.
+			if (isBlockAction(latestEdit)) {
+				const selectors = select(blockEditorStore);
+				const { state } = getBlockActionState(
+					selectors,
+					latestEdit,
+					findNoteBlock(selectors, note.block_id, note.id)
+				);
+				return (
+					state === 'applied' ||
+					(state === 'missing' && latestEdit.type === 'remove_block')
+				);
+			}
 			if (select(STORE_NAME).isFixApplied(latestOwnerId)) {
 				return true;
 			}
@@ -71,7 +86,8 @@ export default function QuickReplies({ note, replies }) {
 	}
 
 	const quickReplies = getQuickReplies(
-		isEditPending(latest, { status, isApplied })
+		isEditPending(latest, { status, isApplied }),
+		isBlockAction(latestEdit)
 	);
 
 	const send = async (message) => {

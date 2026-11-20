@@ -108,7 +108,14 @@ function renderItem(
 			},
 		},
 		selectors: {
-			getBlock: (state, clientId) => state[clientId] ?? null,
+			getBlock: (state, clientId) =>
+				state[clientId] ? { clientId, ...state[clientId] } : null,
+			getClientIdsWithDescendants: (state) => Object.keys(state),
+			getBlockRootClientId: () => null,
+			getBlockIndex: (state, clientId) =>
+				Object.keys(state).indexOf(clientId),
+			getBlockOrder: (state, parent) =>
+				parent ? [] : Object.keys(state),
 		},
 	});
 	registry.registerStore('core/blocks', {
@@ -519,6 +526,11 @@ describe('FeedbackItem Make this change', () => {
 		[
 			'the note has a quick fix',
 			{ quick_fix: { find: 'a', replace: 'b' } },
+			undefined,
+		],
+		[
+			'the note has a structural edit',
+			{ block_action: { type: 'remove_block' } },
 			undefined,
 		],
 		['the note has no suggestion', { suggestion: '' }, undefined],
@@ -953,5 +965,33 @@ describe('FeedbackItem refinement', () => {
 		expect(
 			screen.getByRole('group', { name: 'Quick replies' })
 		).toBeInTheDocument();
+	});
+});
+
+describe('FeedbackItem structural edits', () => {
+	it('offers the review note’s structural edit instead of a quick fix', () => {
+		renderItem(
+			{
+				block_action: { type: 'remove_block' },
+				quick_fix: { find: 'Revenue', replace: 'Income' },
+			},
+			vi.fn(),
+			{
+				blocks: {
+					'block-1': {
+						name: 'core/paragraph',
+						attributes: { content: 'Revenue grew 40% last year.' },
+					},
+				},
+			}
+		);
+
+		expect(screen.getByText('Remove this block')).toBeInTheDocument();
+		expect(
+			screen.getByRole('button', { name: 'Apply change' })
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
 	});
 });
