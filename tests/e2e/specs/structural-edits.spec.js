@@ -33,7 +33,8 @@ async function reviewPost({ editor, admin, requestUtils, aiFeedback }) {
 	const content = [
 		'<!-- wp:heading --><h2 class="wp-block-heading">Why this matters</h2><!-- /wp:heading -->',
 		...PARAGRAPHS.map(
-			(text) => `<!-- wp:paragraph --><p>${text}</p><!-- /wp:paragraph -->`
+			(text) =>
+				`<!-- wp:paragraph --><p>${text}</p><!-- /wp:paragraph -->`
 		),
 	].join('');
 	const post = await requestUtils.createPost({
@@ -122,9 +123,9 @@ test.describe('Structural edits', () => {
 		const preview = moveItem.getByRole('region', {
 			name: 'Preview of the change',
 		});
-		await expect(preview.locator('ol').last().locator('li').nth(1)).toHaveText(
-			'Paragraph: The real opening of the piece. (moved)'
-		);
+		await expect(
+			preview.locator('ol').last().locator('li').nth(1)
+		).toHaveText('Paragraph: The real opening of the piece. (moved)');
 		await moveItem.getByRole('button', { name: 'Apply change' }).click();
 		await expect
 			.poll(() => blockTexts(editor))
@@ -141,7 +142,9 @@ test.describe('Structural edits', () => {
 		await removeItem.getByRole('button', { name: 'Apply change' }).click();
 		await expect
 			.poll(() => blockTexts(editor))
-			.toEqual(original.filter((text) => !text.startsWith('This repeats')));
+			.toEqual(
+				original.filter((text) => !text.startsWith('This repeats'))
+			);
 		await undo(page);
 		await expect.poll(() => blockTexts(editor)).toEqual(original);
 
