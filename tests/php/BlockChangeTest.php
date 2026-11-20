@@ -138,6 +138,25 @@ class BlockChangeTest extends TestCase {
 	}
 
 	/**
+	 * A heading sent without its level is read as the default level 2, so
+	 * proposing level 2 changes nothing and is dropped.
+	 */
+	public function test_missing_level_reads_as_two(): void {
+		$heading = array(
+			'name'       => 'core/heading',
+			'content'    => 'Setup',
+			'attributes' => array(),
+		);
+		$set     = static fn ( int $level ): array => array(
+			'type'       => 'set_attributes',
+			'attributes' => array( 'level' => $level ),
+		);
+
+		$this->assertNull( Block_Change::validate( $set( 2 ), $heading ) );
+		$this->assertSame( array( 'level' => 2 ), Block_Change::validate( $set( 3 ), $heading )['from'] ?? null );
+	}
+
+	/**
 	 * A list can switch between bulleted and numbered.
 	 */
 	public function test_list_type_fix(): void {

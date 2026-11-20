@@ -59,6 +59,8 @@ class Review_Images {
 		 * Filters how many images a review may send to a vision model.
 		 *
 		 * Return 0 to never send images; the AI then only flags missing alt text.
+		 * Raising it raises memory use and request size: each image is held
+		 * in memory, base64 encoded, up to MAX_TOTAL_BYTES in all.
 		 *
 		 * @param int $max Maximum images per review request.
 		 */
@@ -83,10 +85,12 @@ class Review_Images {
 
 			$file = $this->get_image_file( $id, $url );
 			if ( null === $file ) {
+				Logger::debug( sprintf( 'Image block %s not sent: no readable local file for attachment %d', $block['clientId'], $id ) );
 				continue;
 			}
 			$data = $this->read_file( $file['path'] );
 			if ( null === $data || $total + strlen( $data ) > self::MAX_TOTAL_BYTES ) {
+				Logger::debug( sprintf( 'Image block %s not sent: unreadable, or over the size limit for one request', $block['clientId'] ) );
 				continue;
 			}
 			$total += strlen( $data );

@@ -62,6 +62,17 @@ class Block_Change {
 	public const MAX_ALT_LENGTH = 250;
 
 	/**
+	 * Longest current alt text read from a request; enough to tell empty
+	 * alt text from any other.
+	 */
+	private const MAX_READ_ALT_LENGTH = 500;
+
+	/**
+	 * Longest image URL read from a request.
+	 */
+	private const MAX_URL_LENGTH = 2048;
+
+	/**
 	 * Maximum length of a proposed caption.
 	 */
 	public const MAX_CAPTION_LENGTH = 300;
@@ -125,12 +136,12 @@ class Block_Change {
 				break;
 			case 'core/image':
 				if ( is_string( $raw['alt'] ?? null ) ) {
-					$attrs['alt'] = mb_substr( $raw['alt'], 0, self::MAX_ALT_LENGTH * 2 );
+					$attrs['alt'] = mb_substr( $raw['alt'], 0, self::MAX_READ_ALT_LENGTH );
 				}
 				if ( is_int( $raw['id'] ?? null ) && $raw['id'] > 0 ) {
 					$attrs['id'] = $raw['id'];
 				}
-				if ( is_string( $raw['url'] ?? null ) && strlen( $raw['url'] ) <= 2048 ) {
+				if ( is_string( $raw['url'] ?? null ) && strlen( $raw['url'] ) <= self::MAX_URL_LENGTH ) {
 					$attrs['url'] = $raw['url'];
 				}
 				break;
