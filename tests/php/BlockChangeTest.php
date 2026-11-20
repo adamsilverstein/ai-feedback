@@ -384,7 +384,8 @@ class BlockChangeTest extends TestCase {
 			array(
 				'type'  => 'split',
 				'after' => 'idea ends here.',
-				'next'  => 'The second idea starts here and goes on.',
+				'next'        => 'The second idea starts here and goes on.',
+				'next_length' => 40,
 			),
 			Block_Change::validate(
 				array(
@@ -527,15 +528,17 @@ class BlockChangeTest extends TestCase {
 			'list transform'                    => array( wp_json_encode( $list ), 'core/paragraph', $list ),
 			'list transform from a heading'     => array( wp_json_encode( $list ), 'core/heading', null ),
 			'split'                             => array(
-				'{"type":"split","after":"One.","next":"Two."}',
+				'{"type":"split","after":"One.","next":"Two.","next_length":4}',
 				'',
 				array(
-					'type'  => 'split',
-					'after' => 'One.',
-					'next'  => 'Two.',
+					'type'        => 'split',
+					'after'       => 'One.',
+					'next'        => 'Two.',
+					'next_length' => 4,
 				),
 			),
 			'split without next'                => array( '{"type":"split","after":"One."}', '', null ),
+			'split with a short length'         => array( '{"type":"split","after":"One.","next":"Two.","next_length":2}', '', null ),
 			'alt without its image'             => array( '{"type":"set_attributes","attributes":{"alt":"A chart"},"from":{"alt":""}}', 'core/image', null ),
 			'heading without its text'          => array( '{"type":"transform","to":"core/paragraph"}', 'core/heading', null ),
 			'attribute off the allow-list'      => array( '{"type":"set_attributes","attributes":{"className":"x"},"from":{"className":""}}', '', null ),

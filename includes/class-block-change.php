@@ -19,7 +19,8 @@ namespace AI_Feedback;
  *   editor can tell a stale change from one that is ready. Alt text and a
  *   caption also keep the reviewed image's URL as `image`.
  * - Heading and paragraph transforms keep the reviewed `text`, and a split
- *   the start of the text after it as `next`, for the same reason.
+ *   the start of the text after it as `next` and its length in characters
+ *   as `next_length`, for the same reason.
  * - `{ "type": "transform", "to": "core/list", "items": [ ... ] }` turns a
  *   paragraph of separated items into a list; `to` may also be a heading
  *   (with `level`) or, from a heading, a paragraph.
@@ -346,9 +347,10 @@ class Block_Change {
 		}
 
 		return array(
-			'type'  => 'split',
-			'after' => $after,
-			'next'  => mb_substr( trim( $rest ), 0, self::MAX_NEXT_LENGTH ),
+			'type'        => 'split',
+			'after'       => $after,
+			'next'        => mb_substr( trim( $rest ), 0, self::MAX_NEXT_LENGTH ),
+			'next_length' => mb_strlen( trim( $rest ) ),
 		);
 	}
 
@@ -463,12 +465,15 @@ class Block_Change {
 			case 'split':
 				$after = $decoded['after'] ?? null;
 				$next  = $decoded['next'] ?? null;
+				$count = $decoded['next_length'] ?? null;
 				return is_string( $after ) && '' !== $after && mb_strlen( $after ) <= self::MAX_SPLIT_LENGTH && ! str_contains( $after, '<' )
 					&& is_string( $next ) && '' !== $next && mb_strlen( $next ) <= self::MAX_NEXT_LENGTH
+					&& is_int( $count ) && $count >= mb_strlen( $next )
 					? array(
-						'type'  => 'split',
-						'after' => $after,
-						'next'  => $next,
+						'type'        => 'split',
+						'after'       => $after,
+						'next'        => $next,
+						'next_length' => $count,
 					)
 					: null;
 			default:

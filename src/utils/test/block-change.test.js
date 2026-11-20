@@ -365,6 +365,7 @@ describe('split', () => {
 		type: 'split',
 		after: 'idea ends here.',
 		next: 'The second idea goes on.',
+		next_length: 24,
 	};
 
 	it('splits after the sentence, keeping formatting on both halves', () => {
@@ -563,6 +564,27 @@ describe('stale changes', () => {
 			type: 'split',
 			after: 'First sentence.',
 			next: 'Second sentence.',
+			next_length: 16,
+		};
+
+		expect(
+			getBlockChangeState(selectors, change, first.clientId).state
+		).toBe('outdated');
+	});
+
+	it('does not count a next paragraph that only starts like the split', () => {
+		const first = createBlock('core/paragraph', {
+			content: 'First sentence.',
+		});
+		const longer = createBlock('core/paragraph', {
+			content: 'Second sentence. References.',
+		});
+		const { selectors } = setUp([first, longer]);
+		const change = {
+			type: 'split',
+			after: 'First sentence.',
+			next: 'Second sentence.',
+			next_length: 16,
 		};
 
 		expect(

@@ -9,8 +9,9 @@
  * - `{ type: 'transform', to: 'core/list', items, ordered }` turns a
  *   paragraph of separated items into a list; `to` may also be
  *   `core/heading` (with `level`) or, from a heading, `core/paragraph`.
- * - `{ type: 'split', after, next }` splits a paragraph after a sentence;
- *   `next` is the start of the text after it.
+ * - `{ type: 'split', after, next, next_length }` splits a paragraph after
+ *   a sentence; `next` is the start of the text after it and `next_length`
+ *   its length in characters.
  *
  * Alt text and captions keep the reviewed image's URL as `image`, and
  * heading and paragraph transforms the reviewed `text`, so a change to the
@@ -94,7 +95,8 @@ export function isBlockChange(change) {
 		typeof change.after === 'string' &&
 		change.after !== '' &&
 		typeof change.next === 'string' &&
-		change.next !== ''
+		change.next !== '' &&
+		Number.isInteger(change.next_length)
 	);
 }
 
@@ -342,14 +344,17 @@ export function getBlockChangeState(selectors, change, clientId) {
 		if (findSplit(text, change.after) !== -1) {
 			return { state: 'ready' };
 		}
-		// Applied when this block ends the sentence and the next one starts
-		// with the text that followed it.
+		// Applied when this block ends the sentence and the next one holds
+		// the text that followed it: same start, same length in characters,
+		// counted as the server counts them.
 		const next = getNextBlock(selectors, clientId);
+		const nextText = next ? getBlockText(next) : '';
 		return {
 			state:
 				text.endsWith(change.after) &&
 				next?.name === 'core/paragraph' &&
-				getBlockText(next).startsWith(change.next)
+				nextText.startsWith(change.next) &&
+				Array.from(nextText).length === change.next_length
 					? 'applied'
 					: 'outdated',
 		};
