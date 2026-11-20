@@ -172,11 +172,11 @@ class Block_Change {
 	 * caption need the AI to have seen the image, and are only proposed where
 	 * there are none, so nothing the author wrote is replaced.
 	 *
-	 * @param  mixed                $proposed  Proposed attributes.
-	 * @param  string               $name      Block name.
-	 * @param  string               $text      Block text, normalized.
-	 * @param  array<string, mixed> $attrs     Current attributes.
-	 * @param  bool                 $saw_image Whether the AI was shown the image.
+	 * @param  mixed        $proposed  Proposed attributes.
+	 * @param  string       $name      Block name.
+	 * @param  string       $text      Block text, normalized.
+	 * @param  array<mixed> $attrs     Current attributes.
+	 * @param  bool         $saw_image Whether the AI was shown the image.
 	 * @return array<string, mixed>|null Change, or null if unusable.
 	 */
 	private static function validate_set_attributes( mixed $proposed, string $name, string $text, array $attrs, bool $saw_image ): ?array {

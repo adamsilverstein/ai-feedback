@@ -215,8 +215,9 @@ class Review_Service {
 			// Call AI with retry logic.
 			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 3, $images );
 
-			// A model may refuse image input; review the text alone then.
-			if ( is_wp_error( $ai_response ) && array() !== $images && ! $this->is_service_unavailable_error( $ai_response ) ) {
+			// A model may refuse image input, which fails the request without
+			// a retry; review the text alone then.
+			if ( is_wp_error( $ai_response ) && array() !== $images && $this->is_non_retryable_error( $ai_response ) && ! $this->is_service_unavailable_error( $ai_response ) ) {
 				Logger::debug( sprintf( 'AI request with images failed (%s), retrying without them', $ai_response->get_error_code() ) );
 				$attached                = array();
 				$options['image_blocks'] = array();

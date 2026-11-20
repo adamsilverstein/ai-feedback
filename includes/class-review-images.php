@@ -66,11 +66,14 @@ class Review_Images {
 				continue;
 			}
 			$attrs = Block_Change::get_block_attributes( $block );
-			if ( '' !== trim( (string) ( $attrs['alt'] ?? '' ) ) || ! isset( $attrs['id'], $attrs['url'] ) ) {
+			$alt   = is_string( $attrs['alt'] ?? null ) ? $attrs['alt'] : '';
+			$id    = is_int( $attrs['id'] ?? null ) ? $attrs['id'] : 0;
+			$url   = is_string( $attrs['url'] ?? null ) ? $attrs['url'] : '';
+			if ( '' !== trim( $alt ) || 0 === $id || '' === $url ) {
 				continue;
 			}
 
-			$file = $this->get_image_file( (int) $attrs['id'], (string) $attrs['url'] );
+			$file = $this->get_image_file( $id, $url );
 			if ( null === $file ) {
 				continue;
 			}

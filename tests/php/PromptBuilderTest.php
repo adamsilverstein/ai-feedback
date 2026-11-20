@@ -503,4 +503,74 @@ class PromptBuilderTest extends TestCase {
 
 		$this->assertStringNotContainsString( '"name": "core/heading"', $prompt );
 	}
+
+	/**
+	 * Heading levels, list types and image alt text are shown with their
+	 * blocks, and an image without text is still listed.
+	 */
+	public function test_prompt_shows_formatting_attributes(): void {
+		$blocks = array(
+			array(
+				'clientId'   => 'h-1',
+				'name'       => 'core/heading',
+				'content'    => 'Setup',
+				'attributes' => array( 'level' => 4 ),
+			),
+			array(
+				'clientId'   => 'l-1',
+				'name'       => 'core/list',
+				'content'    => 'One Two',
+				'attributes' => array( 'ordered' => true ),
+			),
+			array(
+				'clientId'   => 'img-1',
+				'name'       => 'core/image',
+				'content'    => '',
+				'attributes' => array( 'alt' => '' ),
+			),
+			array(
+				'clientId' => 'p-empty',
+				'name'     => 'core/paragraph',
+				'content'  => '',
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks );
+
+		$this->assertStringContainsString( 'Block ID: h-1 [core/heading - review for hierarchy and SEO; level 4]', $prompt );
+		$this->assertStringContainsString( 'Block ID: l-1 [core/list - review for parallel structure; numbered]', $prompt );
+		$this->assertStringContainsString( 'Block ID: img-1 [core/image - evaluate alt text quality; alt text: none; image not available]', $prompt );
+		$this->assertStringNotContainsString( 'p-empty', $prompt );
+		$this->assertStringContainsString( '"block_change" is optional', $prompt );
+		$this->assertStringContainsString( 'You cannot see the images.', $prompt );
+		$this->assertStringNotContainsString( 'Attached image 1', $prompt );
+	}
+
+	/**
+	 * Attached images are named by block, and only those may get alt text.
+	 */
+	public function test_prompt_names_attached_images(): void {
+		$blocks = array(
+			array(
+				'clientId'   => 'img-1',
+				'name'       => 'core/image',
+				'content'    => '',
+				'attributes' => array( 'alt' => '' ),
+			),
+			array(
+				'clientId'   => 'img-2',
+				'name'       => 'core/image',
+				'content'    => 'External',
+				'attributes' => array( 'alt' => '' ),
+			),
+		);
+
+		$prompt = $this->builder->build_review_prompt( $blocks, array( 'image_blocks' => array( 'img-1' ) ) );
+
+		$this->assertStringContainsString( 'Block ID: img-1 [core/image - evaluate alt text quality; alt text: none; image attached]', $prompt );
+		$this->assertStringContainsString( 'Block ID: img-2 [core/image - evaluate alt text quality; alt text: none; image not available]', $prompt );
+		$this->assertStringContainsString( 'Attached image 1 is block_id img-1', $prompt );
+		$this->assertStringNotContainsString( 'Attached image 2', $prompt );
+		$this->assertStringNotContainsString( 'You cannot see the images.', $prompt );
+	}
 }

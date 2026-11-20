@@ -33,10 +33,11 @@ class CallAiReviewService extends Review_Service {
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
 	 * @param  string $model              Model to use.
+	 * @param  array  $images             Images to attach.
 	 * @return string|WP_Error Response.
 	 */
-	public function public_call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
-		return $this->call_ai( $prompt, $system_instruction, $model );
+	public function public_call_ai( string $prompt, string $system_instruction, string $model, array $images = array() ): string|WP_Error {
+		return $this->call_ai( $prompt, $system_instruction, $model, $images );
 	}
 }
 
@@ -113,5 +114,49 @@ class ReviewServiceCallAiTest extends TestCase {
 
 		$this->assertSame( Review_Service::AI_HTTP_TIMEOUT, $GLOBALS['fake_ai_builder']->timeout_during_call );
 		$this->assertEmpty( $GLOBALS['fake_filters']['wp_ai_client_default_request_timeout'] ?? array() );
+	}
+
+	/**
+	 * Images are attached as inline data, in order, never as a URL or path.
+	 */
+	public function test_attaches_images_as_inline_data(): void {
+		$this->fake_ai_client( 'Feedback JSON' );
+
+		( new CallAiReviewService() )->public_call_ai(
+			'Prompt',
+			'System',
+			'gpt-4o',
+			array(
+				array(
+					'block_id' => 'img-1',
+					'mime'     => 'image/png',
+					'data'     => 'iVBORw0KGgo=',
+				),
+				array(
+					'block_id' => 'img-2',
+					'mime'     => 'image/jpeg',
+					'data'     => '/9j/4AAQ',
+				),
+			)
+		);
+
+		$this->assertSame(
+			array(
+				array( 'data:image/png;base64,iVBORw0KGgo=', 'image/png' ),
+				array( 'data:image/jpeg;base64,/9j/4AAQ', 'image/jpeg' ),
+			),
+			$GLOBALS['fake_ai_builder']->calls['with_file']
+		);
+	}
+
+	/**
+	 * Without images, no file is attached.
+	 */
+	public function test_attaches_nothing_without_images(): void {
+		$this->fake_ai_client( 'Feedback JSON' );
+
+		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+
+		$this->assertArrayNotHasKey( 'with_file', $GLOBALS['fake_ai_builder']->calls );
 	}
 }
