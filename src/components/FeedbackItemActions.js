@@ -4,13 +4,15 @@
  * One-click actions shown on each feedback item in the sidebar.
  */
 import { Button } from '@wordpress/components';
-import { useDispatch, useSelect } from '@wordpress/data';
+import { useDispatch } from '@wordpress/data';
 import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { arrowRight } from '@wordpress/icons';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
+import useRequestReply from '../hooks/useRequestReply';
+import { getSupersededOwnerIds } from '../utils/revisions';
 import { getFeedbackContent } from '../utils/feedback-content';
 import QuickFix from './QuickFix';
 
@@ -55,15 +57,10 @@ export default function FeedbackItemActions({
 	thread,
 }) {
 	const { setNoteResolved } = useDispatch(STORE_NAME);
-	const { saveEntityRecord } = useDispatch('core');
 	const { createSuccessNotice, createErrorNotice } =
 		useDispatch(noticesStore);
 	const [isSaving, setIsSaving] = useState(false);
-	const [isRequesting, setIsRequesting] = useState(false);
-	const postId = useSelect(
-		(select) => select('core/editor').getCurrentPostId(),
-		[]
-	);
+	const { requestReply, isRequesting, canRequest } = useRequestReply(item);
 
 	const suggestionStatus = useSuggestionStatus(item);
 
@@ -108,41 +105,24 @@ export default function FeedbackItemActions({
 
 	const handleRestore = () => updateDismissed(false);
 
-	// Replies for the author, the same way the Notes UI does, so the AI
-	// answers it like any other reply.
-	const handleRequestChange = async () => {
-		setIsRequesting(true);
-		try {
-			await saveEntityRecord(
-				'root',
-				'comment',
-				{
-					post: postId,
-					// A secondary item is itself a reply; answer in its thread.
-					parent: item.parent || item.id,
-					type: 'note',
-					status: 'hold',
-					content: __('Please make this change.', 'fresh-eyes'),
-				},
-				{ throwOnError: true }
-			);
-		} catch (error) {
-			createErrorNotice(
-				error?.message ||
-					__('Could not ask for the change.', 'fresh-eyes'),
-				{ type: 'snackbar' }
-			);
-		} finally {
-			setIsRequesting(false);
-		}
-	};
+	const handleRequestChange = () =>
+		requestReply(__('Please make this change.', 'fresh-eyes'));
 
 	const showQuickFix =
 		!!item.quick_fix && !item.is_group && !isDismissed && !!item.block_id;
 
 	return (
 		<>
-			{showQuickFix && <QuickFix item={item} />}
+			{showQuickFix && (
+				<QuickFix
+					item={item}
+					// Any reply edit in the thread revises the review's quick fix.
+					isSuperseded={getSupersededOwnerIds(
+						item,
+						thread?.replies
+					).includes(item.id)}
+				/>
+			)}
 			<div className="ai-feedback-item-actions">
 				{onNavigate && item.block_id && (
 					<Button
@@ -156,7 +136,7 @@ export default function FeedbackItemActions({
 						{__('Go to block', 'fresh-eyes')}
 					</Button>
 				)}
-				{postId && canRequestChange(item, thread) && (
+				{canRequest && canRequestChange(item, thread) && (
 					<Button
 						variant="secondary"
 						size="small"

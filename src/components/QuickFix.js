@@ -91,13 +91,17 @@ function EditDiff({ parts }) {
  * the note that becomes the Gutenberg suggestion and is marked applied. The
  * thread stays open, so the author can keep refining the change.
  *
- * @param {Object} props          Component props.
- * @param {Object} props.item     Feedback note with `id` and `block_id`, and `quick_fix` unless `edit` is given.
- * @param {Object} [props.edit]   Edit to apply. Defaults to the note's quick fix.
- * @param {number} [props.noteId] Note that owns the edit. Defaults to `item.id`.
+ * A superseded edit, one a newer edit in the thread replaced, can no longer
+ * be applied, so the newest revision is always the one acted on.
+ *
+ * @param {Object}  props                Component props.
+ * @param {Object}  props.item           Feedback note with `id` and `block_id`, and `quick_fix` unless `edit` is given.
+ * @param {Object}  [props.edit]         Edit to apply. Defaults to the note's quick fix.
+ * @param {number}  [props.noteId]       Note that owns the edit. Defaults to `item.id`.
+ * @param {boolean} [props.isSuperseded] Whether a newer edit in the thread replaced this one.
  * @return {Element|null} Quick fix component.
  */
-export default function QuickFix({ item, edit, noteId }) {
+export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 	const fix = edit ?? item.quick_fix;
 	const ownerId = noteId ?? item.id;
 	const isReplyEdit = ownerId !== item.id;
@@ -136,6 +140,26 @@ export default function QuickFix({ item, edit, noteId }) {
 		<p className="ai-feedback-quick-fix-summary">{describeEdit(fix)}</p>
 	);
 
+	const wasAccepted =
+		suggestionStatus === 'applied' ||
+		suggestionStatus === 'applied-unsaved';
+	const wasApplied =
+		isApplied ||
+		(isReplyEdit && !!attributeKey && isEditApplied(content, fix));
+
+	// A replaced edit keeps its summary so the history reads clearly, but
+	// only the newest revision can be applied or accepted.
+	if (isSuperseded && !wasAccepted && !wasApplied) {
+		return (
+			<div className="ai-feedback-quick-fix is-superseded">
+				{summary}
+				<p className="ai-feedback-quick-fix-superseded description">
+					{__('Replaced by a revised suggestion.', 'fresh-eyes')}
+				</p>
+			</div>
+		);
+	}
+
 	// Gutenberg's suggestion UI owns fixes that became suggestions.
 	if (suggestionStatus) {
 		return (
@@ -156,7 +180,7 @@ export default function QuickFix({ item, edit, noteId }) {
 
 	// A reply stays in the thread after its edit is applied. The applied
 	// flag only lasts the session; after a reload the text tells.
-	if (isReplyEdit && (isApplied || isEditApplied(content, fix))) {
+	if (isReplyEdit && wasApplied) {
 		return (
 			<div className="ai-feedback-quick-fix">
 				{summary}

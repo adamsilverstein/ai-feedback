@@ -34,12 +34,24 @@ vi.mock('@wordpress/components', () => ({
 
 // QuickFix pulls in the block editor; render what it is given instead.
 vi.mock('./QuickFix', () => ({
-	default: ({ item, edit, noteId }) => (
+	default: ({ item, edit, noteId, isSuperseded }) => (
 		<div
 			data-testid="reply-edit"
 			data-note={item.id}
 			data-owner={noteId}
 			data-edit={edit.type}
+			data-superseded={isSuperseded ? 'yes' : 'no'}
+		/>
+	),
+}));
+
+// QuickReplies posts through core-data; record where it would show instead.
+vi.mock('./QuickReplies', () => ({
+	default: ({ note, replies }) => (
+		<div
+			data-testid="quick-replies"
+			data-note={note.id}
+			data-count={replies.length}
 		/>
 	),
 }));
@@ -300,6 +312,151 @@ describe('FeedbackReplies', () => {
 			render(<FeedbackReplies replies={replies} />);
 
 			expect(screen.queryByTestId('reply-edit')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('revisions', () => {
+		const edit = { type: 'replace_text', find: 'last year', replace: 'x' };
+		const replies = [
+			{ id: 301, author: 'Jane', content: 'Do it.', is_ai: false },
+			{
+				id: 302,
+				author: 'Fresh Eyes',
+				content: 'Done.',
+				is_ai: true,
+				edit,
+				revision: 2,
+			},
+			{ id: 303, author: 'Jane', content: 'Shorter.', is_ai: false },
+			{
+				id: 304,
+				author: 'Fresh Eyes',
+				content: 'Shorter now.',
+				is_ai: true,
+				edit,
+				revision: 3,
+			},
+		];
+		const note = {
+			id: 300,
+			block_id: 'block-1',
+			quick_fix: { find: 'last year', replace: 'in 2025' },
+		};
+
+		it('labels each edit with its revision', () => {
+			render(<FeedbackReplies replies={replies} note={note} />);
+
+			expect(
+				screen.getByText('Revised suggestion (2)')
+			).toBeInTheDocument();
+			expect(
+				screen.getByText('Revised suggestion (3)')
+			).toBeInTheDocument();
+		});
+
+		it('marks every edit but the newest as superseded', () => {
+			render(<FeedbackReplies replies={replies} note={note} />);
+
+			expect(
+				screen
+					.getAllByTestId('reply-edit')
+					.map((edit) => edit.dataset.superseded)
+			).toEqual(['yes', 'no']);
+		});
+
+		it('labels the first edit without a quick fix as the suggested edit', () => {
+			render(
+				<FeedbackReplies
+					replies={[{ ...replies[1], revision: 1 }]}
+					note={{ id: 300, block_id: 'block-1' }}
+				/>
+			);
+
+			expect(screen.getByText('Suggested edit')).toBeInTheDocument();
+			expect(screen.getByTestId('reply-edit').dataset.superseded).toBe(
+				'no'
+			);
+		});
+	});
+
+	describe('quick replies', () => {
+		const aiReply = {
+			id: 302,
+			author: 'Fresh Eyes',
+			content: 'Done.',
+			is_ai: true,
+		};
+		const userReply = {
+			id: 303,
+			author: 'Jane',
+			content: 'Why?',
+			is_ai: false,
+		};
+		const note = { id: 300, block_id: 'block-1' };
+
+		it('follow the latest AI reply', () => {
+			render(<FeedbackReplies replies={[aiReply]} note={note} />);
+
+			expect(screen.getByTestId('quick-replies').dataset).toMatchObject({
+				note: '300',
+				count: '1',
+			});
+		});
+
+		it('hide while the latest message is the author’s', () => {
+			render(
+				<FeedbackReplies replies={[aiReply, userReply]} note={note} />
+			);
+
+			expect(
+				screen.queryByTestId('quick-replies')
+			).not.toBeInTheDocument();
+		});
+
+		it('hide while a reply waits on the AI', () => {
+			render(
+				<FeedbackReplies
+					replies={[aiReply]}
+					pendingReplyId={303}
+					note={note}
+				/>
+			);
+
+			expect(
+				screen.queryByTestId('quick-replies')
+			).not.toBeInTheDocument();
+		});
+
+		it('hide on a resolved note', () => {
+			render(
+				<FeedbackReplies
+					replies={[aiReply]}
+					note={{ ...note, is_resolved: true }}
+				/>
+			);
+
+			expect(
+				screen.queryByTestId('quick-replies')
+			).not.toBeInTheDocument();
+		});
+
+		it('follow the note itself while its quick fix waits on the author', () => {
+			render(
+				<FeedbackReplies
+					replies={[]}
+					note={{ ...note, quick_fix: { find: 'a', replace: 'b' } }}
+				/>
+			);
+
+			expect(screen.getByTestId('quick-replies')).toBeInTheDocument();
+		});
+
+		it('leave a note without replies or a quick fix to Make this change', () => {
+			const { container } = render(
+				<FeedbackReplies replies={[]} note={note} />
+			);
+
+			expect(container).toBeEmptyDOMElement();
 		});
 	});
 });
