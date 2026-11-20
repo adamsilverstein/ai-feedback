@@ -29,6 +29,12 @@ class Notes_Manager {
 	public const REVISION_META_KEY = 'feedback_revision';
 
 	/**
+	 * Comment meta key holding a review note's structural edit, as JSON:
+	 * removing its block, moving it, or inserting a block next to it.
+	 */
+	public const BLOCK_ACTION_META_KEY = 'feedback_block_action';
+
+	/**
 	 * Label for a revision of a thread's suggested edit.
 	 *
 	 * @param  int $revision Revision number, from 1.
@@ -388,6 +394,10 @@ class Notes_Manager {
 
 		if ( ! empty( $feedback_item['quick_fix'] ) && is_array( $feedback_item['quick_fix'] ) ) {
 			$meta['feedback_quick_fix'] = wp_json_encode( $feedback_item['quick_fix'] );
+		}
+
+		if ( ! empty( $feedback_item['block_action'] ) && is_array( $feedback_item['block_action'] ) ) {
+			$meta[ self::BLOCK_ACTION_META_KEY ] = wp_json_encode( $feedback_item['block_action'] );
 		}
 
 		if ( ! empty( $feedback_item['reply_edit'] ) && is_array( $feedback_item['reply_edit'] ) ) {
@@ -951,7 +961,7 @@ class Notes_Manager {
 	 * was added as a Gutenberg suggestion.
 	 *
 	 * @param  int $note_id Note ID.
-	 * @return array<string, string|array{find: string, replace: string}|null> Feedback fields.
+	 * @return array<string, mixed> Feedback fields.
 	 */
 	private function get_feedback_fields( int $note_id ): array {
 		$fields = array(
@@ -967,6 +977,8 @@ class Notes_Manager {
 		}
 
 		$values['quick_fix'] = $this->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
+
+		$values['block_action'] = self::decode_block_action( get_comment_meta( $note_id, self::BLOCK_ACTION_META_KEY, true ) );
 
 		$values['suggestion_status'] = ( new Suggestions() )->get_status( $note_id );
 
@@ -1000,12 +1012,16 @@ class Notes_Manager {
 	 * Decode the edit stored on an AI reply.
 	 *
 	 * @param  mixed $stored Stored meta value (JSON string).
-	 * @return array<string, string>|null Edit with `type` and its fields, or null if none.
+	 * @return array<string, mixed>|null Edit with `type` and its fields, or null if none.
 	 */
 	public static function decode_reply_edit( mixed $stored ): ?array {
 		$decoded = is_string( $stored ) && '' !== $stored ? json_decode( $stored, true ) : null;
 		if ( ! is_array( $decoded ) ) {
 			return null;
+		}
+
+		if ( Response_Parser::is_block_action( $decoded ) ) {
+			return self::decode_block_action( $stored );
 		}
 
 		$fields = match ( $decoded['type'] ?? null ) {
@@ -1026,6 +1042,74 @@ class Notes_Manager {
 		}
 
 		return $edit;
+	}
+
+	/**
+	 * Decode a stored structural edit.
+	 *
+	 * Only the fields each type needs are kept, with their types checked, so
+	 * the editor never acts on a malformed one.
+	 *
+	 * @param  mixed $stored Stored meta value (JSON string).
+	 * @return array<string, mixed>|null Edit with a `type` from Response_Parser::BLOCK_ACTION_TYPES, or null if none.
+	 */
+	public static function decode_block_action( mixed $stored ): ?array {
+		$decoded = is_string( $stored ) && '' !== $stored ? json_decode( $stored, true ) : null;
+		if ( ! is_array( $decoded ) ) {
+			return null;
+		}
+
+		$type     = $decoded['type'] ?? null;
+		$position = $decoded['position'] ?? null;
+		if ( 'remove_block' === $type ) {
+			return array( 'type' => 'remove_block' );
+		}
+		if ( ! in_array( $position, array( 'before', 'after' ), true ) ) {
+			return null;
+		}
+
+		if ( 'move_block' === $type ) {
+			foreach ( array( 'target_block_id', 'target_name', 'target_text' ) as $field ) {
+				if ( ! is_string( $decoded[ $field ] ?? null ) ) {
+					return null;
+				}
+			}
+			return array(
+				'type'            => 'move_block',
+				'position'        => $position,
+				'target_block_id' => $decoded['target_block_id'],
+				'target_name'     => $decoded['target_name'],
+				'target_text'     => $decoded['target_text'],
+			);
+		}
+
+		$block = $decoded['block'] ?? null;
+		if ( 'insert_block' !== $type || ! is_array( $block ) || ! is_string( $block['name'] ?? null ) ) {
+			return null;
+		}
+
+		$clean = array( 'name' => $block['name'] );
+		if ( is_array( $block['items'] ?? null ) ) {
+			$items = array_values( array_filter( $block['items'], 'is_string' ) );
+			if ( array() === $items || count( $items ) !== count( $block['items'] ) ) {
+				return null;
+			}
+			$clean['items']   = $items;
+			$clean['ordered'] = true === ( $block['ordered'] ?? false );
+		} elseif ( is_string( $block['content'] ?? null ) ) {
+			$clean['content'] = $block['content'];
+			if ( is_int( $block['level'] ?? null ) ) {
+				$clean['level'] = $block['level'];
+			}
+		} else {
+			return null;
+		}
+
+		return array(
+			'type'     => 'insert_block',
+			'position' => $position,
+			'block'    => $clean,
+		);
 	}
 
 	/**

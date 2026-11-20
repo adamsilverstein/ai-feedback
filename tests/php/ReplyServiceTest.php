@@ -541,7 +541,9 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year.', $service->captured_prompt );
-		$this->assertStringNotContainsString( 'Unrelated intro.', $service->captured_prompt );
+		$this->assertStringNotContainsString( 'Block content: Unrelated intro.', $service->captured_prompt );
+		// Other blocks are listed as nearby blocks, for structural edits.
+		$this->assertStringContainsString( '- [b1] core/paragraph: Unrelated intro.', $service->captured_prompt );
 		// Falls back to the parsed block name when the note has no block_name meta.
 		$this->assertStringContainsString( 'Block type: core/paragraph', $service->captured_prompt );
 	}

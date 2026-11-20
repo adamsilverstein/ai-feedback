@@ -235,13 +235,15 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Whether a note carries a review quick fix.
+	 * Whether a note carries a review quick fix or structural edit, which is
+	 * the first revision of its thread's edit.
 	 *
 	 * @param int $note_id Note ID.
 	 * @return bool
 	 */
 	private static function has_quick_fix( int $note_id ): bool {
-		return null !== ( new Notes_Manager() )->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
+		return null !== ( new Notes_Manager() )->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) )
+			|| null !== Notes_Manager::decode_block_action( get_comment_meta( $note_id, Notes_Manager::BLOCK_ACTION_META_KEY, true ) );
 	}
 
 	/**
