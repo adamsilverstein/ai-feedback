@@ -209,4 +209,70 @@ class ReplyRevisionRaceTest extends TestCase {
 		$this->assertSame( "Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Suggested edit</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $first ) );
 		$this->assertSame( "Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Revised suggestion (2)</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $second ) );
 	}
+
+	/**
+	 * The sidebar and the Notes UI badge count the same thread the same way.
+	 *
+	 * Replies share one second, are stored out of ID order, and include a
+	 * person's reply, a resolve marker and an AI reply whose edit was dropped.
+	 */
+	public function test_sidebar_and_badges_agree(): void {
+		$edit = '{"type":"replace_text","find":"last year","replace":"in 2025"}';
+		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2024"}';
+
+		$replies = array(
+			306 => array( 'ai_feedback' => '1', Notes_Manager::REPLY_EDIT_META_KEY => $edit ),
+			302 => array( 'ai_feedback' => '1', Notes_Manager::REPLY_EDIT_META_KEY => $edit, 'feedback_revision' => '2' ),
+			304 => array( 'ai_feedback' => '1', Notes_Manager::REPLY_EDIT_META_KEY => '{"type":"not_an_edit"}' ),
+			301 => array(),
+			305 => array( 'ai_feedback' => '1', Notes_Manager::REPLY_EDIT_META_KEY => $edit, 'feedback_revision' => '2' ),
+			303 => array( '_wp_note_status' => 'resolved' ),
+		);
+		$GLOBALS['test_comments'] = array( 100 => $GLOBALS['test_comments'][100] );
+		foreach ( $replies as $id => $meta ) {
+			$GLOBALS['test_comments'][ $id ]     = new \WP_Comment(
+				(object) array(
+					'comment_ID'      => (string) $id,
+					'comment_post_ID' => '42',
+					'comment_parent'  => '100',
+					'comment_type'    => 'note',
+					'comment_author'  => isset( $meta['ai_feedback'] ) ? 'Fresh Eyes' : 'Jane',
+					'comment_content' => 'Reply.',
+					'comment_date'    => '2026-11-20 10:00:00',
+				)
+			);
+			$GLOBALS['test_comment_meta'][ $id ] = $meta;
+		}
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'post', 42 );
+		$data    = ( new Reply_Status_Controller() )->get_threads( $request )->get_data();
+		$threads = is_array( $data ) ? (array) $data['threads'] : array();
+		$sidebar = array();
+		foreach ( is_array( $threads[100] ?? null ) && is_array( $threads[100]['replies'] ) ? $threads[100]['replies'] : array() as $reply ) {
+			if ( is_array( $reply ) && null !== $reply['revision'] ) {
+				$sidebar[ $reply['id'] ] = $reply['revision'];
+			}
+		}
+
+		$badges = array();
+		foreach ( array_keys( $replies ) as $id ) {
+			$text = Notes_Manager::add_badges_to_comment_text( 'Reply.', $GLOBALS['test_comments'][ $id ] );
+			if ( is_string( $text ) && 1 === preg_match( '/ai-feedback-revision">(?:Suggested edit|Revised suggestion \((\d+)\))</', $text, $match ) ) {
+				$badges[ $id ] = (int) ( $match[1] ?? 1 );
+			}
+		}
+		ksort( $badges );
+
+		// The review's quick fix is 1; the dropped edit, the marker and Jane's reply take no number.
+		$this->assertSame(
+			array(
+				302 => 2,
+				305 => 3,
+				306 => 4,
+			),
+			$sidebar
+		);
+		$this->assertSame( $sidebar, $badges );
+	}
 }
