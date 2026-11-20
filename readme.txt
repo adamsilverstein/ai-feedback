@@ -70,7 +70,7 @@ Yes. The plugin provides Content Quality, Tone & Voice, Flow & Structure, and De
 
 Yes — your content is sent to whichever AI provider you've configured in Settings → Connectors. Please review your provider's privacy policy and terms of service.
 
-When the selected model can see images, a review also sends up to four Media Library images that have no alt text, so the model can propose some. Images from other sites are never fetched or sent. Developers can turn this off by returning 0 from the `ai_feedback_max_review_images` filter.
+When the selected model can see images (the built-in Claude, GPT and Gemini models can, and the AI client's model information is checked first), a review also sends up to four Media Library images that have no alt text, so the model can propose some. Images from other sites are never fetched or sent. Developers can turn this off by returning 0 from the `ai_feedback_max_review_images` filter.
 
 == Screenshots ==
 
