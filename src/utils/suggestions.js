@@ -524,6 +524,25 @@ function canSuggestNow(selectors, action, clientId) {
 }
 
 /**
+ * Where a block is before it moves, in the fields Gutenberg's `block-move`
+ * operation and `pending-move` marker use.
+ *
+ * @param {Object} selectors Block editor selectors.
+ * @param {string} clientId  Client id of the block.
+ * @return {{fromParentClientId: (string|null), fromIndex: number, fromAnchorClientId: (string|null)}} Its origin.
+ */
+function getMoveOrigin(selectors, clientId) {
+	const fromParentClientId = selectors.getBlockRootClientId(clientId);
+	const fromIndex = selectors.getBlockIndex(clientId);
+	const fromOrder = selectors.getBlockOrder(fromParentClientId ?? '');
+	return {
+		fromParentClientId: fromParentClientId || null,
+		fromIndex,
+		fromAnchorClientId: fromOrder[fromIndex - 1] ?? null,
+	};
+}
+
+/**
  * Turns a review note's remove or move into a Gutenberg structural
  * suggestion. Moves between parent blocks stay with Preview and Apply.
  *
@@ -564,7 +583,13 @@ export async function suggestBlockAction(note) {
 	const operation =
 		action.type === 'remove_block'
 			? { type: 'block-remove', clientId, blockName: block.name }
-			: { type: 'block-move', clientId, blockName: block.name };
+			: {
+					type: 'block-move',
+					clientId,
+					blockName: block.name,
+					// Gutenberg's Reject puts the block back from these.
+					...getMoveOrigin(selectors, clientId),
+				};
 	const saved = await saveNoteMeta(note.id, {
 		_wp_suggestion: JSON.stringify(
 			buildStructuralPayload(block.name, operation)
@@ -593,14 +618,7 @@ export async function suggestBlockAction(note) {
 
 	if (action.type === 'move_block') {
 		const { targetId } = getBlockActionState(current, action, clientId);
-		const fromParentClientId = current.getBlockRootClientId(clientId);
-		const fromIndex = current.getBlockIndex(clientId);
-		const fromOrder = current.getBlockOrder(fromParentClientId ?? '');
-		Object.assign(marker, {
-			fromParentClientId: fromParentClientId || null,
-			fromIndex,
-			fromAnchorClientId: fromOrder[fromIndex - 1] ?? null,
-		});
+		Object.assign(marker, getMoveOrigin(current, clientId));
 
 		const { fromRootClientId, toRootClientId, index } = getMovePosition(
 			current,

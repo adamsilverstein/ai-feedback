@@ -247,6 +247,18 @@ describe('suggestBlockAction', () => {
 			0
 		);
 		expect(mocks.order['']).toEqual(['open', 'intro', 'bg', 'rep']);
+		// Gutenberg's Reject reads the origin from the stored operation.
+		const [record] = mocks.saveEntityRecord.mock.calls[0].slice(2);
+		expect(JSON.parse(record.meta._wp_suggestion).operations).toEqual([
+			{
+				type: 'block-move',
+				clientId: 'open',
+				blockName: 'core/paragraph',
+				fromParentClientId: null,
+				fromIndex: 2,
+				fromAnchorClientId: 'bg',
+			},
+		]);
 		expect(mocks.blocks.open.attributes.metadata.suggestion).toEqual({
 			type: 'pending-move',
 			commentId: 13,
