@@ -389,4 +389,28 @@ class ReviewImagesTest extends TestCase {
 
 		$this->assertCount( 1, $service->sent );
 	}
+
+	/**
+	 * Errors that only mention a file or something unsupported, or carry a
+	 * status a text request would hit too, don't send the review again.
+	 */
+	public function test_no_text_retry_for_unrelated_messages(): void {
+		foreach (
+			array(
+				new WP_Error( 'not_found', 'File not found.' ),
+				new WP_Error( 'region', 'Unsupported region.' ),
+				new WP_Error( 'rate_limited', 'Too many image requests.', array( 'status' => 429 ) ),
+			) as $error
+		) {
+			$this->assertFalse( ( new \ReflectionMethod( Review_Service::class, 'is_refused_input' ) )->invoke( null, $error ) );
+		}
+
+		$this->assertTrue(
+			( new \ReflectionMethod( Review_Service::class, 'is_refused_input' ) )->invoke(
+				null,
+				new WP_Error( 'invalid_request', 'This model does not support image input.' )
+			)
+		);
+	}
 }
+

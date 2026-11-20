@@ -188,7 +188,10 @@ class Review_Images {
 			return false;
 		}
 
-		// A size of the image adds "-{width}x{height}" or "-scaled" to its name.
+		// A size of the image adds "-{width}x{height}" or "-scaled" to its
+		// name. An image edited after it was inserted gets a new
+		// "-e{timestamp}" name, so a block still showing the old file
+		// doesn't match and is skipped.
 		$stem = preg_replace( '/-scaled$/', '', pathinfo( $expected, PATHINFO_FILENAME ) );
 		$name = pathinfo( $path, PATHINFO_FILENAME );
 		return is_string( $stem ) && '' !== $stem && 1 === preg_match( '/^' . preg_quote( $stem, '/' ) . '(?:-scaled)?(?:-\d+x\d+)?$/', $name );
@@ -217,8 +220,10 @@ class Review_Images {
 	 * @return string|null File contents, or null when unreadable.
 	 */
 	protected function read_file( string $path ): ?string {
+		// Read one byte past the limit, so a file that grew since its size
+		// was checked is never read whole.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- A local file in uploads, never a URL.
-		$data = file_get_contents( $path );
+		$data = file_get_contents( $path, false, null, 0, self::MAX_BYTES + 1 );
 		return is_string( $data ) && '' !== $data && strlen( $data ) <= self::MAX_BYTES ? $data : null;
 	}
 }

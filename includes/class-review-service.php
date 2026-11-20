@@ -221,7 +221,8 @@ class Review_Service {
 				$attached                = array();
 				$options['image_blocks'] = array();
 				$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
-				$ai_response             = $this->call_ai_with_retry( $prompt, $system_instruction, $model );
+				// One retry at most, so a refused request can't double the wait.
+				$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 1 );
 			}
 
 			if ( is_wp_error( $ai_response ) ) {
@@ -335,8 +336,9 @@ class Review_Service {
 		if ( in_array( $status, array( 400, 413, 415, 422 ), true ) ) {
 			return true;
 		}
+		// Without a status, only an error about the images themselves.
 		$text = strtolower( $error->get_error_code() . ' ' . $error->get_error_message() );
-		return 0 === $status && 1 === preg_match( '/image|vision|modalit|unsupported|file/', $text );
+		return 0 === $status && 1 === preg_match( '/\b(?:images?|vision|modalit(?:y|ies))\b/', $text );
 	}
 
 	/**
