@@ -158,6 +158,77 @@ test.describe('Review Workflow', () => {
 		]);
 	});
 
+	test('offers a review when the only text is inside a loaded group', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Text in a group',
+			content:
+				'<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Only text, in a group.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const { blocks } = response.request().postDataJSON();
+		const [group] = await editor.getBlocks({ full: true });
+
+		// The group has no text of its own, so only its paragraph is sent.
+		expect(blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/paragraph',
+				parent: group.clientId,
+				content: 'Only text, in a group.',
+			}),
+		]);
+		await expect(
+			page
+				.locator('.ai-feedback-panel')
+				.getByText('Add some content to your post')
+		).toHaveCount(0);
+	});
+
+	test('stops offering a review once a loaded block is emptied', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Emptied in the editor',
+			content:
+				'<!-- wp:paragraph --><p>Soon to be cleared.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(aiFeedback.getReviewButton()).toBeVisible();
+
+		await editor.canvas
+			.getByRole('document', { name: 'Block: Paragraph' })
+			.fill('');
+
+		await expect(
+			panel.getByText('Add some content to your post')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Review Document' })
+		).toHaveCount(0);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,
