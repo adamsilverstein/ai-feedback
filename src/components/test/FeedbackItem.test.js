@@ -242,6 +242,31 @@ describe('FeedbackItem quick fixes', () => {
 		expect(setNoteResolved).toHaveBeenLastCalledWith(7, false);
 	});
 
+	it('applies a fix that deletes all of the text', async () => {
+		const updateBlockAttributes = vi.fn();
+		renderItem(
+			{ quick_fix: { find: 'Delete me.', replace: '' } },
+			vi.fn(),
+			{
+				blocks: {
+					'block-1': {
+						name: 'core/paragraph',
+						attributes: { content: 'Delete me.' },
+					},
+				},
+				updateBlockAttributes,
+			}
+		);
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+
+		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: '',
+		});
+	});
+
 	it('refuses to undo over later edits', async () => {
 		const updateBlockAttributes = vi.fn();
 		const registry = renderItem(fixItem, vi.fn(), {

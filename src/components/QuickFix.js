@@ -210,7 +210,9 @@ export default function QuickFix({ item, edit, noteId }) {
 
 	const handleApply = () => {
 		const updated = applyEditToContent(content, fix);
-		if (!updated) {
+		// Only null means the edit no longer applies: deleting all of the
+		// text leaves an empty string.
+		if (updated === null) {
 			return;
 		}
 
