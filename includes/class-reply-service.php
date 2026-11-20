@@ -494,7 +494,6 @@ class Reply_Service {
 			// prompt truncates it, and not when links, formatting or line
 			// breaks would be lost.
 			'block_can_rewrite' => '' !== $block_content
-				&& null !== $block
 				&& ! self::has_inline_markup( $block )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),
