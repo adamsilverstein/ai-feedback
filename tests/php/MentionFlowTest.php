@@ -334,7 +334,7 @@ class MentionFlowTest extends TestCase {
 			),
 			$this->notes->saved[900]['reply_edit'] ?? null
 		);
-		$this->assertSame( 1, $this->notes->saved[900]['revision'] ?? null );
+		$this->assertSame( 1, $this->threads()[300]['replies'][0]['revision'] ?? null );
 		$this->assertSame( 'the sentence', $this->threads()[300]['replies'][0]['edit']['replace'] ?? null );
 	}
 
