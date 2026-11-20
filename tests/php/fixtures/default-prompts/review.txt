@@ -197,6 +197,7 @@ IMPORTANT:
 - If no feedback is needed for a block, don't include it in the array
 - "quick_fix" is optional. Include it only for a simple, mechanical text change inside one block, such as replacing a word or phrase, fixing a typo, or deleting filler words. Never for rewrites or structural changes
 - "find" must be copied exactly, character for character, from that block's content, and long enough to appear only once in the block (max 200 chars)
+- A line break in a block's content is part of its text: keep "find" on one line, or write the break as \n
 - "replace" is the text that takes its place (max 200 chars). Use an empty string to delete the text. To insert text, include a nearby phrase in "find" and the phrase plus the new text in "replace"
 - "block_action" is optional, for a structural change the feedback asks for. Include it only when the structure clearly needs to change, at most one per block, and leave out "quick_fix" when you include it. The author accepts or rejects each one:
   - { "type": "remove" } deletes the block, for example when it repeats another block or adds nothing.

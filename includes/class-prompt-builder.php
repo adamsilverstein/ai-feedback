@@ -268,6 +268,7 @@ class Prompt_Builder {
 	private function get_quick_fix_instruction(): string {
 		$instruction  = '- "quick_fix" is optional. Include it only for a simple, mechanical text change inside one block, such as replacing a word or phrase, fixing a typo, or deleting filler words. Never for rewrites or structural changes' . "\n";
 		$instruction .= '- "find" must be copied exactly, character for character, from that block\'s content, and long enough to appear only once in the block (max 200 chars)' . "\n";
+		$instruction .= '- A line break in a block\'s content is part of its text: keep "find" on one line, or write the break as \\n' . "\n";
 		$instruction .= '- "replace" is the text that takes its place (max 200 chars). Use an empty string to delete the text. To insert text, include a nearby phrase in "find" and the phrase plus the new text in "replace"';
 
 		return $instruction;
@@ -1052,7 +1053,7 @@ EOT;
 		$text .= "- Set \"edit\" only when the user's reply asks you to make a change to the block, in any language. For example \"make that change\", \"yes, do it\" or \"go ahead but keep the statistic\". Decide from what the user means, not from particular words.\n";
 		$text .= "- When the user only asks a question or disagrees, \"edit\" is null.\n";
 		$text .= "- When the user wants a change but it is unclear which one, \"edit\" is null and \"reply\" asks a short question.\n";
-		$text .= '- To change a word, phrase or sentence, use { "type": "replace_text", "find": "exact text copied from the block content", "replace": "new text" }. "find" must appear exactly once in the block content, both values are plain text, and each is at most ' . Response_Parser::MAX_QUICK_FIX_LENGTH . " characters.\n";
+		$text .= '- To change a word, phrase or sentence, use { "type": "replace_text", "find": "exact text copied from the block content", "replace": "new text" }. "find" must appear exactly once in the block content, both values are plain text, and each is at most ' . Response_Parser::MAX_QUICK_FIX_LENGTH . " characters. A line break in the block content is part of its text: keep \"find\" on one line, or write the break as \\n.\n";
 		if ( $can_rewrite ) {
 			$text .= "- To change most of the block, use { \"type\": \"rewrite_block\", \"content\": \"the full new text of the block\" }. Only inline formatting tags are allowed (<strong>, <em>, <a href>, <code>). No block-level HTML.\n";
 		}
