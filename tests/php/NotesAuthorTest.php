@@ -179,6 +179,7 @@ class NotesAuthorTest extends TestCase {
 		$GLOBALS['test_user_objects'][7]->ID  = 7;
 		$someone_else                         = array(
 			'a person\'s note' => $this->note( 5, 'Jane', 7 ),
+			'a person named Fresh Eyes' => $this->note( 6, 'Fresh Eyes', 7 ),
 			'a person\'s ID'   => 7,
 			'a person'         => $GLOBALS['test_user_objects'][7],
 			'an email'         => 'jane@example.com',
