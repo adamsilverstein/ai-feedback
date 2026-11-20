@@ -47,9 +47,10 @@ class TestableReviewService extends Review_Service
      * @param  string $prompt             User prompt.
      * @param  string $system_instruction System instruction.
      * @param  string $model              Model to use.
+     * @param  array  $images             Images to attach.
      * @return string|WP_Error Response from queue.
      */
-    protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error
+    protected function call_ai( string $prompt, string $system_instruction, string $model, array $images = array() ): string|WP_Error
     {
         $this->call_ai_count++;
         return array_shift($this->call_ai_responses) ?? new WP_Error('no_response', 'No response queued');

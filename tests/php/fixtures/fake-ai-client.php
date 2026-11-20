@@ -15,6 +15,10 @@ class Fake_AI_Client_Prompt_Builder {
 	public ?int $timeout_during_call = null;
 
 	public function __call( string $name, array $args ): self {
+		if ( 'with_file' === $name ) {
+			$this->calls['with_file'][] = $args;
+			return $this;
+		}
 		$this->calls[ $name ] = 'using_model_preference' === $name ? $args : $args[0];
 		return $this;
 	}

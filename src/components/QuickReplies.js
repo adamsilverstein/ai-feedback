@@ -17,6 +17,7 @@ import { getRichTextAttributeKey } from '../utils/quick-fix';
 import { isEditApplied } from '../utils/reply-edit';
 import { isBlockAction } from '../utils/is-reply-edit';
 import { findNoteBlock, getBlockActionState } from '../utils/block-action';
+import { getBlockChangeState, isBlockChange } from '../utils/block-change';
 import useRequestReply from '../hooks/useRequestReply';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import {
@@ -47,6 +48,17 @@ export default function QuickReplies({ note, replies }) {
 		(select) => {
 			if (latestOwnerId === null) {
 				return false;
+			}
+			// A formatting fix is judged by the blocks, as in BlockChange.
+			if (isBlockChange(latestEdit)) {
+				const selectors = select(blockEditorStore);
+				return (
+					getBlockChangeState(
+						selectors,
+						latestEdit,
+						findNoteBlock(selectors, note.block_id, note.id)
+					).state === 'applied'
+				);
 			}
 			// A structural edit is judged by the blocks, as in BlockAction.
 			if (isBlockAction(latestEdit)) {
@@ -87,7 +99,7 @@ export default function QuickReplies({ note, replies }) {
 
 	const quickReplies = getQuickReplies(
 		isEditPending(latest, { status, isApplied }),
-		isBlockAction(latestEdit)
+		isBlockAction(latestEdit) || isBlockChange(latestEdit)
 	);
 
 	const send = async (message) => {

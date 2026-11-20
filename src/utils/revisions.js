@@ -11,15 +11,15 @@ import { isReplyEdit } from './is-reply-edit';
 /**
  * Lists the edits proposed in a thread, oldest first.
  *
- * @param {Object|null} note    The thread's note, with `id`, `parent` and `quick_fix` or `block_action`.
+ * @param {Object|null} note    The thread's note, with `id`, `parent` and `quick_fix`, `block_action` or `block_change`.
  * @param {Object[]}    replies The thread's replies, oldest first.
  * @return {Array<{ownerId: number, edit: Object}>} Note that owns each edit, and the edit.
  */
 export function getThreadEdits(note, replies = []) {
 	const edits = [];
 	// A secondary note's quick fix is not the thread's first edit. A review
-	// note has a structural edit or a quick fix, never both.
-	const first = note?.block_action ?? note?.quick_fix;
+	// note has one of a structural edit, a formatting fix or a quick fix.
+	const first = note?.block_action ?? note?.block_change ?? note?.quick_fix;
 	if (note?.id && !note.parent && first) {
 		edits.push({ ownerId: note.id, edit: first });
 	}
@@ -115,7 +115,7 @@ export function isEditPending(latest, { status = null, isApplied = false }) {
  * show depends on whether the thread has an edit waiting on the author.
  *
  * @param {boolean} hasPendingEdit Whether the thread's newest edit is pending.
- * @param {boolean} [isStructural] Whether that edit adds, removes or moves a block.
+ * @param {boolean} [isStructural] Whether that edit adds, removes or moves a block, or changes its formatting.
  * @return {Array<{key: string, label: string, message: string}>} Quick replies.
  */
 export function getQuickReplies(hasPendingEdit, isStructural = false) {
@@ -131,7 +131,8 @@ export function getQuickReplies(hasPendingEdit, isStructural = false) {
 		message: __('Try a different version.', 'fresh-eyes'),
 	};
 
-	// Adding, removing or moving a block can't be made shorter.
+	// Adding, removing or moving a block, or a formatting fix, can't be
+	// made shorter.
 	if (hasPendingEdit && isStructural) {
 		return [tryAnother, why];
 	}

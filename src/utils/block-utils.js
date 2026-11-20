@@ -40,6 +40,36 @@ export function getBlockAnchor(name, content) {
 /* eslint-enable no-bitwise */
 
 /**
+ * The attributes formatting fixes depend on, for the server to check them
+ * against (see Block_Change::get_block_attributes()).
+ *
+ * @param {Object} block Block.
+ * @return {Object|null} Attributes, or null for other block types.
+ */
+export function getFormattingAttributes(block) {
+	const attributes = block.attributes || {};
+	switch (block.name) {
+		case 'core/heading':
+			return { level: attributes.level ?? 2 };
+		case 'core/list':
+			return { ordered: !!attributes.ordered };
+		case 'core/image':
+			return {
+				alt: typeof attributes.alt === 'string' ? attributes.alt : '',
+				...(Number.isInteger(attributes.id) && attributes.id > 0
+					? { id: attributes.id }
+					: {}),
+				...(typeof attributes.url === 'string' &&
+				!attributes.url.startsWith('blob:')
+					? { url: attributes.url }
+					: {}),
+			};
+		default:
+			return null;
+	}
+}
+
+/**
  * Recursively extract blocks with their clientIds and content.
  *
  * Inner blocks carry their parent's client ID, so the server can tell a
@@ -59,14 +89,22 @@ export function extractBlockData(blocks, parent = '') {
 		const rawContent = block.originalContent || serialize(block);
 		const content = extractTextContent(rawContent);
 
-		// Only include blocks with actual content
-		if (content.trim()) {
+		// Only include blocks with actual content, and images, whose alt
+		// text is reviewed even without a caption.
+		const attributes = getFormattingAttributes(block);
+		const isImage = block.name === 'core/image' && !!attributes?.url;
+		if (content.trim() || isImage) {
 			result.push({
 				clientId: block.clientId,
 				name: block.name,
 				content: content.trim(),
-				anchor: getBlockAnchor(block.name, content.trim()),
+				// A captionless image is told apart by its URL.
+				anchor: getBlockAnchor(
+					block.name,
+					content.trim() || (isImage ? attributes.url : '')
+				),
 				...(parent ? { parent } : {}),
+				...(attributes ? { attributes } : {}),
 			});
 		}
 

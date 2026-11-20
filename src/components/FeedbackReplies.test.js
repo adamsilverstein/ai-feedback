@@ -544,6 +544,24 @@ describe('FeedbackReplies', () => {
 			expect(screen.getByTestId('quick-replies')).toBeInTheDocument();
 		});
 
+		it('follow the note itself while its formatting fix waits on the author', () => {
+			render(
+				<FeedbackReplies
+					replies={[]}
+					note={{
+						...note,
+						block_change: {
+							type: 'set_attributes',
+							attributes: { level: 3 },
+							from: { level: 4 },
+						},
+					}}
+				/>
+			);
+
+			expect(screen.getByTestId('quick-replies')).toBeInTheDocument();
+		});
+
 		it('leave a note without replies or a quick fix to Make this change', () => {
 			const { container } = render(
 				<FeedbackReplies replies={[]} note={note} />

@@ -27,7 +27,7 @@ X-WP-Nonce: {nonce}
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `post_id` | integer | Yes | The post ID to review |
-| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content`, an optional `anchor`, and for an inner block its parent's `clientId` as `parent` |
+| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content`, an optional `anchor`, for an inner block its parent's `clientId` as `parent`, and for headings, lists and images the `attributes` formatting fixes check: `level`, `ordered`, or an image's `alt`, attachment `id` and `url`. Images are sent even without a caption, with `content` empty |
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
@@ -79,6 +79,22 @@ The editor shows each one on its note with a one-line description, such as "Move
 With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
 
 Known limitation: the plugin can't tell whether the editor is in Gutenberg's Edit or Suggest intent. Gutenberg only exposes that through a private selector (`getEditorIntent()`) and nothing in the page reflects it. In Suggest intent, Gutenberg's own capture may record a suggested move a second time, as a pending move by the current user. Run reviews in Edit intent when Suggestion Mode is on.
+
+**Formatting fixes:**
+
+A note can carry a `block_change`: a one-click formatting fix that never adds, drops or rewrites the block's words. It is stored as JSON in the note's `feedback_block_change` comment meta (`Notes_Manager::BLOCK_CHANGE_META_KEY`) and returned on each note (null when there is none):
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `set_attributes` | `attributes`, `from`, and `image` for alt text or a caption | Set allow-listed attributes: a heading's `level` (2-6), a list's `ordered`, an image's `alt` and `caption`. `from` holds the values the AI saw, and `image` the URL of the image it described |
+| `transform` | `to`, and `items` and `ordered` for a list, or `text` (and `level` for a heading) | Turn a paragraph into a `core/list` or `core/heading`, or a heading into a `core/paragraph`. `text` is the block's reviewed text, at most 200 characters |
+| `split` | `after`, `next`, `next_length` | Split a paragraph after this sentence ending; `next` is the start of the text after it and `next_length` its length in characters |
+
+`Block_Change::validate()` drops any that fail validation and keeps the note: every attribute must be on its block type's allow-list and differ from the current value; a list's items must appear in the paragraph in order with only separators (commas, semicolons, a final "and" or "or") between them, and text before the first item stays as an introduction unless it ends in a comma or semicolon (which would mean items were left out); a split must fall after sentence-ending punctuation that appears once, with text after it. A review gets one change per block, shared with `block_action`, which wins on the same item; either replaces the `quick_fix` of every item on that block, once grouping has kept it. Groups of similar notes have none, and only a thread's root note keeps one. `Block_Change::decode()` checks the allow-lists again when the meta is read.
+
+Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model has the `vision` capability in the model list, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone. Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
+
+The editor shows each one on its note with a one-line description, such as "Change to a level 3 heading", "Turn into a list" or "Split the paragraph after “…”", with Preview (before and after) and Apply fix. Everything is checked again against the live block: a change whose block changed since the review (another level, image, text or list type) reads as outdated, a transform is only offered when the editor offers it (`getBlockTransformItems()`), and a list split that would drop an inline object is not offered. Text is sliced from the block's rich text, so links and formatting stay, and the note's link (`metadata`) moves to the new list, heading or first half of a split. Apply is one undo step and is only marked applied if the block now reads as the change leaves it. A paragraph's anchor moves to the list's introduction, or the list. The introduction keeps the paragraph's styling, and the list gets what core's own transforms carry over (class name, font size and colors, where the list supports them). A split's second half keeps the paragraph's styling but not its drop cap. Formatting fixes stay with Preview and Apply when Gutenberg's Suggestion Mode is on. A formatting fix is also the thread's first suggested edit: the reply prompt gets it as the pending edit until the saved post shows it, the first reply edit after it is revision 2, and the note gets quick replies ("Try another" and "Why?").
 
 **Example Request:**
 
@@ -269,7 +285,7 @@ The current user must be able to edit the post.
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
-`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix` or `block_action` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
+`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
 Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
 
@@ -954,6 +970,16 @@ Choose which block types a structural edit may insert. By default `core/paragrap
 ```php
 add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
     return array_diff( $blocks, array( 'core/list' ) );
+} );
+```
+
+#### `ai_feedback_max_review_images`
+
+How many images a review request may show a vision model so it can propose alt text. Default 4; return 0 to never send images.
+
+```php
+add_filter( 'ai_feedback_max_review_images', function(): int {
+    return 0;
 } );
 ```
 

@@ -542,7 +542,8 @@ class Reply_Service {
 	/**
 	 * List the edits proposed in a thread, oldest first.
 	 *
-	 * The review's quick fix on the root note comes first, then each AI
+	 * The review's structural edit, formatting fix or quick fix on the root
+	 * note comes first (a note has at most one), then each AI
 	 * reply's edit. Only the newest can be pending: each new edit supersedes
 	 * the ones before it.
 	 *
@@ -554,11 +555,17 @@ class Reply_Service {
 		$edits = array();
 
 		$block_action = Notes_Manager::decode_block_action( get_comment_meta( $parent_id, Notes_Manager::BLOCK_ACTION_META_KEY, true ) );
+		$block_change = Block_Change::decode( get_comment_meta( $parent_id, Notes_Manager::BLOCK_CHANGE_META_KEY, true ), self::meta_string( $parent_id, 'block_name' ) );
 		$quick_fix    = $this->notes_manager->decode_quick_fix( get_comment_meta( $parent_id, 'feedback_quick_fix', true ) );
 		if ( null !== $block_action ) {
 			$edits[] = array(
 				'id'   => $parent_id,
 				'edit' => $block_action,
+			);
+		} elseif ( null !== $block_change ) {
+			$edits[] = array(
+				'id'   => $parent_id,
+				'edit' => $block_change,
 			);
 		} elseif ( null !== $quick_fix ) {
 			$edits[] = array(
@@ -627,6 +634,10 @@ class Reply_Service {
 			return null !== $located && ! self::is_block_action_applied( $latest['edit'], $located ) ? $latest['edit'] : null;
 		}
 
+		if ( Block_Change::is_change( $latest['edit'] ) ) {
+			return null !== $located && ! self::is_block_change_applied( $latest['edit'], $located ) ? $latest['edit'] : null;
+		}
+
 		if ( '' === $block_content ) {
 			return null;
 		}
@@ -676,6 +687,72 @@ class Reply_Service {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Whether the saved post already reads as a formatting fix would leave
+	 * it. The note's link moves with a transformed block, so the block found
+	 * for the note is the new list or heading, or a split's first half.
+	 *
+	 * @param array<string, mixed> $edit    Formatting fix.
+	 * @param array<string, mixed> $located Note's block and its siblings, from locate_note_block().
+	 * @return bool
+	 */
+	private static function is_block_change_applied( array $edit, array $located ): bool {
+		$block = is_array( $located['block'] ?? null ) ? $located['block'] : array();
+		$attrs = is_array( $block['attrs'] ?? null ) ? $block['attrs'] : array();
+		$html  = self::strip_suggestion_markers( self::get_block_html( $block ) );
+
+		switch ( $edit['type'] ?? null ) {
+			case 'transform':
+				return ( $edit['to'] ?? null ) === ( $block['blockName'] ?? null );
+			case 'split':
+				$siblings = is_array( $located['siblings'] ?? null ) ? array_values( $located['siblings'] ) : array();
+				$index    = is_int( $located['index'] ?? null ) ? $located['index'] : 0;
+				$next     = $siblings[ $index + 1 ] ?? null;
+				$after    = is_string( $edit['after'] ?? null ) ? $edit['after'] : '';
+				$rest     = is_string( $edit['next'] ?? null ) ? $edit['next'] : '';
+				return '' !== $after && str_ends_with( self::html_text( $html ), $after )
+					&& is_array( $next ) && 'core/paragraph' === ( $next['blockName'] ?? null )
+					&& str_starts_with( self::html_text( self::get_block_html( $next ) ), $rest );
+		}
+
+		$wanted = is_array( $edit['attributes'] ?? null ) ? $edit['attributes'] : array();
+		foreach ( $wanted as $key => $value ) {
+			$current = match ( $key ) {
+				'level'   => $attrs['level'] ?? 2,
+				'ordered' => $attrs['ordered'] ?? false,
+				'alt'     => self::image_alt( $html ),
+				default   => self::image_caption( $html ),
+			};
+			if ( $current !== $value ) {
+				return false;
+			}
+		}
+		return array() !== $wanted;
+	}
+
+	/**
+	 * Alt text of the image in a block's HTML.
+	 *
+	 * @param string $html Block HTML.
+	 * @return string Alt text, or '' when there is none.
+	 */
+	private static function image_alt( string $html ): string {
+		if ( 1 !== preg_match( '/<img\b[^>]*\balt="([^"]*)"/i', $html, $match ) ) {
+			return '';
+		}
+		return html_entity_decode( $match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	/**
+	 * Caption text of an image block's HTML.
+	 *
+	 * @param string $html Block HTML.
+	 * @return string Caption text, or '' when there is none.
+	 */
+	private static function image_caption( string $html ): string {
+		return 1 === preg_match( '#<figcaption\b[^>]*>(.*?)</figcaption>#is', $html, $match ) ? self::html_text( $match[1] ) : '';
 	}
 
 	/**

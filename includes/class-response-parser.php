@@ -33,7 +33,7 @@ class Response_Parser {
 	/**
 	 * Optional fields for each feedback item.
 	 */
-	public const OPTIONAL_FEEDBACK_FIELDS = array( 'suggestion', 'quick_fix' );
+	public const OPTIONAL_FEEDBACK_FIELDS = array( 'suggestion', 'quick_fix', 'block_action', 'block_change' );
 
 	/**
 	 * Maximum length of a quick fix's find and replace text.
@@ -173,18 +173,20 @@ class Response_Parser {
 	 * Given the raw AI response text, attempts to extract and decode JSON, validates and
 	 * sanitizes feedback items, and enriches them with block metadata drawn from $blocks.
 	 *
-	 * @param  string $response        AI response text (may contain surrounding text; JSON is extracted).
-	 * @param  array  $blocks          Original blocks used to validate `block_id` values and provide
-	 *                                 enrichment (`name` and `index`) for validated items.
-	 * @param  bool   $validate_schema If true, perform strict JSON schema validation and return
-	 *                                 a WP_Error on schema or parse failures; if false, parsing
-	 *                                 errors yield an empty result structure.
-	 * @return array|\WP_Error On success, an array with keys:
+	 * @param  string       $response        AI response text (may contain surrounding text; JSON is extracted).
+	 * @param  array<mixed> $blocks      Original blocks used to validate `block_id` values and provide
+	 *                                   enrichment (`name` and `index`) for validated items.
+	 * @param  bool         $validate_schema If true, perform strict JSON schema validation and return
+	 *                                       a WP_Error on schema or parse failures; if false, parsing
+	 *                                       errors yield an empty result structure.
+	 * @param  string[]     $image_blocks Client IDs of the image blocks whose image the AI was shown,
+	 *                                    the only blocks it may propose alt text or a caption for.
+	 * @return array<string, mixed>|\WP_Error On success, an array with keys:
 	 *                         - `summary` (string): sanitized summary text.
 	 *                         - `feedback` (array): list of validated, sanitized, and enriched feedback items.
 	 *                         On schema validation failure (when $validate_schema is true), returns a WP_Error.
 	 */
-	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false ) {
+	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false, array $image_blocks = array() ) {
 		// Build a map of valid block IDs for validation, including block name.
 		$valid_block_ids = array();
 		$block_info      = array();
@@ -201,6 +203,8 @@ class Response_Parser {
 					'content' => is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '',
 					'parent'  => is_array( $block ) && is_string( $block['parent'] ?? null ) ? $block['parent'] : '',
 					'anchor'  => $this->get_block_anchor( $block ),
+					'attrs'   => Block_Change::get_block_attributes( $block ),
+					'image'   => in_array( $block['clientId'], $image_blocks, true ),
 				);
 				Logger::debug(
 					sprintf(
@@ -293,6 +297,22 @@ class Response_Parser {
 
 		// Group similar feedback items to reduce noise.
 		$grouped = $this->group_similar_feedback( $parsed );
+
+		// A block whose structural edit or formatting fix survived grouping
+		// gets no quick fix from any item, so the review proposes one change
+		// per block.
+		$changed = array();
+		foreach ( $grouped as $item ) {
+			if ( is_string( $item['block_id'] ?? null ) && ( isset( $item['block_action'] ) || isset( $item['block_change'] ) ) ) {
+				$changed[ $item['block_id'] ] = true;
+			}
+		}
+		foreach ( $grouped as $index => $item ) {
+			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
+			if ( isset( $changed[ $block_id ] ) && ! isset( $item['block_action'] ) && ! isset( $item['block_change'] ) ) {
+				unset( $grouped[ $index ]['quick_fix'] );
+			}
+		}
 
 		Logger::debug( sprintf( 'Grouped into %d feedback items', count( $grouped ) ) );
 
@@ -532,6 +552,27 @@ class Response_Parser {
 			$action = $this->validate_block_action( $item['block_action'], $block_id, self::get_review_targets( $block_info ) );
 			if ( null !== $action ) {
 				$validated['block_action'] = $action;
+				$actioned[ $block_id ]     = 1;
+				unset( $validated['quick_fix'] );
+			}
+		}
+
+		// Optional formatting fix. It shares the one change per block with
+		// structural edits, which win on the same item, and also replaces any
+		// quick fix.
+		if ( isset( $item['block_change'] ) && is_string( $block_id ) && ! isset( $actioned[ $block_id ] ) && is_array( $block_info[ $block_id ] ?? null ) ) {
+			$info   = $block_info[ $block_id ];
+			$change = Block_Change::validate(
+				$item['block_change'],
+				array(
+					'name'       => is_string( $info['name'] ?? null ) ? $info['name'] : '',
+					'content'    => is_string( $info['content'] ?? null ) ? $info['content'] : '',
+					'attributes' => is_array( $info['attrs'] ?? null ) ? $info['attrs'] : array(),
+				),
+				true === ( $info['image'] ?? false )
+			);
+			if ( null !== $change ) {
+				$validated['block_change'] = $change;
 				$actioned[ $block_id ]     = 1;
 				unset( $validated['quick_fix'] );
 			}
@@ -1494,7 +1535,7 @@ class Response_Parser {
 			if ( $group['count'] > 1 ) {
 				// A quick fix or structural edit targets one block, so it
 				// can't apply to a group.
-				unset( $group['quick_fix'], $group['block_action'] );
+				unset( $group['quick_fix'], $group['block_action'], $group['block_change'] );
 				$group['is_group'] = true;
 				$group['title']    = sprintf(
 					/* translators: 1: original title, 2: occurrence count */

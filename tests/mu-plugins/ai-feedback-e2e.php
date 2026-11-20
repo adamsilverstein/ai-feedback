@@ -206,3 +206,80 @@ add_filter(
 	20,
 	2
 );
+
+// A review of a post holding the formatting fixture proposes one of each
+// formatting fix: the skipped "Setup" heading level, the "You need" items
+// as a list, a split after "The first idea ends here.", and alt text for
+// the image. Mock reviews never show the AI the image, so the parser drops
+// that alt text and the note stays a plain one.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		$ids = array();
+		foreach ( $blocks as $block ) {
+			$name    = is_array( $block ) && is_string( $block['name'] ?? null ) ? $block['name'] : '';
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( 'core/heading' === $name && 'Setup' === $content ) {
+				$ids['heading'] = $block['clientId'] ?? '';
+			} elseif ( str_starts_with( $content, 'You need Node' ) ) {
+				$ids['list'] = $block['clientId'] ?? '';
+			} elseif ( str_starts_with( $content, 'The first idea' ) ) {
+				$ids['split'] = $block['clientId'] ?? '';
+			} elseif ( 'core/image' === $name ) {
+				$ids['image'] = $block['clientId'] ?? '';
+			}
+		}
+		if ( 4 !== count( $ids ) ) {
+			return $response;
+		}
+
+		$item = static fn ( string $block_id, string $title, array $change ): array => array(
+			'block_id'     => $block_id,
+			'category'     => 'design',
+			'severity'     => 'suggestion',
+			'title'        => $title,
+			'feedback'     => 'The formatting could be clearer.',
+			'block_change' => $change,
+		);
+
+		$response['feedback'] = array(
+			$item(
+				$ids['heading'],
+				'Fix heading level',
+				array(
+					'type'       => 'set_attributes',
+					'attributes' => array( 'level' => 3 ),
+				)
+			),
+			$item(
+				$ids['list'],
+				'Use a list',
+				array(
+					'type'  => 'transform',
+					'to'    => 'core/list',
+					'items' => array( 'Node', 'npm', 'Docker', 'Git' ),
+				)
+			),
+			$item(
+				$ids['split'],
+				'Split this paragraph',
+				array(
+					'type'  => 'split',
+					'after' => 'The first idea ends here.',
+				)
+			),
+			$item(
+				$ids['image'],
+				'Add alt text',
+				array(
+					'type'       => 'set_attributes',
+					'attributes' => array( 'alt' => 'Made up without seeing the image' ),
+				)
+			),
+		);
+
+		return $response;
+	},
+	10,
+	2
+);

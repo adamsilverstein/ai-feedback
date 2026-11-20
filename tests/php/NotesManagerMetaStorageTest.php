@@ -144,4 +144,48 @@ class NotesManagerMetaStorageTest extends TestCase {
 		$this->assertSame( 'Cut it', get_comment_meta( $root, 'feedback_title', true ) );
 		$this->assertSame( 'Text only', get_comment_meta( $child, 'feedback_title', true ) );
 	}
+
+	/**
+	 * A formatting fix with quotes reads back intact on the root note, leads
+	 * its block's thread, is returned with the note and is not kept on a
+	 * later note in the thread.
+	 */
+	public function test_block_change_round_trips_on_root_note(): void {
+		$change = array(
+			'type'    => 'transform',
+			'to'      => 'core/list',
+			'items'   => array( 'le "café"', 'l’espresso' ),
+			'ordered' => false,
+		);
+		$item   = static fn ( string $title, array $extra = array() ): array => array(
+			'block_id'   => 'block-1',
+			'block_name' => 'core/paragraph',
+			'category'   => 'design',
+			'severity'   => 'suggestion',
+			'title'      => $title,
+			'feedback'   => 'Feedback.',
+		) + $extra;
+
+		$result = ( new Notes_Manager() )->create_notes_from_feedback(
+			array(
+				$item( 'Text only' ),
+				$item( 'Use a list', array( 'block_change' => $change ) ),
+				$item( 'Another list', array( 'block_change' => $change ) ),
+			),
+			10
+		);
+
+		$this->assertIsArray( $result );
+		list( $root, $second, $third ) = $result['note_ids'];
+		$this->assertSame( 'Use a list', get_comment_meta( $root, 'feedback_title', true ) );
+		$this->assertSame(
+			$change,
+			\AI_Feedback\Block_Change::decode( get_comment_meta( $root, Notes_Manager::BLOCK_CHANGE_META_KEY, true ), 'core/paragraph' )
+		);
+		$this->assertSame( '', get_comment_meta( $second, Notes_Manager::BLOCK_CHANGE_META_KEY, true ) );
+		$this->assertSame( '', get_comment_meta( $third, Notes_Manager::BLOCK_CHANGE_META_KEY, true ) );
+
+		$fields = new \ReflectionMethod( Notes_Manager::class, 'get_feedback_fields' );
+		$this->assertSame( $change, $fields->invoke( new Notes_Manager(), $root )['block_change'] );
+	}
 }
