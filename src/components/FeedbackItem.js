@@ -146,12 +146,14 @@ function SingleFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 					item={item}
 					title={title}
 					onNavigate={onNavigate}
+					thread={thread}
 				/>
 
 				<FeedbackReplies
 					replies={thread?.replies ?? []}
 					pendingReplyId={thread?.pending_reply_id ?? null}
 					onReplyComplete={onReplyComplete}
+					note={item}
 				/>
 			</CardBody>
 		</Card>
