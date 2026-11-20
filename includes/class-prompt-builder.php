@@ -663,7 +663,7 @@ EOT;
 					wp_strip_all_tags( $content )
 				);
 				if ( $is_ai && is_array( $entry['edit'] ?? null ) ) {
-					$prompt .= '  (Suggested edit: ' . self::describe_edit( $entry['edit'] ) . ")\n";
+					$prompt .= '  (Suggested edit: ' . self::describe_edit( $entry['edit'], self::REPLY_THREAD_ENTRY_LIMIT ) . ")\n";
 				}
 			}
 			$prompt .= "\n";
@@ -744,15 +744,19 @@ EOT;
 	/**
 	 * Describe a suggested edit for the reply prompt.
 	 *
-	 * @param array<mixed> $edit `replace_text` or `rewrite_block` edit.
+	 * The pending edit is described in full, up to the rewrite length the
+	 * parser accepts, so a detail at its end can be kept. Earlier edits in
+	 * the conversation only need a reminder, which keeps long threads small.
+	 *
+	 * @param array<mixed> $edit  `replace_text` or `rewrite_block` edit.
+	 * @param int          $limit Maximum length of a rewrite's text.
 	 * @return string Description.
 	 */
-	private static function describe_edit( array $edit ): string {
+	private static function describe_edit( array $edit, int $limit = Response_Parser::MAX_REWRITE_LENGTH ): string {
 		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
 			return sprintf(
 				'rewrite the block as "%s"',
-				// The whole rewrite the parser accepted, so a detail at its end can be kept.
-				self::truncate( wp_strip_all_tags( self::to_string( $edit['content'] ?? '' ) ), Response_Parser::MAX_REWRITE_LENGTH )
+				self::truncate( wp_strip_all_tags( self::to_string( $edit['content'] ?? '' ) ), $limit )
 			);
 		}
 

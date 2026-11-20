@@ -333,4 +333,41 @@ class PromptBuilderReplyTest extends TestCase {
 		$this->assertGreaterThan( \AI_Feedback\Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT, strlen( $rewrite ) );
 		$this->assertStringContainsString( 'Source: annual report."', $prompt );
 	}
+
+	/**
+	 * Earlier rewrites in the conversation are shortened, while the pending
+	 * one is sent whole.
+	 */
+	public function test_reply_prompt_shortens_earlier_rewrites(): void {
+		$old     = str_repeat( 'Old rewrite. ', 300 ) . 'OLD_TAIL';
+		$pending = str_repeat( 'New rewrite. ', 300 ) . 'NEW_TAIL';
+		$prompt  = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'thread'        => array(
+					array(
+						'author'  => 'AI',
+						'content' => 'Rewrote it.',
+						'is_ai'   => true,
+						'edit'    => array(
+							'type'     => 'rewrite_block',
+							'content'  => $old,
+							'original' => 'Revenue grew 40% last year.',
+						),
+					),
+				),
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => $pending,
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'OLD_TAIL', $prompt );
+		$this->assertStringContainsString( '(Suggested edit: rewrite the block as "Old rewrite.', $prompt );
+		$this->assertStringContainsString( 'NEW_TAIL"', $prompt );
+		$this->assertLessThan( strlen( $old ) + strlen( $pending ), strlen( $prompt ) );
+	}
 }
