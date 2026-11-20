@@ -18,8 +18,12 @@ describe('describeSkippedImages', () => {
 		]);
 
 		expect(lines).toHaveLength(2);
-		expect(lines[0]).toMatch(/^2 images were not shown to the AI: the AI provider does not take their file type/);
-		expect(lines[1]).toMatch(/^1 image was not shown to the AI: it is too large in pixels/);
+		expect(lines[0]).toMatch(
+			/^2 images were not shown to the AI: the AI provider does not take their file type/
+		);
+		expect(lines[1]).toMatch(
+			/^1 image was not shown to the AI: it is too large in pixels/
+		);
 	});
 
 	it('explains a refusal and a remembered refusal', () => {
@@ -28,7 +32,9 @@ describe('describeSkippedImages', () => {
 			{ block_id: 'b', reason: 'refused_recently' },
 		]);
 
-		expect(lines[0]).toMatch(/refused 1 image, so the review ran on the text alone/);
+		expect(lines[0]).toMatch(
+			/refused 1 image, so the review ran on the text alone/
+		);
 		expect(lines[1]).toMatch(/recently refused images/);
 	});
 

@@ -22,6 +22,7 @@ export function describeSkippedImages(skipped) {
 
 	const describe = {
 		type: (n) =>
+			/* translators: %d: number of images. */
 			_n(
 				'%d image was not shown to the AI: the AI provider does not take its file type, so it has no alt text proposal.',
 				'%d images were not shown to the AI: the AI provider does not take their file type, so they have no alt text proposals.',
@@ -29,6 +30,7 @@ export function describeSkippedImages(skipped) {
 				'fresh-eyes'
 			),
 		dimensions: (n) =>
+			/* translators: %d: number of images. */
 			_n(
 				'%d image was not shown to the AI: it is too large in pixels for the AI provider, so it has no alt text proposal.',
 				'%d images were not shown to the AI: they are too large in pixels for the AI provider, so they have no alt text proposals.',
@@ -36,6 +38,7 @@ export function describeSkippedImages(skipped) {
 				'fresh-eyes'
 			),
 		file_size: (n) =>
+			/* translators: %d: number of images. */
 			_n(
 				'%d image was not shown to the AI: its file is too large to send, so it has no alt text proposal.',
 				'%d images were not shown to the AI: their files are too large to send, so they have no alt text proposals.',
@@ -43,6 +46,7 @@ export function describeSkippedImages(skipped) {
 				'fresh-eyes'
 			),
 		refused: (n) =>
+			/* translators: %d: number of images. */
 			_n(
 				'The AI model refused %d image, so the review ran on the text alone and has no alt text proposal for it.',
 				'The AI model refused %d images, so the review ran on the text alone and has no alt text proposals for them.',
@@ -50,6 +54,7 @@ export function describeSkippedImages(skipped) {
 				'fresh-eyes'
 			),
 		refused_recently: (n) =>
+			/* translators: %d: number of images. */
 			_n(
 				'%d image was not shown to the AI because the selected model recently refused images, so it has no alt text proposal.',
 				'%d images were not shown to the AI because the selected model recently refused images, so they have no alt text proposals.',
