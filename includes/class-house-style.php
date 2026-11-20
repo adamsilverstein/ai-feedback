@@ -498,9 +498,8 @@ class House_Style {
 	 *                               otherwise the meta key itself.
 	 */
 	private static function get_user_rule_keys( int $user_id ): array {
-		global $wpdb;
-		$base    = is_object( $wpdb ) && isset( $wpdb->base_prefix ) && is_string( $wpdb->base_prefix ) ? $wpdb->base_prefix : '';
-		$pattern = '/^(?:' . preg_quote( $base, '/' ) . '(?:(\d+)_)?)?' . preg_quote( self::USER_META_KEY, '/' ) . '$/';
+		$base    = self::base_prefix();
+		$pattern = self::user_meta_key_pattern();
 
 		$keys = array();
 		$meta = get_user_meta( $user_id );
@@ -514,6 +513,29 @@ class House_Style {
 			$keys[ $key ] = '' !== $name ? $name : $key;
 		}
 		return $keys;
+	}
+
+	/**
+	 * Pattern matching every user meta key that holds personal rules: one
+	 * per site, `{base prefix}{site ID}_` then USER_META_KEY (no site ID for
+	 * the main site), plus the unprefixed key used before rules were per
+	 * site. Anchored, so other plugins' look-alike keys never match. The
+	 * site ID, when there is one, is the first group.
+	 *
+	 * @return string Regular expression.
+	 */
+	public static function user_meta_key_pattern(): string {
+		return '/^(?:' . preg_quote( self::base_prefix(), '/' ) . '(?:(\d+)_)?)?' . preg_quote( self::USER_META_KEY, '/' ) . '$/';
+	}
+
+	/**
+	 * The network's base table prefix.
+	 *
+	 * @return string Prefix, or an empty string without a database object.
+	 */
+	private static function base_prefix(): string {
+		global $wpdb;
+		return is_object( $wpdb ) && isset( $wpdb->base_prefix ) && is_string( $wpdb->base_prefix ) ? $wpdb->base_prefix : '';
 	}
 
 	/**
