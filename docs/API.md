@@ -240,7 +240,7 @@ X-WP-Nonce: {nonce}
 
 ### GET /replies
 
-List the replies under every AI Feedback note in a post, oldest first, in one request. The sidebar uses this to show each conversation.
+List the replies under every AI Feedback note in a post, oldest first, in one request, and the threads a person started in which someone asked Fresh Eyes with an `@fresh-eyes` mention (see [Mentions](#mentions)). The sidebar uses this to show each conversation.
 
 #### Request
 
@@ -277,6 +277,17 @@ The current user must be able to edit the post.
 ```
 
 `threads` is keyed by the AI note's ID. `content` is plain text. `pending_reply_id` is the newest user reply still waiting on the AI, or null.
+
+A thread a person started is listed once a note in it mentions Fresh Eyes. It is keyed by its opening note's ID and adds `is_mention: true` and `root`, the opening note as `{ id, author, content }` with `content` as plain text cut to 300 characters. Its `pending_reply_id` can be the opening note itself, and only a note that asked Fresh Eyes counts as waiting, so a later note without a mention does not clear it.
+
+```json
+"501": {
+  "is_mention": true,
+  "root": { "id": 501, "author": "Jane", "content": "@fresh-eyes simplify this" },
+  "replies": [],
+  "pending_reply_id": 501
+}
+```
 
 `edit` is the change an AI reply proposes for the note's block, or null. The AI only proposes one when the user's reply asks for a change. It is one of:
 
@@ -360,6 +371,7 @@ Content-Type: application/json
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `retry` | boolean | Also answer a `failed` reply, or take over a claim older than 90 seconds from a request that died. Default `false` |
+| `content` | string | The editor's post content, at most 1,000,000 characters. Only read for a note that mentions Fresh Eyes: the Notes UI links a new note to its block in the editor before the post is saved, so the block is looked up here first and in the saved post after that. Default `''` |
 
 A retry within 10 seconds of the last attempt is ignored, since each attempt is a paid AI request. The response then stays `failed` and `retry_after` says how long to wait.
 
@@ -1091,6 +1103,27 @@ add_action( 'ai_feedback_note_resolved', function( int $note_id, int $post_id ):
 }, 10, 2 );
 ```
 
+#### `ai_feedback_after_mention`
+
+Fires after Fresh Eyes answers a note that mentions it. Usage analytics count these as questions answered.
+
+```php
+add_action( 'ai_feedback_after_mention', function( int $post_id, array $answer ): void {
+    // $answer: user_id (who asked), model, note_id (the answer).
+}, 10, 2 );
+```
+
+#### `ai_feedback_mention_handles` (filter)
+
+Filters the names that mention Fresh Eyes, as words separated by spaces. Each matches with the words joined by a hyphen, an underscore, a space or nothing. Default `fresh eyes` plus the translated plugin name.
+
+```php
+add_filter( 'ai_feedback_mention_handles', function( array $handles ): array {
+    $handles[] = 'editor bot';
+    return $handles;
+} );
+```
+
 #### `ai_feedback_reply_received`
 
 Fires when a user replies to a note.
@@ -1236,3 +1269,19 @@ X-RateLimit-Reset: 1701874200
 - Reply to feedback notes
 - Abilities API integration
 - Support for multiple AI providers
+
+---
+
+## Mentions
+
+Typing `@fresh-eyes` in a note asks Fresh Eyes about the text or blocks the note is on, in a thread a person started. In a thread Fresh Eyes started, every reply is answered, as before.
+
+- **Who is answered:** a note whose own text mentions `@fresh-eyes` (also `@FreshEyes`, `@fresh_eyes` or `@Fresh Eyes`), whether it starts a thread or replies in one, when its author could run a review of the post (`edit_posts` and `edit_post`). Only the note's text is read, at most 5,000 characters: classes, IDs and attributes never count, and a mention inside `blockquote`, `q`, `code` or `pre` is quoted, not asked. Notes by Fresh Eyes never trigger an answer, and a note is only looked at when it is inserted, so editing it does not ask again.
+- **What the AI sees:** the note's block (the first one, for a note shared by several blocks), the text the note is anchored to when it was added to a text selection (Gutenberg's `<mark class="wp-note" data-id="N">` marker), up to five blocks on each side, and the thread. Other people's notes are context only, and the prompt says to ignore instructions in them.
+- **Changes:** a request for a change gets one of the usual reply edits, which the editor offers as a Gutenberg suggestion with Suggestion Mode on, or with Preview and Apply in the sidebar's **Ask Fresh Eyes** panel. Nothing is applied on its own. With a selection, the prompt asks for a `replace_text` edit scoped to it.
+- **Sources:** answers are written without web search. A request to research or link to sources is declined, and any web address in the answer that the post, the thread and the request do not already hold is replaced with "[link removed]"; an edit that would add one is dropped.
+- **Limits:** each answer counts against the hourly review limit of the person who asked, and is refunded when the AI request fails. Answers are counted as "Questions answered" in usage analytics.
+- **Timing:** the editor answers a mention right away through [`POST /replies/{id}/process`](#post-repliesidprocess), sending its unsaved content. WP-Cron answers it after 60 seconds if no editor did, from the saved post.
+- **Notifications:** the typed handle is plain text, not a mention chip, so WordPress sends no mention email for it, and Fresh Eyes' answer is saved without going through the REST API, so it sends none either.
+
+Fresh Eyes is not a WordPress user, so the Notes `@` completer (WordPress 7.1+) does not suggest it as you type.
