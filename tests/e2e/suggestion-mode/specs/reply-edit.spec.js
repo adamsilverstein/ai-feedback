@@ -103,7 +103,7 @@ test.describe('Reply edits as suggestions', () => {
 		});
 	});
 
-	// FIXME: the suggestion sits on the AI reply, and Gutenberg's Notes
+	// FIXME (#328): the suggestion sits on the AI reply, and Gutenberg's Notes
 	// sidebar only links a thread's root note to its block. The reply's
 	// Accept button is disabled ("Target block has been deleted.").
 	test.fixme('Accept applies a reply edit suggestion', async ({
@@ -130,7 +130,7 @@ test.describe('Reply edits as suggestions', () => {
 			.toBe('applied');
 	});
 
-	// FIXME: same cause as Accept above. Reject saves `rejected-unsaved` on
+	// FIXME (#328): same cause as Accept above. Reject saves `rejected-unsaved` on
 	// the reply but has no block to take the markers out of, so the
 	// suggested text stays in the post.
 	test.fixme('Reject leaves the text as it was', async ({
@@ -208,7 +208,7 @@ test.describe('Reply edits as suggestions', () => {
 		await reviseChange({ page, editor, admin, requestUtils, aiFeedback });
 	});
 
-	// FIXME: Gutenberg finalizes `rejected-unsaved` on save only for root
+	// FIXME (#328): Gutenberg finalizes `rejected-unsaved` on save only for root
 	// notes (its reconciler queries `parent => 0`), and the retired
 	// suggestion is on a reply, so it stays `rejected-unsaved` for good.
 	test.fixme('saving makes the retirement final', async ({
