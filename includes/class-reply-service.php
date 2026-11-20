@@ -644,8 +644,14 @@ class Reply_Service {
 			);
 		} while ( $count > 0 && ++$passes < 20 );
 
-		// Put back the other marks, which may hold one another.
-		while ( preg_match( '#\x00(\d+)\x00#', $html ) ) {
+		// Put back the other marks, which may hold one another. A kept mark
+		// only holds placeholders for marks inside it, so one pass per kept
+		// mark is always enough; the bound guards against anything else.
+		$limit = count( $kept ) + 1;
+		for ( $pass = 0; $pass < $limit; $pass++ ) {
+			if ( ! str_contains( $html, "\x00" ) ) {
+				break;
+			}
 			$html = (string) preg_replace_callback(
 				'#\x00(\d+)\x00#',
 				static fn ( array $matches ): string => $kept[ (int) $matches[1] ] ?? '',

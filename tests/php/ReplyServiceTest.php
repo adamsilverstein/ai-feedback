@@ -1114,6 +1114,10 @@ class ReplyServiceTest extends TestCase {
 				'<p>A <mark class="wp-suggestion-del">b</p>',
 				'<p>A <mark class="wp-suggestion-del">b</p>',
 			),
+			'NUL bytes in a kept mark' => array(
+				"<p>A <mark>\x000\x00</mark><mark class=\"wp-suggestion-add\">x</mark></p>",
+				'<p>A <mark>0</mark></p>',
+			),
 			'no markers'               => array(
 				'<p>A <mark>b</mark></p>',
 				'<p>A <mark>b</mark></p>',
