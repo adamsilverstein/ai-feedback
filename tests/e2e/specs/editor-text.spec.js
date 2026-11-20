@@ -26,6 +26,7 @@ test.describe('Editor text fixture', () => {
 					className: format.className,
 					attributes: Object.values(format.attributes || {}),
 					contentEditable: format.contentEditable !== false,
+					object: !!format.object,
 					// Rich text reads these as plain text.
 					asText:
 						!!format.__experimentalCreatePrepareEditableTree &&
@@ -33,12 +34,24 @@ test.describe('Editor text fixture', () => {
 				}))
 		);
 
-		// Other formats may come and go; the ones listed must match.
+		// The listed formats must read as the server reads them.
 		expect(
-			EDITOR_TEXT.formats.map(({ name }) =>
-				live.find((format) => format.name === name)
-			)
+			EDITOR_TEXT.formats.map(({ name }) => {
+				const { object, ...format } =
+					live.find((item) => item.name === name) || {};
+				return format;
+			})
 		).toEqual(EDITOR_TEXT.formats);
+
+		// A non-editable or object format the list lacks, like one core adds
+		// later, reads as U+FFFC in the editor but as text on the server.
+		const listed = EDITOR_TEXT.formats.map(({ name }) => name);
+		expect(
+			live
+				.filter((format) => !format.contentEditable || format.object)
+				.map(({ name }) => name)
+				.filter((name) => !listed.includes(name))
+		).toEqual([]);
 	});
 
 	test('reads each case as the fixture says', async ({ page }) => {
