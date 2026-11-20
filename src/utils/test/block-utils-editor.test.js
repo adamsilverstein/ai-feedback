@@ -18,7 +18,12 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 /**
  * Internal dependencies
  */
-import { extractBlockData, hasTextContent } from '../block-utils';
+import {
+	extractBlockData,
+	extractTextContent,
+	getBlockAnchor,
+	hasTextContent,
+} from '../block-utils';
 
 beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/paragraph')) {
@@ -78,7 +83,7 @@ describe('extractBlockData on editor blocks', () => {
 
 	it('does not repeat inner blocks’ text on their parent', () => {
 		const parsed = parse(
-			'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Parsed inner.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
+			'<!-- wp:group --><div><!-- wp:paragraph --><p>Parsed inner.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
 		);
 		const created = createBlock('core/group', {}, [
 			createBlock('core/paragraph', { content: 'New inner.' }),
@@ -99,7 +104,7 @@ describe('extractBlockData on editor blocks', () => {
 	it('keeps the saved text of a block that failed validation', () => {
 		const [block] = loadEditor(
 			parse(
-				'<!-- wp:heading --><h2 class="wp-block-heading">Kept</h2><p>as saved.</p><!-- /wp:heading -->'
+				'<!-- wp:heading --><h2>Kept</h2><p>as saved.</p><!-- /wp:heading -->'
 			)
 		)
 			.select(blockEditorStore)
@@ -111,7 +116,7 @@ describe('extractBlockData on editor blocks', () => {
 
 	it('finds text that is only in inner blocks', () => {
 		const parsed = parse(
-			'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Inner only.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
+			'<!-- wp:group --><div><!-- wp:paragraph --><p>Inner only.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
 		);
 		const created = createBlock('core/group', {}, [
 			createBlock('core/paragraph', { content: 'Inner only.' }),
@@ -119,5 +124,64 @@ describe('extractBlockData on editor blocks', () => {
 
 		expect(hasTextContent(parsed)).toBe(true);
 		expect(hasTextContent([created])).toBe(true);
+	});
+});
+
+describe('anchors of loaded blocks', () => {
+	/**
+	 * Anchors as reviews made them before blocks were read as edited: from
+	 * the markup each block was parsed from.
+	 *
+	 * @param {Array} blocks Blocks.
+	 * @return {Object} Anchor by client ID, for blocks with text.
+	 */
+	function loadedAnchors(blocks) {
+		const anchors = {};
+		for (const block of blocks) {
+			const text = extractTextContent(block.originalContent).trim();
+			if (text) {
+				anchors[block.clientId] = getBlockAnchor(block.name, text);
+			}
+			Object.assign(anchors, loadedAnchors(block.innerBlocks));
+		}
+		return anchors;
+	}
+
+	it('are unchanged for unedited blocks, so earlier notes still relink', () => {
+		const blocks = parse(
+			[
+				'<!-- wp:paragraph --><p>Plain, <strong>bold</strong> and <a href="https://example.com">linked</a> &amp; escaped.</p><!-- /wp:paragraph -->',
+				'<!-- wp:paragraph --><p>Two<br>lines.</p><!-- /wp:paragraph -->',
+				'<!-- wp:heading {"level":3} --><h3>A heading</h3><!-- /wp:heading -->',
+				'<!-- wp:list --><ul><!-- wp:list-item --><li>One</li><!-- /wp:list-item --><!-- wp:list-item --><li>Two</li><!-- /wp:list-item --></ul><!-- /wp:list -->',
+				'<!-- wp:quote --><blockquote><!-- wp:paragraph --><p>Quoted.</p><!-- /wp:paragraph --><cite>Someone</cite></blockquote><!-- /wp:quote -->',
+				'<!-- wp:group --><div><!-- wp:paragraph --><p>In a group.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+				'<!-- wp:preformatted --><pre>Line one\nLine  two</pre><!-- /wp:preformatted -->',
+				'<!-- wp:code --><pre><code>if ( a &lt; b ) {}</code></pre><!-- /wp:code -->',
+			].join('\n\n')
+		);
+		const blockList = loadEditor(blocks)
+			.select(blockEditorStore)
+			.getBlocks();
+
+		const anchors = Object.fromEntries(
+			extractBlockData(blockList).map(({ clientId, anchor }) => [
+				clientId,
+				anchor,
+			])
+		);
+
+		// Valid blocks, so the new anchors come from their save output. The
+		// markup has no generated `wp-block-*` classes, as the hook adding
+		// them is not loaded here.
+		const flat = (list) =>
+			list.flatMap((block) => [block, ...flat(block.innerBlocks)]);
+		expect(flat(blockList).every(({ isValid }) => isValid)).toBe(true);
+		expect(Object.keys(anchors)).toHaveLength(10);
+		expect(anchors).toEqual(loadedAnchors(blockList));
+		// Parents with only inner blocks had no text of their own and still
+		// have none, so they are not sent and have no anchor.
+		const group = blockList.find(({ name }) => name === 'core/group');
+		expect(anchors[group.clientId]).toBeUndefined();
 	});
 });
