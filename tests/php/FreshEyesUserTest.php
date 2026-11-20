@@ -112,6 +112,30 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
 	}
 
+	public function test_reactivation_strips_what_the_account_picked_up_while_inactive(): void {
+		$id = $this->create_user();
+		// Changed while the plugin was inactive, with no hooks guarding it.
+		$GLOBALS['test_user_meta'][ $id ]['wp_capabilities'] = array( 'administrator' => true );
+		$GLOBALS['test_user_objects'][ $id ]->user_email    = 'someone@example.com';
+		Fresh_Eyes_User::reset_cache();
+
+		$this->assertSame( $id, Fresh_Eyes_User::ensure() );
+
+		$this->assertSame( array(), $GLOBALS['test_user_meta'][ $id ]['wp_capabilities'] );
+		$this->assertSame( '', $GLOBALS['test_user_objects'][ $id ]->user_email );
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+	}
+
+	public function test_an_adopted_account_is_stripped_too(): void {
+		$this->add_person( 9, 'fresh-eyes' );
+		$GLOBALS['test_user_meta'][9][ Fresh_Eyes_User::MARKER_META ] = '1';
+
+		$this->assertSame( 9, Fresh_Eyes_User::ensure() );
+
+		$this->assertSame( array(), $GLOBALS['test_user_meta'][9]['wp_capabilities'] );
+		$this->assertSame( '', $GLOBALS['test_user_objects'][9]->user_email );
+	}
+
 	public function test_a_taken_login_is_left_alone_and_another_is_picked(): void {
 		$this->add_person( 5, 'fresh-eyes' );
 		$this->add_person( 6, 'fresh-eyes-2' );

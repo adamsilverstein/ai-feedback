@@ -216,6 +216,8 @@ class Fresh_Eyes_User {
 
 		$id = self::get_id();
 		if ( $id > 0 && self::is_ours( $id ) ) {
+			// Undo anything it picked up while the plugin was inactive and not guarding it.
+			self::enforce( $id );
 			return $id;
 		}
 
@@ -236,6 +238,7 @@ class Fresh_Eyes_User {
 
 			update_network_option( null, self::OPTION, $user_id );
 			self::$id = $user_id;
+			self::enforce( $user_id );
 			return $user_id;
 		} finally {
 			self::release_lock();
