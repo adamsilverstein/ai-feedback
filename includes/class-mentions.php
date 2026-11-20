@@ -389,7 +389,7 @@ class Mentions {
 		preg_match_all( '#<[a-zA-Z][a-zA-Z0-9:-]*((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#', $html, $tags );
 		foreach ( $tags[1] as $attributes ) {
 			preg_match_all(
-				'#(?:^|[\s/])(' . self::LINK_ATTRIBUTES . ')\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i',
+				'#(?:^|[\s/"\'])(' . self::LINK_ATTRIBUTES . ')\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i',
 				$attributes,
 				$found,
 				PREG_SET_ORDER

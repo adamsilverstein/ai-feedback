@@ -258,6 +258,8 @@ class MentionsTest extends TestCase {
 			'unquoted'                  => array( '<a href=//evil.example/x>this</a>' ),
 			'single quotes'             => array( "<a href='//evil.example/x'>this</a>" ),
 			'slash before attribute'    => array( '<a/href="//evil.example/x">this</a>' ),
+			'after a double quote'      => array( '<a title="x"href="//evil.example/x">this</a>' ),
+			'after a single quote'      => array( "<a title='x'href='//evil.example/x'>this</a>" ),
 			'uppercase attribute'       => array( '<a HREF="//evil.example/x">this</a>' ),
 			'relative path'             => array( '<a href="/wp-admin/x">this</a>' ),
 			'script scheme'             => array( '<a href="javascript:alert(1)">this</a>' ),
