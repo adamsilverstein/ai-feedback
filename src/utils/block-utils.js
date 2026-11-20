@@ -136,6 +136,14 @@ export function extractBlockData(blocks, parent = '') {
 }
 
 /**
+ * Whether each block, inner blocks included, has text, by block object.
+ *
+ * The editor replaces a block's object, and its parents', only when it
+ * changes, so typing in one block re-reads just that block and its parents.
+ */
+const hasTextCache = new WeakMap();
+
+/**
  * Check if blocks array contains any text content.
  *
  * @param {Array} blocks Array of blocks from the editor.
@@ -146,9 +154,14 @@ export function hasTextContent(blocks) {
 		if (!block.name) {
 			return false;
 		}
-		const text = extractTextContent(getOwnHTML(block));
-		return (
-			text.trim().length > 0 || hasTextContent(block.innerBlocks ?? [])
-		);
+		if (!hasTextCache.has(block)) {
+			const text = extractTextContent(getOwnHTML(block));
+			hasTextCache.set(
+				block,
+				text.trim().length > 0 ||
+					hasTextContent(block.innerBlocks ?? [])
+			);
+		}
+		return hasTextCache.get(block);
 	});
 }
