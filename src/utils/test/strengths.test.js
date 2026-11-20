@@ -12,13 +12,22 @@ const blocks = [];
 
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 vi.mock('@wordpress/blocks', () => ({ serialize: () => '' }));
-vi.mock('@wordpress/data', async (importOriginal) => ({
-	...(await importOriginal()),
-	select: () => ({
-		getBlock: (id) => blocks.find((block) => block.clientId === id),
-		getBlocks: () => blocks,
-	}),
-}));
+// Only the block editor is faked; rich-text, used to read block text,
+// keeps the real registry.
+vi.mock('@wordpress/data', async (importOriginal) => {
+	const actual = await importOriginal();
+	return {
+		...actual,
+		select: (store) =>
+			store === 'core/block-editor'
+				? {
+						getBlock: (id) =>
+							blocks.find((block) => block.clientId === id),
+						getBlocks: () => blocks,
+					}
+				: actual.select(store),
+	};
+});
 
 import {
 	MAX_STRENGTHS,
