@@ -72,6 +72,49 @@ class ResponseParserReplyTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for responses whose JSON needs more than one try.
+	 *
+	 * @return array<string, array{0: string, 1: string|null}>
+	 */
+	public static function messy_json_provider(): array {
+		return array(
+			'two objects'            => array( '{"reply": "First.", "edit": null} {"note": "extra"}', 'First.' ),
+			'trailing brace in text' => array( "{\"reply\": \"Done.\", \"edit\": null}\nUse {braces} carefully }", 'Done.' ),
+			'truncated object'       => array( '{"reply": "Le caf\u00e9 \"bio\" est pr\u00eat.", "edit": {"type": "replace_text", "find"', 'Le café "bio" est prêt.' ),
+			'broken without reply'   => array( '{"edit": {"type": ', null ),
+			'broken fence'           => array( "```json\n{\"reply\": \n```", null ),
+		);
+	}
+
+	/**
+	 * JSON that doesn't decode in one piece still gives the reply text, and
+	 * never posts the raw object.
+	 *
+	 * @dataProvider messy_json_provider
+	 *
+	 * @param string      $response Raw AI response.
+	 * @param string|null $expected Expected reply, or null for no reply.
+	 */
+	public function test_messy_json_never_posts_raw_json( string $response, ?string $expected ): void {
+		$parsed = $this->parser->parse_reply( $response, self::BLOCK, true );
+
+		$this->assertSame( $expected, null === $parsed ? null : $parsed['reply'] );
+		if ( null !== $parsed ) {
+			$this->assertNull( $parsed['edit'] );
+		}
+	}
+
+	/**
+	 * Prose that mentions braces is still prose.
+	 */
+	public function test_prose_with_braces_is_prose(): void {
+		$this->assertSame(
+			'Wrap the variable in {curly braces}.',
+			$this->parser->parse_reply( 'Wrap the variable in {curly braces}.', self::BLOCK, true )['reply'] ?? null
+		);
+	}
+
+	/**
 	 * A valid edit without reply text gets a default reply.
 	 */
 	public function test_edit_without_reply_text_gets_default_reply(): void {

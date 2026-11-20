@@ -577,8 +577,9 @@ class Response_Parser {
 		$data = $this->decode_reply_json( $response );
 
 		if ( null === $data ) {
+			// Broken JSON is not prose; posting it would show the raw object.
 			$reply = trim( $response );
-			return '' === $reply ? null : array(
+			return '' === $reply || self::looks_like_json( $reply ) ? null : array(
 				'reply' => $reply,
 				'edit'  => null,
 			);
@@ -603,20 +604,52 @@ class Response_Parser {
 	/**
 	 * Decode a reply's JSON object, allowing a code fence or text around it.
 	 *
+	 * Tries the whole response, then a fenced block, then the first `{` to
+	 * the last `}`. When none decodes, for example with two objects or a
+	 * truncated one, the `reply` string is read on its own if it can be, so
+	 * the raw JSON is never shown to the author.
+	 *
 	 * @param  string $response Raw AI response.
 	 * @return array<mixed>|null Decoded object with a `reply` or `edit` key, or null.
 	 */
 	private function decode_reply_json( string $response ): ?array {
-		if ( ! preg_match( '/\{.*\}/s', $response, $matches ) ) {
-			return null;
+		$response   = trim( $response );
+		$candidates = array( $response );
+		if ( preg_match( '/```(?:json)?\s*(.*?)```/s', $response, $fenced ) ) {
+			$candidates[] = trim( $fenced[1] );
+		}
+		$start = strpos( $response, '{' );
+		$end   = strrpos( $response, '}' );
+		if ( false !== $start && false !== $end && $end > $start ) {
+			$candidates[] = substr( $response, $start, $end - $start + 1 );
 		}
 
-		$data = json_decode( $matches[0], true );
-		if ( ! is_array( $data ) || ( ! array_key_exists( 'reply', $data ) && ! array_key_exists( 'edit', $data ) ) ) {
-			return null;
+		foreach ( $candidates as $candidate ) {
+			$data = json_decode( $candidate, true );
+			if ( is_array( $data ) && ( array_key_exists( 'reply', $data ) || array_key_exists( 'edit', $data ) ) ) {
+				return $data;
+			}
 		}
 
-		return $data;
+		if ( preg_match( '/"reply"\s*:\s*("(?:[^"\\\\]|\\\\.)*")/s', $response, $reply ) ) {
+			$text = json_decode( $reply[1] );
+			if ( is_string( $text ) ) {
+				return array( 'reply' => $text );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a response that did not decode was meant to be JSON.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return bool
+	 */
+	private static function looks_like_json( string $response ): bool {
+		$response = ltrim( $response );
+		return str_starts_with( $response, '{' ) || str_starts_with( $response, '```' );
 	}
 
 	/**
