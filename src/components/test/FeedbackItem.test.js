@@ -8,6 +8,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from '@testing-library/react';
 
 /**
@@ -44,6 +45,9 @@ function renderItem(
 		updateBlockAttributes = vi.fn(),
 		blockType = { attributes: { content: { type: 'rich-text' } } },
 		notes = null,
+		thread = undefined,
+		saveEntityRecord = vi.fn(),
+		setFixApplied = vi.fn(),
 	} = {}
 ) {
 	const registry = createRegistry();
@@ -54,6 +58,12 @@ function renderItem(
 	});
 	registry.registerStore('core', {
 		reducer: (state = notes) => state,
+		actions: {
+			saveEntityRecord: (...args) => {
+				saveEntityRecord(...args);
+				return { type: 'NOOP' };
+			},
+		},
 		selectors: { getEntityRecords: (state) => state },
 	});
 	registry.registerStore('ai-feedback/store', {
@@ -63,7 +73,10 @@ function renderItem(
 				setNoteResolved(...args);
 				return { type: 'NOOP' };
 			},
-			setFixApplied: () => ({ type: 'NOOP' }),
+			setFixApplied: (...args) => {
+				setFixApplied(...args);
+				return { type: 'NOOP' };
+			},
 		},
 		selectors: {
 			isFixApplied: (state, noteId) => !!appliedFixes[noteId],
@@ -107,7 +120,7 @@ function renderItem(
 
 	render(
 		<RegistryProvider value={registry}>
-			<FeedbackItem item={{ ...item, ...props }} />
+			<FeedbackItem item={{ ...item, ...props }} thread={thread} />
 		</RegistryProvider>
 	);
 
@@ -431,5 +444,227 @@ describe('FeedbackItem quick fixes', () => {
 		expect(
 			screen.getByText('You accepted this suggested edit.')
 		).toBeInTheDocument();
+	});
+});
+
+describe('FeedbackItem Make this change', () => {
+	it('replies for the author on a note with a suggestion', async () => {
+		const saveEntityRecord = vi.fn();
+		renderItem({}, vi.fn(), { saveEntityRecord });
+
+		await act(async () => {
+			fireEvent.click(
+				screen.getByRole('button', { name: 'Make this change' })
+			);
+		});
+
+		expect(saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			{
+				post: 1,
+				parent: 7,
+				type: 'note',
+				status: 'hold',
+				content: 'Please make this change.',
+			},
+			{ throwOnError: true }
+		);
+	});
+
+	it.each([
+		[
+			'the note has a quick fix',
+			{ quick_fix: { find: 'a', replace: 'b' } },
+			undefined,
+		],
+		['the note has no suggestion', { suggestion: '' }, undefined],
+		['the note is dismissed', { is_resolved: true }, undefined],
+		[
+			'a reply is waiting on the AI',
+			{},
+			{ replies: [], pending_reply_id: 9 },
+		],
+		[
+			'an AI reply already proposed an edit',
+			{},
+			{
+				replies: [
+					{
+						id: 9,
+						is_ai: true,
+						content: 'Done.',
+						edit: { type: 'replace_text', find: 'a', replace: 'b' },
+					},
+				],
+				pending_reply_id: null,
+			},
+		],
+	])('is hidden when %s', (_label, props, thread) => {
+		renderItem(props, vi.fn(), { thread });
+
+		expect(
+			screen.queryByRole('button', { name: 'Make this change' })
+		).not.toBeInTheDocument();
+	});
+});
+
+describe('FeedbackItem reply edits', () => {
+	const blocks = {
+		'block-1': {
+			name: 'core/paragraph',
+			attributes: { content: 'Revenue grew 40% last year.' },
+		},
+	};
+	const replyWith = (edit) => ({
+		replies: [
+			{ id: 8, is_ai: false, author: 'Jane', content: 'Do it.' },
+			{
+				id: 9,
+				is_ai: true,
+				author: 'Fresh Eyes',
+				content: 'Done.',
+				edit,
+			},
+		],
+		pending_reply_id: null,
+	});
+	const textEdit = {
+		type: 'replace_text',
+		find: 'last year',
+		replace: 'in 2025',
+	};
+	const rewrite = {
+		type: 'rewrite_block',
+		content: 'Revenue grew <strong>40%</strong> in 2025.',
+		original: 'Revenue grew 40% last year.',
+	};
+
+	it('applies a text edit from a reply in one update', async () => {
+		const updateBlockAttributes = vi.fn();
+		const setNoteResolved = vi.fn();
+		const setFixApplied = vi.fn();
+		const registry = renderItem({}, setNoteResolved, {
+			blocks,
+			updateBlockAttributes,
+			setFixApplied,
+			thread: replyWith(textEdit),
+		});
+
+		expect(
+			screen.getByText('Replace “last year” with “in 2025”')
+		).toBeInTheDocument();
+
+		await act(async () => {
+			fireEvent.click(
+				screen.getByRole('button', { name: 'Apply change' })
+			);
+		});
+
+		expect(updateBlockAttributes).toHaveBeenCalledTimes(1);
+		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'Revenue grew 40% in 2025.',
+		});
+		expect(setNoteResolved).toHaveBeenCalledWith(7, true);
+		expect(setFixApplied).toHaveBeenCalledWith(7, true);
+		expect(setFixApplied).toHaveBeenCalledWith(9, true);
+		expect(
+			registry
+				.select(noticesStore)
+				.getNotices()
+				.some(({ content }) => content === 'Change applied.')
+		).toBe(true);
+	});
+
+	it('previews a rewrite as a word diff and applies it', async () => {
+		const updateBlockAttributes = vi.fn();
+		renderItem({}, vi.fn(), {
+			blocks,
+			updateBlockAttributes,
+			thread: replyWith(rewrite),
+		});
+
+		expect(screen.getByText('Rewrite this block')).toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+		const dialog = screen.getByRole('dialog', { name: 'Preview change' });
+		const removed = Array.from(dialog.querySelectorAll('del')).map(
+			(node) => node.textContent
+		);
+		const added = Array.from(dialog.querySelectorAll('ins')).map(
+			(node) => node.textContent
+		);
+		// Bolding "40%" changes it too; changes split by a space read as one.
+		expect(removed).toEqual(['40% last year']);
+		expect(added).toEqual(['40% in 2025']);
+		expect(
+			dialog.querySelector('.ai-feedback-quick-fix-diff')
+		).toHaveTextContent('Revenue grew 40% last year40% in 2025.');
+
+		await act(async () => {
+			fireEvent.click(
+				within(dialog).getByRole('button', { name: 'Apply change' })
+			);
+		});
+		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: rewrite.content,
+		});
+	});
+
+	it('marks a rewrite outdated once the block text changed', () => {
+		renderItem({}, vi.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: { content: 'Revenue grew 45% last year.' },
+				},
+			},
+			thread: replyWith(rewrite),
+		});
+
+		expect(
+			screen.getByRole('button', { name: 'Apply change' })
+		).toHaveAttribute('aria-disabled', 'true');
+		expect(screen.getByText(/This change is outdated/)).toBeInTheDocument();
+	});
+
+	it('shows an applied reply edit as applied', () => {
+		renderItem({}, vi.fn(), {
+			blocks,
+			appliedFixes: { 9: true },
+			thread: replyWith(textEdit),
+		});
+
+		expect(
+			screen.getByText('You applied this change.')
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply change' })
+		).not.toBeInTheDocument();
+	});
+
+	it('defers to Gutenberg once the reply edit is a suggestion', () => {
+		renderItem({}, vi.fn(), {
+			blocks,
+			thread: replyWith(textEdit),
+			notes: [
+				{
+					id: 9,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: 'pending',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.getByText(
+				'Suggested in the text. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply change' })
+		).not.toBeInTheDocument();
 	});
 });
