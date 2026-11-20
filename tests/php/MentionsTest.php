@@ -8,6 +8,7 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Fresh_Eyes_User;
 use AI_Feedback\Mentions;
 
 /**
@@ -19,8 +20,75 @@ class MentionsTest extends TestCase {
 	 * Reset filter and capability overrides.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_user_can'] );
+		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_user_can'], $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		Fresh_Eyes_User::reset_cache();
 		parent::tearDown();
+	}
+
+	/**
+	 * Read the completer chip cases shared with src/utils/test/mentions.test.js.
+	 *
+	 * @param string $key `mentions` or `others`.
+	 * @return array<int, array{string, int}>
+	 */
+	private static function chip_cases( string $key ): array {
+		$cases = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/mention-cases.json' ), true );
+		return array_map( static fn ( string $content ): array => array( $content, (int) $cases['chips']['userId'] ), $cases['chips'][ $key ] );
+	}
+
+	/**
+	 * Notes holding a completer chip for the Fresh Eyes user.
+	 *
+	 * @return array<int, array{string, int}>
+	 */
+	public static function chip_mentions(): array {
+		return self::chip_cases( 'mentions' );
+	}
+
+	/**
+	 * A completer chip for the Fresh Eyes user is a mention, whatever name it shows.
+	 *
+	 * @dataProvider chip_mentions
+	 *
+	 * @param string $content Note content.
+	 * @param int    $user_id Fresh Eyes user ID.
+	 */
+	public function test_detects_user_chip( string $content, int $user_id ): void {
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = $user_id;
+		Fresh_Eyes_User::reset_cache();
+
+		$this->assertTrue( Mentions::has_user_chip( $content ) );
+		$this->assertTrue( Mentions::mentions_fresh_eyes( $content ) );
+
+		// Without the user, the chip is only its text.
+		unset( $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		Fresh_Eyes_User::reset_cache();
+		$this->assertFalse( Mentions::has_user_chip( $content ) );
+	}
+
+	/**
+	 * Notes with a chip for someone else, or a chip that is quoted or not a chip.
+	 *
+	 * @return array<int, array{string, int}>
+	 */
+	public static function chip_others(): array {
+		return self::chip_cases( 'others' );
+	}
+
+	/**
+	 * Only the completer's chip for the Fresh Eyes user, in the note's own text, counts.
+	 *
+	 * @dataProvider chip_others
+	 *
+	 * @param string $content Note content.
+	 * @param int    $user_id Fresh Eyes user ID.
+	 */
+	public function test_ignores_other_chips( string $content, int $user_id ): void {
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = $user_id;
+		Fresh_Eyes_User::reset_cache();
+
+		$this->assertFalse( Mentions::has_user_chip( $content ) );
+		$this->assertFalse( Mentions::mentions_fresh_eyes( $content ) );
 	}
 
 	/**

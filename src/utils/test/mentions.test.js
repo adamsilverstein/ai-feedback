@@ -1,10 +1,11 @@
 /**
  * Tests for mentions.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
 	getNoteContent,
 	getNoteText,
+	hasUserChip,
 	mayAwaitAnswer,
 	mentionsFreshEyes,
 } from '../mentions';
@@ -38,6 +39,31 @@ describe('mentionsFreshEyes', () => {
 		const content = 'word '.repeat(5000) + '@fresh-eyes simplify';
 		expect(mentionsFreshEyes(content)).toBe(false);
 		expect(getNoteText(content).length).toBeLessThanOrEqual(5000);
+	});
+});
+
+describe('hasUserChip', () => {
+	afterEach(() => {
+		delete window.aiFeedbackData;
+	});
+
+	it.each(CASES.chips.mentions)(
+		'finds the Fresh Eyes chip in %s',
+		(content) => {
+			window.aiFeedbackData = { mentionUserId: CASES.chips.userId };
+			expect(hasUserChip(content)).toBe(true);
+			expect(mentionsFreshEyes(content)).toBe(true);
+		}
+	);
+
+	it.each(CASES.chips.others)('finds no Fresh Eyes chip in %s', (content) => {
+		window.aiFeedbackData = { mentionUserId: CASES.chips.userId };
+		expect(hasUserChip(content)).toBe(false);
+		expect(mentionsFreshEyes(content)).toBe(false);
+	});
+
+	it('needs the user ID from the server', () => {
+		expect(hasUserChip(CASES.chips.mentions[0])).toBe(false);
 	});
 });
 

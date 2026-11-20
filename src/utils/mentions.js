@@ -6,6 +6,8 @@
  */
 import { __ } from '@wordpress/i18n';
 
+import { getFreshEyesUserId } from './user-completer';
+
 /**
  * Handle typed after `@` in a note to ask Fresh Eyes.
  */
@@ -50,7 +52,22 @@ function getMentionPattern() {
  * @return {string} Text.
  */
 export function getNoteText(content) {
-	let html = String(content || '').slice(0, MAX_SCAN_LENGTH * 2);
+	const html = stripQuoted(String(content || '').slice(0, MAX_SCAN_LENGTH * 2));
+	const text = html
+		.replace(/<[^>]*>/g, ' ')
+		.replace(/&#64;|&commat;/gi, '@')
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&amp;/gi, '&');
+	return text.replace(/\s+/gu, ' ').trim().slice(0, MAX_SCAN_LENGTH);
+}
+
+/**
+ * Remove quoted elements from note HTML.
+ *
+ * @param {string} html Note HTML, already bounded.
+ * @return {string} HTML without quoted elements.
+ */
+function stripQuoted(html) {
 	const quoted = new RegExp(
 		`<(${QUOTED_TAGS})\\b[^>]*>(?:(?!<(?:${QUOTED_TAGS})\\b)[\\s\\S])*?</\\1\\s*>`,
 		'gi'
@@ -62,17 +79,44 @@ export function getNoteText(content) {
 		}
 		html = stripped;
 	}
-	html = html.replace(
+	return html.replace(
 		new RegExp(`<(?:${QUOTED_TAGS})\\b[\\s\\S]*$`, 'i'),
 		' '
 	);
+}
 
-	const text = html
-		.replace(/<[^>]*>/g, ' ')
-		.replace(/&#64;|&commat;/gi, '@')
-		.replace(/&nbsp;/gi, ' ')
-		.replace(/&amp;/gi, '&');
-	return text.replace(/\s+/gu, ' ').trim().slice(0, MAX_SCAN_LENGTH);
+/**
+ * Whether note content holds a Notes `@` completer chip for the Fresh Eyes
+ * user, `<span class="wp-note-mention user-N">`, outside quoted text.
+ *
+ * @param {string} content Note HTML.
+ * @return {boolean} True when the note picked Fresh Eyes from the completer.
+ */
+export function hasUserChip(content) {
+	const userId = getFreshEyesUserId();
+	const html = String(content || '');
+	if (!userId || !html.includes('wp-note-mention')) {
+		return false;
+	}
+
+	const tags = stripQuoted(html.slice(0, MAX_SCAN_LENGTH * 2)).matchAll(
+		/<span\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi
+	);
+	for (const [, attributes] of tags) {
+		const match = attributes.match(
+			/(?:^|[\s/"'])class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
+		);
+		const tokens = (match?.[1] ?? match?.[2] ?? match?.[3] ?? '')
+			.trim()
+			.split(/\s+/);
+		if (
+			tokens.includes('wp-note-mention') &&
+			tokens.includes(`user-${userId}`)
+		) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**
@@ -82,6 +126,9 @@ export function getNoteText(content) {
  * @return {boolean} True when the note asks Fresh Eyes.
  */
 export function mentionsFreshEyes(content) {
+	if (hasUserChip(content)) {
+		return true;
+	}
 	const text = getNoteText(content);
 	return text.includes('@') && getMentionPattern().test(text);
 }
