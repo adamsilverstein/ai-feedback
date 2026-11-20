@@ -123,6 +123,13 @@ describe('isProofreadingItem / splitProofreading', () => {
 		]);
 		const { proofreading, others } = splitProofreading(items);
 		expect(proofreading.map((item) => item.id)).toEqual([1, 5]);
+		expect(
+			splitProofreading([
+				note(9, 'a', 'x', 'y', { block_index: 2 }),
+				note(8, 'b', 'x', 'y', { block_index: 0 }),
+				note(7, 'a', 'x', 'y', { block_index: 2 }),
+			]).proofreading.map((item) => item.id)
+		).toEqual([8, 7, 9]);
 		expect(others.map((item) => item.id)).toEqual([2, 3, 4]);
 	});
 

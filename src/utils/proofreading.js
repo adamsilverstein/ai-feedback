@@ -45,7 +45,7 @@ export function isProofreadingItem(item) {
  * Split notes into proofreading fixes and everything else.
  *
  * @param {Object[]} items Feedback notes.
- * @return {{proofreading: Object[], others: Object[]}} Notes, each list in the original order.
+ * @return {{proofreading: Object[], others: Object[]}} Proofreading notes in document order, and the rest in their original order.
  */
 export function splitProofreading(items = []) {
 	const proofreading = [];
@@ -53,6 +53,12 @@ export function splitProofreading(items = []) {
 	items.forEach((item) => {
 		(isProofreadingItem(item) ? proofreading : others).push(item);
 	});
+	// Document order, then note order, however the notes arrived.
+	const position = (item) =>
+		typeof item.block_index === 'number' ? item.block_index : Infinity;
+	proofreading.sort(
+		(a, b) => position(a) - position(b) || (a.id ?? 0) - (b.id ?? 0)
+	);
 	return { proofreading, others };
 }
 
