@@ -33,7 +33,7 @@ const FRANK = {
  *
  * @param {Object}   requestUtils Request utils.
  * @param {Object}   user         User to create.
- * @param {Function} steps        Steps, given the created user.
+ * @param {(user: Object) => Promise<void>} steps Steps, given the created user.
  */
 async function withUser(requestUtils, user, steps) {
 	const remove = async (id) =>
