@@ -717,7 +717,7 @@ class Reply_Service {
 
 		// The text as it reads without any pending suggestion, which is how
 		// the editor leaves it once a new edit supersedes that suggestion.
-		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
+		$block_html = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
 		// What an edit's `find` is matched against: the block's own text as
 		// the editor holds it, without its inner blocks, like a list item's
 		// text without its nested list.
