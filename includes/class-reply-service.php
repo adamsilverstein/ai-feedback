@@ -725,7 +725,7 @@ class Reply_Service {
 				? self::editor_text( $block_html )
 				: self::html_text( $block_html );
 		}
-		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
+		$nearby = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
 			'is_mention'        => $is_mention,
