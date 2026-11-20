@@ -374,4 +374,26 @@ class NotesThreadResolutionTest extends TestCase {
 			$this->assertSame( 0, $this->detect_at_insert( $marker ), $resolved ? 'resolve' : 'reopen' );
 		}
 	}
+
+	/**
+	 * The resolve and reopen markers keep backslashes in the author's
+	 * display name, since wp_insert_comment() unslashes it.
+	 */
+	public function test_thread_status_markers_keep_backslashes_in_author_name(): void {
+		$user                         = new \WP_User();
+		$user->ID                     = 5;
+		$user->display_name           = 'Dev C:\\path\\new "Ed"';
+		$GLOBALS['test_current_user'] = $user;
+
+		$thread = $this->add_note();
+
+		foreach ( array( true, false ) as $resolved ) {
+			$this->assertTrue( $this->manager->set_thread_resolved( $thread, $resolved ) );
+
+			$marker = get_comment( (int) array_key_last( self::global_array( 'test_comments' ) ) );
+			$this->assertInstanceOf( \WP_Comment::class, $marker );
+			$this->assertSame( 'Dev C:\\path\\new "Ed"', $marker->comment_author, $resolved ? 'resolve' : 'reopen' );
+			$this->assertSame( $resolved ? 'resolved' : 'reopen', get_comment_meta( (int) $marker->comment_ID, '_wp_note_status', true ) );
+		}
+	}
 }
