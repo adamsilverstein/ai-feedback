@@ -207,5 +207,43 @@
 			"content": "Two.&nbsp; Spaces",
 			"text": "Two.\u00a0 Spaces"
 		}
+	],
+	"_comment_targets": "Serialized blocks and the text a move keeps when it targets them: the block's own text without its inner blocks, whitespace collapsed and inline images left out. Reply_Service::target_text() and getOwnBlockTexts() in src/utils/block-action.js must agree with it.",
+	"targets": [
+		{
+			"name": "paragraph",
+			"markup": "<!-- wp:paragraph --><p>Plain <strong>text</strong> here.</p><!-- /wp:paragraph -->",
+			"text": "Plain text here."
+		},
+		{
+			"name": "paragraph with a line break",
+			"markup": "<!-- wp:paragraph --><p>Revenue grew<br>last year.</p><!-- /wp:paragraph -->",
+			"text": "Revenue grew last year."
+		},
+		{
+			"name": "quote with a citation",
+			"markup": "<!-- wp:quote --><blockquote class=\"wp-block-quote\"><!-- wp:paragraph --><p>Inner words.</p><!-- /wp:paragraph --><cite>Ada Lovelace</cite></blockquote><!-- /wp:quote -->",
+			"text": "Ada Lovelace"
+		},
+		{
+			"name": "list item with a nested list",
+			"markup": "<!-- wp:list-item --><li>Parent item<!-- wp:list --><ul class=\"wp-block-list\"><!-- wp:list-item --><li>Nested item</li><!-- /wp:list-item --></ul><!-- /wp:list --></li><!-- /wp:list-item -->",
+			"text": "Parent item"
+		},
+		{
+			"name": "details",
+			"markup": "<!-- wp:details --><details class=\"wp-block-details\"><summary>More info</summary><!-- wp:paragraph --><p>Hidden words.</p><!-- /wp:paragraph --></details><!-- /wp:details -->",
+			"text": "More info"
+		},
+		{
+			"name": "group",
+			"markup": "<!-- wp:group --><div class=\"wp-block-group\"><!-- wp:paragraph --><p>Grouped words.</p><!-- /wp:paragraph --></div><!-- /wp:group -->",
+			"text": ""
+		},
+		{
+			"name": "image with a caption",
+			"markup": "<!-- wp:image --><figure class=\"wp-block-image\"><img src=\"http://example.com/chart.png\" alt=\"\"/><figcaption class=\"wp-element-caption\">A chart</figcaption></figure><!-- /wp:image -->",
+			"text": "A chart"
+		}
 	]
 }
