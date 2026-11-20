@@ -419,6 +419,64 @@ class ResponseParserGrammarTest extends TestCase {
 	}
 
 	/**
+	 * Build a non-grammar item with a quick fix.
+	 *
+	 * @param  string $category Category.
+	 * @param  string $severity Severity.
+	 * @param  string $find     Text to find.
+	 * @param  string $replace  Replacement.
+	 * @return array<string, mixed>
+	 */
+	private static function other( string $category, string $severity, string $find, string $replace ): array {
+		return array(
+			'block_id'  => 'b1',
+			'category'  => $category,
+			'severity'  => $severity,
+			'title'     => ucfirst( $category ) . ' note',
+			'feedback'  => 'Because.',
+			'quick_fix' => array(
+				'find'    => $find,
+				'replace' => $replace,
+			),
+		);
+	}
+
+	/**
+	 * Overlapping fixes from other categories both keep their fix, as they
+	 * did before proofreading: the author picks one, and the editor shows
+	 * the other as outdated.
+	 */
+	public function test_other_categories_keep_overlapping_fixes(): void {
+		$feedback = $this->parse(
+			array(
+				self::other( 'content', 'important', 'very unique', 'unique' ),
+				self::other( 'tone', 'suggestion', 'very unique idea', 'novel idea' ),
+			),
+			array( 'b1' => 'This is a very unique idea for teh team.' )
+		);
+
+		$this->assertSame( array( 'very unique idea>novel idea', 'very unique>unique' ), self::fixes( $feedback ) );
+	}
+
+	/**
+	 * A typo listed first never takes the fix from another category's
+	 * item: the grammar item yields and is dropped.
+	 */
+	public function test_grammar_fix_yields_to_a_later_content_fix(): void {
+		$feedback = $this->parse(
+			array(
+				self::grammar( 'b1', 'idea for teh', 'idea for the' ),
+				self::other( 'content', 'critical', 'very unique idea', 'new idea' ),
+			),
+			array( 'b1' => 'This is a very unique idea for teh team.' )
+		);
+
+		$this->assertCount( 1, $feedback );
+		$this->assertSame( 'content', $this->item( $feedback, 0 )['category'] );
+		$this->assertSame( array( 'very unique idea>new idea' ), self::fixes( $feedback ) );
+	}
+
+	/**
 	 * Proofreading items count by category but not by severity.
 	 */
 	public function test_summary_leaves_grammar_out_of_severity_counts(): void {

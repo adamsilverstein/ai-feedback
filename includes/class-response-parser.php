@@ -985,24 +985,30 @@ class Response_Parser {
 	}
 
 	/**
-	 * Keep only the quick fixes on each block that can be applied together
-	 * without one changing where another applies.
+	 * Keep only the proofreading fixes on each block that can be applied
+	 * together, and beside the block's other quick fixes, without one
+	 * changing where another applies.
 	 *
-	 * Fixes are kept in review order. A later fix loses its quick fix when its
-	 * text overlaps a kept fix's text, when applying any one kept fix, or all
-	 * of them, moves its text or makes it missing or ambiguous, or the other
-	 * way round, and once a block has MAX_FIXES_PER_BLOCK fixes. Other
-	 * subsets are not checked, as their number grows exponentially: applying
-	 * some fixes one at a time can still leave another ambiguous, and the
-	 * editor then shows it as outdated rather than applying it. Accept all
-	 * locates every fix before replacing any (src/utils/proofreading.js).
+	 * Other quick fixes are never changed here: each one already appears
+	 * exactly once, and the editor checks it again before applying it, as
+	 * before proofreading existed. Grammar fixes are settled after them, in
+	 * review order, and give way to them. A grammar fix loses its quick fix
+	 * when its text overlaps another kept fix, when applying any one kept fix
+	 * moves its text or makes it missing or ambiguous (or the other way
+	 * round), when applying all the kept grammar fixes does, and once a block
+	 * has MAX_FIXES_PER_BLOCK grammar fixes. Other subsets are not checked, as
+	 * their number grows exponentially: applying some fixes one at a time can
+	 * still leave another ambiguous, and the editor then shows it as outdated
+	 * rather than applying it. Accept all locates every fix before replacing
+	 * any (src/utils/proofreading.js).
 	 *
 	 * @param  array<int, array<string, mixed>> $items      Feedback items.
 	 * @param  array<mixed>                     $block_info Map of block IDs to their info, with `content`.
-	 * @return array<int, array<string, mixed>> Items, some without their quick fix.
+	 * @return array<int, array<string, mixed>> Items, some grammar items without their quick fix.
 	 */
 	private function resolve_fix_conflicts( array $items, array $block_info ): array {
-		$kept = array();
+		$others  = array();
+		$grammar = array();
 		foreach ( $items as $index => $item ) {
 			$fix      = $item['quick_fix'] ?? null;
 			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
@@ -1014,18 +1020,31 @@ class Response_Parser {
 			$content = is_array( $info ) && is_string( $info['content'] ?? null ) ? $info['content'] : '';
 			// Byte offsets, compared only with each other; the editor works
 			// in UTF-16 units on its own copy of the text.
-			$start  = self::find_unique_offset( $fix['find'], $content );
-			$others = $kept[ $block_id ] ?? array();
+			$start = self::find_unique_offset( $fix['find'], $content );
 
-			$candidate = null === $start ? null : array(
+			$located = null === $start ? null : array(
 				'find'    => $fix['find'],
 				'replace' => $fix['replace'],
 				'start'   => $start,
 				'end'     => $start + strlen( $fix['find'] ),
 			);
 
-			if ( null === $candidate || count( $others ) >= self::MAX_FIXES_PER_BLOCK || ! self::fits_with( $candidate, $others, $content ) ) {
-				Logger::debug( 'Quick fix conflicts with another fix on its block, dropping it' );
+			if ( self::GRAMMAR_CATEGORY === ( $item['category'] ?? null ) ) {
+				$grammar[] = array( $index, $block_id, $content, $located );
+			} elseif ( null !== $located ) {
+				$others[ $block_id ][] = $located;
+			}
+		}
+
+		$kept = array();
+		foreach ( $grammar as list( $index, $block_id, $content, $candidate ) ) {
+			$block_kept = $kept[ $block_id ] ?? array();
+			if (
+				null === $candidate
+				|| count( $block_kept ) >= self::MAX_FIXES_PER_BLOCK
+				|| ! self::fits_with( $candidate, $block_kept, $others[ $block_id ] ?? array(), $content )
+			) {
+				Logger::debug( 'Grammar fix conflicts with another fix on its block, dropping it' );
 				unset( $items[ $index ]['quick_fix'] );
 				continue;
 			}
@@ -1037,15 +1056,16 @@ class Response_Parser {
 	}
 
 	/**
-	 * Whether a fix can join the fixes already kept for its block.
+	 * Whether a grammar fix can join the fixes already kept for its block.
 	 *
-	 * @param  array{find: string, replace: string, start: int, end: int}       $candidate Fix to add.
-	 * @param  list<array{find: string, replace: string, start: int, end: int}> $kept      Fixes already kept.
+	 * @param  array{find: string, replace: string, start: int, end: int}       $candidate Grammar fix to add.
+	 * @param  list<array{find: string, replace: string, start: int, end: int}> $kept      Grammar fixes already kept.
+	 * @param  list<array{find: string, replace: string, start: int, end: int}> $others    The block's other quick fixes.
 	 * @param  string                                                           $content   Block content.
 	 * @return bool
 	 */
-	private static function fits_with( array $candidate, array $kept, string $content ): bool {
-		foreach ( $kept as $other ) {
+	private static function fits_with( array $candidate, array $kept, array $others, string $content ): bool {
+		foreach ( array_merge( $others, $kept ) as $other ) {
 			if ( $candidate['start'] < $other['end'] && $other['start'] < $candidate['end'] ) {
 				return false;
 			}
@@ -1054,8 +1074,8 @@ class Response_Parser {
 			}
 		}
 
-		// Kept fixes already work with each other one at a time, so only
-		// the whole set is left to check.
+		// Kept grammar fixes already work with each other one at a time, so
+		// only the whole set Accept all applies is left to check.
 		$all = array_merge( $kept, array( $candidate ) );
 		if ( count( $all ) > 2 ) {
 			foreach ( $all as $index => $fix ) {
