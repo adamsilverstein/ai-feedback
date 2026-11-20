@@ -734,8 +734,7 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
       "strengths": [
         { "block_id": "abc123-def456", "block_name": "core/paragraph", "block_index": 0, "block_anchor": "1x2y3z", "text": "The opening example makes the problem concrete." }
       ],
-      "progress": { "addressed": 3, "still_open": 1 },
-      "open_note_ids": [456, 457, 812]
+      "progress": { "addressed": 3, "still_open": 1 }
     }
   ],
   "total": 1
@@ -746,14 +745,14 @@ The parts of a chunked review share one entry: their counts add up, their streng
 
 #### Progress
 
-Each entry keeps `open_note_ids`: the notes still open right after that review ran, its own and those left over from earlier reviews (at most 500). The next review checks those notes and stores the counts in its `progress`:
+The newest entry also keeps `open_note_ids` in post meta: the notes still open right after that review ran, its own and those left over from earlier reviews (at most 500, newest kept). The next review checks those notes, stores the counts in its `progress` and takes over the list; older entries drop it. It is left out of the REST responses. The counts:
 
 | Count | Meaning |
 |-------|---------|
 | `addressed` | Notes left open by the previous review that are now dismissed (or had their quick fix applied), whose suggested edit was accepted or rejected, or whose thread was resolved in the Notes panel. |
 | `still_open` | Notes left open by the previous review that are none of those. |
 
-Deleted notes are not counted at all. The new review's own notes are its `note_count`. Entries recorded before `open_note_ids` existed fall back to the notes the previous review created. The sidebar's "5 of 12 notes addressed" row applies the same rules to the latest review's notes, reading thread and suggestion status live from the editor.
+Deleted, trashed and spam notes are not counted at all, as the editor never loads them; the Notes panel deletes a note by trashing it. A trashed note stays on the list, so it counts again if it is restored. The cases both sides are tested against are in `tests/fixtures/addressed-cases.json`. The new review's own notes are its `note_count`. Entries recorded before `open_note_ids` existed fall back to the notes the previous review created. The sidebar's "5 of 12 notes addressed" row applies the same rules to the latest review's notes, reading thread and suggestion status live from the editor.
 
 A follow-up review adds feedback to a block's open thread as a reply. When the block's thread is resolved it starts a new thread instead, so the new feedback is not hidden in a resolved thread or counted as addressed.
 

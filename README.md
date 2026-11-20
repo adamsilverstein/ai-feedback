@@ -146,7 +146,7 @@ You can change these in the plugin sidebar within the block editor.
 ### What's Working and Progress
 
 - **What's working** lists up to three things the draft already does well. Click one to jump to its block. They stay in the sidebar rather than becoming notes, so there is nothing to resolve.
-- **5 of 12 notes addressed** counts the review's notes you have dismissed, applied, accepted or rejected, or whose thread you resolved in the Notes panel. Deleted notes drop out of the count. Once every note is addressed, the list gives way to a short done state with **Review again**; **Show feedback** brings the list back.
+- **5 of 12 notes addressed** counts the review's notes you have dismissed, applied, accepted or rejected, or whose thread you resolved in the Notes panel. Deleted notes, including ones moved to the trash, drop out of the count. Once every note is addressed, the list gives way to a short done state with **Review again**; **Show feedback** brings the list back.
 - After a follow-up review, the summary says what changed: "Since the last review: 3 addressed, 1 new, 2 still open". Review History shows the same line for each review.
 
 ### Keyboard Shortcuts

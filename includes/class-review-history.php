@@ -127,11 +127,6 @@ class Review_History {
 						'still_open' => array( 'type' => 'integer' ),
 					),
 				),
-				'open_note_ids'    => array(
-					'description' => __( 'Notes still open when this review ran, compared by the next review.', 'fresh-eyes' ),
-					'type'        => 'array',
-					'items'       => array( 'type' => 'integer' ),
-				),
 			),
 		);
 	}
@@ -180,6 +175,11 @@ class Review_History {
 				} else {
 					$entry['open_note_ids'] = Review_Progress::merge_ids( $note_ids );
 				}
+
+				// Only the newest entry's open notes are ever compared.
+				foreach ( $history as $index => $stored ) {
+					unset( $history[ $index ]['open_note_ids'] );
+				}
 				$history[] = $entry;
 			}
 			$history = array_slice( $history, -self::MAX_ENTRIES );
@@ -189,6 +189,18 @@ class Review_History {
 		} catch ( \Throwable $e ) {
 			Logger::debug( sprintf( 'Could not record review history: %s', $e->getMessage() ) );
 		}
+	}
+
+	/**
+	 * An entry as the editor sees it, without the bookkeeping for the next comparison.
+	 *
+	 * @param  array<mixed> $entry History entry.
+	 * @return array<mixed>
+	 */
+	public static function for_response( array $entry ): array {
+		unset( $entry['open_note_ids'] );
+
+		return $entry;
 	}
 
 	/**
