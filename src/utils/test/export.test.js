@@ -188,3 +188,52 @@ describe('escapeMarkdown', () => {
 		);
 	});
 });
+
+describe('strengths in exports', () => {
+	const withStrengths = {
+		...review,
+		strengths: [
+			{
+				block_id: 'b1',
+				block_name: 'core/paragraph',
+				text: '# The opening <img src=x> works',
+			},
+			{ block_id: 'b2', text: 'Clear steps.' },
+		],
+	};
+
+	it('lists them in Markdown, escaped', () => {
+		const md = generateMarkdownReport(withStrengths, 'My Post');
+		expect(md).toContain('## What’s working');
+		expect(md).toContain('- \\# The opening \\<img src=x\\> works');
+		expect(md).toContain('- Clear steps.');
+		// They are not feedback.
+		expect(md).toContain('Feedback (2 items)');
+	});
+
+	it('lists them in the plain text summary', () => {
+		const text = generatePlainTextSummary(withStrengths, 'My Post');
+		expect(text).toContain('What’s working:\n- # The opening');
+	});
+
+	it('includes them in JSON without editor-only fields', () => {
+		const data = JSON.parse(generateJSON(withStrengths, 'My Post'));
+		expect(data.strengths).toEqual([
+			{
+				text: '# The opening <img src=x> works',
+				block_name: 'core/paragraph',
+			},
+			{ text: 'Clear steps.', block_name: '' },
+		]);
+		expect(data.feedback).toHaveLength(2);
+	});
+
+	it('leaves the section out when there are none', () => {
+		expect(generateMarkdownReport(review, 'My Post')).not.toContain(
+			'What’s working'
+		);
+		expect(JSON.parse(generateJSON(review, 'My Post')).strengths).toEqual(
+			[]
+		);
+	});
+});

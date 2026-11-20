@@ -85,6 +85,8 @@ export function toHistoryEntry(review) {
 			by_severity: review.summary?.by_severity || {},
 			by_category: review.summary?.by_category || {},
 		},
+		strengths: review.strengths || [],
+		progress: review.progress ?? null,
 	};
 }
 

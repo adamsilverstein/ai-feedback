@@ -17,6 +17,8 @@ import {
 	formatNoteCount,
 	getReviewISODate,
 } from '../utils/review-history';
+import { describeComparison } from '../utils/progress';
+import { getStrengths } from '../utils/strengths';
 
 const SEVERITIES = ['critical', 'important', 'suggestion'];
 
@@ -72,6 +74,7 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 
 	const notes = review?.notes || [];
 	const severities = formatSeverities(entry.summary?.by_severity);
+	const strengths = getStrengths(entry.strengths);
 
 	return (
 		<Modal
@@ -95,6 +98,24 @@ function HistoryReviewModal({ postId, entry, onClose }) {
 						<ModelName id={entry.model} />
 					</em>
 				</p>
+			)}
+
+			{strengths.length > 0 && (
+				<>
+					<h3 className="ai-feedback-history-strengths-heading">
+						{__('What’s working', 'fresh-eyes')}
+					</h3>
+					<ul className="ai-feedback-history-strengths">
+						{strengths.map((strength) => (
+							<li
+								key={strength.block_id}
+								className="ai-feedback-strength"
+							>
+								{strength.text}
+							</li>
+						))}
+					</ul>
+				</>
 			)}
 
 			{isLoading && <Spinner />}
@@ -186,6 +207,10 @@ export default function ReviewHistory() {
 					const severities = formatSeverities(
 						entry.summary?.by_severity
 					);
+					const comparison = describeComparison(
+						entry.progress,
+						entry.note_count
+					);
 
 					return (
 						<li
@@ -207,6 +232,11 @@ export default function ReviewHistory() {
 							{change && (
 								<div className="ai-feedback-history-change">
 									{change}
+								</div>
+							)}
+							{comparison && (
+								<div className="ai-feedback-history-progress">
+									{comparison}
 								</div>
 							)}
 							{entry.model && (
