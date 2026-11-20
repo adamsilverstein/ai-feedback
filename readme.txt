@@ -4,7 +4,7 @@ Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -77,6 +77,11 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 
 == Changelog ==
 
+= 1.0.3 =
+* Renamed the plugin to Fresh Eyes: AI Editorial Feedback. The text domain is now `fresh-eyes`.
+* The notes and settings REST routes now require per-post and administrator capabilities.
+* Requirement notices only show on the Plugins and Updates screens.
+
 = 1.0.2 =
 * AI replies to notes are now answered from the editor, so they no longer depend on WP-Cron.
 * The Try again button waits out the short retry cooldown after a failed AI reply, with a hint next to it.
@@ -126,6 +131,9 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 * Review button with loading states.
 
 == Upgrade Notice ==
+
+= 1.0.3 =
+Copydesk AI is now Fresh Eyes. The plugin now installs to a `fresh-eyes` folder, so if you installed Copydesk AI from GitHub, deactivate and delete that copy before activating this one. Existing notes, settings and history carry over.
 
 = 1.0.2 =
 AI replies to notes no longer depend on WP-Cron, plus fixes for suggestions, note badges and review history.

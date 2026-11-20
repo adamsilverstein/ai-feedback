@@ -294,7 +294,7 @@ Editor ← Notes API ← Notes Manager ← Response Parser ← AI Client ← AI 
 
 ## Project Status
 
-**Current release:** 1.0.2. Phases 1 to 4 are complete. Phase 5 shipped 1.0.0, with streaming and the Abilities API still to come.
+**Current release:** 1.0.3. Phases 1 to 4 are complete. Phase 5 shipped 1.0.0, with streaming and the Abilities API still to come.
 
 ### Phase 1: Foundation ✅ Complete
 - Plugin scaffold with build system
