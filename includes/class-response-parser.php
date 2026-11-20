@@ -948,8 +948,9 @@ class Response_Parser {
 	 * Count matches of a quick fix's text in block content.
 	 *
 	 * Text that starts or ends with a letter or digit only matches at a word
-	 * boundary there, so "cat" doesn't match inside "concatenate". The editor
-	 * uses the same rule (src/utils/quick-fix.js).
+	 * boundary there, so "cat" doesn't match inside "concatenate", and a
+	 * space matches a non-breaking one. The editor uses the same rules
+	 * (src/utils/quick-fix.js).
 	 *
 	 * @param  string $find    Text to find.
 	 * @param  string $content Block content.
@@ -968,7 +969,7 @@ class Response_Parser {
 	 * @return string Pattern.
 	 */
 	private static function quick_fix_pattern( string $find ): string {
-		$pattern = preg_quote( $find, '/' );
+		$pattern = (string) preg_replace( '/[ \x{00A0}]/u', '[ \x{00A0}]', preg_quote( $find, '/' ) );
 
 		if ( preg_match( '/^[\p{L}\p{N}]/u', $find ) ) {
 			$pattern = '(?<![\p{L}\p{N}])' . $pattern;
@@ -989,9 +990,22 @@ class Response_Parser {
 	 * @return int|null Byte offset of the only match, or null unless there is exactly one.
 	 */
 	private static function find_unique_offset( string $find, string $content ): ?int {
+		return self::find_unique_match( $find, $content )[0] ?? null;
+	}
+
+	/**
+	 * Find where a quick fix's text sits in block content, and its length
+	 * there, which differs from the find's when a space matches a
+	 * non-breaking one.
+	 *
+	 * @param  string $find    Text to find.
+	 * @param  string $content Block content.
+	 * @return array{0: int, 1: int}|null Byte offset and length of the only match, or null unless there is exactly one.
+	 */
+	private static function find_unique_match( string $find, string $content ): ?array {
 		$count = preg_match_all( self::quick_fix_pattern( $find ), $content, $matches, PREG_OFFSET_CAPTURE );
 
-		return 1 === $count ? $matches[0][0][1] : null;
+		return 1 === $count ? array( $matches[0][0][1], strlen( $matches[0][0][0] ) ) : null;
 	}
 
 	/**
@@ -1030,13 +1044,13 @@ class Response_Parser {
 			$content = is_array( $info ) && is_string( $info['content'] ?? null ) ? $info['content'] : '';
 			// Byte offsets, compared only with each other; the editor works
 			// in UTF-16 units on its own copy of the text.
-			$start = self::find_unique_offset( $fix['find'], $content );
+			$match = self::find_unique_match( $fix['find'], $content );
 
-			$located = null === $start ? null : array(
+			$located = null === $match ? null : array(
 				'find'    => $fix['find'],
 				'replace' => $fix['replace'],
-				'start'   => $start,
-				'end'     => $start + strlen( $fix['find'] ),
+				'start'   => $match[0],
+				'end'     => $match[0] + $match[1],
 			);
 
 			if ( self::GRAMMAR_CATEGORY === ( $item['category'] ?? null ) ) {
