@@ -1284,14 +1284,29 @@ class Notes_Manager {
 			return null;
 		}
 
-		$review_notes = $review_ids[ $latest_review_id ]['notes'];
+		// A follow-up review adds its feedback to existing threads as replies,
+		// so the review history, not the top-level notes, says which review
+		// ran last. Every note of that review is listed, replies included,
+		// as in the response to the review itself.
+		$latest_review_id = $this->get_latest_recorded_review( $post_id ) ?? ( is_string( $latest_review_id ) ? $latest_review_id : '' );
+		$review_notes     = $this->get_review_notes_on_post( $post_id, $latest_review_id );
+		$latest_date      = null;
+		foreach ( $review_notes as $note ) {
+			if ( null === $latest_date || $note['date'] > $latest_date ) {
+				$latest_date = $note['date'];
+			}
+		}
+		if ( null === $latest_date ) {
+			return null;
+		}
 
-		// Build block mapping from notes.
+		// Build block mapping from notes. Feedback added to an earlier
+		// thread maps the block to that thread.
 		$block_mapping = array();
 		foreach ( $review_notes as $note ) {
-			$block_id = $note['block_id'] ?? '';
-			if ( ! empty( $block_id ) && 0 === $note['parent'] ) {
-				$block_mapping[ $block_id ] = $note['id'];
+			$block_id = is_string( $note['block_id'] ?? null ) ? $note['block_id'] : '';
+			if ( '' !== $block_id && ( 0 === $note['parent'] || ! isset( $block_mapping[ $block_id ] ) ) ) {
+				$block_mapping[ $block_id ] = 0 === $note['parent'] ? $note['id'] : $note['parent'];
 			}
 		}
 
@@ -1322,6 +1337,39 @@ class Notes_Manager {
 	}
 
 	/**
+	 * The newest review in the post's history that still has notes.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return string|null Review ID, or null when no recorded review has notes left.
+	 */
+	private function get_latest_recorded_review( int $post_id ): ?string {
+		foreach ( array_reverse( Review_History::get( $post_id ) ) as $entry ) {
+			$review_id = is_string( $entry['review_id'] ?? null ) ? $entry['review_id'] : '';
+			if ( '' !== $review_id && array() !== $this->get_review_notes_on_post( $post_id, $review_id ) ) {
+				return $review_id;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * A review's notes on one post.
+	 *
+	 * @param  int    $post_id   Post ID.
+	 * @param  string $review_id Review ID.
+	 * @return list<array<mixed>>
+	 */
+	private function get_review_notes_on_post( int $post_id, string $review_id ): array {
+		return array_values(
+			array_filter(
+				$this->get_notes_by_review( $review_id ),
+				static fn ( mixed $note ): bool => is_array( $note ) && ( $note['post'] ?? 0 ) === $post_id
+			)
+		);
+	}
+
+	/**
 	 * Calculate summary statistics from notes.
 	 *
 	 * @param  array $notes Array of notes.
@@ -1342,12 +1390,8 @@ class Notes_Manager {
 			'grammar' => 0,
 		);
 
+		// Every note passed is a feedback item of the review, replies included.
 		foreach ( $notes as $note ) {
-			// Only count top-level notes (not replies).
-			if ( $note['parent'] > 0 ) {
-				continue;
-			}
-
 			$severity = $note['severity'] ?? '';
 			$category = $note['category'] ?? '';
 
