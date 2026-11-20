@@ -21,13 +21,16 @@ vi.mock('@wordpress/data', () => ({
 }));
 
 const mockSuggestReplyEdit = vi.fn();
+const mockSupersedeSuggestions = vi.fn();
+let mockSuggestionMode = true;
 vi.mock('../utils/suggestions', () => ({
+	isSuggestionModeAvailable: () => mockSuggestionMode,
 	suggestReplyEdit: (...args) => mockSuggestReplyEdit(...args),
+	supersedeSuggestions: (...args) => mockSupersedeSuggestions(...args),
 }));
 
 import useReplyThreads, {
 	getNotesQuery,
-	getReplyEdits,
 	suggestNewReplyEdits,
 } from './useReplyThreads';
 
@@ -125,29 +128,15 @@ describe('useReplyThreads', () => {
 	});
 });
 
-describe('getReplyEdits', () => {
-	it('lists AI replies with an edit and their thread', () => {
-		const edit = { type: 'rewrite_block', content: 'x', original: 'y' };
-		expect(
-			getReplyEdits({
-				300: {
-					replies: [
-						{ id: 301, is_ai: false, edit },
-						{ id: 302, is_ai: true, edit: null },
-						{ id: 303, is_ai: true, edit },
-					],
-				},
-			})
-		).toEqual([{ reply: { id: 303, is_ai: true, edit }, threadId: 300 }]);
-	});
-});
-
 describe('suggestNewReplyEdits', () => {
 	beforeEach(() => {
 		mockSuggestReplyEdit.mockReset();
+		mockSupersedeSuggestions.mockReset();
+		mockSupersedeSuggestions.mockResolvedValue([]);
+		mockSuggestionMode = true;
 	});
 
-	it('suggests each new edit once, across hook instances', () => {
+	it('suggests each new edit once, across hook instances', async () => {
 		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
 		const threads = {
 			400: { replies: [{ id: 401, is_ai: true, edit }] },
@@ -156,6 +145,9 @@ describe('suggestNewReplyEdits', () => {
 		suggestNewReplyEdits(threads, new Set());
 		suggestNewReplyEdits(threads, new Set());
 
+		await waitFor(() =>
+			expect(mockSupersedeSuggestions).toHaveBeenCalledTimes(2)
+		);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
 			threads[400].replies[0],
@@ -171,6 +163,78 @@ describe('suggestNewReplyEdits', () => {
 		);
 
 		expect(seen).toEqual(new Set([501]));
+		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();
+	});
+
+	it('retires the earlier suggestions before suggesting a revision', async () => {
+		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
+		const first = { id: 601, is_ai: true, edit };
+		const user = { id: 602, is_ai: false, edit: null };
+		const revised = { id: 603, is_ai: true, edit };
+		const order = [];
+		mockSupersedeSuggestions.mockImplementation(async () => {
+			order.push('supersede');
+			return [];
+		});
+		mockSuggestReplyEdit.mockImplementation(async () => {
+			order.push('suggest');
+			return true;
+		});
+
+		const seen = suggestNewReplyEdits(
+			{ 600: { replies: [first] } },
+			new Set()
+		);
+		suggestNewReplyEdits(
+			{ 600: { replies: [first, user, revised] } },
+			seen
+		);
+
+		await waitFor(() =>
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(revised, 600)
+		);
+		// The review's quick fix on the root note, then the first revision.
+		expect(mockSupersedeSuggestions).toHaveBeenLastCalledWith(
+			600,
+			[600, 601]
+		);
+		expect(order).toEqual(['supersede', 'suggest', 'supersede', 'suggest']);
+	});
+
+	it('retires stale suggestions on the first load without suggesting', async () => {
+		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
+		suggestNewReplyEdits(
+			{
+				700: {
+					replies: [
+						{ id: 701, is_ai: true, edit },
+						{ id: 702, is_ai: true, edit },
+					],
+				},
+			},
+			null
+		);
+
+		await waitFor(() =>
+			expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
+				700,
+				[700, 701]
+			)
+		);
+		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();
+	});
+
+	it('leaves the block alone without Suggestion Mode', async () => {
+		mockSuggestionMode = false;
+		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
+		const seen = suggestNewReplyEdits(
+			{ 800: { replies: [{ id: 801, is_ai: true, edit }] } },
+			new Set()
+		);
+
+		expect(seen).toEqual(new Set([801]));
+		await Promise.resolve();
+		expect(mockSupersedeSuggestions).not.toHaveBeenCalled();
 		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();
 	});
 });

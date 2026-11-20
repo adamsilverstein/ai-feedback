@@ -7,15 +7,20 @@
  * appears there.
  *
  * An AI reply that arrives while the editor is open and proposes an edit is
- * added as a Gutenberg suggestion when Suggestion Mode is on. Replies that
- * were already there when the threads first loaded are left to the sidebar's
- * Preview and Apply, so reopening a post never adds markers by itself.
+ * added as a Gutenberg suggestion when Suggestion Mode is on, replacing the
+ * thread's earlier suggestion. Replies that were already there when the
+ * threads first loaded are left to the sidebar's Preview and Apply, so
+ * reopening a post never adds markers by itself.
  */
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
 import apiFetch from '@wordpress/api-fetch';
-import { suggestReplyEdit } from '../utils/suggestions';
-import { isReplyEdit } from '../utils/is-reply-edit';
+import {
+	isSuggestionModeAvailable,
+	suggestReplyEdit,
+	supersedeSuggestions,
+} from '../utils/suggestions';
+import { getThreadEdits } from '../utils/revisions';
 
 /**
  * AI replies whose edit this editor has already tried to suggest, shared by
@@ -24,21 +29,42 @@ import { isReplyEdit } from '../utils/is-reply-edit';
 const suggestedReplyIds = new Set();
 
 /**
- * List the AI replies with an edit in a set of threads.
- *
- * @param {Object<string, ReplyThread>} threads Threads keyed by root note ID.
- * @return {Array<{reply: Object, threadId: number}>} Replies with their thread's root note ID.
+ * Pending thread refinements, run one after another.
  */
-export function getReplyEdits(threads) {
-	return Object.entries(threads || {}).flatMap(([threadId, thread]) =>
-		(thread?.replies || [])
-			.filter((reply) => reply.is_ai && isReplyEdit(reply.edit))
-			.map((reply) => ({ reply, threadId: Number(threadId) }))
-	);
+let queue = Promise.resolve();
+
+/**
+ * Retire superseded suggestions in a thread, then suggest its newest edit.
+ *
+ * Runs one thread at a time, so each step sees the block as the last left it.
+ *
+ * @param {number}      threadId   Root note of the thread.
+ * @param {number[]}    superseded Notes whose edits the newest edit replaces.
+ * @param {Object|null} reply      AI reply whose edit to suggest, or null.
+ * @return {Promise<void>} Resolves once the thread is done.
+ */
+function refineThread(threadId, superseded, reply) {
+	queue = queue
+		.then(async () => {
+			await supersedeSuggestions(threadId, superseded);
+			if (reply) {
+				await suggestReplyEdit(reply, threadId);
+			}
+		})
+		.catch(() => {
+			// Each step reports its own failure; keep the queue going.
+		});
+	return queue;
 }
 
 /**
- * Suggest the edits of AI replies that arrived since the threads first loaded.
+ * Suggest the edits of AI replies that arrived since the threads first
+ * loaded, and retire the suggestions they supersede.
+ *
+ * Only a thread's newest edit is suggested. Earlier suggestions in a thread
+ * with a newer edit are retired on every load too, so an older revision can
+ * never be accepted, but edits already there on the first load are never
+ * suggested.
  *
  * @param {Object<string, ReplyThread>} threads Latest threads.
  * @param {Set<number>|null}            known   Reply IDs seen so far, or null before the first load.
@@ -46,15 +72,32 @@ export function getReplyEdits(threads) {
  */
 export function suggestNewReplyEdits(threads, known) {
 	const seen = new Set(known || []);
-	for (const { reply, threadId } of getReplyEdits(threads)) {
-		if (seen.has(reply.id)) {
+	for (const [key, thread] of Object.entries(threads || {})) {
+		const threadId = Number(key);
+		const edits = getThreadEdits(null, thread?.replies);
+		const latest = edits[edits.length - 1];
+		if (!latest) {
 			continue;
 		}
-		seen.add(reply.id);
-		if (known && !suggestedReplyIds.has(reply.id)) {
-			suggestedReplyIds.add(reply.id);
-			suggestReplyEdit(reply, threadId);
+
+		const isNew = !seen.has(latest.ownerId);
+		edits.forEach(({ ownerId }) => seen.add(ownerId));
+
+		let reply = null;
+		if (known && isNew && !suggestedReplyIds.has(latest.ownerId)) {
+			suggestedReplyIds.add(latest.ownerId);
+			reply = thread.replies.find((item) => item.id === latest.ownerId);
 		}
+		if (!isSuggestionModeAvailable()) {
+			continue;
+		}
+
+		// The root note's quick fix is superseded by any reply edit.
+		refineThread(
+			threadId,
+			[threadId, ...edits.slice(0, -1).map(({ ownerId }) => ownerId)],
+			reply
+		);
 	}
 	return seen;
 }
