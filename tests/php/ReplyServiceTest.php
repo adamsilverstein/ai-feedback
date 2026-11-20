@@ -902,6 +902,56 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for edits beside and across a footnote, which the editor
+	 * reads as one object character.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function footnote_provider(): array {
+		$footnote = '<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+		$html     = "<p>Revenue growth{$footnote} was strong last year.</p>";
+		return array(
+			'find across the footnote number'   => array( $html, 'growth1 was', false ),
+			'find holding the object character' => array( $html, "growth\u{FFFC} was", false ),
+			'find skipping the footnote'        => array( $html, 'growth was', false ),
+			'find beside the footnote'          => array( $html, 'was strong', true ),
+			'find ending at the footnote'       => array( $html, 'Revenue growth', true ),
+			'find across an inline comment'     => array( '<p>Revenue grew<!-- check -->fast.</p>', 'grewfast', false ),
+			'find beside an empty anchor'       => array( '<p>Revenue<a id="q3"></a> grew fast.</p>', 'grew fast', true ),
+		);
+	}
+
+	/**
+	 * An edit is kept only when the editor can match it: a footnote is one
+	 * object character there, not its number, and a text edit can't write
+	 * the footnote back, so a `find` across it is dropped.
+	 *
+	 * @dataProvider footnote_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	public function test_text_edit_beside_a_footnote( string $html, string $find, bool $kept ): void {
+		$notes = $this->reply_with(
+			(string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			),
+			$html
+		);
+
+		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
 	 * Data provider for the block text cases shared with the editor.
 	 *
 	 * @return array<string, array{0: string, 1: string}>
