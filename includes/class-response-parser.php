@@ -622,7 +622,10 @@ class Response_Parser {
 			$self   = $targets[ $block_id ];
 
 			// Moving a block before the block after it, or after the block
-			// before it, leaves it where it is.
+			// before it, leaves it where it is. Indexes count the reviewed
+			// blocks in document order, nested ones included, so across
+			// parents this can drop a real move; the editor checks the
+			// actual siblings before applying anything.
 			$offset = self::int_value( $target['index'] ?? null ) - self::int_value( $self['index'] ?? null );
 			if ( ( 'before' === $position && 1 === $offset ) || ( 'after' === $position && -1 === $offset ) ) {
 				return null;
@@ -729,6 +732,24 @@ class Response_Parser {
 	 */
 	private static function excerpt( string $text ): string {
 		return mb_substr( self::normalize_text( wp_strip_all_tags( $text ) ), 0, self::MAX_TARGET_TEXT_LENGTH );
+	}
+
+	/**
+	 * Whether a block's text is the one a move's `target_text` was kept from.
+	 *
+	 * The kept text is the whole text when it is shorter than the excerpt
+	 * length, so it must match exactly; otherwise the block's text must
+	 * start with it. Matches matchesTargetText() in src/utils/block-action.js.
+	 *
+	 * @param  string $block_text  Whitespace-collapsed block text.
+	 * @param  string $target_text Kept target text.
+	 * @return bool
+	 */
+	public static function matches_target_text( string $block_text, string $target_text ): bool {
+		$block_text = self::normalize_text( $block_text );
+		return mb_strlen( $target_text ) < self::MAX_TARGET_TEXT_LENGTH
+			? $block_text === $target_text
+			: str_starts_with( $block_text, $target_text );
 	}
 
 	/**

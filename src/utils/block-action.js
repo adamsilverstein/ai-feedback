@@ -178,6 +178,29 @@ export function findNoteBlock(selectors, clientId, noteId) {
 }
 
 /**
+ * Length of a move target's text kept on the server.
+ */
+const TARGET_TEXT_LENGTH = 80;
+
+/**
+ * Whether a block's text is the one a move's `target_text` was kept from.
+ *
+ * Shorter text than the kept length is the whole text, so it must match
+ * exactly; otherwise the block's text must start with it. Matches
+ * Response_Parser::matches_target_text().
+ *
+ * @param {string} blockText  Block text.
+ * @param {string} targetText Kept target text.
+ * @return {boolean} True when they match.
+ */
+export function matchesTargetText(blockText, targetText) {
+	const text = normalizeText(blockText);
+	return targetText.length < TARGET_TEXT_LENGTH
+		? text === targetText
+		: text.startsWith(targetText);
+}
+
+/**
  * Finds the block a move puts the note's block next to.
  *
  * Its client ID wins while it still names a block of the same type.
@@ -210,7 +233,7 @@ export function findMoveTarget(selectors, action, clientId) {
 		return (
 			id !== clientId &&
 			block?.name === action.target_name &&
-			getBlockText(block).startsWith(text)
+			matchesTargetText(getBlockText(block), text)
 		);
 	});
 	if (matches.length === 1) {
@@ -302,9 +325,14 @@ export function getBlockActionState(selectors, action, clientId) {
 
 	if (action.type === 'insert_block') {
 		const neighbor = getNeighbor(selectors, clientId, offset);
+		const spec = action.block;
+		// A heading's level and a list's type are part of the edit; both
+		// blocks default to an h2 and a bulleted list.
 		const isThere =
-			neighbor?.name === action.block.name &&
-			getBlockText(neighbor) === getInsertedText(action.block);
+			neighbor?.name === spec.name &&
+			(neighbor.attributes?.level ?? 2) === (spec.level ?? 2) &&
+			!!neighbor.attributes?.ordered === !!spec.ordered &&
+			getBlockText(neighbor) === getInsertedText(spec);
 		return { state: isThere ? 'applied' : 'ready', targetId: null };
 	}
 
@@ -357,7 +385,7 @@ export function buildInsertedBlock(spec) {
  * @param {Object} action    Structural edit.
  * @param {string} clientId  Client ID of the note's block.
  * @param {string} targetId  A move's target, from getBlockActionState().
- * @return {boolean} Whether the edit was applied.
+ * @return {boolean} Whether the blocks now read as the edit leaves them.
  */
 export function applyBlockAction(
 	selectors,
@@ -400,8 +428,17 @@ export function applyBlockAction(
 	}
 	actions.__unstableMarkLastChangeAsPersistent?.();
 	run();
-	actions.__unstableMarkLastChangeAsPersistent?.();
-	return true;
+	// The editor can refuse a change, eg. inside a locked template, without
+	// an error, so check the blocks now read as the edit leaves them.
+	const { state } = getBlockActionState(selectors, action, clientId);
+	const isDone =
+		action.type === 'remove_block'
+			? state === 'missing'
+			: state === 'applied';
+	if (isDone) {
+		actions.__unstableMarkLastChangeAsPersistent?.();
+	}
+	return isDone;
 }
 
 /**

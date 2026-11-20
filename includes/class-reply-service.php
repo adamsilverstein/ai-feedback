@@ -656,7 +656,7 @@ class Reply_Service {
 			$text     = is_string( $edit['target_text'] ?? null ) ? $edit['target_text'] : '';
 			return is_array( $neighbor ) && '' !== $text
 				&& ( $edit['target_name'] ?? null ) === ( $neighbor['blockName'] ?? null )
-				&& str_starts_with( self::html_text( self::get_block_html( $neighbor ) ), $text );
+				&& Response_Parser::matches_target_text( self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) ), $text );
 		}
 
 		if ( 'insert_block' === $type ) {
@@ -666,9 +666,13 @@ class Reply_Service {
 			$text     = is_array( $block['items'] ?? null )
 				? implode( ' ', array_filter( $block['items'], 'is_string' ) )
 				: ( is_string( $block['content'] ?? null ) ? $block['content'] : '' );
+			$attrs    = is_array( $neighbor ) && is_array( $neighbor['attrs'] ?? null ) ? $neighbor['attrs'] : array();
 			return is_array( $neighbor )
 				&& ( $block['name'] ?? null ) === ( $neighbor['blockName'] ?? null )
-				&& self::html_text( $text ) === self::html_text( self::get_block_html( $neighbor ) );
+				// A heading's level and a list's type are part of the edit; both blocks default to an h2 and a bulleted list.
+				&& ( $block['level'] ?? 2 ) === ( $attrs['level'] ?? 2 )
+				&& ( $block['ordered'] ?? false ) === ( $attrs['ordered'] ?? false )
+				&& self::html_text( $text ) === self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) );
 		}
 
 		return false;

@@ -133,6 +133,13 @@ class Notes_Manager {
 		// Build note content.
 		$content = $this->build_note_content( $feedback_item );
 
+		// A structural edit is only kept on a thread's root note: the thread's
+		// edits supersede one another from the root on, so one on a later
+		// note in the thread could not be told apart from the root's.
+		if ( $parent_id > 0 ) {
+			unset( $feedback_item['block_action'] );
+		}
+
 		// Build metadata first so we can log it.
 		$note_meta = $this->build_note_meta( $feedback_item, $review_data );
 
@@ -1083,23 +1090,32 @@ class Notes_Manager {
 			);
 		}
 
+		// The parser's limits are checked again, so an edit stored another
+		// way, or before the allow-list was narrowed, is never acted on.
 		$block = $decoded['block'] ?? null;
-		if ( 'insert_block' !== $type || ! is_array( $block ) || ! is_string( $block['name'] ?? null ) ) {
+		if (
+			'insert_block' !== $type
+			|| ! is_array( $block )
+			|| ! is_string( $block['name'] ?? null )
+			|| ! in_array( $block['name'], Response_Parser::get_insertable_blocks(), true )
+		) {
 			return null;
 		}
 
-		$clean = array( 'name' => $block['name'] );
+		$within_limit = static fn ( mixed $text ): bool => is_string( $text ) && mb_strlen( $text ) <= Response_Parser::MAX_INSERT_LENGTH;
+		$clean        = array( 'name' => $block['name'] );
 		if ( is_array( $block['items'] ?? null ) ) {
-			$items = array_values( array_filter( $block['items'], 'is_string' ) );
-			if ( array() === $items || count( $items ) !== count( $block['items'] ) ) {
+			$items = array_values( array_filter( $block['items'], $within_limit ) );
+			if ( array() === $items || count( $items ) !== count( $block['items'] ) || count( $items ) > Response_Parser::MAX_INSERT_LIST_ITEMS ) {
 				return null;
 			}
 			$clean['items']   = $items;
 			$clean['ordered'] = true === ( $block['ordered'] ?? false );
-		} elseif ( is_string( $block['content'] ?? null ) ) {
+		} elseif ( is_string( $block['content'] ?? null ) && $within_limit( $block['content'] ) ) {
 			$clean['content'] = $block['content'];
-			if ( is_int( $block['level'] ?? null ) ) {
-				$clean['level'] = $block['level'];
+			if ( 'core/heading' === $block['name'] ) {
+				$level          = $block['level'] ?? 2;
+				$clean['level'] = is_int( $level ) && $level >= 2 && $level <= 6 ? $level : 2;
 			}
 		} else {
 			return null;

@@ -121,16 +121,16 @@ class ReplyServiceTest extends TestCase {
 	 */
 	public function test_handle_reply_persists_ai_reply_as_thread_child(): void {
 		// Parent: AI note on a paragraph block with original feedback.
-		$GLOBALS['test_comments'][100] = (object) array(
+		$GLOBALS['test_comments'][100]     = (object) array(
 			'comment_ID'      => 100,
 			'comment_content' => 'Add a source for the 40% growth claim.',
 			'comment_author'  => 'AI Feedback',
 		);
 		$GLOBALS['test_comment_meta'][100] = array(
-			'ai_feedback'        => '1',
-			'block_name'         => 'core/paragraph',
-			'feedback_category'  => 'content',
-			'feedback_severity'  => 'important',
+			'ai_feedback'       => '1',
+			'block_name'        => 'core/paragraph',
+			'feedback_category' => 'content',
+			'feedback_severity' => 'important',
 		);
 
 		// Reply: user asking for clarification.
@@ -141,7 +141,7 @@ class ReplyServiceTest extends TestCase {
 		);
 
 		// Prior thread entry (an earlier user comment, chronologically first).
-		$GLOBALS['test_comments'][150] = (object) array(
+		$GLOBALS['test_comments'][150]                 = (object) array(
 			'comment_ID'      => 150,
 			'comment_content' => 'Which stat?',
 			'comment_author'  => 'Jane',
@@ -183,7 +183,7 @@ class ReplyServiceTest extends TestCase {
 	 * prompt doesn't echo them back to themselves.
 	 */
 	public function test_thread_history_excludes_the_current_reply(): void {
-		$GLOBALS['test_comments'][100] = (object) array(
+		$GLOBALS['test_comments'][100]     = (object) array(
 			'comment_ID'      => 100,
 			'comment_content' => 'Vague claim.',
 			'comment_author'  => 'AI Feedback',
@@ -259,7 +259,7 @@ class ReplyServiceTest extends TestCase {
 	 * AI failure propagates as a WP_Error and the reply is not persisted.
 	 */
 	public function test_ai_failure_returns_wp_error_and_skips_persistence(): void {
-		$GLOBALS['test_comments'][100] = (object) array(
+		$GLOBALS['test_comments'][100]     = (object) array(
 			'comment_ID'      => 100,
 			'comment_content' => 'Original feedback.',
 			'comment_author'  => 'AI Feedback',
@@ -291,7 +291,7 @@ class ReplyServiceTest extends TestCase {
 	 * reply comment ID when handle_reply succeeds.
 	 */
 	public function test_on_reply_received_records_complete_status_on_success(): void {
-		$GLOBALS['test_comments'][100] = (object) array(
+		$GLOBALS['test_comments'][100]     = (object) array(
 			'comment_ID'      => 100,
 			'comment_content' => 'Vague.',
 			'comment_author'  => 'AI Feedback',
@@ -355,7 +355,7 @@ class ReplyServiceTest extends TestCase {
 	 * non-existent comment ID.
 	 */
 	public function test_on_reply_received_records_failed_status_when_persistence_returns_zero(): void {
-		$GLOBALS['test_comments'][100] = (object) array(
+		$GLOBALS['test_comments'][100]     = (object) array(
 			'comment_ID'      => 100,
 			'comment_content' => 'Original feedback.',
 			'comment_author'  => 'AI Feedback',
@@ -503,7 +503,7 @@ class ReplyServiceTest extends TestCase {
 	 * @param array<int, array<string, mixed>> $blocks Parsed blocks.
 	 */
 	private function seed_post_blocks( array $blocks ): void {
-		$GLOBALS['test_post_content'][42]                 = '<!-- post 42 -->';
+		$GLOBALS['test_post_content'][42]                  = '<!-- post 42 -->';
 		$GLOBALS['test_parsed_blocks']['<!-- post 42 -->'] = $blocks;
 	}
 
@@ -909,7 +909,7 @@ class ReplyServiceTest extends TestCase {
 			'comment_parent'  => 100,
 		);
 		$GLOBALS['test_comment_meta'][ $id ] = array(
-			'ai_feedback'                       => '1',
+			'ai_feedback'                      => '1',
 			Notes_Manager::REPLY_EDIT_META_KEY => (string) wp_json_encode( $edit ),
 		) + $meta;
 	}
@@ -937,8 +937,22 @@ class ReplyServiceTest extends TestCase {
 	 */
 	public function test_prompt_includes_pending_edit_from_latest_reply(): void {
 		$this->seed_parent_and_reply();
-		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ) );
-		$this->seed_ai_edit_reply( 600, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in fiscal 2025' ) );
+		$this->seed_ai_edit_reply(
+			500,
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in 2025',
+			)
+		);
+		$this->seed_ai_edit_reply(
+			600,
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in fiscal 2025',
+			)
+		);
 
 		$prompt = $this->refine_with( '{"reply": "Shorter.", "edit": null}' )->captured_prompt;
 
@@ -977,7 +991,14 @@ class ReplyServiceTest extends TestCase {
 	 */
 	public function test_applied_edit_is_not_pending(): void {
 		$this->seed_parent_and_reply();
-		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ) );
+		$this->seed_ai_edit_reply(
+			500,
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in 2025',
+			)
+		);
 
 		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}', '<p>Revenue grew 40% in 2025.</p>' )->captured_prompt;
 
@@ -1014,7 +1035,11 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_parent_and_reply();
 		$this->seed_ai_edit_reply(
 			500,
-			array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ),
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in 2025',
+			),
 			array(
 				'_wp_suggestion'        => '{"schemaVersion":2}',
 				'_wp_suggestion_status' => $status,
@@ -1048,7 +1073,11 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_parent_and_reply();
 		$this->seed_ai_edit_reply(
 			500,
-			array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ),
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in 2025',
+			),
 			array( '_wp_suggestion' => '{"schemaVersion":2}' )
 		);
 		$html = '<p>Revenue grew 40% <mark class="wp-suggestion-add" data-suggestion-id="500" data-suggestion-type="add">in 2025</mark><mark class="wp-suggestion-del" data-suggestion-id="500" data-suggestion-type="del">last year</mark>.</p>';
@@ -1066,7 +1095,14 @@ class ReplyServiceTest extends TestCase {
 	public function test_new_edit_is_numbered_after_earlier_edits(): void {
 		$this->seed_parent_and_reply();
 		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2025"}';
-		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in fiscal 2025' ) );
+		$this->seed_ai_edit_reply(
+			500,
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in fiscal 2025',
+			)
+		);
 		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% last year.</p>', 100 ) ) );
 
 		$notes                    = new Reply_Service_Fake_Notes_Manager();
@@ -1306,5 +1342,36 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_ai_edit_reply( 500, $insert );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 		$this->assertStringContainsString( 'insert a core/paragraph block after this block reading "Something new."', $service->captured_prompt );
+	}
+
+	/**
+	 * A heading of another level next to the block is not the inserted one.
+	 */
+	public function test_insert_compares_heading_level(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array(
+				self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% last year.</p>', 100 ),
+				self::leaf_block( 'core/heading', '<h2 class="wp-block-heading">Next steps</h2>' ),
+			)
+		);
+		$heading = static fn ( int $level ): array => array(
+			'type'     => 'insert_block',
+			'position' => 'after',
+			'block'    => array(
+				'name'    => 'core/heading',
+				'content' => 'Next steps',
+				'level'   => $level,
+			),
+		);
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+
+		$this->seed_ai_edit_reply( 500, $heading( 3 ) );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		$this->assertStringContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
+
+		$this->seed_ai_edit_reply( 500, $heading( 2 ) );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
 	}
 }

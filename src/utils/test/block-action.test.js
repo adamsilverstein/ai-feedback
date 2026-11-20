@@ -17,6 +17,7 @@ import {
 	getBlockActionState,
 	getMovePosition,
 	isBlockAction,
+	matchesTargetText,
 } from '../block-action';
 
 vi.mock('@wordpress/blocks', () => ({
@@ -82,6 +83,9 @@ const doc = () =>
 			inner: ['core/paragraph', 'Inside the group.'],
 		}
 	);
+
+// Longer than the 80 characters of target text the server keeps.
+const LONG = 'Same start '.repeat(8).trim();
 
 const move = (target, position, extra = {}) => ({
 	type: 'move_block',
@@ -181,7 +185,9 @@ describe('findMoveTarget', () => {
 		expect(
 			findMoveTarget(
 				doc(),
-				move('stale', 'before', { target_text: 'Background on' }),
+				move('stale', 'before', {
+					target_text: 'Background on the project.',
+				}),
 				'open'
 			)
 		).toBe('bg');
@@ -190,7 +196,7 @@ describe('findMoveTarget', () => {
 				doc(),
 				move('', 'before', {
 					target_name: 'core/heading',
-					target_text: 'Why this',
+					target_text: 'Why this matters',
 				}),
 				'open'
 			)
@@ -211,16 +217,16 @@ describe('findMoveTarget', () => {
 		const selectors = treeSelectors(
 			{ '': ['a', 'me', 'group'], group: ['b'] },
 			{
-				a: ['core/paragraph', 'Same start here.'],
+				a: ['core/paragraph', `${LONG} here.`],
 				me: ['core/paragraph', 'Me.'],
 				group: ['core/group', ''],
-				b: ['core/paragraph', 'Same start there.'],
+				b: ['core/paragraph', `${LONG} there.`],
 			}
 		);
 		expect(
 			findMoveTarget(
 				selectors,
-				move('', 'before', { target_text: 'Same start' }),
+				move('', 'before', { target_text: LONG.slice(0, 80) }),
 				'me'
 			)
 		).toBe('a');
@@ -230,15 +236,15 @@ describe('findMoveTarget', () => {
 		const selectors = treeSelectors(
 			{ '': ['a', 'b', 'me'] },
 			{
-				a: ['core/paragraph', 'Same start here.'],
-				b: ['core/paragraph', 'Same start there.'],
+				a: ['core/paragraph', `${LONG} here.`],
+				b: ['core/paragraph', `${LONG} there.`],
 				me: ['core/paragraph', 'Me.'],
 			}
 		);
 		expect(
 			findMoveTarget(
 				selectors,
-				move('', 'before', { target_text: 'Same start' }),
+				move('', 'before', { target_text: LONG.slice(0, 80) }),
 				'me'
 			)
 		).toBeNull();
@@ -250,6 +256,16 @@ describe('findMoveTarget', () => {
 			)
 		).toBeNull();
 		expect(findMoveTarget(selectors, move('', 'before'), 'me')).toBeNull();
+	});
+});
+
+describe('matchesTargetText', () => {
+	it('needs the whole text when it was short, and the start otherwise', () => {
+		expect(matchesTargetText('Step 1 of setup.', 'Step 1')).toBe(false);
+		expect(matchesTargetText(' Step  1 ', 'Step 1')).toBe(true);
+		expect(matchesTargetText(`${LONG} here.`, LONG.slice(0, 80))).toBe(
+			true
+		);
 	});
 });
 
@@ -321,6 +337,36 @@ describe('getBlockActionState', () => {
 		expect(
 			getBlockActionState(doc(), insert('Something new.'), 'open').state
 		).toBe('ready');
+		// A heading's level is part of the edit.
+		expect(
+			getBlockActionState(
+				doc(),
+				{
+					type: 'insert_block',
+					position: 'before',
+					block: {
+						name: 'core/heading',
+						content: 'Why this matters',
+						level: 3,
+					},
+				},
+				'bg'
+			).state
+		).toBe('ready');
+		expect(
+			getBlockActionState(
+				doc(),
+				{
+					type: 'insert_block',
+					position: 'before',
+					block: {
+						name: 'core/heading',
+						content: 'Why this matters',
+					},
+				},
+				'bg'
+			).state
+		).toBe('applied');
 		expect(
 			getBlockActionState(
 				doc(),
@@ -384,9 +430,23 @@ describe('applyBlockAction', () => {
 	});
 
 	it('removes the block in its own undo level', () => {
+		const order = { '': ['bg', 'rep'] };
+		const blocks = {
+			bg: ['core/paragraph', 'Background.'],
+			rep: ['core/paragraph', 'Repeats.'],
+		};
 		const actions = editorActions();
+		actions.removeBlocks.mockImplementation(([id]) => {
+			order[''] = order[''].filter((item) => item !== id);
+			delete blocks[id];
+		});
 		expect(
-			applyBlockAction(doc(), actions, { type: 'remove_block' }, 'rep')
+			applyBlockAction(
+				treeSelectors(order, blocks),
+				actions,
+				{ type: 'remove_block' },
+				'rep'
+			)
 		).toBe(true);
 		expect(actions.removeBlocks).toHaveBeenCalledWith(['rep'], false);
 		expect(
@@ -398,6 +458,17 @@ describe('applyBlockAction', () => {
 		expect(before).toBeLessThan(
 			actions.removeBlocks.mock.invocationCallOrder[0]
 		);
+	});
+
+	it('reports a change the editor refused, eg. in a locked template', () => {
+		const actions = editorActions();
+		expect(
+			applyBlockAction(doc(), actions, { type: 'remove_block' }, 'rep')
+		).toBe(false);
+		expect(actions.removeBlocks).toHaveBeenCalled();
+		expect(
+			actions.__unstableMarkLastChangeAsPersistent
+		).toHaveBeenCalledTimes(1);
 	});
 
 	it('moves the block next to its target', () => {

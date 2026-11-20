@@ -662,4 +662,16 @@ class ResponseParserBlockActionTest extends TestCase {
 		$this->assertFalse( Response_Parser::is_block_action( array( 'type' => 'remove' ) ) );
 		$this->assertFalse( Response_Parser::is_block_action( array( 'type' => 'replace_text' ) ) );
 	}
+
+	/**
+	 * Short target text must match a block's whole text; text kept at the
+	 * full excerpt length only its start.
+	 */
+	public function test_matches_target_text(): void {
+		$long = str_repeat( 'Same start ', 8 );
+
+		$this->assertFalse( Response_Parser::matches_target_text( 'Step 1 of setup.', 'Step 1' ) );
+		$this->assertTrue( Response_Parser::matches_target_text( ' Step  1 ', 'Step 1' ) );
+		$this->assertTrue( Response_Parser::matches_target_text( $long . 'here.', mb_substr( trim( $long ), 0, Response_Parser::MAX_TARGET_TEXT_LENGTH ) ) );
+	}
 }

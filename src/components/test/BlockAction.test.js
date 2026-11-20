@@ -2,7 +2,7 @@
  * External dependencies
  */
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 /**
  * WordPress dependencies
@@ -48,7 +48,7 @@ function renderAction(props, options = {}) {
 		setFixApplied: vi.fn(),
 		undo: vi.fn(),
 	};
-	const order = options.order ?? ['intro', 'bg', 'rep'];
+	let order = options.order ?? ['intro', 'bg', 'rep'];
 	const blocks = {
 		intro: { name: 'core/heading', content: 'Intro' },
 		bg: { name: 'core/paragraph', content: 'Background.' },
@@ -60,7 +60,10 @@ function renderAction(props, options = {}) {
 			? {
 					clientId: id,
 					name: blocks[id].name,
-					attributes: { content: blocks[id].content },
+					attributes: {
+						content: blocks[id].content,
+						level: blocks[id].level,
+					},
 					innerBlocks: [],
 				}
 			: null;
@@ -103,16 +106,42 @@ function renderAction(props, options = {}) {
 			spies[name](...args);
 			return { type: 'NOOP' };
 		};
+	// Changes the post the way the block editor would.
+	const change =
+		(name, update) =>
+		(...args) => {
+			spies[name](...args);
+			update(...args);
+			return { type: 'CHANGED', order: [...order] };
+		};
 	registry.registerStore('core/block-editor', {
-		reducer: (state = {}) => state,
+		reducer: (state = { order }, action) =>
+			action.type === 'CHANGED' ? { order: action.order } : state,
 		actions: {
-			removeBlocks: record('removeBlocks'),
-			moveBlocksToPosition: record('moveBlocksToPosition'),
-			insertBlocks: record('insertBlocks'),
+			removeBlocks: change('removeBlocks', (ids) => {
+				order = order.filter((id) => !ids.includes(id));
+			}),
+			moveBlocksToPosition: change(
+				'moveBlocksToPosition',
+				(ids, from, to, index) => {
+					order = order.filter((id) => !ids.includes(id));
+					order.splice(index, 0, ...ids);
+				}
+			),
+			insertBlocks: change('insertBlocks', ([block], index) => {
+				blocks.new = {
+					name: block.name,
+					content: block.attributes.content,
+					level: block.attributes.level,
+				};
+				order = [...order];
+				order.splice(index, 0, 'new');
+			}),
 			toggleBlockHighlight: record('toggleBlockHighlight'),
 			__unstableMarkLastChangeAsPersistent: () => ({ type: 'NOOP' }),
 		},
 		selectors: {
+			getBlocks: (state) => state,
 			getBlock: (state, id) => getBlock(id),
 			getClientIdsWithDescendants: () => order,
 			getBlockRootClientId: () => null,
@@ -315,5 +344,28 @@ describe('BlockAction', () => {
 		);
 		expect(spies.setFixApplied).toHaveBeenCalledWith(9, true);
 		expect(spies.setNoteResolved).not.toHaveBeenCalled();
+	});
+	it('goes by the blocks, not the applied flag, once the editor’s Undo took the change back', () => {
+		renderAction({ action: move }, { applied: { 7: true } });
+
+		expect(
+			screen.getByRole('button', { name: 'Apply change' })
+		).not.toHaveAttribute('aria-disabled');
+	});
+
+	it('refuses its Undo once the post has changed again', () => {
+		const { spies, registry } = renderAction({
+			action: { type: 'remove_block' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Apply change' }));
+		act(() => {
+			registry.dispatch('core/block-editor').removeBlocks(['intro']);
+		});
+
+		const [notice] = registry.select(noticesStore).getNotices();
+		act(() => notice.actions[0].onClick());
+
+		expect(spies.undo).not.toHaveBeenCalled();
+		expect(spies.setFixApplied).not.toHaveBeenCalledWith(7, false);
 	});
 });

@@ -559,6 +559,27 @@ function findStructuralMarker(noteId) {
 }
 
 /**
+ * Where a suggested move goes back to: right after the block that came
+ * before it, while that block is still in the parent, or else its old index.
+ *
+ * @param {Object} selectors     Block editor selectors.
+ * @param {string} clientId      Client id of the moved block.
+ * @param {string} restoreParent Parent to restore it to, '' for the root.
+ * @param {Object} marker        Its `pending-move` marker.
+ * @return {number} Index once the block has left its current place.
+ */
+function getRestoreIndex(selectors, clientId, restoreParent, marker) {
+	if (marker.fromAnchorClientId === null) {
+		return 0;
+	}
+	const order = selectors
+		.getBlockOrder(restoreParent)
+		.filter((id) => id !== clientId);
+	const anchor = order.indexOf(marker.fromAnchorClientId);
+	return anchor === -1 ? (marker.fromIndex ?? 0) : anchor + 1;
+}
+
+/**
  * Takes a structural suggestion out of the post, as Reject does: a removal
  * keeps its block, and a move goes back to where it came from.
  *
@@ -583,7 +604,7 @@ function rejectStructuralMarker(clientId) {
 			[clientId],
 			liveParent,
 			restoreParent,
-			suggestion.fromIndex ?? 0
+			getRestoreIndex(selectors, clientId, restoreParent, suggestion)
 		);
 	}
 }

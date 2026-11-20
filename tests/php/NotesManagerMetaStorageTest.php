@@ -84,4 +84,35 @@ class NotesManagerMetaStorageTest extends TestCase {
 		$manager = new Notes_Manager();
 		$this->assertSame( $fix, $manager->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) ) );
 	}
+
+	/**
+	 * A structural edit with markup and quotes reads back intact on the
+	 * thread's root note, and is not kept on a later note in the thread.
+	 */
+	public function test_block_action_round_trips_on_root_note_only(): void {
+		$action = array(
+			'type'     => 'insert_block',
+			'position' => 'before',
+			'block'    => array(
+				'name'    => 'core/heading',
+				'content' => 'Le <em>"café"</em>',
+				'level'   => 3,
+			),
+		);
+		$item   = static fn ( string $title ): array => array(
+			'block_id'     => 'block-1',
+			'category'     => 'flow',
+			'severity'     => 'suggestion',
+			'title'        => $title,
+			'feedback'     => 'Add a heading.',
+			'block_action' => $action,
+		);
+
+		$result = ( new Notes_Manager() )->create_notes_from_feedback( array( $item( 'First' ), $item( 'Second' ) ), 10 );
+
+		$this->assertIsArray( $result );
+		list( $root, $child ) = $result['note_ids'];
+		$this->assertSame( $action, Notes_Manager::decode_block_action( get_comment_meta( $root, Notes_Manager::BLOCK_ACTION_META_KEY, true ) ) );
+		$this->assertSame( '', get_comment_meta( $child, Notes_Manager::BLOCK_ACTION_META_KEY, true ) );
+	}
 }

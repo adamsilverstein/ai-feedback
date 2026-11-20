@@ -321,6 +321,16 @@ describe('supersedeSuggestions', () => {
 		);
 	});
 
+	it('moves a superseded move back after the block it followed', async () => {
+		await suggestBlockAction(moveNote);
+		// The author adds a block at the top meanwhile.
+		mocks.blocks.x = paragraph('x', 'New.');
+		mocks.order[''].unshift('x');
+
+		await supersedeSuggestions(13, [13]);
+		expect(mocks.order['']).toEqual(['x', 'intro', 'bg', 'open', 'rep']);
+	});
+
 	it('clears a superseded removal and keeps the block', async () => {
 		await suggestBlockAction(removeNote);
 

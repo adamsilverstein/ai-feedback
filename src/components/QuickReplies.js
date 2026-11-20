@@ -48,11 +48,7 @@ export default function QuickReplies({ note, replies }) {
 			if (latestOwnerId === null) {
 				return false;
 			}
-			if (select(STORE_NAME).isFixApplied(latestOwnerId)) {
-				return true;
-			}
-			// The applied flag only lasts the session; after a reload the
-			// blocks tell, as in QuickFix and BlockAction.
+			// A structural edit is judged by the blocks, as in BlockAction.
 			if (isBlockAction(latestEdit)) {
 				const selectors = select(blockEditorStore);
 				const { state } = getBlockActionState(
@@ -65,6 +61,11 @@ export default function QuickReplies({ note, replies }) {
 					(state === 'missing' && latestEdit.type === 'remove_block')
 				);
 			}
+			if (select(STORE_NAME).isFixApplied(latestOwnerId)) {
+				return true;
+			}
+			// The applied flag only lasts the session; after a reload the
+			// block text tells, as in QuickFix.
 			const block = select(blockEditorStore).getBlock(note.block_id);
 			const key = block
 				? getRichTextAttributeKey(

@@ -139,7 +139,7 @@ export default function BlockAction({
 	const { createSuccessNotice, createWarningNotice } =
 		useDispatch(noticesStore);
 
-	const canApply = state === 'ready' && !suggestionStatus && !isApplied;
+	const canApply = state === 'ready' && !suggestionStatus;
 
 	// Highlight the block and its destination while the preview is open.
 	useEffect(() => {
@@ -168,7 +168,9 @@ export default function BlockAction({
 	const wasAccepted =
 		suggestionStatus === 'applied' ||
 		suggestionStatus === 'applied-unsaved';
-	const wasApplied = isApplied || state === 'applied';
+	// The blocks decide, not the session's applied flag: the editor's own
+	// Undo can take a change back without clearing it.
+	const wasApplied = state === 'applied';
 
 	if (isSuperseded && !wasAccepted && !wasApplied) {
 		return status(
@@ -253,10 +255,8 @@ export default function BlockAction({
 		) {
 			return;
 		}
-		const appliedOrder = registry
-			.select(blockEditorStore)
-			.getClientIdsWithDescendants()
-			.join();
+		// Any later edit gives the editor a new blocks tree.
+		const appliedBlocks = registry.select(blockEditorStore).getBlocks();
 		setFixApplied(ownerId, true);
 		setResolved(true);
 
@@ -268,11 +268,10 @@ export default function BlockAction({
 					label: __('Undo', 'fresh-eyes'),
 					onClick: () => {
 						// Undo only while the change is still the last one.
-						const current = registry
-							.select(blockEditorStore)
-							.getClientIdsWithDescendants()
-							.join();
-						if (current !== appliedOrder) {
+						if (
+							registry.select(blockEditorStore).getBlocks() !==
+							appliedBlocks
+						) {
 							createWarningNotice(
 								__(
 									'The post has changed since the change was applied. Use the editor’s Undo instead.',
