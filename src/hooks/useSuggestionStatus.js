@@ -22,25 +22,38 @@ export function getRecordSuggestionStatus(record) {
 }
 
 /**
+ * Reads a note's suggestion status with a registry's `select`.
+ *
+ * @param {(store: string) => Object} select Registry select.
+ * @param {Object}                    item   Feedback item with `id` and `suggestion_status`.
+ * @return {string|null} Suggestion status, or null when the note is not a suggestion.
+ */
+export function selectSuggestionStatus(select, item) {
+	const postId = select('core/editor').getCurrentPostId();
+	const notes = postId
+		? select('core').getEntityRecords(
+				'root',
+				'comment',
+				getNotesQuery(postId)
+			)
+		: null;
+	const record = notes?.find((note) => note.id === item.id);
+	return record
+		? getRecordSuggestionStatus(record)
+		: (item.suggestion_status ?? null);
+}
+
+/**
  * @param {Object} item Feedback item with `id` and `suggestion_status`.
  * @return {string|null} Suggestion status, or null when the note is not a suggestion.
  */
 export default function useSuggestionStatus(item) {
 	return useSelect(
-		(select) => {
-			const postId = select('core/editor').getCurrentPostId();
-			const notes = postId
-				? select('core').getEntityRecords(
-						'root',
-						'comment',
-						getNotesQuery(postId)
-					)
-				: null;
-			const record = notes?.find((note) => note.id === item.id);
-			return record
-				? getRecordSuggestionStatus(record)
-				: (item.suggestion_status ?? null);
-		},
+		(select) =>
+			selectSuggestionStatus(select, {
+				id: item.id,
+				suggestion_status: item.suggestion_status,
+			}),
 		[item.id, item.suggestion_status]
 	);
 }
