@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use AI_Feedback\Notes_Manager;
 
 require_once __DIR__ . '/reply-status-controller-bootstrap.php';
+require_once __DIR__ . '/reply-service-mocks.php';
 
 /**
  * Test cases for Notes_Manager::add_badges_to_comment_text().
@@ -37,7 +38,7 @@ class NotesManagerBadgesTest extends TestCase {
 	 * Clear stored meta.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_comment_meta'] );
+		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_comments'] );
 	}
 
 	/**
@@ -168,25 +169,40 @@ class NotesManagerBadgesTest extends TestCase {
 	}
 
 	/**
-	 * An AI reply with an edit is labeled with its revision.
+	 * Add an AI reply to note 7's thread.
+	 *
+	 * @param  int                   $id   Comment ID.
+	 * @param  array<string, string> $meta Meta besides `ai_feedback`.
+	 * @return \WP_Comment Reply.
+	 */
+	private function ai_reply( int $id, array $meta = array() ): \WP_Comment {
+		$reply                            = $this->note( $id );
+		$reply->comment_parent            = '7';
+		$GLOBALS['test_comments'][ $id ]  = $reply;
+		$GLOBALS['test_comment_meta'][ $id ] = array( 'ai_feedback' => '1' ) + $meta;
+		return $reply;
+	}
+
+	/**
+	 * AI replies with an edit are labeled in thread order, after the
+	 * review's quick fix, whatever revision an earlier version stored.
 	 */
 	public function test_reply_edit_gets_revision_badge(): void {
-		$GLOBALS['test_comment_meta'][8] = array(
-			'ai_feedback'                      => '1',
-			Notes_Manager::REVISION_META_KEY => '2',
-		);
-		$GLOBALS['test_comment_meta'][9] = array(
-			'ai_feedback'                      => '1',
-			Notes_Manager::REVISION_META_KEY => '1',
-		);
+		$edit = array( Notes_Manager::REPLY_EDIT_META_KEY => '{"type":"replace_text","find":"a","replace":"b"}' );
 
-		$this->assertSame(
-			"Shorter.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Revised suggestion (2)</span>',
-			Notes_Manager::add_badges_to_comment_text( 'Shorter.', $this->note( 8 ) )
-		);
-		$this->assertSame(
-			"Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Suggested edit</span>',
-			Notes_Manager::add_badges_to_comment_text( 'Done.', $this->note( 9 ) )
-		);
+		$GLOBALS['test_comments']                          = array( 7 => $this->note() );
+		$GLOBALS['test_comment_meta'][7]['feedback_quick_fix'] = '{"find":"a","replace":"c"}';
+		$first   = $this->ai_reply( 8, $edit + array( 'feedback_revision' => '2' ) );
+		$no_edit = $this->ai_reply( 9 );
+		$second  = $this->ai_reply( 10, $edit + array( 'feedback_revision' => '2' ) );
+
+		$badge = static fn( string $label ): string => "Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">' . $label . '</span>';
+		$this->assertSame( $badge( 'Revised suggestion (2)' ), Notes_Manager::add_badges_to_comment_text( 'Done.', $first ) );
+		$this->assertSame( 'Done.', Notes_Manager::add_badges_to_comment_text( 'Done.', $no_edit ) );
+		$this->assertSame( $badge( 'Revised suggestion (3)' ), Notes_Manager::add_badges_to_comment_text( 'Done.', $second ) );
+
+		// Without a review edit, the first reply edit is the first revision.
+		unset( $GLOBALS['test_comment_meta'][7]['feedback_quick_fix'] );
+		$this->assertSame( $badge( 'Suggested edit' ), Notes_Manager::add_badges_to_comment_text( 'Done.', $first ) );
 	}
 }
