@@ -269,6 +269,30 @@ describe('suggestBlockAction', () => {
 		});
 	});
 
+	it('records the parent of a move inside a container', async () => {
+		mocks.order = {
+			'': ['group'],
+			group: ['intro', 'bg', 'open', 'rep'],
+		};
+		mocks.blocks.group = paragraph('group', '');
+
+		expect(await suggestBlockAction(moveNote)).toBe(true);
+
+		expect(mocks.order.group).toEqual(['open', 'intro', 'bg', 'rep']);
+		const [record] = mocks.saveEntityRecord.mock.calls[0].slice(2);
+		const origin = {
+			fromParentClientId: 'group',
+			fromIndex: 2,
+			fromAnchorClientId: 'bg',
+		};
+		expect(JSON.parse(record.meta._wp_suggestion).operations[0]).toEqual(
+			expect.objectContaining(origin)
+		);
+		expect(mocks.blocks.open.attributes.metadata.suggestion).toEqual(
+			expect.objectContaining(origin)
+		);
+	});
+
 	it('turns the note back into a plain note when the server drops the payload', async () => {
 		mocks.saveEntityRecord.mockImplementation(
 			async (kind, name, { id }) => ({
