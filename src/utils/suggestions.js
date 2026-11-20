@@ -532,7 +532,13 @@ function canSuggestNow(selectors, action, clientId) {
  * in its new place, marked `pending-move` with where it came from. Accept
  * then removes the block or keeps it where it is; Reject clears the mark
  * or moves it back. The marker carries the note's id, so the suggestion is
- * found again after a reload. If the server did not store the payload as
+ * found again after a reload.
+ *
+ * Meant for Gutenberg's Edit intent. Its Suggest intent can only be read
+ * through a private selector, so it is not checked; there, Gutenberg's own
+ * capture may record the move a second time.
+ *
+ * If the server did not store the payload as
  * sent, the note goes back to being a plain note and the edit stays with
  * Preview and Apply.
  *
