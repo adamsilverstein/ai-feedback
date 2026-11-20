@@ -360,7 +360,7 @@ describe('FeedbackReplies', () => {
 			expect(
 				screen
 					.getAllByTestId('reply-edit')
-					.map((edit) => edit.dataset.superseded)
+					.map((node) => node.dataset.superseded)
 			).toEqual(['yes', 'no']);
 		});
 
