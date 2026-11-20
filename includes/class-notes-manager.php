@@ -193,13 +193,13 @@ class Notes_Manager {
 			'comment_parent'   => $parent_id,
 			'user_id'          => 0, // System-generated (AI).
 			'comment_author'   => Plugin::get_ai_feedback_author(),
-			// add_comment_meta() unslashes each value, which would strip the
-			// backslashes from JSON escapes such as \" and \u00e9.
-			'comment_meta'     => wp_slash( $note_meta ),
+			'comment_meta'     => $note_meta,
 		);
 
-		// Insert comment as note.
-		$note_id = wp_insert_comment( $comment_data );
+		// wp_insert_comment() unslashes the fields, and add_comment_meta() each
+		// meta value, which would strip backslashes such as those in C:\path or
+		// the JSON escape \".
+		$note_id = wp_insert_comment( wp_slash( $comment_data ) );
 
 		if ( ! $note_id ) {
 			Logger::debug( 'Note creation failed - wp_insert_comment returned false' );
@@ -818,18 +818,21 @@ class Notes_Manager {
 
 		$user = wp_get_current_user();
 
+		// wp_insert_comment() unslashes, which would strip backslashes from the name.
 		wp_insert_comment(
-			array(
-				'comment_post_ID'  => (int) $thread->comment_post_ID,
-				'comment_type'     => 'note',
-				'comment_content'  => '',
-				'comment_approved' => $resolved ? '1' : '0',
-				'comment_parent'   => $thread_id,
-				'user_id'          => $user->ID,
-				'comment_author'   => $user->display_name,
-				'comment_meta'     => array(
-					'_wp_note_status' => $resolved ? 'resolved' : 'reopen',
-				),
+			wp_slash(
+				array(
+					'comment_post_ID'  => (int) $thread->comment_post_ID,
+					'comment_type'     => 'note',
+					'comment_content'  => '',
+					'comment_approved' => $resolved ? '1' : '0',
+					'comment_parent'   => $thread_id,
+					'user_id'          => $user->ID,
+					'comment_author'   => $user->display_name,
+					'comment_meta'     => array(
+						'_wp_note_status' => $resolved ? 'resolved' : 'reopen',
+					),
+				)
 			)
 		);
 

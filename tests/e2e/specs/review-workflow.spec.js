@@ -90,6 +90,37 @@ test.describe('Review Workflow', () => {
 		expect(block.attributes.metadata.noteId).toBe(review.note_ids[0]);
 	});
 
+	test('keeps backslashes in the saved note text', async ({
+		page,
+		editor,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		// The e2e mu-plugin returns feedback with backslashes for this block.
+		await aiFeedback.createAndSavePost(
+			{ title: 'Backslashes', content: 'Backslash fixture paragraph.' },
+			{ editor }
+		);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		expect(review.note_count).toBe(1);
+
+		const [note] = await requestUtils.rest({
+			path: '/wp/v2/comments',
+			params: {
+				post: await getPostId(page),
+				type: 'note',
+				status: 'all',
+				context: 'edit',
+			},
+		});
+		expect(note.content.raw).toContain(
+			'Use C:\\path\\new and match \\d+\\.\\d+ in {"say":"\\"hi\\""}.'
+		);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,

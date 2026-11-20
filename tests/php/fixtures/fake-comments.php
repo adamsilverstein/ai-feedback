@@ -41,7 +41,10 @@ function ai_feedback_test_reset_comments(): void {
 ai_feedback_test_reset_comments();
 
 if ( ! function_exists( 'wp_insert_comment' ) ) {
-	function wp_insert_comment( $data ) {
+	function wp_insert_comment( $raw ) {
+		// Like core, which unslashes the comment fields, and stores each meta
+		// value through add_comment_meta(), which unslashes it again.
+		$data    = wp_unslash( array_diff_key( $raw, array( 'comment_meta' => true ) ) );
 		$id      = $GLOBALS['test_next_comment']++;
 		$comment = new WP_Comment();
 
@@ -55,10 +58,9 @@ if ( ! function_exists( 'wp_insert_comment' ) ) {
 		$comment->user_id          = (string) ( $data['user_id'] ?? 0 );
 
 		$GLOBALS['test_comments'][ $id ]      = $comment;
-		$GLOBALS['test_inserted_args'][ $id ] = $data;
+		$GLOBALS['test_inserted_args'][ $id ] = $raw;
 
-		// Like core, which stores each value through add_comment_meta(), and so unslashes it.
-		foreach ( $data['comment_meta'] ?? array() as $key => $value ) {
+		foreach ( $raw['comment_meta'] ?? array() as $key => $value ) {
 			$GLOBALS['test_comment_meta'][ $id ][ $key ] = wp_unslash( $value );
 		}
 
@@ -102,6 +104,7 @@ if ( ! function_exists( 'update_comment_meta' ) ) {
 		if ( '' !== $prev_value && ( $GLOBALS['test_comment_meta'][ (int) $id ][ $key ] ?? null ) != $prev_value ) {
 			return false; // Matches core: a compare-and-set miss returns false.
 		}
+		$value = wp_unslash( $value ); // Like core's update_metadata().
 		if ( ( $GLOBALS['test_comment_meta'][ (int) $id ][ $key ] ?? null ) === $value ) {
 			return false; // Matches core: unchanged values return false.
 		}
