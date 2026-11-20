@@ -577,9 +577,15 @@ $ai-feedback-text-muted: #595959;
 	}
 
 	/* stylelint-disable-next-line no-descending-specificity */
-	.ai-feedback-quick-fix-unavailable {
+	.ai-feedback-quick-fix-unavailable,
+	.ai-feedback-quick-fix-superseded {
 		margin: 0 0 8px;
 		text-align: left;
+	}
+
+	&.is-superseded .ai-feedback-quick-fix-summary {
+		color: $ai-feedback-text-muted;
+		text-decoration: line-through;
 	}
 }
 
@@ -811,6 +817,20 @@ $ai-feedback-reply-error: #cc1818;
 .ai-feedback-reply-content {
 	color: $ai-feedback-reply-text;
 	overflow-wrap: anywhere;
+}
+
+/* Revision label on an AI reply's suggested edit */
+.ai-feedback-reply-revision {
+	font-weight: 600;
+	font-size: 12px;
+}
+
+/* Quick replies under the latest AI message */
+.ai-feedback-quick-replies {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 8px;
 }
 
 .ai-feedback-reply-pending .ai-feedback-reply-error {
