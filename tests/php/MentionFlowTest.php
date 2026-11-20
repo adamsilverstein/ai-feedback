@@ -588,6 +588,55 @@ class MentionFlowTest extends TestCase {
 	}
 
 	/**
+	 * Structural changes a mention on selected text can come back with.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function structural_edits(): array {
+		return array(
+			'remove' => array( '{"type": "remove_block"}' ),
+			'insert' => array( '{"type": "insert_block", "position": "after", "block": {"name": "core/paragraph", "content": "More."}}' ),
+		);
+	}
+
+	/**
+	 * A structural change is beyond a note on selected text: it is dropped,
+	 * and the answer says so.
+	 *
+	 * @dataProvider structural_edits
+	 *
+	 * @param string $edit Edit JSON.
+	 */
+	public function test_structural_change_to_a_selection_is_dropped( string $edit ): void {
+		$this->service->response = '{"reply": "Cut it.", "edit": ' . $edit . '}';
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->process( 300 );
+
+		$this->assertArrayNotHasKey( 'reply_edit', $this->notes->saved[900] ?? array() );
+		$this->assertSame(
+			'Cut it. (The suggested change was left out because it went beyond the selected text.)',
+			$this->notes->saved[900]['feedback'] ?? null
+		);
+	}
+
+	/**
+	 * A note on a whole block may still get a structural change.
+	 */
+	public function test_structural_change_to_a_whole_block_is_kept(): void {
+		$html = '<p>Intro the very long sentence ends here.</p>';
+		$GLOBALS['test_parsed_blocks'][ self::EDITOR_CONTENT ][0]['innerHTML']    = $html;
+		$GLOBALS['test_parsed_blocks'][ self::EDITOR_CONTENT ][0]['innerContent'] = array( $html );
+		$this->service->response = '{"reply": "Cut it.", "edit": {"type": "remove_block"}}';
+		$this->insert_note( 300, '@fresh-eyes should this go?' );
+
+		$this->process( 300 );
+
+		$this->assertSame( array( 'type' => 'remove_block' ), $this->notes->saved[900]['reply_edit'] ?? null );
+		$this->assertSame( 'Cut it.', $this->notes->saved[900]['feedback'] ?? null );
+	}
+
+	/**
 	 * Asking Fresh Eyes, even with a mention chip, sends no email.
 	 */
 	public function test_mention_sends_no_email(): void {
