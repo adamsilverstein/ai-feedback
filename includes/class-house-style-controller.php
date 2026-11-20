@@ -23,11 +23,16 @@ use WP_Error;
 class House_Style_Controller extends WP_REST_Controller {
 
 	/**
+	 * Route namespace.
+	 */
+	private const ROUTE_NAMESPACE = 'ai-feedback/v1';
+
+	/**
 	 * Namespace.
 	 *
 	 * @var string
 	 */
-	protected $namespace = 'ai-feedback/v1';
+	protected $namespace = self::ROUTE_NAMESPACE;
 
 	/**
 	 * REST base.
@@ -53,7 +58,7 @@ class House_Style_Controller extends WP_REST_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace,
+			self::ROUTE_NAMESPACE,
 			'/' . $this->rest_base,
 			array(
 				array(
@@ -79,7 +84,7 @@ class House_Style_Controller extends WP_REST_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace,
+			self::ROUTE_NAMESPACE,
 			'/' . $this->rest_base . '/(?P<id>[a-z0-9-]{1,64})',
 			array(
 				array(
@@ -103,7 +108,7 @@ class House_Style_Controller extends WP_REST_Controller {
 		);
 
 		register_rest_route(
-			$this->namespace,
+			self::ROUTE_NAMESPACE,
 			'/' . $this->rest_base . '/proposals/(?P<note_id>\d+)/dismiss',
 			array(
 				array(

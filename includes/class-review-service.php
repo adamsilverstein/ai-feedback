@@ -665,8 +665,8 @@ class Review_Service {
 	/**
 	 * Get mock AI response for testing.
 	 *
-	 * @param  array  $blocks Document blocks with clientId, name, content.
-	 * @param  string $prompt Review prompt, for filters that answer from it.
+	 * @param  array<mixed> $blocks Document blocks with clientId, name, content.
+	 * @param  string       $prompt Review prompt, for filters that answer from it.
 	 * @return string Mock JSON response.
 	 */
 	private function get_mock_response( array $blocks, string $prompt = '' ): string {

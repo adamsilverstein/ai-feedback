@@ -505,4 +505,30 @@ class ReplyStatusControllerTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'rest_comment_invalid_id', $result->get_error_code() );
 	}
+
+	/**
+	 * An AI reply's proposed house style rule is returned with its status.
+	 */
+	public function test_threads_include_house_rule_proposal(): void {
+		$this->seed_thread( 'complete' );
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\House_Style::PROPOSAL_META_KEY ]        = 'Headings use sentence case';
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\House_Style::PROPOSAL_STATUS_META_KEY ] = 'saved';
+		// A user reply can't carry a proposal, even with the meta set.
+		$GLOBALS['test_comment_meta'][301][ \AI_Feedback\House_Style::PROPOSAL_META_KEY ] = 'Anything';
+
+		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$replies = ( (array) $data['threads'] )[300]['replies'];
+
+		$this->assertSame(
+			array(
+				null,
+				array(
+					'text'   => 'Headings use sentence case',
+					'status' => 'saved',
+				),
+				null,
+			),
+			array_column( $replies, 'proposal' )
+		);
+	}
 }

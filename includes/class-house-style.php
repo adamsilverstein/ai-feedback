@@ -188,10 +188,14 @@ class House_Style {
 			);
 		}
 
-		$rules[ $index ]['text'] = $text;
+		$rule            = array(
+			'id'   => $id,
+			'text' => $text,
+		);
+		$rules[ $index ] = $rule;
 		self::save( $scope, $rules );
 
-		return $rules[ $index ];
+		return $rule;
 	}
 
 	/**
@@ -237,7 +241,7 @@ class House_Style {
 		 */
 		$filtered = apply_filters( 'ai_feedback_house_style_rules', $rules, $user_id );
 
-		return self::clean_list( is_array( $filtered ) ? $filtered : $rules, 2 * self::MAX_RULES );
+		return self::clean_list( $filtered, 2 * self::MAX_RULES );
 	}
 
 	/**
@@ -260,18 +264,21 @@ class House_Style {
 	/**
 	 * Sanitize a list of rule texts, dropping empty, too long and repeated ones.
 	 *
-	 * @param  array<mixed> $rules Rule texts.
-	 * @param  int          $limit Most rules to keep.
+	 * @param  mixed $rules Rule texts. Anything but an array gives no rules.
+	 * @param  int   $limit Most rules to keep.
 	 * @return list<string>
 	 */
-	public static function clean_list( array $rules, int $limit ): array {
+	public static function clean_list( mixed $rules, int $limit ): array {
 		$clean = array();
-		foreach ( $rules as $rule ) {
+		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
 			$text = self::sanitize_rule( $rule );
 			if ( '' === $text || self::is_too_long( $text ) ) {
 				continue;
 			}
-			$clean[ self::compare_key( $text ) ] = $text;
+			$key = self::compare_key( $text );
+			if ( ! isset( $clean[ $key ] ) ) {
+				$clean[ $key ] = $text;
+			}
 			if ( count( $clean ) >= $limit ) {
 				break;
 			}

@@ -954,7 +954,7 @@ EOT;
 	 * @return string Section, or an empty string when there are no rules.
 	 */
 	private function build_house_style_section( mixed $rules, bool $is_reply ): string {
-		$rules = House_Style::clean_list( is_array( $rules ) ? $rules : array(), 2 * House_Style::MAX_RULES );
+		$rules = House_Style::clean_list( $rules, 2 * House_Style::MAX_RULES );
 		if ( array() === $rules ) {
 			return '';
 		}
