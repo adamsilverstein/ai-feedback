@@ -293,19 +293,26 @@ class Response_Parser {
 			}
 		}
 
-		// A block with a structural edit or formatting fix gets no quick fix
-		// from any item, so the review proposes one change per block.
-		foreach ( $parsed as $index => $validated ) {
-			$block_id = is_string( $validated['block_id'] ?? null ) ? $validated['block_id'] : '';
-			if ( isset( $actioned[ $block_id ] ) && ! isset( $validated['block_action'] ) && ! isset( $validated['block_change'] ) ) {
-				unset( $parsed[ $index ]['quick_fix'] );
-			}
-		}
-
 		Logger::debug( sprintf( 'Parsed %d valid feedback items', count( $parsed ) ) );
 
 		// Group similar feedback items to reduce noise.
 		$grouped = $this->group_similar_feedback( $parsed );
+
+		// A block whose structural edit or formatting fix survived grouping
+		// gets no quick fix from any item, so the review proposes one change
+		// per block.
+		$changed = array();
+		foreach ( $grouped as $item ) {
+			if ( is_string( $item['block_id'] ?? null ) && ( isset( $item['block_action'] ) || isset( $item['block_change'] ) ) ) {
+				$changed[ $item['block_id'] ] = true;
+			}
+		}
+		foreach ( $grouped as $index => $item ) {
+			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
+			if ( isset( $changed[ $block_id ] ) && ! isset( $item['block_action'] ) && ! isset( $item['block_change'] ) ) {
+				unset( $grouped[ $index ]['quick_fix'] );
+			}
+		}
 
 		Logger::debug( sprintf( 'Grouped into %d feedback items', count( $grouped ) ) );
 

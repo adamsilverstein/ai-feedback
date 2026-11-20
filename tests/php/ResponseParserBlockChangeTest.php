@@ -330,4 +330,44 @@ class ResponseParserBlockChangeTest extends TestCase {
 		$feedback                      = self::parse( array( $quick, $list ) );
 		$this->assertArrayHasKey( 'quick_fix', self::find( $feedback, 'Word choice' ) );
 	}
+
+	/**
+	 * When grouping drops a formatting fix, the block's quick fix on
+	 * another item stays.
+	 */
+	public function test_quick_fix_kept_when_grouping_drops_the_fix(): void {
+		$feedback = self::parse(
+			array(
+				self::item(
+					'needs',
+					'Use a list',
+					array(
+						'block_change' => array(
+							'type'  => 'transform',
+							'to'    => 'core/list',
+							'items' => array( 'Node', 'npm', 'Docker', 'Git' ),
+						),
+					)
+				),
+				self::item( 'h2', 'Use a list' ),
+				self::item(
+					'needs',
+					'Word choice',
+					array(
+						'category'  => 'tone',
+						'quick_fix' => array(
+							'find'    => 'Node',
+							'replace' => 'Python',
+						),
+					)
+				),
+			)
+		);
+
+		foreach ( $feedback as $item ) {
+			$this->assertArrayNotHasKey( 'block_change', $item );
+		}
+		$this->assertArrayHasKey( 'quick_fix', self::find( $feedback, 'Word choice' ) );
+	}
 }
+
