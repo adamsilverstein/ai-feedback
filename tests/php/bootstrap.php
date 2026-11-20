@@ -48,6 +48,7 @@ if ( ! function_exists( 'did_action' ) ) {
 // Loaded after ABSPATH, which it requires.
 require_once $includes_dir . 'class-suggestions.php';
 require_once $includes_dir . 'class-mentions.php';
+require_once $includes_dir . 'class-editor-text.php';
 
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {

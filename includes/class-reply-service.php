@@ -1242,27 +1242,18 @@ class Reply_Service {
 	 *
 	 * An edit's `find` is matched against this text here and against
 	 * `create( { html } ).text` in the editor, so they must agree: a line
-	 * break is "\n", an inline image is U+FFFC, entities are decoded and
-	 * whitespace is kept as written. The outer ends are trimmed. Shares its
-	 * cases with extractEditorText() in src/utils/block-utils.js through
-	 * tests/fixtures/editor-text.json.
+	 * break is "\n", a footnote, an inline image or a comment is U+FFFC,
+	 * entities are decoded and whitespace is kept as written. The outer ends
+	 * are trimmed. Shares its cases with extractEditorText() in
+	 * src/utils/block-utils.js through tests/fixtures/editor-text.json.
 	 *
-	 * Table cells and list items, which the editor never matches across,
-	 * end with a space so their text doesn't run together in the prompt.
-	 * A rich text block's own closing tag ends the text, so it is trimmed.
+	 * @see Editor_Text::read()
 	 *
 	 * @param string $html Block HTML.
 	 * @return string Block text.
 	 */
 	public static function editor_text( string $html ): string {
-		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
-		// Comments are block delimiters here, not text.
-		$html = (string) preg_replace( '#<!--.*?-->#s', '', $html );
-		$html = (string) preg_replace( '#<br\b[^>]*>#i', "\n", $html );
-		$html = (string) preg_replace( '#</(?:p|li|td|th|h[1-6]|div|figcaption|blockquote|pre)\b[^>]*>#i', '$0 ', $html );
-		$html = (string) preg_replace( '#<img\b[^>]*>#i', "\u{FFFC}", $html );
-		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-		return trim( str_replace( "\u{FEFF}", '', $text ) );
+		return Editor_Text::read( $html );
 	}
 
 	/**
