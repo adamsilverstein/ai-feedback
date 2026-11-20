@@ -613,6 +613,45 @@ $ai-feedback-text-muted: #595959;
 	}
 }
 
+/* Structural edit previews */
+.ai-feedback-block-action-preview {
+	margin: 8px 0 0;
+	font-size: 12px;
+
+	.ai-feedback-block-action-outline-label {
+		margin: 8px 0 4px;
+		font-weight: 600;
+	}
+
+	ol {
+		margin: 0 0 0 20px;
+	}
+
+	.ai-feedback-block-action-line {
+		margin: 0 0 2px;
+		overflow-wrap: anywhere;
+	}
+
+	.is-removed {
+		background: #fcf0f1;
+		color: #8a2424;
+	}
+
+	.is-moved {
+		background: #fcf9e8;
+		color: #614200;
+	}
+
+	.is-added {
+		background: #edfaef;
+		color: #005c12;
+	}
+
+	.ai-feedback-block-action-mark {
+		font-style: italic;
+	}
+}
+
 /* Dismissed feedback items */
 .ai-feedback-item.is-dismissed,
 .ai-feedback-group.is-dismissed {

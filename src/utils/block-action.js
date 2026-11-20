@@ -416,9 +416,9 @@ export function applyBlockAction(
 /**
  * Label a block for the preview outline.
  *
- * @param {Function} getTitle Returns a block type's title from its name.
- * @param {string}   name     Block name.
- * @param {string}   text     Block text.
+ * @param {(name: string) => (string|undefined)} getTitle Returns a block type's title from its name.
+ * @param {string}                               name     Block name.
+ * @param {string}                               text     Block text.
  * @return {string} Label.
  */
 function outlineLabel(getTitle, name, text) {
@@ -461,11 +461,11 @@ function aroundChanges(lines, focus = []) {
  * Shows the blocks at the level the edit lands on: the note block's
  * siblings, or a move target's siblings when it moves to another parent.
  *
- * @param {Object}   selectors Block editor selectors.
- * @param {Function} getTitle  Returns a block type's title from its name.
- * @param {Object}   action    Structural edit.
- * @param {string}   clientId  Client ID of the note's block.
- * @param {string}   targetId  A move's target.
+ * @param {Object}                               selectors Block editor selectors.
+ * @param {(name: string) => (string|undefined)} getTitle  Returns a block type's title from its name.
+ * @param {Object}                               action    Structural edit.
+ * @param {string}                               clientId  Client ID of the note's block.
+ * @param {string}                               targetId  A move's target.
  * @return {{before: OutlineLine[], after: OutlineLine[]}} Outlines.
  */
 export function getBlockActionOutline(

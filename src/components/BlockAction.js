@@ -71,7 +71,10 @@ function Outline({ label, lines }) {
 				{lines.map((line) => (
 					<li
 						key={line.key}
-						className={line.mark ? `is-${line.mark}` : undefined}
+						className={
+							'ai-feedback-block-action-line' +
+							(line.mark ? ` is-${line.mark}` : '')
+						}
 					>
 						{line.mark === 'removed' ? (
 							<del>{line.label}</del>
