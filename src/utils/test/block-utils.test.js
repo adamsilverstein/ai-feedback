@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * WordPress dependencies
  */
-import { create } from '@wordpress/rich-text';
+import { create, RichTextData } from '@wordpress/rich-text';
 
 /**
  * Internal dependencies
@@ -144,5 +144,41 @@ describe('extractEditorText', () => {
 				'<!-- wp:paragraph -->\n<p>a<br>b</p>\n<!-- /wp:paragraph -->'
 			)
 		).toBe('\na\nb\n');
+	});
+});
+
+// Shared with ReplyServiceTest::test_text_edit_matches_own_text_of_a_block_with_inner_blocks().
+describe('extractBlockData for a block with inner blocks', () => {
+	it.each(
+		EDITOR_TEXT.blocks.flatMap((item) => [
+			[item.name, 'a string', item, item.content],
+			[
+				item.name,
+				'rich text',
+				item,
+				RichTextData.fromHTMLString(item.content),
+			],
+		])
+	)('sends the own text of a %s, as %s', (_name, _type, item, content) => {
+		const [data] = extractBlockData([
+			{
+				clientId: 'item',
+				name: item.block,
+				attributes: { content },
+				originalContent: item.before + item.inner + item.after,
+				innerBlocks: [
+					{
+						clientId: 'nested',
+						name: 'core/list',
+						attributes: {},
+						originalContent: item.inner,
+						innerBlocks: [],
+					},
+				],
+			},
+		]);
+
+		expect(create({ html: item.content }).text).toBe(item.text);
+		expect(data.content).toBe(item.text.trim());
 	});
 });

@@ -41,6 +41,29 @@ export function extractEditorText(innerHTML) {
 }
 
 /**
+ * Text of a block a review's quick fixes are matched against.
+ *
+ * A block with inner blocks and its own rich text, like a list item with
+ * a nested list, is edited in its `content` alone, so that is its text.
+ *
+ * @param {Object} block      Block.
+ * @param {string} rawContent The block's saved HTML.
+ * @return {string} Text.
+ */
+function getReviewText(block, rawContent) {
+	const own = block.attributes?.content;
+	if (block.innerBlocks?.length && own !== undefined && own !== null) {
+		return extractEditorText(
+			typeof own === 'string' ? own : own.toHTMLString()
+		);
+	}
+	// An image block's <img> is the block, not an inline image in its text.
+	return block.name === 'core/image'
+		? extractTextContent(rawContent)
+		: extractEditorText(rawContent);
+}
+
+/**
  * Fingerprint a block's text so a note can find the block again after a
  * reload, when its clientId has changed.
  *
@@ -108,11 +131,7 @@ export function extractBlockData(blocks, parent = '') {
 		// Use originalContent if available (parsed from existing HTML),
 		// otherwise serialize the current block state.
 		const rawContent = block.originalContent || serialize(block);
-		// An image block's <img> is the block, not an inline image in its text.
-		const content =
-			block.name === 'core/image'
-				? extractTextContent(rawContent)
-				: extractEditorText(rawContent);
+		const content = getReviewText(block, rawContent);
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.

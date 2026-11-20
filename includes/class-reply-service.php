@@ -501,7 +501,7 @@ class Reply_Service {
 			return $ai_text;
 		}
 
-		$block_content = is_string( $context['block_content'] ?? null ) ? $context['block_content'] : '';
+		$block_content = is_string( $context['block_text'] ?? null ) ? $context['block_text'] : '';
 		$targets       = is_array( $context['block_targets'] ?? null ) ? $context['block_targets'] : array();
 		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ), $targets );
 		if ( null === $parsed && ! $this->response_parser->is_readable_reply( $ai_text ) ) {
@@ -716,13 +716,17 @@ class Reply_Service {
 		// The text as it reads without any pending suggestion, which is how
 		// the editor leaves it once a new edit supersedes that suggestion.
 		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
+		// What an edit's `find` is matched against: the block's own text as
+		// the editor holds it, without its inner blocks, like a list item's
+		// text without its nested list.
+		$block_text    = null !== $block ? self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) : '';
 		$block_content = '';
 		if ( null !== $block ) {
-			// Edits apply to a block's own rich text, so a block with inner
-			// blocks, or an image block, whose <img> is the block, keeps the
-			// collapsed reading, which is easier to follow.
+			// The prompt reads a block with inner blocks, or an image block,
+			// whose <img> is the block, the collapsed way, which is easier to
+			// follow.
 			$block_content = empty( $block['innerBlocks'] ) && 'core/image' !== $block_type
-				? self::editor_text( $block_html )
+				? $block_text
 				: self::html_text( $block_html );
 		}
 		$nearby = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
@@ -734,6 +738,7 @@ class Reply_Service {
 			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
 			'block_html'        => $block_html,
 			'block_content'     => $block_content,
+			'block_text'        => $block_text,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
 			// A rewrite replaces the whole block from the plain text the AI
@@ -750,7 +755,7 @@ class Reply_Service {
 			'thread'            => $thread,
 			'nearby_blocks'     => $nearby,
 			'block_targets'     => self::get_block_targets( $nearby ),
-			'pending_edit'      => $this->find_pending_edit( $edits, $block_content, $located ),
+			'pending_edit'      => $this->find_pending_edit( $edits, $block_text, $located ),
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
@@ -1291,6 +1296,17 @@ class Reply_Service {
 		}
 
 		return $html;
+	}
+
+	/**
+	 * Get a parsed block's own HTML, without its inner blocks.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return string Block HTML.
+	 */
+	private static function get_own_html( array $block ): string {
+		$inner_content = is_array( $block['innerContent'] ?? null ) ? $block['innerContent'] : array();
+		return implode( '', array_filter( $inner_content, 'is_string' ) );
 	}
 
 	/**

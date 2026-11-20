@@ -186,5 +186,26 @@
 			"html": "<p class=\"has-text-align-center\">a <strong>b</strong></p>",
 			"text": "a b"
 		}
+	],
+	"_comment_blocks": "Blocks with inner blocks: the editor matches an edit against the block's own rich text, `content`, never the inner blocks. The server reads it from the innerContent strings around the inner blocks (before, inner, after); the review reads the `content` attribute.",
+	"blocks": [
+		{
+			"name": "list item with a nested list",
+			"block": "core/list-item",
+			"before": "<li>Revenue grew 40%<br>last year.",
+			"inner": "<ul class=\"wp-block-list\"><li>Nested item</li></ul>",
+			"after": "</li>",
+			"content": "Revenue grew 40%<br>last year.",
+			"text": "Revenue grew 40%\nlast year."
+		},
+		{
+			"name": "list item with a nested list and two spaces",
+			"block": "core/list-item",
+			"before": "<li>Two.&nbsp; Spaces",
+			"inner": "<ul class=\"wp-block-list\"><li>Nested item</li></ul>",
+			"after": "</li>",
+			"content": "Two.&nbsp; Spaces",
+			"text": "Two.\u00a0 Spaces"
+		}
 	]
 }

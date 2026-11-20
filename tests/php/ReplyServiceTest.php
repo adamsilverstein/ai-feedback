@@ -864,11 +864,11 @@ class ReplyServiceTest extends TestCase {
 	public static function editor_whitespace_provider(): array {
 		return array(
 			'break then source newline, as the prompt showed it before' => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n last year", false ),
-			'break then source newline, as the editor reads it'         => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n\nlast year", true ),
-			'two typed spaces, read as one'                             => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew. Last', false ),
-			'two typed spaces, as the editor reads them'                => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew.  Last', true ),
-			'narrow no-break space read as a space'                     => array( "<p>Prix\u{202F}: 5 euros.</p>", 'Prix : 5', false ),
-			'narrow no-break space kept'                                => array( "<p>Prix\u{202F}: 5 euros.</p>", "Prix\u{202F}: 5", true ),
+			'break then source newline, as the editor reads it' => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n\nlast year", true ),
+			'two typed spaces, read as one'              => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew. Last', false ),
+			'two typed spaces, as the editor reads them' => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew.  Last', true ),
+			'narrow no-break space read as a space'      => array( "<p>Prix\u{202F}: 5 euros.</p>", 'Prix : 5', false ),
+			'narrow no-break space kept'                 => array( "<p>Prix\u{202F}: 5 euros.</p>", "Prix\u{202F}: 5", true ),
 		);
 	}
 
@@ -883,7 +883,19 @@ class ReplyServiceTest extends TestCase {
 	 * @param bool   $kept Whether the edit is kept.
 	 */
 	public function test_text_edit_matches_editor_whitespace( string $html, string $find, bool $kept ): void {
-		$notes = $this->reply_with( (string) wp_json_encode( array( 'reply' => 'Changed it.', 'edit' => array( 'type' => 'replace_text', 'find' => $find, 'replace' => 'x' ) ) ), $html );
+		$notes = $this->reply_with(
+			(string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			),
+			$html
+		);
 
 		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
 		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
@@ -917,6 +929,80 @@ class ReplyServiceTest extends TestCase {
 	 */
 	public function test_editor_text_matches_the_editor( string $html, string $text ): void {
 		$this->assertSame( trim( $text ), Reply_Service::editor_text( $html ) );
+	}
+
+	/**
+	 * Data provider for the shared blocks with inner blocks.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: string, 3: string, 4: string}>
+	 */
+	public static function own_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['blocks'] ?? null ) ? $fixture['blocks'] : array() as $case ) {
+			if ( ! is_array( $case ) ) {
+				continue;
+			}
+			$fields = array();
+			foreach ( array( 'name', 'block', 'before', 'inner', 'after', 'text' ) as $key ) {
+				$fields[ $key ] = is_string( $case[ $key ] ?? null ) ? $case[ $key ] : '';
+			}
+			$cases[ $fields['name'] ] = array( $fields['block'], $fields['before'], $fields['inner'], $fields['after'], $fields['text'] );
+		}
+		return $cases;
+	}
+
+	/**
+	 * An edit on a block with inner blocks, like a list item with a nested
+	 * list, is matched against the block's own text as the editor reads it,
+	 * without the inner blocks.
+	 *
+	 * @dataProvider own_text_provider
+	 *
+	 * @param string $name   Block name.
+	 * @param string $before HTML before the inner blocks.
+	 * @param string $inner  Inner blocks' HTML.
+	 * @param string $after  HTML after the inner blocks.
+	 * @param string $text   The block's own text, as the editor reads it.
+	 */
+	public function test_text_edit_matches_own_text_of_a_block_with_inner_blocks( string $name, string $before, string $inner, string $after, string $text ): void {
+		$finds = array(
+			$text                                         => true,
+			(string) preg_replace( '/\s+/u', ' ', $text ) => false,
+			'Nested item'                                 => false,
+		);
+		foreach ( $finds as $find => $kept ) {
+			$find = (string) $find;
+			$this->seed_parent_and_reply();
+			$this->seed_post_blocks(
+				array(
+					array(
+						'blockName'    => $name,
+						'attrs'        => array( 'metadata' => array( 'noteId' => 100 ) ),
+						'innerBlocks'  => array( self::leaf_block( 'core/list', $inner ) ),
+						'innerHTML'    => $before . $after,
+						'innerContent' => array( $before, null, $after ),
+					),
+				)
+			);
+
+			$notes                    = new Reply_Service_Fake_Notes_Manager();
+			$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+			$service->canned_response = (string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			);
+			$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+			$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+			$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null, $find );
+		}
 	}
 
 	/**
@@ -1478,7 +1564,7 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_parent_and_reply();
 		$GLOBALS['test_comment_meta'][100]['block_name']                           = 'core/heading';
 		$GLOBALS['test_comment_meta'][100][ Notes_Manager::BLOCK_CHANGE_META_KEY ] = '{"type":"set_attributes","attributes":{"level":3},"from":{"level":4}}';
-		$heading                  = self::leaf_block( 'core/heading', '<h4 class="wp-block-heading">Setup</h4>', 100 );
+		$heading                   = self::leaf_block( 'core/heading', '<h4 class="wp-block-heading">Setup</h4>', 100 );
 		$heading['attrs']['level'] = 4;
 		$this->seed_post_blocks( array( $heading ) );
 
