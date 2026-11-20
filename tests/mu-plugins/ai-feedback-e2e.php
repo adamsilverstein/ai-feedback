@@ -376,6 +376,37 @@ add_filter(
 	2
 );
 
+// A review of a paragraph split by a line break fixes a typo with a find
+// that runs across the break, copied as a newline. It only does when the
+// newline reaches the review intact.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		foreach ( $blocks as $block ) {
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( "Revenue grew 40%\nlast yaer." !== $content ) {
+				continue;
+			}
+			$response['feedback'] = array(
+				array(
+					'block_id'  => $block['clientId'] ?? '',
+					'category'  => 'grammar',
+					'severity'  => 'suggestion',
+					'title'     => 'yaer → year',
+					'feedback'  => 'Spelling.',
+					'quick_fix' => array(
+						'find'    => "40%\nlast yaer",
+						'replace' => "40%\nlast year",
+					),
+				),
+			);
+		}
+		return $response;
+	},
+	10,
+	2
+);
+
 // A note that mentions Fresh Eyes and asks to simplify gets an edit that
 // shortens the text the note is on, and names that text so tests can tell
 // the selection reached the AI. Asking for sources gets an answer with a
