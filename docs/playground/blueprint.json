@@ -1,0 +1,170 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "Fresh Eyes + Suggestion mode (Gutenberg PR #78994)",
+		"description": "Installs the Gutenberg PR #78994 build with Suggestion mode on, the Fresh Eyes plugin, and the AI provider plugins, plus a sample draft and a second Editor user.",
+		"author": "adamsilverstein",
+		"categories": [
+			"Gutenberg",
+			"AI"
+		]
+	},
+	"landingPage": "/wp-admin/post.php?post=100&action=edit",
+	"preferredVersions": {
+		"php": "8.3",
+		"wp": "latest"
+	},
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "url",
+				"url": "https://playground.wordpress.net/plugin-proxy.php?org=WordPress&repo=gutenberg&workflow=Build%20Gutenberg%20Plugin%20Zip&artifact=gutenberg.zip&pr=78994"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "url",
+				"url": "https://wordpress-playground-cors-proxy.net/?https://github.com/adamsilverstein/fresh-eyes/releases/latest/download/fresh-eyes.zip"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "ai-provider-for-anthropic"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "ai-provider-for-openai"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "ai-provider-for-google"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"option",
+				"update",
+				"gutenberg-experiments",
+				"{\"gutenberg-suggestion-mode\":1}",
+				"--format=json"
+			]
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"user",
+				"create",
+				"reviewer",
+				"reviewer@example.com",
+				"--role=editor",
+				"--user_pass=password",
+				"--display_name=Reviewer"
+			]
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"user",
+				"meta",
+				"update",
+				"reviewer",
+				"wp_persisted_preferences",
+				"{\"core/edit-post\":{\"welcomeGuide\":false}}",
+				"--format=json"
+			]
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"user",
+				"meta",
+				"update",
+				"admin",
+				"wp_persisted_preferences",
+				"{\"core/edit-post\":{\"welcomeGuide\":false}}",
+				"--format=json"
+			]
+		},
+		{
+			"step": "mkdir",
+			"path": "/wordpress/wp-content/uploads"
+		},
+		{
+			"step": "writeFile",
+			"path": "/wordpress/wp-content/uploads/suggestion-mode-sample.webp",
+			"data": {
+				"resource": "url",
+				"url": "https://raw.githubusercontent.com/WordPress/wordpress-develop/trunk/src/wp-content/themes/twentytwentyfive/assets/images/marshland-birds-square.webp"
+			}
+		},
+		{
+			"step": "writeFile",
+			"path": "/tmp/suggestion-mode-post.html",
+			"data": "<!-- wp:paragraph -->\n<p>This post is here to try Fresh Eyes with Suggestion mode. First add an API key under Settings, then Connectors (Anthropic, OpenAI or Google). Then open the Fresh Eyes sidebar and run a review: quick fixes arrive as suggestions you can accept or reject. You can also make your own suggestions from Options, then Mode.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Getting there</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>We left early on Saturday and reached the harbor before the fog lifted. The fishing boats were already out, and the cafe by the pier had just started serving coffee.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:image {\"sizeSlug\":\"large\"} -->\n<figure class=\"wp-block-image size-large\"><img src=\"/wp-content/uploads/suggestion-mode-sample.webp\" alt=\"Birds over a marsh at the water's edge\"/><figcaption class=\"wp-element-caption\">Birds over the marsh behind the harbor.</figcaption></figure>\n<!-- /wp:image -->\n\n<!-- wp:paragraph -->\n<p>By noon the sun was out, so we walked the cliff path to the lighthouse. It is about three miles each way, with a steep section near the top.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\">What to pack</h3>\n<!-- /wp:heading -->\n\n<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>A warm layer, even in summer</li>\n<!-- /wp:list-item -->\n\n<!-- wp:list-item -->\n<li>Water and a snack for the lighthouse walk</li>\n<!-- /wp:list-item -->\n\n<!-- wp:list-item -->\n<li>Cash for the parking meter by the harbor</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->\n\n<!-- wp:paragraph -->\n<p>We would go back in a heartbeat, though next time we will stay the night.</p>\n<!-- /wp:paragraph -->\n"
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"post",
+				"create",
+				"/tmp/suggestion-mode-post.html",
+				"--import_id=100",
+				"--post_type=post",
+				"--post_status=draft",
+				"--post_author=1",
+				"--post_title=A short trip to the coast"
+			]
+		},
+		{
+			"step": "wp-cli",
+			"command": [
+				"wp",
+				"media",
+				"import",
+				"/wordpress/wp-content/uploads/suggestion-mode-sample.webp",
+				"--skip-copy",
+				"--post_id=100",
+				"--title=Suggestion mode sample image"
+			]
+		},
+		{
+			"step": "login",
+			"username": "admin",
+			"password": "password"
+		}
+	],
+	"features": {
+		"networking": true
+	}
+}

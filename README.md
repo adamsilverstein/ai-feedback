@@ -4,6 +4,10 @@ A fresh pair of eyes on your draft, right in the block editor. (Formerly Copydes
 
 AI-powered editorial feedback for WordPress Gutenberg, built on WordPress 7.0's core AI Client, Connectors API, and Notes feature.
 
+[![Try Fresh Eyes in WordPress Playground](https://img.shields.io/badge/Try%20it%20in-WordPress%20Playground-3858e9?style=for-the-badge&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/adamsilverstein/fresh-eyes/main/docs/playground/blueprint.json)
+
+The button opens a sample draft in [WordPress Playground](https://wordpress.org/playground/) with the latest Fresh Eyes release and Gutenberg's Suggestion Mode experiment switched on, so suggested edits work right away. Add an API key for Anthropic, OpenAI or Google under **Settings → Connectors**, then open the Fresh Eyes sidebar and run a review. The setup lives in [`docs/playground/blueprint.json`](docs/playground/blueprint.json).
+
 ## Overview
 
 The AI Feedback plugin integrates AI-powered content review directly into the WordPress block editor. It uses the WordPress 7.0 core [AI Client](https://make.wordpress.org/core/2026/03/24/introducing-the-ai-client-in-wordpress-7-0/) for provider-agnostic AI access, the [Connectors API](https://make.wordpress.org/core/2026/03/18/introducing-the-connectors-api-in-wordpress-7-0/) for credentials, and the native Notes API for contextual, block-level feedback.
