@@ -252,6 +252,10 @@ export default function Dashboard() {
 							label={__('Average items per review', 'fresh-eyes')}
 							value={Number(data.avg_feedback).toFixed(1)}
 						/>
+						<Stat
+							label={__('Questions answered', 'fresh-eyes')}
+							value={String(data.total_mentions ?? 0)}
+						/>
 					</div>
 
 					<div className="ai-feedback-analytics-grid">

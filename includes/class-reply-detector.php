@@ -22,6 +22,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * was not itself authored by AI Feedback, and which has text. Resolve and
  * reopen status markers are not replies.
  *
+ * In a thread a person started, only a note that mentions Fresh Eyes is
+ * answered (see Mentions), whether it starts the thread or replies in it,
+ * and only when its author could run a review of the post. The block is
+ * found later from the post content, so the block ID may be empty.
+ *
  * The second check stops our own replies from re-triggering detection. It
  * relies on AI replies passing `ai_feedback` through `comment_meta` in
  * wp_insert_comment(), which saves meta before `wp_insert_comment` fires.
@@ -65,14 +70,12 @@ class Reply_Detector {
 			return;
 		}
 
-		$parent_id = self::int_field( $comment, 'comment_parent' );
-		if ( $parent_id <= 0 ) {
-			// Top-level note, not a reply.
-			return;
-		}
+		$parent_id    = self::int_field( $comment, 'comment_parent' );
+		$is_top_level = $parent_id <= 0;
 
-		// A reply to another reply belongs to the same conversation.
-		$parent_id = self::find_thread_root( $parent_id );
+		// A reply to another reply belongs to the same conversation. A
+		// top-level note that mentions Fresh Eyes starts its own.
+		$parent_id = $is_top_level ? $comment_id : self::find_thread_root( $parent_id );
 
 		// Ignore replies authored by AI Feedback itself.
 		$is_ai_reply = (bool) get_comment_meta( $comment_id, 'ai_feedback', true );
@@ -96,15 +99,16 @@ class Reply_Detector {
 			return;
 		}
 
-		// The thread must start with an AI Feedback note.
-		$parent_is_ai = (bool) get_comment_meta( $parent_id, 'ai_feedback', true );
-		if ( ! $parent_is_ai ) {
-			return;
-		}
-
 		$post_id = self::int_field( $comment, 'comment_post_ID' );
 		if ( $post_id <= 0 ) {
 			// Comment without a valid post association - nothing to route.
+			return;
+		}
+
+		// In a thread Fresh Eyes started, every reply is answered.
+		$parent_is_ai = ! $is_top_level && (bool) get_comment_meta( $parent_id, 'ai_feedback', true );
+		if ( ! $parent_is_ai ) {
+			$this->maybe_dispatch_mention( $comment_id, $comment, $content, $parent_id, $post_id );
 			return;
 		}
 
@@ -116,6 +120,35 @@ class Reply_Detector {
 		}
 
 		do_action( self::ACTION_REPLY_RECEIVED, $comment_id, $parent_id, $post_id, $block_id );
+	}
+
+	/**
+	 * Dispatch a note in a thread a person started when it mentions Fresh Eyes.
+	 *
+	 * The note is flagged first, so the reply listing and the cron fallback
+	 * know the thread is a conversation with Fresh Eyes.
+	 *
+	 * @param int    $comment_id Note ID.
+	 * @param object $comment    Note.
+	 * @param string $content    Note content.
+	 * @param int    $root_id    Thread's root note ID, which is the note itself for a top-level note.
+	 * @param int    $post_id    Post ID.
+	 */
+	private function maybe_dispatch_mention( int $comment_id, object $comment, string $content, int $root_id, int $post_id ): void {
+		if ( ! Mentions::mentions_fresh_eyes( $content ) ) {
+			return;
+		}
+
+		if ( ! Mentions::can_ask( self::int_field( $comment, 'user_id' ), $post_id ) ) {
+			return;
+		}
+
+		update_comment_meta( $comment_id, Mentions::META_KEY, '1' );
+
+		$raw_block_id = get_comment_meta( $root_id, 'block_id', true );
+		$block_id     = is_string( $raw_block_id ) ? sanitize_text_field( $raw_block_id ) : '';
+
+		do_action( self::ACTION_REPLY_RECEIVED, $comment_id, $root_id, $post_id, $block_id );
 	}
 
 	/**

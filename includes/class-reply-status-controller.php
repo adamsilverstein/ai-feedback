@@ -36,6 +36,16 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	protected $rest_base = 'replies';
 
 	/**
+	 * Longest editor content accepted with a request to answer a reply.
+	 */
+	public const MAX_EDITOR_CONTENT_LENGTH = 1000000;
+
+	/**
+	 * Most characters of a thread's opening note listed for a mention thread.
+	 */
+	public const ROOT_EXCERPT_LENGTH = 300;
+
+	/**
 	 * Reply service that answers replies for the process route.
 	 *
 	 * @var Reply_Service
@@ -85,16 +95,22 @@ class Reply_Status_Controller extends WP_REST_Controller {
 					'callback'            => array( $this, 'process_reply' ),
 					'permission_callback' => array( $this, 'process_reply_permissions_check' ),
 					'args'                => array(
-						'id'    => array(
+						'id'      => array(
 							'description'       => __( 'ID of the user reply comment.', 'fresh-eyes' ),
 							'type'              => 'integer',
 							'required'          => true,
 							'sanitize_callback' => 'absint',
 						),
-						'retry' => array(
+						'retry'   => array(
 							'description' => __( 'Whether to retry a failed or stalled reply.', 'fresh-eyes' ),
 							'type'        => 'boolean',
 							'default'     => false,
+						),
+						'content' => array(
+							'description' => __( 'The editor\'s post content, used to find the block of a note that mentions Fresh Eyes before the post is saved.', 'fresh-eyes' ),
+							'type'        => 'string',
+							'default'     => '',
+							'maxLength'   => self::MAX_EDITOR_CONTENT_LENGTH,
 						),
 					),
 				),
@@ -151,6 +167,11 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	 * waiting for an AI response. An AI reply that proposes a change to the
 	 * note's block carries it as `edit`. One request covers the whole sidebar.
 	 *
+	 * A thread a person started is listed once someone in it mentions Fresh
+	 * Eyes, flagged `is_mention` with an excerpt of its opening note as
+	 * `root`. Its opening note can itself be the one waiting for an answer,
+	 * and only notes that asked Fresh Eyes count as waiting.
+	 *
 	 * @param  WP_REST_Request $request Request.
 	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
 	 * @return WP_REST_Response
@@ -170,22 +191,48 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		);
 
 		$ai_note_ids = array();
+		$mention_ids = array();
+		$roots       = array();
 		$replies     = array();
 		foreach ( $comments as $comment ) {
-			$id = (int) $comment->comment_ID;
-			if ( get_comment_meta( $id, 'ai_feedback', true ) && 0 === (int) $comment->comment_parent ) {
-				$ai_note_ids[ $id ] = true;
-			}
-			if ( (int) $comment->comment_parent > 0 ) {
+			$id     = (int) $comment->comment_ID;
+			$parent = (int) $comment->comment_parent;
+			if ( 0 === $parent ) {
+				$roots[ $id ] = $comment;
+				if ( get_comment_meta( $id, 'ai_feedback', true ) ) {
+					$ai_note_ids[ $id ] = true;
+				}
+			} else {
 				$replies[] = $comment;
+			}
+			if ( get_comment_meta( $id, Mentions::META_KEY, true ) ) {
+				// A thread a person started, in which someone asked Fresh Eyes.
+				$mention_ids[ 0 === $parent ? $id : $parent ] = true;
 			}
 		}
 
 		$threads   = array();
 		$revisions = array();
+		foreach ( array_keys( $mention_ids ) as $root_id ) {
+			$root = $roots[ $root_id ] ?? null;
+			if ( null === $root || isset( $ai_note_ids[ $root_id ] ) ) {
+				continue;
+			}
+			$threads[ $root_id ] = array(
+				'replies'          => array(),
+				'is_mention'       => true,
+				'root'             => array(
+					'id'      => $root_id,
+					'author'  => $root->comment_author,
+					'content' => mb_substr( trim( wp_strip_all_tags( $root->comment_content ) ), 0, self::ROOT_EXCERPT_LENGTH ),
+				),
+				'pending_reply_id' => self::is_pending( self::meta_string( $root_id, Reply_Cron_Dispatcher::STATUS_META_KEY ) ) ? $root_id : null,
+			);
+		}
+
 		foreach ( $replies as $comment ) {
 			$parent_id = (int) $comment->comment_parent;
-			if ( ! isset( $ai_note_ids[ $parent_id ] ) ) {
+			if ( ! isset( $ai_note_ids[ $parent_id ] ) && ! isset( $threads[ $parent_id ] ) ) {
 				continue;
 			}
 
@@ -212,12 +259,19 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				'revision' => $revision,
 			);
 
-			if ( ! $is_ai ) {
-				// Only the newest user reply matters: an older pending one has been superseded.
-				$status = self::meta_string( $id, Reply_Cron_Dispatcher::STATUS_META_KEY );
-
-				$threads[ $parent_id ]['pending_reply_id'] = self::is_pending( $status ) ? $id : null;
+			if ( $is_ai ) {
+				continue;
 			}
+
+			$status = self::meta_string( $id, Reply_Cron_Dispatcher::STATUS_META_KEY );
+			if ( ! empty( $threads[ $parent_id ]['is_mention'] ) && '' === $status ) {
+				// In a thread a person started, a note that does not ask
+				// Fresh Eyes leaves the pending question as it is.
+				continue;
+			}
+
+			// Only the newest user reply matters: an older pending one has been superseded.
+			$threads[ $parent_id ]['pending_reply_id'] = self::is_pending( $status ) ? $id : null;
 		}
 
 		foreach ( $threads as $parent_id => $thread ) {
@@ -307,7 +361,12 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		// Finish the answer even if the editor navigates away mid-request.
 		ignore_user_abort( true );
 		self::raise_time_limit( Reply_Service::REQUEST_TIME_LIMIT );
-		$this->reply_service->process( $comment_id, true === $request->get_param( 'retry' ) );
+		$content = $request->get_param( 'content' );
+		$this->reply_service->process(
+			$comment_id,
+			true === $request->get_param( 'retry' ),
+			is_string( $content ) ? $content : ''
+		);
 
 		return new WP_REST_Response( $this->build_status( $comment_id ), 200 );
 	}
