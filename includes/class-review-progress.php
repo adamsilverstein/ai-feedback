@@ -116,9 +116,16 @@ class Review_Progress {
 			$note_ids  = self::get_review_note_ids( $post_id, $review_id );
 		}
 
+		$note_ids = array_values( array_unique( $note_ids ) );
+
+		// Load the notes and their meta in two queries rather than a few per note.
+		if ( function_exists( '_prime_comment_caches' ) ) {
+			_prime_comment_caches( $note_ids );
+		}
+
 		$addressed = 0;
 		$open_ids  = array();
-		foreach ( array_unique( $note_ids ) as $note_id ) {
+		foreach ( $note_ids as $note_id ) {
 			$note = get_comment( $note_id );
 			// Deleted notes, and IDs that are not notes on this post, don't count.
 			if ( ! $note instanceof \WP_Comment || 'note' !== $note->comment_type || (int) $note->comment_post_ID !== $post_id ) {

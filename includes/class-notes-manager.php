@@ -1364,7 +1364,7 @@ class Notes_Manager {
 		return array_values(
 			array_filter(
 				$this->get_notes_by_review( $review_id ),
-				static fn ( mixed $note ): bool => is_array( $note ) && ( $note['post'] ?? 0 ) === $post_id
+				static fn ( mixed $note ): bool => is_array( $note ) && is_numeric( $note['post'] ?? null ) && (int) $note['post'] === $post_id
 			)
 		);
 	}
