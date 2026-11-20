@@ -1028,6 +1028,12 @@ class Response_Parser {
 			return null;
 		}
 
+		// U+FFFC stands for a footnote, an image or another object in the
+		// block's text, which a text edit would delete or can't write back.
+		if ( str_contains( $find, Editor_Text::OBJECT ) || str_contains( $replace, Editor_Text::OBJECT ) ) {
+			return null;
+		}
+
 		if ( '' === trim( $find ) || $find === $replace ) {
 			return null;
 		}

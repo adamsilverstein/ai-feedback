@@ -119,6 +119,21 @@ add_filter(
 			return $reply;
 		}
 
+		// Asked to change text across a footnote, the edit's find reads the
+		// footnote's number, which the editor never matches.
+		if ( str_contains( $user_reply[1], 'footnote number' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: "growth1 was" now reads "growth is".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => 'growth1 was',
+						'replace' => 'growth is',
+					),
+				)
+			);
+		}
+
 		// Asked to change both lines of a block split by a line break, the
 		// edit's find runs across the break, copying it as a newline.
 		if ( str_contains( $user_reply[1], 'both lines' ) ) {
