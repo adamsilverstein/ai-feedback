@@ -1,5 +1,5 @@
 /**
- * E2E tests for asking Fresh Eyes about a selection with an @fresh-eyes
+ * E2E tests for asking Fresh Eyes about a selection with an `@fresh-eyes`
  * mention in a note.
  *
  * Runs on the server with the mock AI provider from
