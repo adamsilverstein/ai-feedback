@@ -1226,7 +1226,7 @@ tests/e2e/suggestion-mode/
 └── specs/
 ```
 
-It runs on its own wp-env instance (`.wp-env.suggestion-mode.json`, port 8892, no tests site) with its own Playwright config (`playwright.suggestion-mode.config.js`). The main suite and stock wp-env are untouched. The e2e mu-plugin turns the `gutenberg-suggestion-mode` experiment on when the config defines `AI_FEEDBACK_E2E_SUGGESTION_MODE`.
+It runs on its own wp-env instance (`.wp-env.suggestion-mode.json`, port 8892, no tests site) with its own Playwright config (`playwright.suggestion-mode.config.js`). The main suite and stock wp-env are untouched. An `afterStart` lifecycle script saves `{"gutenberg-suggestion-mode":1}` in the `gutenberg-experiments` option. It has to be saved: the pinned branch forces the experiment on with an option filter, but on a site that never saved the option, Gutenberg's registered setting default wins in any request that loads the REST API (the editor does, to preload data), so the server reports Suggestion Mode as off.
 
 ```mermaid
 flowchart LR
