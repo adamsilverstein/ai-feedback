@@ -380,15 +380,31 @@ class Review_Service {
 	 *
 	 * Images are only sent to a model that reads them: given an image, core
 	 * would otherwise switch to another model that does, or refuse the prompt.
+	 * The model is only asked about once there are images to send, since the
+	 * answer can need a request to the provider for its model list. That
+	 * request uses the WordPress HTTP timeout (`http_request_timeout`, 5
+	 * seconds by default), as core's `wp_ai_client_default_request_timeout`
+	 * only applies to prompt requests.
 	 *
 	 * @param  array<mixed> $blocks Blocks being reviewed.
 	 * @param  string       $model  Model ID.
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
-		if ( ! $this->model_supports_vision( $model ) ) {
+		$images = $this->collect_review_images( $blocks );
+		if ( array() === $images || ! $this->model_supports_vision( $model ) ) {
 			return array();
 		}
+		return $images;
+	}
+
+	/**
+	 * Images from the blocks that could be sent, see Review_Images.
+	 *
+	 * @param  array<mixed> $blocks Blocks being reviewed.
+	 * @return list<array{block_id: string, mime: string, data: string}> Images.
+	 */
+	protected function collect_review_images( array $blocks ): array {
 		return ( new Review_Images() )->collect( $blocks );
 	}
 

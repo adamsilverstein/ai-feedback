@@ -40,6 +40,24 @@ class ImageReviewService extends Review_Service {
 	public array $responses = array();
 
 	/**
+	 * Models asked whether they read images, in order.
+	 *
+	 * @var list<string>
+	 */
+	public array $vision_checks = array();
+
+	/**
+	 * Record the model, then ask as usual.
+	 *
+	 * @param  string $model Model ID.
+	 * @return bool
+	 */
+	protected function model_supports_vision( string $model ): bool {
+		$this->vision_checks[] = $model;
+		return parent::model_supports_vision( $model );
+	}
+
+	/**
 	 * Record the images and return the next response.
 	 *
 	 * @param  string $prompt             User prompt.
@@ -287,9 +305,10 @@ class ReviewImagesTest extends TestCase {
 	 *
 	 * @param  string               $model     Model ID.
 	 * @param  list<string|WP_Error> $responses AI responses, in order.
+	 * @param  array<mixed>|null    $blocks    Blocks to review, by default one image without alt text.
 	 * @return array{0: ImageReviewService, 1: CapturingNotesManager}
 	 */
-	private function review( string $model, array $responses ): array {
+	private function review( string $model, array $responses, ?array $blocks = null ): array {
 		define( 'AI_FEEDBACK_MOCK_MODE', false );
 		$service            = new ImageReviewService();
 		$service->responses = $responses;
@@ -300,7 +319,7 @@ class ReviewImagesTest extends TestCase {
 			1,
 			array(
 				'model'  => $model,
-				'blocks' => array(
+				'blocks' => $blocks ?? array(
 					self::image( 'img', 12, 'http://example.com/wp-content/uploads/2026/11/chart.png' ),
 				),
 			)
@@ -382,6 +401,34 @@ class ReviewImagesTest extends TestCase {
 		$this->assertSame( array( array() ), $service->sent );
 		$this->assertSame( 'Add alt text', $notes->items[0]['title'] );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
+	}
+
+	/**
+	 * The model is only asked whether it reads images once there is an image
+	 * to send, as asking can mean a request to the provider.
+	 */
+	public function test_no_vision_lookup_without_images(): void {
+		list( $service ) = $this->review(
+			AI_FEEDBACK_DEFAULT_MODEL,
+			array( self::alt_response() ),
+			array(
+				// Has alt text, and an external image: neither is sent.
+				self::image( 'img', 12, 'http://example.com/wp-content/uploads/2026/11/chart.png', 'A chart' ),
+				self::image( 'ext', 12, 'http://evil.example/chart.png' ),
+			)
+		);
+
+		$this->assertSame( array(), $service->vision_checks );
+		$this->assertSame( array( array() ), $service->sent );
+	}
+
+	/**
+	 * With an image to send, the model is asked once.
+	 */
+	public function test_vision_lookup_with_images(): void {
+		list( $service ) = $this->review( AI_FEEDBACK_DEFAULT_MODEL, array( self::alt_response() ) );
+
+		$this->assertSame( array( AI_FEEDBACK_DEFAULT_MODEL ), $service->vision_checks );
 	}
 
 	/**
