@@ -20,6 +20,30 @@ export function extractTextContent(innerHTML) {
 }
 
 /**
+ * Extract a block's text as the editor's rich text reads it: wrapped
+ * source text is a space and a line break is "\n".
+ *
+ * A quick fix's `find` is matched against this text on the server and
+ * in the editor, so a `find` across a break never passes on one side only.
+ *
+ * @param {string} innerHTML The block's innerHTML.
+ * @return {string} Plain text content.
+ */
+export function extractEditorText(innerHTML) {
+	if (!innerHTML) {
+		return '';
+	}
+	const temp = document.createElement('div');
+	temp.innerHTML = innerHTML;
+	const walker = document.createTreeWalker(temp, window.NodeFilter.SHOW_TEXT);
+	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+		node.nodeValue = node.nodeValue.replace(/[\n\t\r\f]+/g, ' ');
+	}
+	temp.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
+	return temp.textContent || '';
+}
+
+/**
  * Fingerprint a block's text so a note can find the block again after a
  * reload, when its clientId has changed.
  *
@@ -87,7 +111,7 @@ export function extractBlockData(blocks, parent = '') {
 		// Use originalContent if available (parsed from existing HTML),
 		// otherwise serialize the current block state.
 		const rawContent = block.originalContent || serialize(block);
-		const content = extractTextContent(rawContent);
+		const content = extractEditorText(rawContent);
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
@@ -98,10 +122,12 @@ export function extractBlockData(blocks, parent = '') {
 				clientId: block.clientId,
 				name: block.name,
 				content: content.trim(),
-				// A captionless image is told apart by its URL.
+				// A captionless image is told apart by its URL. Anchors hash
+				// the text read without line breaks, as for notes saved before.
 				anchor: getBlockAnchor(
 					block.name,
-					content.trim() || (isImage ? attributes.url : '')
+					extractTextContent(rawContent).trim() ||
+						(isImage ? attributes.url : '')
 				),
 				...(parent ? { parent } : {}),
 				...(attributes ? { attributes } : {}),

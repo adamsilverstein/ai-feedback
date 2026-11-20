@@ -246,6 +246,7 @@ class Prompt_Builder {
 	private function get_quick_fix_instruction(): string {
 		$instruction  = '- "quick_fix" is optional. Include it only for a simple, mechanical text change inside one block, such as replacing a word or phrase, fixing a typo, or deleting filler words. Never for rewrites or structural changes' . "\n";
 		$instruction .= '- "find" must be copied exactly, character for character, from that block\'s content, and long enough to appear only once in the block (max 200 chars)' . "\n";
+		$instruction .= '- A line break in a block\'s content is part of its text: keep "find" on one line, or write the break as \\n' . "\n";
 		$instruction .= '- "replace" is the text that takes its place (max 200 chars). Use an empty string to delete the text. To insert text, include a nearby phrase in "find" and the phrase plus the new text in "replace"';
 
 		return $instruction;

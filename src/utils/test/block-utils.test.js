@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Internal dependencies
  */
-import { extractBlockData } from '../block-utils';
+import { extractBlockData, getBlockAnchor } from '../block-utils';
 
 const block = (clientId, content, innerBlocks = []) => ({
 	clientId,
@@ -84,5 +84,34 @@ describe('extractBlockData', () => {
 			},
 		});
 		expect(data[0].anchor).not.toBe(data[1].anchor);
+	});
+
+	// The editor reads a break as "\n", so the review sees the same text a
+	// quick fix's `find` is later matched against.
+	it.each([
+		['br', '<p>First line<br>second line.</p>'],
+		['self-closing', '<p>First line<br />second line.</p>'],
+	])('sends a %s line break as a newline', (_label, html) => {
+		const [data] = extractBlockData([block('p', html)]);
+
+		expect(data.content).toBe('First line\nsecond line.');
+	});
+
+	it('reads wrapped source text as spaces, as the editor does', () => {
+		const [data] = extractBlockData([
+			block('p', '<p>First\n\tline<br>\nsecond line.</p>'),
+		]);
+
+		expect(data.content).toBe('First line\n second line.');
+	});
+
+	it('keeps the anchor notes saved before were linked by', () => {
+		const [data] = extractBlockData([
+			block('p', '<p>First line<br>second line.</p>'),
+		]);
+
+		expect(data.anchor).toBe(
+			getBlockAnchor('core/paragraph', 'First linesecond line.')
+		);
 	});
 });
