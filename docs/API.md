@@ -120,7 +120,9 @@ Every AI request (reviews, thread replies and mention answers) runs on the selec
 - **Model not listed:** the request is not sent. The error `ai_feedback_model_unavailable` (400) names the model and provider, for example "Claude Opus 4 (claude-opus-4) is not available from Anthropic, so Fresh Eyes did not send the request. Choose another model in the Fresh Eyes settings, or check the models your Anthropic account offers." It is not retried, and a review with images is not sent again without them.
 - **Provider not set up:** `ai_feedback_provider_unavailable` (400) when the model's provider isn't registered or has no credentials under Settings > Connectors.
 - **Model list unavailable:** when the provider's model list can't be read (network error, provider outage), the request is not sent either, since there is no way to tell the model is there. The error is `ai_feedback_model_check_failed` (503): reviews retry it with backoff and then return `ai_service_unavailable`, which the editor offers to retry. Core caches a provider's model list for a day once it has been read.
-- **Models without a provider:** a model added through `ai_feedback_available_models` without `provider` runs on the first configured provider that lists its exact ID.
+- **Models without a provider:** a model added through `ai_feedback_available_models` without `provider` runs on the first configured provider that lists it.
+
+`Model_Capabilities` reads the provider's model list for both: the ID a request is pinned to, and that ID's metadata for the image check, so the two agree on the model.
 
 The review response and its history entry add `answered_by` (`provider` and `model`) with the provider and model core reports for the answer, which is the model ID the provider listed. Notes from a review and AI replies store it as `provider/model` in `ai_answered_by` comment meta, next to `ai_model` (the model that was selected). An answer from any other provider is refused (`ai_feedback_wrong_provider`), which a pinned request should never see.
 

@@ -2,7 +2,8 @@
 /**
  * Model Capabilities
  *
- * Whether a model can read the images a review sends for alt text.
+ * What a provider lists for a model: under which ID, and whether it reads
+ * the images a review sends for alt text.
  *
  * @package AI_Feedback
  */
@@ -18,6 +19,9 @@ namespace AI_Feedback;
  * client, provider not registered or set up, or a model the provider
  * doesn't list), the `vision` capability in the plugin's model list
  * decides. The `ai_feedback_model_supports_vision` filter has the last word.
+ *
+ * Model_Pin uses the same reader to find the ID a provider lists a model
+ * under, so the vision check and the request agree on the model.
  */
 class Model_Capabilities {
 
@@ -106,7 +110,7 @@ class Model_Capabilities {
 
 		foreach ( $providers as $provider_id ) {
 			try {
-				$metadata = $this->find_model_metadata( $registry, $provider_id, $model_id );
+				$metadata = $this->find_model_metadata( $provider_id, $model_id );
 			} catch ( \Throwable $e ) {
 				// Listing models can need a request to the provider; a failure
 				// is no answer from it, so the next provider is asked.
@@ -136,41 +140,160 @@ class Model_Capabilities {
 	}
 
 	/**
-	 * A configured provider's metadata for a model.
+	 * Provider IDs that are registered and set up, in registry order.
 	 *
-	 * @param  object $registry    Provider registry.
+	 * @return list<string> Provider IDs.
+	 */
+	public function configured_providers(): array {
+		$registry = $this->get_provider_registry();
+		if ( null === $registry ) {
+			return array();
+		}
+		try {
+			return array_values( array_filter( $this->registered_providers( $registry ), array( $this, 'is_provider_ready' ) ) );
+		} catch ( \Throwable $e ) {
+			return array();
+		}
+	}
+
+	/**
+	 * Whether a provider is registered and has credentials.
+	 *
+	 * @param  string $provider_id Provider ID.
+	 * @return bool
+	 */
+	public function is_provider_ready( string $provider_id ): bool {
+		$registry = $this->get_provider_registry();
+		if ( null === $registry || ! method_exists( $registry, 'hasProvider' ) || ! method_exists( $registry, 'isProviderConfigured' ) ) {
+			return false;
+		}
+		try {
+			return true === $registry->hasProvider( $provider_id ) && true === $registry->isProviderConfigured( $provider_id );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+	}
+
+	/**
+	 * The ID a configured provider lists a model under.
+	 *
+	 * The exact ID wins. Otherwise a dated release of it (`<id>-20250514`,
+	 * `<id>-2024-08-06`) or `<id>-latest`, newest first, because providers
+	 * often list only dated IDs for what the plugin calls by its short name.
+	 * Google lists IDs with a `models/` prefix, which is ignored.
+	 *
+	 * @param  string $provider_id Provider ID.
+	 * @param  string $model_id    Model ID from the plugin's model list.
+	 * @return string|null Listed ID, or null when the provider isn't set up or doesn't list the model.
+	 * @throws \Throwable When the provider's model list can't be read.
+	 */
+	public function find_listed_id( string $provider_id, string $model_id ): ?string {
+		$directory = $this->get_model_directory( $provider_id );
+		if ( null === $directory || ! method_exists( $directory, 'hasModelMetadata' ) ) {
+			return null;
+		}
+
+		if ( true === $directory->hasModelMetadata( $model_id ) ) {
+			return $model_id;
+		}
+
+		$listed = array();
+		if ( method_exists( $directory, 'listModelMetadata' ) ) {
+			foreach ( (array) $directory->listModelMetadata() as $metadata ) {
+				$id = is_object( $metadata ) && method_exists( $metadata, 'getId' ) ? $metadata->getId() : null;
+				if ( is_string( $id ) ) {
+					$listed[] = $id;
+				}
+			}
+		}
+
+		$pattern = '/^(?:models\/)?' . preg_quote( $model_id, '/' ) . '(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest)?$/';
+		$matches = array_values( array_filter( $listed, static fn ( string $id ): bool => 1 === preg_match( $pattern, $id ) ) );
+		rsort( $matches, SORT_STRING );
+
+		/**
+		 * Filters the ID a provider runs a model under, for a model the
+		 * provider lists under a name Fresh Eyes doesn't recognize.
+		 *
+		 * Return an ID from `$listed`; any other value is ignored.
+		 *
+		 * @param string|null  $match       Listed ID, or null when none matched.
+		 * @param string       $model_id    Model ID from the Fresh Eyes model list.
+		 * @param string       $provider_id Provider ID.
+		 * @param list<string> $listed      IDs the provider lists.
+		 */
+		$filtered = apply_filters( 'ai_feedback_provider_model_id', $matches[0] ?? null, $model_id, $provider_id, $listed );
+
+		return is_string( $filtered ) && in_array( $filtered, $listed, true ) ? $filtered : null;
+	}
+
+	/**
+	 * A provider's display name, or its ID.
+	 *
+	 * @param  string $provider_id Provider ID.
+	 * @return string
+	 */
+	public function provider_name( string $provider_id ): string {
+		try {
+			$class    = $this->get_provider_class( $provider_id );
+			$metadata = null !== $class && method_exists( $class, 'metadata' ) ? $class::metadata() : null;
+			$name     = is_object( $metadata ) && method_exists( $metadata, 'getName' ) ? $metadata->getName() : null;
+		} catch ( \Throwable $e ) {
+			$name = null;
+		}
+		return is_string( $name ) && '' !== $name ? $name : $provider_id;
+	}
+
+	/**
+	 * A configured provider's metadata for a model, under the ID it lists.
+	 *
 	 * @param  string $provider_id Provider ID.
 	 * @param  string $model_id    Model ID.
 	 * @return object|null Model metadata, or null when the provider isn't set up or doesn't list the model.
+	 * @throws \Throwable When the provider's model list can't be read.
 	 */
-	private function find_model_metadata( object $registry, string $provider_id, string $model_id ): ?object {
-		if (
-			! method_exists( $registry, 'hasProvider' )
-			|| ! method_exists( $registry, 'isProviderConfigured' )
-			|| ! method_exists( $registry, 'getProviderClassName' )
-			|| true !== $registry->hasProvider( $provider_id )
-			|| true !== $registry->isProviderConfigured( $provider_id )
-		) {
+	private function find_model_metadata( string $provider_id, string $model_id ): ?object {
+		$listed_id = $this->find_listed_id( $provider_id, $model_id );
+		$directory = null === $listed_id ? null : $this->get_model_directory( $provider_id );
+		if ( null === $listed_id || null === $directory || ! method_exists( $directory, 'getModelMetadata' ) ) {
 			return null;
 		}
 
-		$class = $registry->getProviderClassName( $provider_id );
-		if ( ! is_string( $class ) || ! class_exists( $class ) || ! method_exists( $class, 'modelMetadataDirectory' ) ) {
-			return null;
-		}
-
-		$directory = $class::modelMetadataDirectory();
-		if (
-			! is_object( $directory )
-			|| ! method_exists( $directory, 'hasModelMetadata' )
-			|| ! method_exists( $directory, 'getModelMetadata' )
-			|| true !== $directory->hasModelMetadata( $model_id )
-		) {
-			return null;
-		}
-
-		$metadata = $directory->getModelMetadata( $model_id );
+		$metadata = $directory->getModelMetadata( $listed_id );
 		return is_object( $metadata ) ? $metadata : null;
+	}
+
+	/**
+	 * A configured provider's model metadata directory.
+	 *
+	 * @param  string $provider_id Provider ID.
+	 * @return object|null Directory, or null when the provider isn't set up or has none.
+	 */
+	private function get_model_directory( string $provider_id ): ?object {
+		if ( ! $this->is_provider_ready( $provider_id ) ) {
+			return null;
+		}
+		$class = $this->get_provider_class( $provider_id );
+		if ( null === $class || ! method_exists( $class, 'modelMetadataDirectory' ) ) {
+			return null;
+		}
+		$directory = $class::modelMetadataDirectory();
+		return is_object( $directory ) ? $directory : null;
+	}
+
+	/**
+	 * A registered provider's class.
+	 *
+	 * @param  string $provider_id Provider ID.
+	 * @return class-string|null Class, or null when unknown.
+	 */
+	private function get_provider_class( string $provider_id ): ?string {
+		$registry = $this->get_provider_registry();
+		if ( null === $registry || ! method_exists( $registry, 'getProviderClassName' ) ) {
+			return null;
+		}
+		$class = $registry->getProviderClassName( $provider_id );
+		return is_string( $class ) && class_exists( $class ) ? $class : null;
 	}
 
 	/**
@@ -226,6 +349,15 @@ class Model_Capabilities {
 		// Core enums cast to their value.
 		$value = is_string( $value ) || $value instanceof \Stringable ? (string) $value : '';
 		return strtolower( str_replace( '_', '', $value ) );
+	}
+
+	/**
+	 * The core AI Client provider registry, for loading a model from it.
+	 *
+	 * @return object|null Registry, or null when the AI Client is unavailable.
+	 */
+	public function provider_registry(): ?object {
+		return $this->get_provider_registry();
 	}
 
 	/**

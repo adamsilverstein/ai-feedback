@@ -50,12 +50,21 @@ class Model_Pin {
 	private Settings_Controller $settings;
 
 	/**
+	 * Reader for what providers list.
+	 *
+	 * @var Model_Capabilities
+	 */
+	private Model_Capabilities $capabilities;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param Settings_Controller|null $settings Settings controller, for the model list.
+	 * @param Settings_Controller|null $settings     Settings controller, for the model list.
+	 * @param Model_Capabilities|null  $capabilities Reader for what providers list.
 	 */
-	public function __construct( ?Settings_Controller $settings = null ) {
-		$this->settings = $settings ?? new Settings_Controller();
+	public function __construct( ?Settings_Controller $settings = null, ?Model_Capabilities $capabilities = null ) {
+		$this->settings     = $settings ?? new Settings_Controller();
+		$this->capabilities = $capabilities ?? new Model_Capabilities( $this->settings );
 	}
 
 	/**
@@ -102,7 +111,7 @@ class Model_Pin {
 	 * @return array{provider: string, model_id: string, model: object}|WP_Error Core model instance, or an error.
 	 */
 	public function resolve( string $model_id ): array|WP_Error {
-		$registry = $this->get_provider_registry();
+		$registry = $this->capabilities->provider_registry();
 		if ( null === $registry || ! method_exists( $registry, 'getProviderModel' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
@@ -118,7 +127,7 @@ class Model_Pin {
 			return $this->resolve_without_provider( $registry, $model_id, $name );
 		}
 
-		if ( ! $this->is_provider_ready( $registry, $provider ) ) {
+		if ( ! $this->capabilities->is_provider_ready( $provider ) ) {
 			return new WP_Error(
 				self::ERROR_PROVIDER_UNAVAILABLE,
 				sprintf(
@@ -135,10 +144,10 @@ class Model_Pin {
 			);
 		}
 
-		$provider_name = $this->provider_name( $registry, $provider );
+		$provider_name = $this->capabilities->provider_name( $provider );
 
 		try {
-			$listed_id = $this->find_listed_id( $registry, $provider, $model_id );
+			$listed_id = $this->capabilities->find_listed_id( $provider, $model_id );
 		} catch ( \Throwable $e ) {
 			Logger::debug( sprintf( 'Could not list %s models to check %s: %s', $provider, $model_id, $e->getMessage() ) );
 			return $this->check_failed_error( $model_id, $name, $provider, $provider_name );
@@ -258,59 +267,6 @@ class Model_Pin {
 	}
 
 	/**
-	 * Finds the ID a provider lists a model under.
-	 *
-	 * The exact ID wins. Otherwise a dated release of it (`<id>-20250514`,
-	 * `<id>-2024-08-06`) or `<id>-latest`, newest first, because providers
-	 * often list only dated IDs for what the plugin calls by its short name.
-	 * Google lists IDs with a `models/` prefix, which is ignored.
-	 *
-	 * @param  object $registry Provider registry.
-	 * @param  string $provider Provider ID.
-	 * @param  string $model_id Model ID.
-	 * @return string|null Listed ID, or null when the provider doesn't list the model.
-	 * @throws \Throwable When the provider's model list can't be read.
-	 */
-	private function find_listed_id( object $registry, string $provider, string $model_id ): ?string {
-		$directory = $this->get_model_directory( $registry, $provider );
-		if ( null === $directory || ! method_exists( $directory, 'hasModelMetadata' ) || ! method_exists( $directory, 'listModelMetadata' ) ) {
-			return null;
-		}
-
-		if ( true === $directory->hasModelMetadata( $model_id ) ) {
-			return $model_id;
-		}
-
-		$listed = array();
-		foreach ( (array) $directory->listModelMetadata() as $metadata ) {
-			$id = is_object( $metadata ) && method_exists( $metadata, 'getId' ) ? $metadata->getId() : null;
-			if ( is_string( $id ) ) {
-				$listed[] = $id;
-			}
-		}
-
-		$pattern = '/^(?:models\/)?' . preg_quote( $model_id, '/' ) . '(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest)?$/';
-		$matches = array_values( array_filter( $listed, static fn ( string $id ): bool => 1 === preg_match( $pattern, $id ) ) );
-		rsort( $matches, SORT_STRING );
-		$match = $matches[0] ?? null;
-
-		/**
-		 * Filters the ID a provider runs a model under, for a model the
-		 * provider lists under a name Fresh Eyes doesn't recognize.
-		 *
-		 * Return an ID from `$listed`; any other value is ignored.
-		 *
-		 * @param string|null  $match    Listed ID, or null when none matched.
-		 * @param string       $model_id Model ID from the Fresh Eyes model list.
-		 * @param string       $provider Provider ID.
-		 * @param list<string> $listed   IDs the provider lists.
-		 */
-		$filtered = apply_filters( 'ai_feedback_provider_model_id', $match, $model_id, $provider, $listed );
-
-		return is_string( $filtered ) && in_array( $filtered, $listed, true ) ? $filtered : null;
-	}
-
-	/**
 	 * Finds a model ID in the configured providers, for a model with no provider in the list.
 	 *
 	 * @param  object $registry Provider registry.
@@ -323,25 +279,18 @@ class Model_Pin {
 			return new WP_Error( 'ai_client_missing', __( 'The WordPress core AI Client is unavailable. WordPress 7.0 or higher is required.', 'fresh-eyes' ) );
 		}
 
-		$providers = method_exists( $registry, 'getRegisteredProviderIds' ) ? $registry->getRegisteredProviderIds() : array();
-		foreach ( is_array( $providers ) ? $providers : array() as $provider ) {
-			if ( ! is_string( $provider ) || ! $this->is_provider_ready( $registry, $provider ) ) {
-				continue;
-			}
+		foreach ( $this->capabilities->configured_providers() as $provider ) {
 			try {
-				$directory = $this->get_model_directory( $registry, $provider );
-				if ( null === $directory || ! method_exists( $directory, 'hasModelMetadata' ) || true !== $directory->hasModelMetadata( $model_id ) ) {
-					continue;
-				}
-				$model = $registry->getProviderModel( $provider, $model_id );
+				$listed_id = $this->capabilities->find_listed_id( $provider, $model_id );
+				$model     = null === $listed_id ? null : $registry->getProviderModel( $provider, $listed_id );
 			} catch ( \Throwable $e ) {
 				Logger::debug( sprintf( 'Could not check %s for model %s: %s', $provider, $model_id, $e->getMessage() ) );
 				continue;
 			}
-			if ( is_object( $model ) ) {
+			if ( null !== $listed_id && is_object( $model ) ) {
 				return array(
 					'provider' => $provider,
-					'model_id' => $model_id,
+					'model_id' => $listed_id,
 					'model'    => $model,
 				);
 			}
@@ -387,77 +336,5 @@ class Model_Pin {
 				'provider' => $provider,
 			)
 		);
-	}
-
-	/**
-	 * Whether a provider is registered and has credentials.
-	 *
-	 * @param  object $registry Provider registry.
-	 * @param  string $provider Provider ID.
-	 * @return bool
-	 */
-	private function is_provider_ready( object $registry, string $provider ): bool {
-		if ( ! method_exists( $registry, 'hasProvider' ) || ! method_exists( $registry, 'isProviderConfigured' ) ) {
-			return false;
-		}
-		try {
-			return true === $registry->hasProvider( $provider ) && true === $registry->isProviderConfigured( $provider );
-		} catch ( \Throwable $e ) {
-			return false;
-		}
-	}
-
-	/**
-	 * A provider's model metadata directory.
-	 *
-	 * @param  object $registry Provider registry.
-	 * @param  string $provider Provider ID.
-	 * @return object|null Directory, or null when the provider has none.
-	 */
-	private function get_model_directory( object $registry, string $provider ): ?object {
-		if ( ! method_exists( $registry, 'getProviderClassName' ) ) {
-			return null;
-		}
-		$class = $registry->getProviderClassName( $provider );
-		if ( ! is_string( $class ) || ! class_exists( $class ) || ! method_exists( $class, 'modelMetadataDirectory' ) ) {
-			return null;
-		}
-		$directory = $class::modelMetadataDirectory();
-		return is_object( $directory ) ? $directory : null;
-	}
-
-	/**
-	 * A provider's display name, or its ID.
-	 *
-	 * @param  object $registry Provider registry.
-	 * @param  string $provider Provider ID.
-	 * @return string
-	 */
-	private function provider_name( object $registry, string $provider ): string {
-		try {
-			$class    = method_exists( $registry, 'getProviderClassName' ) ? $registry->getProviderClassName( $provider ) : null;
-			$metadata = is_string( $class ) && method_exists( $class, 'metadata' ) ? $class::metadata() : null;
-			$name     = is_object( $metadata ) && method_exists( $metadata, 'getName' ) ? $metadata->getName() : null;
-		} catch ( \Throwable $e ) {
-			$name = null;
-		}
-		return is_string( $name ) && '' !== $name ? $name : $provider;
-	}
-
-	/**
-	 * Gets the core AI Client provider registry.
-	 *
-	 * @return object|null Registry, or null when the AI Client is unavailable.
-	 */
-	protected function get_provider_registry(): ?object {
-		if ( ! class_exists( \WordPress\AiClient\AiClient::class ) ) {
-			return null;
-		}
-
-		try {
-			return \WordPress\AiClient\AiClient::defaultRegistry();
-		} catch ( \Throwable $e ) {
-			return null;
-		}
 	}
 }
