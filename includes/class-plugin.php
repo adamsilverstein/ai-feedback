@@ -137,6 +137,7 @@ class Plugin {
 		add_action( 'deleted_user', array( Analytics::class, 'on_deleted_user' ) );
 		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
+		Image_Refusals::register();
 		Analytics_Page::init();
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 

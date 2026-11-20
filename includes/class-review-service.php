@@ -51,7 +51,7 @@ class Review_Service {
 	 *
 	 * @var int[]
 	 */
-	const NON_RETRYABLE_STATUSES = array( 400, 401, 402, 403, 404, 422 );
+	const NON_RETRYABLE_STATUSES = array( 400, 401, 402, 403, 404, 413, 415, 422 );
 
 	/**
 	 * Message phrases that mark a permanent auth or billing failure, for
@@ -120,6 +120,13 @@ class Review_Service {
 	 * @var Notes_Manager
 	 */
 	private Notes_Manager $notes_manager;
+
+	/**
+	 * Images the current review left out, with why, see Review_Images::get_skipped().
+	 *
+	 * @var list<array{block_id: string, reason: string}>
+	 */
+	private array $skipped_images = array();
 
 	/**
 	 * Constructor.
@@ -199,10 +206,11 @@ class Review_Service {
 		}
 
 		// Get AI model.
-		$model    = $options['model'] ?? AI_FEEDBACK_DEFAULT_MODEL;
-		$is_mock  = self::is_mock_mode();
-		$images   = $is_mock || ! is_array( $blocks ) || ! is_string( $model ) ? array() : $this->get_review_images( $blocks, $model );
-		$attached = array_column( $images, 'block_id' );
+		$model                = $options['model'] ?? AI_FEEDBACK_DEFAULT_MODEL;
+		$is_mock              = self::is_mock_mode();
+		$this->skipped_images = array();
+		$images               = $is_mock || ! is_array( $blocks ) || ! is_string( $model ) ? array() : $this->get_review_images( $blocks, $model );
+		$attached             = array_column( $images, 'block_id' );
 
 		// Build prompt with existing feedback context if available.
 		$options['image_blocks'] = $attached;
@@ -222,11 +230,21 @@ class Review_Service {
 			// A model may refuse image input; review the text alone then.
 			if ( is_wp_error( $ai_response ) && array() !== $images && self::is_refused_input( $ai_response ) ) {
 				Logger::debug( sprintf( 'AI request with images was refused (%s: %s), retrying without them', $ai_response->get_error_code(), $ai_response->get_error_message() ) );
+				$refusal = $ai_response;
+				foreach ( $attached as $block_id ) {
+					$this->skip_image( $block_id, 'refused' );
+				}
 				$attached                = array();
 				$options['image_blocks'] = array();
 				$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
 				// One retry at most, so a refused request can't double the wait.
 				$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 1 );
+
+				// The text alone worked, so the images were the problem.
+				if ( ! is_wp_error( $ai_response ) && is_string( $model ) && Image_Refusals::is_lasting_refusal( $refusal ) ) {
+					Logger::debug( sprintf( 'Model %s will not be sent images for a while', $model ) );
+					Image_Refusals::remember( $this->get_model_provider( $model ), $model );
+				}
 			}
 
 			if ( is_wp_error( $ai_response ) ) {
@@ -292,7 +310,7 @@ class Review_Service {
 				'block_mapping' => array(),
 				'note_count'    => count( $feedback_items ),
 				'notes_error'   => $note_result->get_error_message(),
-			) + $persona;
+			) + $persona + $this->build_skipped_images_result();
 
 			$this->fire_review_completed( $post_id, $result );
 
@@ -321,7 +339,7 @@ class Review_Service {
 			'summary_text'  => $ai_summary,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
-		) + $persona;
+		) + $persona + $this->build_skipped_images_result();
 
 		$this->fire_review_completed( $post_id, $result );
 
@@ -344,6 +362,31 @@ class Review_Service {
 			'persona'          => $persona,
 			'persona_label'    => Personas::get_label( $persona ),
 			'persona_takeaway' => Personas::sanitize_takeaway( $takeaway ),
+		);
+	}
+
+	/**
+	 * The images the review left out, for its result.
+	 *
+	 * @return array{images_skipped?: list<array{block_id: string, reason: string}>} Empty when none were.
+	 */
+	private function build_skipped_images_result(): array {
+		return array() === $this->skipped_images ? array() : array( 'images_skipped' => $this->skipped_images );
+	}
+
+	/**
+	 * Note an image the review left out.
+	 *
+	 * @param string $block_id Image block's client ID.
+	 * @param string $reason   A Review_Images::SKIP_* reason, `refused` when
+	 *                         the provider refused the request with it, or
+	 *                         `refused_recently` when the model refused images
+	 *                         in an earlier review.
+	 */
+	private function skip_image( string $block_id, string $reason ): void {
+		$this->skipped_images[] = array(
+			'block_id' => $block_id,
+			'reason'   => $reason,
 		);
 	}
 
@@ -391,21 +434,55 @@ class Review_Service {
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
-		$images = $this->collect_review_images( $blocks );
-		if ( array() === $images || ! $this->model_supports_vision( $model ) ) {
+		$provider = $this->get_model_provider( $model );
+		$images   = $this->collect_review_images( $blocks, $provider );
+		if ( array() === $images && array() === $this->skipped_images ) {
+			return array();
+		}
+		// A model that refused images recently passed this check before, so
+		// it isn't asked again.
+		if ( Image_Refusals::is_refused( $provider, $model ) ) {
+			Logger::debug( sprintf( 'Model %s refused images recently, so none are sent', $model ) );
+			foreach ( $images as $image ) {
+				$this->skip_image( $image['block_id'], 'refused_recently' );
+			}
+			return array();
+		}
+		if ( ! $this->model_supports_vision( $model ) ) {
+			// A text-only model was never going to be sent images.
+			$this->skipped_images = array();
 			return array();
 		}
 		return $images;
 	}
 
 	/**
-	 * Images from the blocks that could be sent, see Review_Images.
+	 * Images from the blocks that could be sent, see Review_Images. Images
+	 * left out because the provider would refuse them are noted.
 	 *
-	 * @param  array<mixed> $blocks Blocks being reviewed.
+	 * @param  array<mixed> $blocks   Blocks being reviewed.
+	 * @param  string       $provider Provider ID of the review's model, or '' when unknown.
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
-	protected function collect_review_images( array $blocks ): array {
-		return ( new Review_Images() )->collect( $blocks );
+	protected function collect_review_images( array $blocks, string $provider = '' ): array {
+		$collector = new Review_Images();
+		$images    = $collector->collect( $blocks, $provider );
+		foreach ( $collector->get_skipped() as $skipped ) {
+			$this->skip_image( $skipped['block_id'], $skipped['reason'] );
+		}
+		return $images;
+	}
+
+	/**
+	 * Provider of a model in the model list, for its image limits and for
+	 * remembering a refusal.
+	 *
+	 * @param  string $model Model ID.
+	 * @return string Provider ID, or '' when the model isn't listed.
+	 */
+	protected function get_model_provider( string $model ): string {
+		$provider = ( new Settings_Controller() )->get_model( $model )['provider'] ?? null;
+		return is_string( $provider ) ? $provider : '';
 	}
 
 	/**

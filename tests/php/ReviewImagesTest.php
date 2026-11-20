@@ -121,8 +121,8 @@ class ReviewImagesTest extends TestCase {
 
 		$this->uploads = sys_get_temp_dir() . '/ai-feedback-uploads-' . uniqid();
 		mkdir( $this->uploads . '/2026/11', 0777, true );
-		file_put_contents( $this->uploads . '/2026/11/chart.png', 'png-original' );
-		file_put_contents( $this->uploads . '/2026/11/chart-768x400.png', 'png-medium-large' );
+		file_put_contents( $this->uploads . '/2026/11/chart.png', ai_feedback_test_png( 1600, 833, 'original' ) );
+		file_put_contents( $this->uploads . '/2026/11/chart-768x400.png', ai_feedback_test_png( 768, 400, 'medium-large' ) );
 		file_put_contents( $this->uploads . '/2026/11/huge.jpg', str_repeat( 'x', Review_Images::MAX_BYTES + 1 ) );
 		file_put_contents( $this->uploads . '/2026/11/logo.svg', '<svg/>' );
 		file_put_contents( sys_get_temp_dir() . '/ai-feedback-outside.png', 'secret' );
@@ -206,7 +206,7 @@ class ReviewImagesTest extends TestCase {
 				array(
 					'block_id' => 'img',
 					'mime'     => 'image/png',
-					'data'     => base64_encode( 'png-medium-large' ),
+					'data'     => base64_encode( ai_feedback_test_png( 768, 400, 'medium-large' ) ),
 				),
 			),
 			$images
@@ -282,7 +282,7 @@ class ReviewImagesTest extends TestCase {
 	 */
 	public function test_total_size_limit(): void {
 		$size = (int) ( Review_Images::MAX_TOTAL_BYTES / 2 ) - 10;
-		file_put_contents( $this->uploads . '/2026/11/big.png', str_repeat( 'x', $size ) );
+		file_put_contents( $this->uploads . '/2026/11/big.png', ai_feedback_test_png( 800, 600, str_repeat( 'x', $size - 33 ) ) );
 		$GLOBALS['test_attachments'][20] = array(
 			'file' => '2026/11/big.png',
 			'mime' => 'image/png',
