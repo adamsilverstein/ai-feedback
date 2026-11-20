@@ -67,11 +67,11 @@ function renderSummary(props) {
 		selectors: { getGlobalBlockCount: () => 2 },
 	});
 
-	return render(
-		<RegistryProvider value={registry}>
-			<ReviewSummary {...props} />
-		</RegistryProvider>
-	);
+	return render(<ReviewSummary {...props} />, {
+		wrapper: ({ children }) => (
+			<RegistryProvider value={registry}>{children}</RegistryProvider>
+		),
+	});
 }
 
 describe('ReviewSummary strengths and progress', () => {
@@ -166,6 +166,36 @@ describe('ReviewSummary strengths and progress', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Review again' })
 		).toBeNull();
+	});
+
+	it('shows the done state again once a restored note is addressed', () => {
+		const { rerender } = renderSummary({
+			review,
+			progress: { addressed: 2, total: 2 },
+		});
+		fireEvent.click(screen.getByRole('button', { name: 'Show feedback' }));
+
+		rerender(
+			<ReviewSummary
+				review={review}
+				progress={{ addressed: 1, total: 2 }}
+			/>
+		);
+		expect(screen.getByText('1 of 2 notes addressed')).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Review again' })
+		).toBeNull();
+
+		rerender(
+			<ReviewSummary
+				review={review}
+				progress={{ addressed: 2, total: 2 }}
+			/>
+		);
+		expect(
+			screen.getByRole('button', { name: 'Review again' })
+		).toBeInTheDocument();
+		expect(screen.queryByText('Feedback list')).toBeNull();
 	});
 });
 

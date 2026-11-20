@@ -72,6 +72,12 @@ export default function ReviewSummary({ review, progress = null }) {
 	const showProgress =
 		hasNotes && !review.is_in_progress && progress?.total > 0;
 	const isDone = showProgress && progress.addressed >= progress.total;
+
+	// Once a note is restored, addressing it again shows the done state again.
+	if (!isDone && showAddressed) {
+		setShowAddressed(false);
+	}
+
 	const mappedBlockCount = blockMapping
 		? Object.keys(blockMapping).length
 		: 0;
