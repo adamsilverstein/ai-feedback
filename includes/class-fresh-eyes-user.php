@@ -168,15 +168,34 @@ class Fresh_Eyes_User {
 	 * Create the user on upgrade, once per plugin version and site.
 	 */
 	public static function maybe_ensure(): void {
-		if ( AI_FEEDBACK_VERSION === get_option( self::CHECKED_OPTION ) || false !== get_transient( self::RETRY_TRANSIENT ) ) {
+		// The filter's answer is part of what was checked, so changing it is acted on at the next admin page load.
+		$checked = AI_FEEDBACK_VERSION . ( self::should_exist() ? '' : ':off' );
+		if ( get_option( self::CHECKED_OPTION ) === $checked || false !== get_transient( self::RETRY_TRANSIENT ) ) {
 			return;
 		}
-		if ( self::ensure() > 0 ) {
-			update_option( self::CHECKED_OPTION, AI_FEEDBACK_VERSION );
+		if ( self::ensure() > 0 || ! self::should_exist() ) {
+			update_option( self::CHECKED_OPTION, $checked );
 			return;
 		}
 		// Another request holds the lock, or creating failed: try again in a few minutes, not on every page.
 		set_transient( self::RETRY_TRANSIENT, 1, 5 * MINUTE_IN_SECONDS );
+	}
+
+	/**
+	 * Whether the site wants the Fresh Eyes user.
+	 *
+	 * @return bool
+	 */
+	public static function should_exist(): bool {
+		/**
+		 * Filters whether to create the hidden Fresh Eyes user the Notes `@`
+		 * completer offers. Return false to go without it: an existing
+		 * account is removed at the next activation or admin page load, and
+		 * typing `@fresh-eyes` still asks Fresh Eyes.
+		 *
+		 * @param bool $create Whether to create the user. Default true.
+		 */
+		return false !== apply_filters( 'ai_feedback_create_mention_user', true );
 	}
 
 	/**
@@ -190,6 +209,11 @@ class Fresh_Eyes_User {
 	 * @return int User ID, or 0 when it could not be created or another request is creating it.
 	 */
 	public static function ensure(): int {
+		if ( ! self::should_exist() ) {
+			self::remove();
+			return 0;
+		}
+
 		$id = self::get_id();
 		if ( $id > 0 && self::is_ours( $id ) ) {
 			return $id;
@@ -417,6 +441,27 @@ class Fresh_Eyes_User {
 		}
 		self::$id = null;
 
+		self::delete_account( $id );
+	}
+
+	/**
+	 * Remove the account and forget its ID, when the filter says the site goes without it.
+	 */
+	public static function remove(): void {
+		$id = self::get_id();
+		// Forget the ID first, so deleting the user does not recreate it.
+		delete_network_option( null, self::OPTION );
+		self::$id = null;
+		self::delete_account( $id );
+	}
+
+	/**
+	 * Delete an account, only when it carries the plugin's marker. It
+	 * authors nothing, so nothing is reassigned.
+	 *
+	 * @param int $id User ID.
+	 */
+	private static function delete_account( int $id ): void {
 		if ( ! self::is_ours( $id ) ) {
 			return;
 		}

@@ -10,6 +10,7 @@ namespace AI_Feedback\Tests;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Fresh_Eyes_User;
+use AI_Feedback\Mentions;
 
 require_once __DIR__ . '/fresh-eyes-user-mocks.php';
 
@@ -219,6 +220,61 @@ class FreshEyesUserTest extends TestCase {
 		unset( $GLOBALS['test_transients']['ai_feedback_user_retry'] );
 		Fresh_Eyes_User::maybe_ensure();
 		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+	}
+
+	public function test_the_filter_stops_the_user_being_created(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
+
+		$this->assertSame( 0, Fresh_Eyes_User::ensure() );
+		Fresh_Eyes_User::maybe_ensure();
+
+		$this->assertSame( array(), $GLOBALS['test_inserted_users'] );
+		$this->assertSame( 0, Fresh_Eyes_User::get_id() );
+		$this->assertSame( AI_FEEDBACK_VERSION . ':off', $GLOBALS['test_options'][ Fresh_Eyes_User::CHECKED_OPTION ] );
+		$this->assertArrayNotHasKey( 'ai_feedback_user_retry', $GLOBALS['test_transients'] );
+	}
+
+	public function test_turning_the_filter_off_removes_the_account_at_the_next_check(): void {
+		Fresh_Eyes_User::maybe_ensure();
+		$id = Fresh_Eyes_User::get_id();
+		$this->assertGreaterThan( 0, $id );
+
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
+		Fresh_Eyes_User::maybe_ensure();
+
+		$this->assertSame( array( array( $id, null ) ), $GLOBALS['test_deleted_users'] );
+		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
+		$this->assertSame( 0, Fresh_Eyes_User::get_id() );
+
+		// Deleting it does not bring it back while the filter says no.
+		Fresh_Eyes_User::on_deleted_user( $id );
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+
+		// A typed handle still asks Fresh Eyes; a chip for the old ID does not.
+		$this->assertTrue( Mentions::mentions_fresh_eyes( '@fresh-eyes simplify this' ) );
+		$this->assertFalse( Mentions::has_user_chip( '<span class="wp-note-mention user-' . $id . '">@Fresh Eyes</span>' ) );
+	}
+
+	public function test_turning_the_filter_back_on_creates_the_account_again(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
+		Fresh_Eyes_User::maybe_ensure();
+
+		unset( $GLOBALS['test_filter_results'] );
+		Fresh_Eyes_User::maybe_ensure();
+
+		$this->assertGreaterThan( 0, Fresh_Eyes_User::get_id() );
+		$this->assertSame( AI_FEEDBACK_VERSION, $GLOBALS['test_options'][ Fresh_Eyes_User::CHECKED_OPTION ] );
+	}
+
+	public function test_the_filter_never_removes_an_account_it_did_not_create(): void {
+		$this->add_person( 5, 'fresh-eyes' );
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = 5;
+		$GLOBALS['test_filter_results']                     = array( 'ai_feedback_create_mention_user' => false );
+
+		Fresh_Eyes_User::ensure();
+
+		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
+		$this->assertArrayHasKey( 5, $GLOBALS['test_user_objects'] );
 	}
 
 	public function test_a_deleted_user_is_recreated(): void {

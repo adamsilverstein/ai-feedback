@@ -71,7 +71,7 @@ function ai_feedback_test_reset_users(): void {
 	$GLOBALS['test_queried_id']        = 0;
 	$GLOBALS['test_status_header']     = null;
 	$GLOBALS['wp_query']               = new WP_Query();
-	unset( $GLOBALS['test_current_user_can'] );
+	unset( $GLOBALS['test_current_user_can'], $GLOBALS['test_filter_results'] );
 	\AI_Feedback\Fresh_Eyes_User::reset_cache();
 }
 
