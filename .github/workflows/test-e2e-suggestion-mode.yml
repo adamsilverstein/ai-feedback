@@ -74,7 +74,10 @@ jobs:
               if: steps.gutenberg-cache.outputs.cache-hit != 'true'
               env:
                   SHA: ${{ steps.pin.outputs.sha }}
-              run: echo "version=$(curl -fsSL "https://raw.githubusercontent.com/WordPress/gutenberg/$SHA/.nvmrc")" >> "$GITHUB_OUTPUT"
+              run: |
+                  version="$(curl -fsSL --retry 3 "https://raw.githubusercontent.com/WordPress/gutenberg/$SHA/.nvmrc")"
+                  test -n "$version"
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
 
             - name: Setup Gutenberg's Node.js
               if: steps.gutenberg-cache.outputs.cache-hit != 'true'
