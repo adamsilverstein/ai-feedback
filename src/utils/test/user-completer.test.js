@@ -55,9 +55,7 @@ describe('hideUserFromCompleter', () => {
 		const completer = hideUserFromCompleter(userCompleter(), 41);
 		const { result } = renderHook(() => completer.useItems('fr'));
 
-		expect(result.current[0].map((option) => option.value.id)).toEqual([
-			7,
-		]);
+		expect(result.current[0].map((option) => option.value.id)).toEqual([7]);
 		expect(completer.name).toBe('users');
 		expect(completer.triggerPrefix).toBe('@');
 	});
@@ -96,9 +94,9 @@ describe('hideFreshEyesUser', () => {
 		const [completer] = applyFilters('editor.Autocomplete.completers', []);
 		const { result } = renderHook(() => completer.useItems('fresh'));
 
-		expect(result.current[0].map((option) => option.value.name)).toEqual(
-			['Fred']
-		);
+		expect(result.current[0].map((option) => option.value.name)).toEqual([
+			'Fred',
+		]);
 	});
 
 	it('passes anything that is not a list through', () => {

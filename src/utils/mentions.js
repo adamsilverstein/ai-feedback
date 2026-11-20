@@ -52,7 +52,9 @@ function getMentionPattern() {
  * @return {string} Text.
  */
 export function getNoteText(content) {
-	const html = stripQuoted(String(content || '').slice(0, MAX_SCAN_LENGTH * 2));
+	const html = stripQuoted(
+		String(content || '').slice(0, MAX_SCAN_LENGTH * 2)
+	);
 	const text = html
 		.replace(/<[^>]*>/g, ' ')
 		.replace(/&#64;|&commat;/gi, '@')
