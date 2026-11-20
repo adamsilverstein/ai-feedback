@@ -5,7 +5,7 @@
 /**
  * External dependencies
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * WordPress dependencies
@@ -21,11 +21,20 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 import { getNoteRelinks } from '../relink-notes';
 import { extractBlockData, getBlockAnchor } from '../block-utils';
 
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
+
 beforeAll(() => {
+	// Read block HTML as the editor does, with its rich text formats.
+	registerEditorFormats();
 	if (!getBlockTypes().some((type) => type.name === 'core/quote')) {
 		registerCoreBlocks();
 	}
 });
+
+afterAll(unregisterEditorFormats);
 
 describe('getNoteRelinks on loaded blocks', () => {
 	it('relinks a note made before its block was migrated from a deprecated format', () => {

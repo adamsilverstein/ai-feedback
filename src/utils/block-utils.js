@@ -64,19 +64,9 @@ function getReviewText(block, rawContent) {
 		);
 	}
 	// An image block's <img> is the block, not an inline image in its text.
-	if (block.name === 'core/image') {
-		return extractTextContent(rawContent);
-	}
-	// Rich text reads the empty wrapper a parent like a group keeps, once
-	// its inner blocks are left out, as an object (U+FFFC). A parent whose
-	// own HTML reads as nothing but that, and holds no image, has no text of
-	// its own, as Reply_Service::editor_text() reads it.
-	const text = extractEditorText(rawContent);
-	const isEmptyWrapper =
-		block.innerBlocks?.length > 0 &&
-		!/<img\b/i.test(rawContent) &&
-		!text.replace(/[\uFFFC\s]/g, '');
-	return isEmptyWrapper ? '' : text;
+	return block.name === 'core/image'
+		? extractTextContent(rawContent)
+		: extractEditorText(rawContent);
 }
 
 /**
@@ -193,12 +183,14 @@ export function extractBlockData(blocks, parent = '') {
 	for (const block of blocks) {
 		const rawContent = getBlockOwnHTML(block);
 		const content = getReviewText(block, rawContent);
+		// Objects alone, like a cover's image (U+FFFC), are no text to review.
+		const hasText = content.replace(/[\uFFFC\s]/g, '') !== '';
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
 		const attributes = getFormattingAttributes(block);
 		const isImage = block.name === 'core/image' && !!attributes?.url;
-		if (content.trim() || isImage) {
+		if (hasText || isImage) {
 			result.push({
 				clientId: block.clientId,
 				name: block.name,

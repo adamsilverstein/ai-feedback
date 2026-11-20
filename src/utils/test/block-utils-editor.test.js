@@ -5,7 +5,7 @@
 /**
  * External dependencies
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * WordPress dependencies
@@ -39,11 +39,20 @@ import {
 // from its `innerContent` strings with Reply_Service::editor_text().
 const EDITOR_TEXT = require('../../../tests/fixtures/editor-text.json');
 
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
+
 beforeAll(() => {
+	// Read block HTML as the editor does, with its rich text formats.
+	registerEditorFormats();
 	if (!getBlockTypes().some((type) => type.name === 'core/paragraph')) {
 		registerCoreBlocks();
 	}
 });
+
+afterAll(unregisterEditorFormats);
 
 /**
  * Load blocks into a fresh block editor store, as the editor does for a
@@ -324,22 +333,56 @@ describe('Custom HTML and blocks that save nothing', () => {
 	);
 });
 
-// Only a parent's empty wrapper is read as no text: U+FFFC in a block's
-// own text is kept, as the server is to read it too (see #311).
-describe('U+FFFC in a block’s own text', () => {
-	it('is kept in a paragraph', () => {
-		const [block] = loadEditor(
-			parse(
-				'<!-- wp:paragraph --><p>Before <span class="marker"></span>after.</p><!-- /wp:paragraph -->'
-			)
-		)
-			.select(blockEditorStore)
-			.getBlocks();
+// Shared with Reply_Service::editor_text(): objects like a footnote or a
+// comment are U+FFFC in the text sent, as the editor and the server read it.
+describe('objects in a block’s own text', () => {
+	const objects = EDITOR_TEXT.cases.filter(
+		({ name }) =>
+			/footnote|comment/.test(name) && !/unclosed|without the/.test(name)
+	);
 
-		expect(extractBlockData([block])[0].content).toBe(
-			'Before \uFFFCafter.'
-		);
+	it('has footnote and comment cases to check', () => {
+		expect(objects.length).toBeGreaterThan(3);
 	});
+
+	it.each(objects.map((item) => [item.name, item]))(
+		'sends a paragraph with a %s as the fixture reads it',
+		(_name, item) => {
+			const [block] = loadEditor(
+				parse(
+					`<!-- wp:paragraph --><p>${item.html}</p><!-- /wp:paragraph -->`
+				)
+			)
+				.select(blockEditorStore)
+				.getBlocks();
+
+			expect(block.isValid).toBe(true);
+			expect(extractBlockData([block])[0].content).toBe(item.text.trim());
+		}
+	);
+
+	it.each([
+		[
+			'cover',
+			'<!-- wp:cover {"url":"https://example.com/a.jpg","dimRatio":50} --><div class="wp-block-cover"><img class="wp-block-cover__image-background" alt="" src="https://example.com/a.jpg" data-object-fit="cover"/><span aria-hidden="true" class="wp-block-cover__background has-background-dim"></span><div class="wp-block-cover__inner-container"><!-- wp:paragraph --><p>Inside the cover.</p><!-- /wp:paragraph --></div></div><!-- /wp:cover -->',
+		],
+		[
+			'media and text',
+			'<!-- wp:media-text {"mediaType":"image"} --><div class="wp-block-media-text is-stacked-on-mobile"><figure class="wp-block-media-text__media"><img src="https://example.com/a.jpg" alt=""/></figure><div class="wp-block-media-text__content"><!-- wp:paragraph --><p>Beside the image.</p><!-- /wp:paragraph --></div></div><!-- /wp:media-text -->',
+		],
+	])(
+		'does not send a %s block whose own text is only its image',
+		(name, markup) => {
+			const blocks = loadEditor(parse(markup))
+				.select(blockEditorStore)
+				.getBlocks();
+
+			expect(blocks[0].isValid).toBe(true);
+			expect(extractBlockData(blocks).map((block) => block.name)).toEqual(
+				['core/paragraph']
+			);
+		}
+	);
 });
 
 // The editor's notion of a block's own text, from its save output without
