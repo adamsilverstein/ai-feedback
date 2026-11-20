@@ -38,13 +38,8 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 }
 
 if ( ! class_exists( 'wpdb' ) ) {
-	class wpdb {
-		public $users       = 'wp_users';
-		public $base_prefix = 'wp_';
-
-		public function get_blog_prefix( $blog_id = null ) {
-			return null === $blog_id || 1 === (int) $blog_id ? 'wp_' : 'wp_' . (int) $blog_id . '_';
-		}
+	// The bootstrap's database stand-in, with the INSERT IGNORE lock, as the real class name.
+	class wpdb extends Test_WPDB {
 	}
 }
 
@@ -155,6 +150,20 @@ if ( ! function_exists( 'wp_delete_user' ) ) {
 if ( ! function_exists( 'is_multisite' ) ) {
 	function is_multisite() {
 		return false;
+	}
+}
+
+if ( ! function_exists( 'get_users' ) ) {
+	// Only the marker lookup is needed: IDs of users carrying the given meta.
+	function get_users( $args = array() ) {
+		$ids = array();
+		foreach ( $GLOBALS['test_user_meta'] ?? array() as $id => $meta ) {
+			if ( isset( $args['meta_key'] ) && ( $meta[ $args['meta_key'] ] ?? null ) === $args['meta_value'] && isset( $GLOBALS['test_user_objects'][ $id ] ) ) {
+				$ids[] = (string) $id;
+			}
+		}
+		sort( $ids );
+		return array_slice( $ids, 0, $args['number'] ?? 10 );
 	}
 }
 

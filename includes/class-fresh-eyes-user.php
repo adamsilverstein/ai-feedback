@@ -45,6 +45,16 @@ class Fresh_Eyes_User {
 	public const CHECKED_OPTION = 'ai_feedback_user_checked';
 
 	/**
+	 * Option used as the lock while the user is created.
+	 */
+	private const LOCK_OPTION = 'ai_feedback_user_lock';
+
+	/**
+	 * Seconds after which a creation lock is treated as abandoned.
+	 */
+	private const LOCK_TTL = 60;
+
+	/**
 	 * Preferred login.
 	 */
 	public const LOGIN = 'fresh-eyes';
@@ -156,10 +166,11 @@ class Fresh_Eyes_User {
 	 * Make sure the user exists, creating it when it does not.
 	 *
 	 * The stored ID is only trusted while that account still carries the
-	 * plugin's marker. Otherwise a new account is created and the other one
-	 * is left alone.
+	 * plugin's marker. Otherwise an account that carries it is adopted, or a
+	 * new one is created, and an unmarked account is left alone. A lock keeps
+	 * two requests after an update from each creating one.
 	 *
-	 * @return int User ID, or 0 when it could not be created.
+	 * @return int User ID, or 0 when it could not be created or another request is creating it.
 	 */
 	public static function ensure(): int {
 		$id = self::get_id();
@@ -167,15 +178,105 @@ class Fresh_Eyes_User {
 			return $id;
 		}
 
-		$created = self::create();
-		if ( is_wp_error( $created ) ) {
-			Logger::debug( 'Fresh_Eyes_User: could not create the user: ' . $created->get_error_message() );
+		if ( ! self::acquire_lock() ) {
 			return 0;
 		}
 
-		update_network_option( null, self::OPTION, $created );
-		self::$id = $created;
-		return $created;
+		try {
+			$user_id = self::find_marked();
+			if ( 0 === $user_id ) {
+				$created = self::create();
+				if ( is_wp_error( $created ) ) {
+					Logger::debug( 'Fresh_Eyes_User: could not create the user: ' . $created->get_error_message() );
+					return 0;
+				}
+				$user_id = $created;
+			}
+
+			update_network_option( null, self::OPTION, $user_id );
+			self::$id = $user_id;
+			return $user_id;
+		} finally {
+			self::release_lock();
+		}
+	}
+
+	/**
+	 * Find an account carrying the plugin's marker, such as one another
+	 * request created, straight from the database.
+	 *
+	 * @return int User ID, or 0.
+	 */
+	private static function find_marked(): int {
+		$ids = get_users(
+			array(
+				'blog_id'    => 0,
+				'meta_key'   => self::MARKER_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Runs once, when the user is missing.
+				'meta_value' => '1', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Runs once, when the user is missing.
+				'fields'     => 'ID',
+				'orderby'    => 'ID',
+				'number'     => 1,
+			)
+		);
+		$id  = $ids[0] ?? 0;
+		return is_numeric( $id ) ? (int) $id : 0;
+	}
+
+	/**
+	 * Take the creation lock.
+	 *
+	 * Uses an INSERT IGNORE on the options table, like WP_Upgrader::create_lock(),
+	 * because add_option() checks and inserts in separate queries. A lock
+	 * older than LOCK_TTL is treated as abandoned.
+	 *
+	 * @return bool True when the lock was acquired.
+	 */
+	private static function acquire_lock(): bool {
+		$db = self::db();
+		if ( null === $db ) {
+			return false;
+		}
+
+		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+			$insert = $db->prepare( "INSERT IGNORE INTO %i ( `option_name`, `option_value`, `autoload` ) VALUES (%s, %s, 'off') /* LOCK */", $db->options, self::LOCK_OPTION, (string) time() );
+			if ( null === $insert ) {
+				return false;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Atomic lock, must hit the database; prepared above.
+			if ( $db->query( $insert ) ) {
+				return true;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Read the lock without a stale option cache.
+			$locked_at = $db->get_var( $db->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $db->options, self::LOCK_OPTION ) );
+			if ( ! is_numeric( $locked_at ) || (int) $locked_at > time() - self::LOCK_TTL ) {
+				return false;
+			}
+
+			// Delete only the stale lock seen, so two requests taking it over can't both win.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
+			$db->delete(
+				$db->options,
+				array(
+					'option_name'  => self::LOCK_OPTION,
+					'option_value' => $locked_at,
+				)
+			);
+		}
+
+		return false;
+	}
+
+	/**
+	 * Release the creation lock.
+	 */
+	private static function release_lock(): void {
+		$db = self::db();
+		if ( null !== $db ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
+			$db->delete( $db->options, array( 'option_name' => self::LOCK_OPTION ) );
+		}
 	}
 
 	/**
@@ -202,18 +303,21 @@ class Fresh_Eyes_User {
 		$name = __( 'Fresh Eyes', 'fresh-eyes' );
 
 		self::$updating = true;
-		$user_id        = wp_insert_user(
-			array(
-				'user_login'           => self::available_login(),
-				'user_pass'            => wp_generate_password( 64, true, true ),
-				'user_email'           => '',
-				'display_name'         => $name,
-				'nickname'             => $name,
-				'role'                 => '',
-				'show_admin_bar_front' => 'false',
-			)
-		);
-		self::$updating = false;
+		try {
+			$user_id = wp_insert_user(
+				array(
+					'user_login'           => self::available_login(),
+					'user_pass'            => wp_generate_password( 64, true, true ),
+					'user_email'           => '',
+					'display_name'         => $name,
+					'nickname'             => $name,
+					'role'                 => '',
+					'show_admin_bar_front' => 'false',
+				)
+			);
+		} finally {
+			self::$updating = false;
+		}
 
 		if ( is_wp_error( $user_id ) ) {
 			return $user_id;
@@ -264,6 +368,7 @@ class Fresh_Eyes_User {
 		$id = self::get_id();
 		delete_network_option( null, self::OPTION );
 		delete_option( self::CHECKED_OPTION );
+		delete_option( self::LOCK_OPTION );
 		self::$id = null;
 
 		if ( ! self::is_ours( $id ) ) {
@@ -564,36 +669,38 @@ class Fresh_Eyes_User {
 			return;
 		}
 		self::$updating = true;
-
-		$meta = get_user_meta( $user_id );
-		foreach ( is_array( $meta ) ? $meta : array() as $key => $values ) {
-			$key = (string) $key;
-			if ( 1 === preg_match( '/^' . preg_quote( $db->base_prefix, '/' ) . '(?:\d+_)?capabilities$/', $key ) ) {
-				$raw   = is_array( $values ) ? ( $values[0] ?? '' ) : $values;
-				$value = is_string( $raw ) ? maybe_unserialize( $raw ) : $raw;
-				if ( array() !== $value ) {
-					update_user_meta( $user_id, $key, array() );
-					update_user_meta( $user_id, substr( $key, 0, -strlen( 'capabilities' ) ) . 'user_level', 0 );
+		try {
+			$meta = get_user_meta( $user_id );
+			foreach ( is_array( $meta ) ? $meta : array() as $key => $values ) {
+				$key = (string) $key;
+				if ( 1 === preg_match( '/^' . preg_quote( $db->base_prefix, '/' ) . '(?:\d+_)?capabilities$/', $key ) ) {
+					$raw   = is_array( $values ) ? ( $values[0] ?? '' ) : $values;
+					$value = is_string( $raw ) ? maybe_unserialize( $raw ) : $raw;
+					if ( array() !== $value ) {
+						update_user_meta( $user_id, $key, array() );
+						update_user_meta( $user_id, substr( $key, 0, -strlen( 'capabilities' ) ) . 'user_level', 0 );
+					}
 				}
 			}
-		}
 
-		if ( is_multisite() && is_super_admin( $user_id ) ) {
-			revoke_super_admin( $user_id );
-		}
+			if ( is_multisite() && is_super_admin( $user_id ) ) {
+				revoke_super_admin( $user_id );
+			}
 
-		$user = get_userdata( $user_id );
-		if ( $user instanceof WP_User && '' !== $user->user_email ) {
-			wp_update_user(
-				array(
-					'ID'         => $user_id,
-					'user_email' => '',
-				)
-			);
-		}
+			$user = get_userdata( $user_id );
+			if ( $user instanceof WP_User && '' !== $user->user_email ) {
+				wp_update_user(
+					array(
+						'ID'         => $user_id,
+						'user_email' => '',
+					)
+				);
+			}
 
-		clean_user_cache( $user_id );
-		self::$updating = false;
+			clean_user_cache( $user_id );
+		} finally {
+			self::$updating = false;
+		}
 	}
 
 	/**

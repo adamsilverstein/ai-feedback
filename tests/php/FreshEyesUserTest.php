@@ -135,6 +135,42 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertArrayNotHasKey( Fresh_Eyes_User::MARKER_META, $GLOBALS['test_user_meta'][5] );
 	}
 
+	public function test_creation_waits_for_another_request_holding_the_lock(): void {
+		$GLOBALS['test_options']['ai_feedback_user_lock'] = (string) time();
+
+		$this->assertSame( 0, Fresh_Eyes_User::ensure() );
+		$this->assertSame( array(), $GLOBALS['test_inserted_users'] );
+		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
+	}
+
+	public function test_an_abandoned_lock_is_taken_over_and_released(): void {
+		$GLOBALS['test_options']['ai_feedback_user_lock'] = (string) ( time() - 120 );
+
+		$id = $this->create_user();
+
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+		$this->assertSame( $id, $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		$this->assertArrayNotHasKey( 'ai_feedback_user_lock', $GLOBALS['test_options'] );
+	}
+
+	public function test_an_account_another_request_created_is_adopted(): void {
+		// Another request created and marked it, and this one read the option before it was stored.
+		$this->add_person( 9, 'fresh-eyes' );
+		$GLOBALS['test_user_meta'][9][ Fresh_Eyes_User::MARKER_META ] = '1';
+
+		$this->assertSame( 9, Fresh_Eyes_User::ensure() );
+		$this->assertSame( array(), $GLOBALS['test_inserted_users'] );
+		$this->assertSame( 9, $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+	}
+
+	public function test_a_failed_insert_releases_the_lock(): void {
+		$GLOBALS['test_insert_user_error'] = new \WP_Error( 'existing_user_login', 'Taken.' );
+
+		Fresh_Eyes_User::ensure();
+
+		$this->assertArrayNotHasKey( 'ai_feedback_user_lock', $GLOBALS['test_options'] );
+	}
+
 	public function test_a_failed_insert_stores_nothing(): void {
 		$GLOBALS['test_insert_user_error'] = new \WP_Error( 'existing_user_login', 'Taken.' );
 
