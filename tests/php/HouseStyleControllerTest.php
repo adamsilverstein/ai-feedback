@@ -344,4 +344,27 @@ class HouseStyleControllerTest extends TestCase {
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( $first, $this->data( $response )['rule'] );
 	}
+
+	/**
+	 * A scope other than exactly `site` is never treated as the site scope,
+	 * so it needs no more than `edit_posts` and only ever saves a personal
+	 * rule. The REST route also rejects it through its `enum`.
+	 */
+	public function test_unknown_scope_is_never_the_site(): void {
+		$this->act_as( array( 'edit_posts' ) );
+
+		foreach ( array( 'SITE', 'network', ' site', '' ) as $index => $scope ) {
+			$request = $this->request(
+				array(
+					'scope' => $scope,
+					'text'  => 'Rule ' . $index,
+				)
+			);
+			$this->assertTrue( $this->controller->edit_rules_permissions_check( $request ) );
+			$this->controller->create_rule( $request );
+		}
+
+		$this->assertSame( array(), House_Style::get_rules( House_Style::SCOPE_SITE ) );
+		$this->assertCount( 4, House_Style::get_rules( House_Style::SCOPE_USER ) );
+	}
 }
