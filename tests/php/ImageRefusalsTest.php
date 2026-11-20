@@ -36,7 +36,7 @@ class ImageRefusalsTest extends TestCase {
 	}
 
 	/**
-	 * A refusal is kept per provider and model, for an hour by default.
+	 * A refusal is kept per provider and model, for 15 minutes by default.
 	 */
 	public function test_remembers_per_provider_and_model(): void {
 		Image_Refusals::remember( 'openai', 'gpt-4o' );
@@ -46,7 +46,7 @@ class ImageRefusalsTest extends TestCase {
 		$this->assertFalse( Image_Refusals::is_refused( 'azure', 'gpt-4o' ) );
 
 		$expires = $GLOBALS['test_transients'][ Image_Refusals::TRANSIENT ]['openai|gpt-4o'];
-		$this->assertEqualsWithDelta( time() + HOUR_IN_SECONDS, $expires, 2 );
+		$this->assertEqualsWithDelta( time() + 15 * MINUTE_IN_SECONDS, $expires, 2 );
 	}
 
 	/**
@@ -65,7 +65,7 @@ class ImageRefusalsTest extends TestCase {
 
 	/**
 	 * The filter sets the time, 0 turns remembering off, and it is never
-	 * longer than a day.
+	 * longer than an hour.
 	 */
 	public function test_ttl_filter(): void {
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_image_refusal_ttl' => 0 );
@@ -76,7 +76,7 @@ class ImageRefusalsTest extends TestCase {
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_image_refusal_ttl' => 10 * DAY_IN_SECONDS );
 		Image_Refusals::remember( 'openai', 'gpt-4o' );
 		$expires = $GLOBALS['test_transients'][ Image_Refusals::TRANSIENT ]['openai|gpt-4o'];
-		$this->assertEqualsWithDelta( time() + DAY_IN_SECONDS, $expires, 2 );
+		$this->assertEqualsWithDelta( time() + HOUR_IN_SECONDS, $expires, 2 );
 	}
 
 	/**
@@ -115,11 +115,12 @@ class ImageRefusalsTest extends TestCase {
 		return array(
 			'core finds no model for the images' => array( new WP_Error( 'prompt_invalid_argument', 'No models found that support text_generation for this prompt.', array( 'status' => 400 ) ), true ),
 			'415 media type'                     => array( $error( 'prompt_client_error', 'Unsupported Media Type', 415 ), true ),
-			'400 naming images'                  => array( $error( 'prompt_client_error', 'This model does not support image input.', 400 ), true ),
-			'400 naming image_url'               => array( $error( 'prompt_client_error', 'Invalid content type. image_url is only supported by certain models.', 400 ), true ),
-			'422 naming modalities'              => array( $error( 'prompt_client_error', 'Input modality not supported.', 422 ), true ),
-			'400 naming the media type'          => array( $error( 'prompt_client_error', 'Image does not match the provided media type.', 400 ), true ),
-			'400 with an underscored code'       => array( $error( 'invalid_input_image', 'Bad request.', 400 ), true ),
+			'400 naming images'                  => array( $error( 'prompt_client_error', 'This model does not support image input.', 400 ), false ),
+			'400 naming image_url'               => array( $error( 'prompt_client_error', 'Invalid content type. image_url is only supported by certain models.', 400 ), false ),
+			'422 naming modalities'              => array( $error( 'prompt_client_error', 'Input modality not supported.', 422 ), false ),
+			'400 naming the media type'          => array( $error( 'prompt_client_error', 'Image does not match the provided media type.', 400 ), false ),
+			'400 with an underscored code'       => array( $error( 'invalid_input_image', 'Bad request.', 400 ), false ),
+			'400 corrupt image'                  => array( $error( 'prompt_client_error', 'Could not process image.', 400 ), false ),
 			'400 underscored size code'          => array( $error( 'image_too_large', 'Bad request.', 400 ), false ),
 			'400 underscored count code'         => array( $error( 'max_images_exceeded', 'Bad request.', 400 ), false ),
 			'400 image too large'                => array( $error( 'prompt_client_error', 'image exceeds 5 MB maximum', 400 ), false ),
@@ -137,8 +138,8 @@ class ImageRefusalsTest extends TestCase {
 	}
 
 	/**
-	 * Only errors that say the model or request shape doesn't take images
-	 * are remembered.
+	 * Only errors that say the model takes no images at all are
+	 * remembered, never one that can be about a single image.
 	 *
 	 * @param WP_Error $error    Error from the request with images.
 	 * @param bool     $expected Whether it is remembered.

@@ -29,13 +29,13 @@ class Image_Refusals {
 	/**
 	 * Default time a refusal is remembered, in seconds.
 	 */
-	public const DEFAULT_TTL = HOUR_IN_SECONDS;
+	public const DEFAULT_TTL = 15 * MINUTE_IN_SECONDS;
 
 	/**
 	 * Longest time a refusal may be remembered, in seconds, whatever the
 	 * filter returns.
 	 */
-	public const MAX_TTL = DAY_IN_SECONDS;
+	public const MAX_TTL = HOUR_IN_SECONDS;
 
 	/**
 	 * Whether a model refused images recently.
@@ -58,9 +58,9 @@ class Image_Refusals {
 	public static function remember( string $provider, string $model ): void {
 		/**
 		 * Filters how long a model's refusal of images is remembered, in
-		 * seconds. Return 0 to never remember one. At most a day.
+		 * seconds. Return 0 to never remember one. At most an hour.
 		 *
-		 * @param int    $ttl      Seconds. Default an hour.
+		 * @param int    $ttl      Seconds. Default 15 minutes.
 		 * @param string $provider Provider ID, or '' when unknown.
 		 * @param string $model    Model ID.
 		 */
@@ -83,22 +83,22 @@ class Image_Refusals {
 	}
 
 	/**
-	 * Whether a failed request with images means the model, or the request's
-	 * shape, doesn't take images, so later reviews shouldn't send them.
+	 * Whether a failed request with images means the model doesn't take
+	 * images at all, so later reviews, by any user, shouldn't send them.
 	 *
-	 * Only called once the same review without images succeeded, so an
-	 * outage or auth failure never gets here. Remembered:
+	 * The memory is site-wide, so only errors that can't come from one
+	 * author's image count. Only called once the same review without images
+	 * succeeded, so an outage or auth failure never gets here. Remembered:
 	 *
 	 * - core finding no configured model for the prompt
 	 *   (`prompt_invalid_argument`, "No models found ..."), which with the
-	 *   text alone working means none takes its images;
-	 * - a 415, the provider refusing the media type;
-	 * - a 400 or 422 whose code or message names images (`image_url` too),
-	 *   vision, modalities, media types or MIME types, unless it says they
-	 *   are too large or too many, or exceed a limit.
+	 *   text alone working means the model's metadata takes no images;
+	 * - a 415, the provider refusing image input.
 	 *
-	 * Not remembered: a 413 (that request was too large, the next may not
-	 * be), any other 400 or 422, and every other error.
+	 * Never remembered: any 400 or 422, even one naming images, since it can
+	 * be about one image (corrupt, too large, an unsupported format, too
+	 * many), a 413, and every other error. Those cost only that review's
+	 * proposals.
 	 *
 	 * @param  WP_Error $error Error from the request with images.
 	 * @return bool
@@ -109,18 +109,7 @@ class Image_Refusals {
 		$data    = $error->get_error_data();
 		$status  = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
 
-		if ( 'prompt_invalid_argument' === $code && str_starts_with( $message, 'No models found' ) ) {
-			$lasting = true;
-		} elseif ( 415 === $status ) {
-			$lasting = true;
-		} elseif ( in_array( $status, array( 400, 422 ), true ) ) {
-			$text = $code . ' ' . $message;
-			// An image too large, or too many, may pass in a later review.
-			$lasting = 1 === preg_match( '/(?<![a-z])(?:image|vision|modalit|media[ _]type|mime)/i', $text )
-				&& 1 !== preg_match( '/(?<![a-z])(?:too[ _](?:large|big|many)|exceed|limit|max(?:imum)?(?![a-z]))/i', $text );
-		} else {
-			$lasting = false;
-		}
+		$lasting = ( 'prompt_invalid_argument' === $code && str_starts_with( $message, 'No models found' ) ) || 415 === $status;
 
 		/**
 		 * Filters whether a refused request with images is remembered, so

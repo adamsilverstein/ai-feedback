@@ -554,6 +554,14 @@ class ReviewImagesTest extends TestCase {
 			$this->assertFalse( ( new \ReflectionMethod( Review_Service::class, 'is_refused_input' ) )->invoke( null, $error ) );
 		}
 
+		// The plugin's own errors never drop the images.
+		$this->assertFalse(
+			( new \ReflectionMethod( Review_Service::class, 'is_refused_input' ) )->invoke(
+				null,
+				new WP_Error( 'ai_feedback_model_unavailable', 'The selected model does not take images.', array( 'status' => 400 ) )
+			)
+		);
+
 		$this->assertTrue(
 			( new \ReflectionMethod( Review_Service::class, 'is_refused_input' ) )->invoke(
 				null,
@@ -749,7 +757,7 @@ class ReviewImagesTest extends TestCase {
 	public function test_refusal_is_remembered(): void {
 		list( $service, , $result ) = $this->review(
 			'gpt-4o',
-			array( new WP_Error( 'prompt_client_error', 'Invalid content type. image_url is only supported by certain models.', array( 'status' => 400 ) ), self::alt_response() )
+			array( new WP_Error( 'prompt_client_error', 'Unsupported Media Type', array( 'status' => 415 ) ), self::alt_response() )
 		);
 		$this->assertCount( 2, $service->sent );
 		$this->assertSame( array( 'refused' ), array_column( $result['images_skipped'], 'reason' ) );
@@ -765,6 +773,41 @@ class ReviewImagesTest extends TestCase {
 		Image_Refusals::clear_on_option_change( 'connectors_ai_openai_api_key' );
 		list( $service ) = $this->review( 'gpt-4o', array( self::alt_response() ) );
 		$this->assertNotEmpty( $service->sent[0] );
+	}
+
+	/**
+	 * One author's bad image costs only that review: a 400 about an image
+	 * is not remembered, so the next review, by another user, sends its
+	 * images again.
+	 */
+	public function test_bad_image_does_not_affect_other_users(): void {
+		$GLOBALS['test_current_user_id'] = 1;
+		list( $service, , $result ) = $this->review(
+			'gpt-4o',
+			array( new WP_Error( 'prompt_client_error', 'Could not process image: the image is invalid.', array( 'status' => 400 ) ), self::alt_response() )
+		);
+		$this->assertCount( 2, $service->sent );
+		$this->assertSame( array( 'refused' ), array_column( $result['images_skipped'], 'reason' ) );
+		$this->assertFalse( Image_Refusals::is_refused( 'openai', 'gpt-4o' ) );
+
+		$GLOBALS['test_current_user_id'] = 2;
+		list( $service, $notes, $result ) = $this->review( 'gpt-4o', array( self::alt_response() ) );
+		$this->assertSame( array( 'img' ), array_column( $service->sent[0], 'block_id' ) );
+		$this->assertArrayNotHasKey( 'images_skipped', $result );
+		$this->assertSame( array( 'alt' => 'Bar chart of test times before and after' ), $notes->items[0]['block_change']['attributes'] ?? null );
+	}
+
+	/**
+	 * A remembered refusal expires: once its time passes, images are sent
+	 * again.
+	 */
+	public function test_remembered_refusal_expires(): void {
+		$GLOBALS['test_transients'][ Image_Refusals::TRANSIENT ] = array( 'openai|gpt-4o' => time() - 1 );
+
+		list( $service, , $result ) = $this->review( 'gpt-4o', array( self::alt_response() ) );
+
+		$this->assertNotEmpty( $service->sent[0] );
+		$this->assertArrayNotHasKey( 'images_skipped', $result );
 	}
 
 	/**

@@ -400,6 +400,11 @@ class Review_Service {
 	 * @return bool
 	 */
 	private static function is_refused_input( WP_Error $error ): bool {
+		// The plugin's own errors, eg. the selected model being unavailable,
+		// would fail the same way without images.
+		if ( str_starts_with( (string) $error->get_error_code(), 'ai_feedback_' ) ) {
+			return false;
+		}
 		$data   = $error->get_error_data();
 		$status = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
 		if ( in_array( $status, array( 400, 413, 415, 422 ), true ) ) {
