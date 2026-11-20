@@ -37,6 +37,9 @@ on:
             - '.github/workflows/test-e2e-suggestion-mode.yml'
     workflow_dispatch:
 
+permissions:
+    contents: read
+
 jobs:
     e2e-suggestion-mode:
         name: E2E Tests (Suggestion Mode, pinned Gutenberg)
@@ -63,7 +66,21 @@ jobs:
               uses: actions/cache/restore@v6
               with:
                   path: .cache/suggestion-mode/gutenberg
-                  key: gutenberg-suggestion-mode-${{ steps.pin.outputs.sha }}
+                  key: gutenberg-suggestion-mode-${{ runner.os }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('bin/build-suggestion-mode-gutenberg.sh') }}
+
+            # Gutenberg pins its own Node version.
+            - name: Read Gutenberg's Node version
+              id: gutenberg-node
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              env:
+                  SHA: ${{ steps.pin.outputs.sha }}
+              run: echo "version=$(curl -fsSL "https://raw.githubusercontent.com/WordPress/gutenberg/$SHA/.nvmrc")" >> "$GITHUB_OUTPUT"
+
+            - name: Setup Gutenberg's Node.js
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              uses: actions/setup-node@v7
+              with:
+                  node-version: ${{ steps.gutenberg-node.outputs.version }}
 
             - name: Build Gutenberg at the pinned commit
               if: steps.gutenberg-cache.outputs.cache-hit != 'true'
@@ -75,7 +92,12 @@ jobs:
               uses: actions/cache/save@v6
               with:
                   path: .cache/suggestion-mode/gutenberg
-                  key: gutenberg-suggestion-mode-${{ steps.pin.outputs.sha }}
+                  key: gutenberg-suggestion-mode-${{ runner.os }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('bin/build-suggestion-mode-gutenberg.sh') }}
+
+            - name: Setup Node.js for the plugin
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: '.nvmrc'
 
             - name: Install dependencies
               run: npm ci

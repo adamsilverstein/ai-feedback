@@ -43,6 +43,12 @@ NO_CHECKS=true npm run build:plugin-zip
 rm -rf "$PLUGIN"
 mkdir -p "$PLUGIN"
 unzip -q "$SOURCE/gutenberg.zip" -d "$PLUGIN"
+# The archive keeps its files at the root; catch a layout change before the
+# build is stamped and cached.
+if [ ! -f "$PLUGIN/gutenberg.php" ]; then
+	echo "The Gutenberg archive has no gutenberg.php at its root." >&2
+	exit 1
+fi
 echo "$SHA" > "$PLUGIN/.built-sha"
 
 if [ -z "${GUTENBERG_KEEP_SOURCE:-}" ]; then
