@@ -119,7 +119,9 @@ test.describe('Refining a suggested edit', () => {
 		await expect
 			.poll(() => paragraphContent(editor))
 			.toBe('Revenue grew 40% in fiscal 2025.');
-		await expect(aiReplies.nth(2)).toContainText('You applied this change.');
+		await expect(aiReplies.nth(2)).toContainText(
+			'You applied this change.'
+		);
 
 		// With nothing pending, the quick replies offer a new change.
 		await expect(
