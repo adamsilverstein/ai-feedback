@@ -119,6 +119,7 @@ test.describe('Proofreading', () => {
 				original[3],
 			]);
 		await expect(group).toContainText('1 proofreading fix');
+		const afterAccept = await texts(editor);
 
 		// One editor Undo takes back every fix, in every block.
 		await page.evaluate(() =>
@@ -130,5 +131,12 @@ test.describe('Proofreading', () => {
 		await expect(
 			group.locator('.ai-feedback-item', { hasText: 'Teh → The' })
 		).toContainText('Apply fix');
+
+		// Redo puts the fixes back, and they read as applied again.
+		await page.evaluate(() =>
+			window.wp.data.dispatch('core/editor').redo()
+		);
+		await expect.poll(() => texts(editor)).toEqual(afterAccept);
+		await expect(group).toContainText('1 proofreading fix');
 	});
 });

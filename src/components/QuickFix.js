@@ -15,7 +15,11 @@ import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import { hasSuggestionMarkers } from '../utils/suggestions';
 import { getRichTextAttributeKey, isFixInPlace } from '../utils/quick-fix';
-import { trackSaves } from '../utils/proofreading';
+import {
+	forgetApplied,
+	recordApplied,
+	trackSaves,
+} from '../utils/proofreading';
 import {
 	applyEditToContent,
 	describeEdit,
@@ -277,6 +281,14 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 		updateBlockAttributes(item.block_id, { [attributeKey]: updated });
 		markLastChangeAsPersistent?.();
 		setApplied(true);
+		if (!isReplyEdit) {
+			recordApplied([item.id], {
+				clientId: item.block_id,
+				key: attributeKey,
+				before: previous,
+				after: updated,
+			});
+		}
 		trackSaves([item.id], setResolved(true));
 		setIsPreviewOpen(false);
 
@@ -311,6 +323,7 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 							updateBlockAttributes(item.block_id, {
 								[attributeKey]: previous,
 							});
+							forgetApplied([item.id]);
 							setApplied(false);
 							setResolved(false);
 						},

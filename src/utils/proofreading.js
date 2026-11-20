@@ -118,18 +118,75 @@ export function whenSaved(noteId) {
 }
 
 /**
- * Whether a fix's text is in a block again, so the fix can be applied:
- * after the editor's Undo takes back a fix that was applied.
- *
- * @param {string|RichTextData} content Current attribute value.
- * @param {Object}              fix     Quick fix with `find` and `replace`.
- * @return {boolean} True when the fix's text appears exactly once.
+ * Block content around each fix applied this session, keyed by note id: the
+ * HTML before and after, so the editor's Undo and Redo can be told apart
+ * from any other edit.
  */
-export function isFixTextBack(content, fix) {
-	if (!fix?.find || hasSuggestionMarkers(content)) {
-		return false;
+const appliedRecords = new Map();
+
+/**
+ * Remember the content a fix was applied to and the content it left.
+ *
+ * @param {number[]}            noteIds             Notes whose fixes the change applied.
+ * @param {Object}              change              The change.
+ * @param {string}              change.clientId     Block client id.
+ * @param {string}              change.key          Rich text attribute.
+ * @param {string|RichTextData} change.before       Value before.
+ * @param {string|RichTextData} change.after        Value after.
+ * @param {boolean}             [change.suggestion] Whether the notes were suggestions accepted in the text.
+ */
+export function recordApplied(
+	noteIds,
+	{ clientId, key, before, after, suggestion = false }
+) {
+	const record = {
+		clientId,
+		key,
+		before: toHtml(before),
+		after: toHtml(after),
+		suggestion,
+	};
+	noteIds.forEach((id) => appliedRecords.set(id, record));
+}
+
+/**
+ * Forget applied fixes, once Undo in the snackbar takes them back.
+ *
+ * @param {number[]} noteIds Note ids.
+ */
+export function forgetApplied(noteIds) {
+	noteIds.forEach((id) => appliedRecords.delete(id));
+}
+
+/**
+ * Where a fix applied this session stands in its block.
+ *
+ * @param {number}                                         noteId   Note id.
+ * @param {(clientId: string) => string|RichTextData|null} getValue Returns a block's value for an attribute, given its record.
+ * @return {string|null} `before` when the block reads as it did before the
+ *                       fix (the editor's Undo), `after` when it reads as the
+ *                       fix left it, `changed` otherwise, or null without a record.
+ */
+export function getAppliedState(noteId, getValue) {
+	const record = appliedRecords.get(noteId);
+	if (!record) {
+		return null;
 	}
-	return findUniqueOffset(create({ html: toHtml(content) }), fix) !== -1;
+	const html = toHtml(getValue(record));
+	if (html === record.after) {
+		return 'after';
+	}
+	return html === record.before ? 'before' : 'changed';
+}
+
+/**
+ * Whether a recorded fix was a suggestion accepted in the text.
+ *
+ * @param {number} noteId Note id.
+ * @return {boolean} True for accepted suggestions.
+ */
+export function isRecordedSuggestion(noteId) {
+	return !!appliedRecords.get(noteId)?.suggestion;
 }
 
 /**
@@ -222,7 +279,7 @@ export function applyFixesToContent(content, fixes) {
  * @param {(clientId: string) => ?Object}      options.getBlock     Returns a block by client id.
  * @param {(name: string) => Object|undefined} options.getBlockType Returns a block type by name.
  * @param {Object}                             [options.statuses]   Suggestion status by note id.
- * @return {{updates: Object, previous: Object, applied: number[], accepted: number[], skipped: number[]}} Attribute updates and prior values keyed by client id, and note ids by outcome.
+ * @return {{updates: Object, previous: Object, blocks: Object, applied: number[], accepted: number[], skipped: number[]}} Attribute updates, prior values and the notes applied, keyed by client id, and note ids by outcome.
  */
 export function planAcceptAll({
 	items,
@@ -233,6 +290,7 @@ export function planAcceptAll({
 	const plan = {
 		updates: {},
 		previous: {},
+		blocks: {},
 		applied: [],
 		accepted: [],
 		skipped: [],
@@ -301,6 +359,7 @@ export function planAcceptAll({
 
 		plan.updates[clientId] = { [key]: content };
 		plan.previous[clientId] = { [key]: original };
+		plan.blocks[clientId] = { key, applied, accepted };
 		plan.applied.push(...applied);
 		plan.accepted.push(...accepted);
 		plan.skipped.push(...skipped);
@@ -329,6 +388,18 @@ export function acceptAllFixes(registry, items, statuses = {}) {
 	});
 
 	updateAsOneStep(registry, plan.updates);
+	Object.entries(plan.blocks).forEach(
+		([clientId, { key, applied, accepted }]) => {
+			const change = {
+				clientId,
+				key,
+				before: plan.previous[clientId][key],
+				after: plan.updates[clientId][key],
+			};
+			recordApplied(applied, change);
+			recordApplied(accepted, { ...change, suggestion: true });
+		}
+	);
 	return plan;
 }
 
@@ -354,6 +425,7 @@ export function undoAcceptAll(registry, plan) {
 	}
 
 	updateAsOneStep(registry, plan.previous);
+	forgetApplied([...plan.applied, ...plan.accepted]);
 	return true;
 }
 

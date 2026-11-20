@@ -286,6 +286,7 @@ describe('Accept all with the real block editor', () => {
 		expect(plan).toEqual({
 			updates: {},
 			previous: {},
+			blocks: {},
 			applied: [],
 			accepted: [],
 			skipped: [1],

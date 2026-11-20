@@ -20,7 +20,12 @@ import { registerCoreBlocks } from '@wordpress/block-library';
  * Internal dependencies
  */
 import useRevertedFixes from '../useRevertedFixes';
-import { acceptAllFixes, trackSaves } from '../../utils/proofreading';
+import {
+	acceptAllFixes,
+	recordApplied,
+	trackSaves,
+} from '../../utils/proofreading';
+import { applyFixToContent } from '../../utils/quick-fix';
 
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 
@@ -123,6 +128,65 @@ describe('useRevertedFixes', () => {
 			['applied', 2, false],
 			['resolved', 1, false],
 			['resolved', 2, false],
+		]);
+	});
+
+	it('leaves a fix that adds words applied, and follows the editor’s Undo and Redo', async () => {
+		const { registry, block, calls } = setUp('Read data now.');
+		const item = note(7, block.clientId, 'data', 'the data');
+		const editor = registry.dispatch(blockEditorStore);
+		const content = () =>
+			registry.select(blockEditorStore).getBlock(block.clientId)
+				.attributes.content;
+
+		// As QuickFix applies it.
+		const before = content();
+		const after = applyFixToContent(before, item.quick_fix);
+		editor.updateBlockAttributes(block.clientId, { content: after });
+		recordApplied([7], {
+			clientId: block.clientId,
+			key: 'content',
+			before,
+			after,
+		});
+		registry.dispatch('ai-feedback/store').setFixApplied(7, true);
+		calls.length = 0;
+
+		render(
+			<RegistryProvider value={registry}>
+				<Probe items={[item]} />
+			</RegistryProvider>
+		);
+		// "data" still appears once, inside "the data": still applied.
+		expect(String(content())).toBe('Read the data now.');
+		expect(calls).toEqual([]);
+
+		// Typing elsewhere changes nothing.
+		await act(async () => {
+			editor.updateBlockAttributes(block.clientId, {
+				content: 'Read the data now!',
+			});
+		});
+		expect(calls).toEqual([]);
+
+		// The editor's Undo, back to the text before the fix.
+		await act(async () => {
+			editor.updateBlockAttributes(block.clientId, { content: before });
+		});
+		expect(calls).toEqual([
+			['applied', 7, false],
+			['resolved', 7, false],
+		]);
+
+		// The editor's Redo puts the fix back, so it reads as applied again.
+		await act(async () => {
+			editor.updateBlockAttributes(block.clientId, { content: after });
+		});
+		expect(calls).toEqual([
+			['applied', 7, false],
+			['resolved', 7, false],
+			['applied', 7, true],
+			['resolved', 7, true],
 		]);
 	});
 });
