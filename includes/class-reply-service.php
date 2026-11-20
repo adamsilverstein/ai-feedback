@@ -622,14 +622,15 @@ class Reply_Service {
 			return $html;
 		}
 
+		$input = $html;
 		// Placeholders below use NUL bytes, which block HTML never needs.
-		$html    = str_replace( "\x00", '', $html );
-		$kept    = array();
+		$html = str_replace( "\x00", '', $html );
+		$kept = array();
 		$pattern = '#<mark\b([^>]*)>((?:(?!<mark\b).)*?)</mark>#si';
 		// Each pass unwraps one level of nesting; the cap guards odd markup.
 		$passes = 0;
 		do {
-			$html = (string) preg_replace_callback(
+			$html = preg_replace_callback(
 				$pattern,
 				static function ( array $matches ) use ( &$kept ): string {
 					if ( preg_match( '#\bclass\s*=\s*(["\'])[^"\']*\bwp-suggestion-(add|del|format)\b#i', $matches[1], $type ) ) {
@@ -642,6 +643,12 @@ class Reply_Service {
 				-1,
 				$count
 			);
+			if ( null === $html ) {
+				// The regex failed, eg. on a backtrack limit. Keep the markup
+				// as it was rather than lose the block's text: an edit that
+				// no longer matches the editor's text is dropped, not applied.
+				return $input;
+			}
 		} while ( $count > 0 && ++$passes < 20 );
 
 		// Put back the other marks, which may hold one another. A kept mark
@@ -652,11 +659,14 @@ class Reply_Service {
 			if ( ! str_contains( $html, "\x00" ) ) {
 				break;
 			}
-			$html = (string) preg_replace_callback(
+			$html = preg_replace_callback(
 				'#\x00(\d+)\x00#',
 				static fn ( array $matches ): string => $kept[ (int) $matches[1] ] ?? '',
 				$html
 			);
+			if ( null === $html ) {
+				return $input;
+			}
 		}
 
 		return $html;

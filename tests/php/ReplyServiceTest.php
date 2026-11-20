@@ -1137,4 +1137,26 @@ class ReplyServiceTest extends TestCase {
 		$method = new \ReflectionMethod( Reply_Service::class, 'strip_suggestion_markers' );
 		$this->assertSame( $expected, $method->invoke( null, $html ) );
 	}
+
+	/**
+	 * When the marker regex fails, the block keeps its markup instead of
+	 * losing its text.
+	 */
+	public function test_strip_suggestion_markers_keeps_input_when_the_regex_fails(): void {
+		$html   = '<p>A <mark class="wp-suggestion-del">' . str_repeat( 'b', 5000 ) . '</mark> c</p>';
+		$limit  = ini_get( 'pcre.backtrack_limit' );
+		$jit    = ini_get( 'pcre.jit' );
+		$method = new \ReflectionMethod( Reply_Service::class, 'strip_suggestion_markers' );
+
+		ini_set( 'pcre.jit', '0' );
+		ini_set( 'pcre.backtrack_limit', '10' );
+		try {
+			$result = $method->invoke( null, $html );
+		} finally {
+			ini_set( 'pcre.backtrack_limit', (string) $limit );
+			ini_set( 'pcre.jit', (string) $jit );
+		}
+
+		$this->assertSame( $html, $result );
+	}
 }
