@@ -48,8 +48,8 @@ export function describeSkippedImages(skipped) {
 		refused: (n) =>
 			/* translators: %d: number of images. */
 			_n(
-				'The AI model refused %d image, so the review ran on the text alone and has no alt text proposal for it.',
-				'The AI model refused %d images, so the review ran on the text alone and has no alt text proposals for them.',
+				'The AI model refused the request with images, so the review ran on the text alone and %d image has no alt text proposal.',
+				'The AI model refused the request with images, so the review ran on the text alone and %d images have no alt text proposals.',
 				n,
 				'fresh-eyes'
 			),

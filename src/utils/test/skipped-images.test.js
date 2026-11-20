@@ -33,7 +33,7 @@ describe('describeSkippedImages', () => {
 		]);
 
 		expect(lines[0]).toMatch(
-			/refused 1 image, so the review ran on the text alone/
+			/refused the request with images, so the review ran on the text alone and 1 image/
 		);
 		expect(lines[1]).toMatch(/recently refused images/);
 	});
