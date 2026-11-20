@@ -108,6 +108,47 @@ class NotesManagerPersonaTest extends TestCase {
 	}
 
 	/**
+	 * The persona is stored on each note created through wp_insert_comment(),
+	 * which unslashes meta like core, and reads back for the badge.
+	 */
+	public function test_persona_is_stored_on_inserted_notes(): void {
+		require_once __DIR__ . '/fixtures/fake-comments.php';
+		require_once dirname( __DIR__, 2 ) . '/includes/class-plugin.php';
+		\ai_feedback_test_reset_comments(); // @phpstan-ignore function.notFound (defined in the fixture above)
+
+		$result = ( new Notes_Manager() )->create_notes_from_feedback(
+			array(
+				array(
+					'block_id' => 'block-1',
+					'category' => 'content',
+					'severity' => 'important',
+					'title'    => 'Compared to what?',
+					'feedback' => 'Link the benchmark.',
+				),
+				array(
+					'block_id' => 'block-1',
+					'category' => 'flow',
+					'severity' => 'suggestion',
+					'title'    => 'Lead with the number',
+					'feedback' => 'Put it first.',
+				),
+			),
+			10,
+			array(
+				'review_id' => 'r-1',
+				'persona'   => 'skeptical_expert',
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertCount( 2, $result['note_ids'] );
+		foreach ( $result['note_ids'] as $note_id ) {
+			$this->assertSame( 'skeptical_expert', get_comment_meta( $note_id, Personas::META_KEY, true ) );
+			$this->assertSame( 'Skeptical expert', Notes_Manager::get_persona_fields( $note_id )['persona_label'] );
+		}
+	}
+
+	/**
 	 * The note shows a badge naming the persona, before the other badges.
 	 */
 	public function test_badge_names_the_persona(): void {

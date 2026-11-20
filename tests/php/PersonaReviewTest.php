@@ -13,10 +13,14 @@ use AI_Feedback\Personas;
 use AI_Feedback\Response_Parser;
 use AI_Feedback\Review_History;
 
+require_once __DIR__ . '/fixtures/backslash-text.php';
+
 /**
  * Test cases for the persona takeaway.
  */
 class PersonaReviewTest extends TestCase {
+
+	use Backslash_Text_Provider;
 
 	/**
 	 * Blocks reviewed.
@@ -35,7 +39,7 @@ class PersonaReviewTest extends TestCase {
 	 * Clean up globals.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_current_user_id'], $GLOBALS['test_filter_results'], $GLOBALS['test_comment_meta'] );
+		unset( $GLOBALS['test_current_user_id'], $GLOBALS['test_filter_results'], $GLOBALS['test_comment_meta'], $GLOBALS['test_post_meta'] );
 		parent::tearDown();
 	}
 
@@ -149,6 +153,33 @@ class PersonaReviewTest extends TestCase {
 
 		$this->assertSame( 'Skimmer', Review_History::build_persona_fields( $entry )['persona_label'] ?? null );
 		$this->assertSame( 'Skimmer', Notes_Manager::get_persona_fields( 7 )['persona_label'] );
+	}
+
+	/**
+	 * A takeaway with backslashes survives the round trip through review
+	 * history, since update_post_meta() unslashes the value.
+	 *
+	 * @dataProvider backslash_text_provider
+	 *
+	 * @param string $text Takeaway.
+	 */
+	public function test_takeaway_keeps_backslashes_through_history( string $text ): void {
+		$GLOBALS['test_post_meta']       = array();
+		$GLOBALS['test_current_user_id'] = 7;
+
+		Review_History::record(
+			42,
+			array(
+				'review_id'        => 'r-1',
+				'persona'          => 'skeptical_expert',
+				'persona_takeaway' => $text,
+			)
+		);
+
+		// What get_latest_review() adds back to a review rebuilt from its notes.
+		$entry = Review_History::find( 42, 'r-1' );
+		$this->assertIsArray( $entry );
+		$this->assertSame( $text, Review_History::build_persona_fields( $entry )['persona_takeaway'] ?? null );
 	}
 
 	/**
