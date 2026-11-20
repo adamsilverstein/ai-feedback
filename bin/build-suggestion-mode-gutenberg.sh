@@ -12,6 +12,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PIN="$ROOT/tests/e2e/suggestion-mode/gutenberg.json"
 REPOSITORY="$(node -p 'require(process.argv[1]).repository' "$PIN")"
 SHA="$(node -p 'require(process.argv[1]).sha' "$PIN")"
+
+# A branch or tag name would quietly follow a moving ref.
+if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+	echo "The pinned sha in $PIN must be a full 40 character commit hash, not \"$SHA\"." >&2
+	exit 1
+fi
 CACHE="$ROOT/.cache/suggestion-mode"
 PLUGIN="$CACHE/gutenberg"
 SOURCE="$CACHE/source"
@@ -27,6 +33,10 @@ mkdir -p "$SOURCE"
 git -C "$SOURCE" init -q
 git -C "$SOURCE" fetch -q --depth=1 "https://github.com/$REPOSITORY.git" "$SHA"
 git -C "$SOURCE" checkout -q FETCH_HEAD
+if [ "$(git -C "$SOURCE" rev-parse HEAD)" != "$SHA" ]; then
+	echo "Fetched $(git -C "$SOURCE" rev-parse HEAD), expected $SHA." >&2
+	exit 1
+fi
 
 cd "$SOURCE"
 # Gutenberg pins its own Node version; use it when nvm is around.
