@@ -31,6 +31,8 @@ X-WP-Nonce: {nonce}
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design`, `grammar` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
+| `persona` | string | No | Reader persona to review as, an ID from `available_personas` (default: `copy_editor`). Unknown IDs return 400 |
+| `audience` | string | No | Who the document is for, in the author's words ("Who is this for?"). Plain text, at most 100 characters |
 | `chunk_index` | integer | No | Zero-based part number when a large document is reviewed in parts (default: `0`) |
 | `chunk_total` | integer | No | Number of parts in the review (default: `1`) |
 | `review_id` | string | No | Review ID returned for part 0, required for later parts |
@@ -99,6 +101,12 @@ The editor shows each one on its note with a one-line description, such as "Chan
 With the `grammar` focus area (Grammar & Spelling), the prompt asks for each typo, spelling or grammar error as its own `grammar` item with a `quick_fix`, spelled the way the review locale (the feedback language, or the site locale) spells it, for example British English for `en_GB`. The parser drops a `grammar` item without a valid quick fix, makes it a `suggestion`, ignores any `block_action` or `block_change` on it and never groups it. Other categories' quick fixes are left as they were before proofreading: each must appear once, and the editor checks it again before applying it. Grammar fixes are settled after them and give way to them: in review order, a grammar fix is dropped when its text overlaps any kept fix, when applying any one kept fix (or all the kept grammar fixes) would move its text or make it missing or ambiguous, or the other way round, and after `Response_Parser::MAX_FIXES_PER_BLOCK` (20) grammar fixes on a block. A `grammar` item that loses its fix this way is dropped. A `block_change` of type `set_attributes` (heading level, list type, alt text) leaves the text alone, so grammar fixes on that block keep their fix beside it; a `block_action`, transform or split rewrites, moves or removes the block, so its `grammar` items are dropped. `summary.by_category.grammar` counts them, but they stay out of `by_severity` and `has_critical`, so a draft full of typos doesn't read as one with many problems.
 
 The sidebar groups them in one row ("8 proofreading fixes") with **Accept all**, and each fix keeps Preview, Apply fix and Dismiss when the row is expanded. Accept all (`acceptAllFixes()` in `src/utils/proofreading.js`) reads each block when it runs, finds every open fix's text once in the current text, and replaces them where they were found, from the end backwards, so one fix never moves another. Fixes whose text is gone, ambiguous or overlapping are skipped. Every changed block is updated in one `updateBlockAttributes()` call, one undo step, links and formatting kept, and the notice reports what was applied and what no longer applies, with Undo. With Suggestion Mode on, fixes that became suggestions are accepted in the text (their deleted runs dropped, added runs kept) and marked `applied-unsaved`; other fixes in a block that still holds a suggestion are skipped. Applying a fix (one at a time or with Accept all) records its block's content before and after. When the editor's own Undo puts a block back to the content before, `useRevertedFixes()` (used by the feedback list for every quick fix) marks the fix not applied and reopens its note once the save that resolved it has finished; when Redo puts back the content after, it marks it applied and resolves it again. Any other edit leaves the note alone. A fix whose text only matches inside its own replacement ("data" → "the data" after it was applied) is never applied again, and reads as "The block already has this change."
+
+**Reader personas:**
+
+A review can be read as a persona: `copy_editor` (the default), `skeptical_expert`, `first_time_visitor` or `busy_skimmer`, plus any added with the `ai_feedback_personas` filter. Each persona adds a `READER PERSONA` section with its guidance to the prompt and asks the AI for a one-sentence `persona_takeaway`; an `audience` adds an `INTENDED AUDIENCE` section. The copy editor without an audience adds nothing, so its prompt is the same as before personas. One persona per review.
+
+Notes from a persona review store the persona ID in `ai_feedback_persona` comment meta, get a persona badge before their category and severity badges, and are returned with `persona` and `persona_label` (both empty for the default). An AI reply in the thread answers as the note's persona and is tagged with it too. The review response, and its history entry, add `persona`, `persona_label` and `persona_takeaway` (at most 200 characters, plain text); the sidebar summary leads with "Skeptical expert: …". Default reviews return none of these fields.
 
 **Example Request:**
 
@@ -462,6 +470,14 @@ X-WP-Nonce: {nonce}
     { "id": "casual", "label": "Casual" },
     { "id": "academic", "label": "Academic" },
     { "id": "friendly", "label": "Friendly" }
+  ],
+  "default_persona": "copy_editor",
+  "review_audience": "",
+  "available_personas": [
+    { "id": "copy_editor", "label": "Copy editor", "description": "A general editorial review, the same as without a persona." },
+    { "id": "skeptical_expert", "label": "Skeptical expert", "description": "Questions claims and asks for sources." },
+    { "id": "first_time_visitor", "label": "First-time visitor", "description": "Flags jargon and assumed knowledge." },
+    { "id": "busy_skimmer", "label": "Busy skimmer", "description": "Reads headings and first sentences only, and reports what they took away." }
   ]
 }
 ```
@@ -493,6 +509,8 @@ X-WP-Nonce: {nonce}
 | `default_focus_areas` | array | No | Default focus areas |
 | `default_tone` | string | No | Default target tone |
 | `feedback_locale` | string | No | Feedback language, or `auto` |
+| `default_persona` | string | No | Reader persona ID ("Read it as"). Unknown IDs return 400 `invalid_persona` |
+| `review_audience` | string | No | "Who is this for?" text, at most 100 characters. An empty string clears it |
 
 **Example Request:**
 
@@ -779,6 +797,9 @@ const data = useSelect( ( select ) => {
 | `getSelectedModel()` | string | Currently selected model ID |
 | `getFocusAreas()` | array | Selected focus areas |
 | `getTargetTone()` | string | Selected target tone |
+| `getAvailablePersonas()` | array | Reader personas, `{ id, label, description }` |
+| `getPersona()` | string | Selected reader persona ID |
+| `getReviewAudience()` | string | "Who is this for?" text |
 | `getNotesByBlockId(blockId)` | array | Notes for a specific block |
 | `getUnresolvedNotesCount()` | number | Count of unresolved notes |
 | `getAllNotes()` | array | All notes for current post |
@@ -808,6 +829,7 @@ const {
 |--------|------------|-------------|
 | `startReview(options)` | `{ postId, model?, focusAreas?, targetTone? }` | Start document review |
 | `updateSettings(settings)` | `{ defaultModel?, defaultFocusAreas?, defaultTone? }` | Update settings |
+| `setReviewAudience(audience)` | `string` | Set the audience in the store without saving it |
 | `resolveNote(noteId)` | `number` | Mark note as resolved |
 | `deleteNote(noteId)` | `number` | Delete a note |
 | `replyToNote(noteId, content)` | `number, string` | Reply to a note |
@@ -901,6 +923,21 @@ Set how many blocks are sent to the AI per review request (default 20, clamped t
 ```php
 add_filter( 'ai_feedback_chunk_size', function( int $size ): int {
     return 10;
+} );
+```
+
+#### `ai_feedback_personas`
+
+Add, relabel or remove the reader personas offered under "Read it as". Keys are persona IDs (lowercase letters, numbers, `_` and `-`, up to 40 characters); `guidance` describes the reader for the prompt. The copy editor is always offered and never adds guidance, so the default review is unchanged. Notes keep their persona ID, and a persona removed later stops showing its badge.
+
+```php
+add_filter( 'ai_feedback_personas', function( array $personas ): array {
+    $personas['legal_reviewer'] = array(
+        'label'       => __( 'Legal reviewer', 'my-plugin' ),
+        'description' => __( 'Flags promises the company cannot keep.', 'my-plugin' ),
+        'guidance'    => 'A lawyer who flags guarantees, absolute claims and anything that reads as a promise.',
+    );
+    return $personas;
 } );
 ```
 
