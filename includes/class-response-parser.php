@@ -18,7 +18,17 @@ class Response_Parser {
 	/**
 	 * Valid category values for feedback items.
 	 */
-	public const VALID_CATEGORIES = array( 'content', 'tone', 'flow', 'design' );
+	public const VALID_CATEGORIES = array( 'content', 'tone', 'flow', 'design', 'grammar' );
+
+	/**
+	 * Category of proofreading items: each one is a single quick fix.
+	 */
+	public const GRAMMAR_CATEGORY = 'grammar';
+
+	/**
+	 * Maximum number of quick fixes kept for one block in a review.
+	 */
+	public const MAX_FIXES_PER_BLOCK = 20;
 
 	/**
 	 * Valid severity values for feedback items.
@@ -136,6 +146,7 @@ class Response_Parser {
 		'flow'    => 20,
 		'tone'    => 15,
 		'design'  => 10,
+		'grammar' => 5,
 	);
 
 	/**
@@ -301,18 +312,36 @@ class Response_Parser {
 		// A block whose structural edit or formatting fix survived grouping
 		// gets no quick fix from any item, so the review proposes one change
 		// per block.
+		// A heading level or list type change leaves the text alone, so
+		// proofreading fixes stay beside it. Any other change rewrites, moves
+		// or removes the block, and its proofreading items are dropped below.
 		$changed = array();
 		foreach ( $grouped as $item ) {
 			if ( is_string( $item['block_id'] ?? null ) && ( isset( $item['block_action'] ) || isset( $item['block_change'] ) ) ) {
-				$changed[ $item['block_id'] ] = true;
+				$change                       = $item['block_change'] ?? null;
+				$keeps_text                   = ! isset( $item['block_action'] ) && is_array( $change ) && 'set_attributes' === ( $change['type'] ?? null );
+				$changed[ $item['block_id'] ] = $keeps_text && ( $changed[ $item['block_id'] ] ?? true );
 			}
 		}
 		foreach ( $grouped as $index => $item ) {
 			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
-			if ( isset( $changed[ $block_id ] ) && ! isset( $item['block_action'] ) && ! isset( $item['block_change'] ) ) {
+			if ( ! isset( $changed[ $block_id ] ) || isset( $item['block_action'] ) || isset( $item['block_change'] ) ) {
+				continue;
+			}
+			if ( ! $changed[ $block_id ] || self::GRAMMAR_CATEGORY !== ( $item['category'] ?? null ) ) {
 				unset( $grouped[ $index ]['quick_fix'] );
 			}
 		}
+
+		$grouped = $this->resolve_fix_conflicts( $grouped, $block_info );
+
+		// A proofreading item is only its fix, so one that lost it is noise.
+		$grouped = array_values(
+			array_filter(
+				$grouped,
+				static fn ( array $item ): bool => self::GRAMMAR_CATEGORY !== ( $item['category'] ?? null ) || isset( $item['quick_fix'] )
+			)
+		);
 
 		Logger::debug( sprintf( 'Grouped into %d feedback items', count( $grouped ) ) );
 
@@ -544,6 +573,19 @@ class Response_Parser {
 			if ( null !== $quick_fix ) {
 				$validated['quick_fix'] = $quick_fix;
 			}
+		}
+
+		// A proofreading item is a text fix and nothing else, and always a
+		// suggestion: a typo is never a critical problem.
+		if ( self::GRAMMAR_CATEGORY === $validated['category'] ) {
+			// A missing replacement is a malformed fix here, not a deletion.
+			$fix = $item['quick_fix'] ?? null;
+			if ( ! isset( $validated['quick_fix'] ) || ! is_array( $fix ) || ! is_string( $fix['replace'] ?? null ) ) {
+				Logger::debug( 'Grammar item without a usable quick fix, skipping' );
+				return null;
+			}
+			$validated['severity'] = 'suggestion';
+			return $validated;
 		}
 
 		// Optional structural edit, at most one per block in a review. It
@@ -912,6 +954,18 @@ class Response_Parser {
 	 * @return int Number of matches.
 	 */
 	private function count_quick_fix_matches( string $find, string $content ): int {
+		$count = preg_match_all( self::quick_fix_pattern( $find ), $content );
+
+		return false === $count ? 0 : $count;
+	}
+
+	/**
+	 * Build the regular expression that finds a quick fix's text.
+	 *
+	 * @param  string $find Text to find.
+	 * @return string Pattern.
+	 */
+	private static function quick_fix_pattern( string $find ): string {
 		$pattern = preg_quote( $find, '/' );
 
 		if ( preg_match( '/^[\p{L}\p{N}]/u', $find ) ) {
@@ -922,9 +976,149 @@ class Response_Parser {
 			$pattern .= '(?![\p{L}\p{N}])';
 		}
 
-		$count = preg_match_all( '/' . $pattern . '/u', $content );
+		return '/' . $pattern . '/u';
+	}
 
-		return false === $count ? 0 : $count;
+	/**
+	 * Find where a quick fix's text sits in block content.
+	 *
+	 * @param  string $find    Text to find.
+	 * @param  string $content Block content.
+	 * @return int|null Byte offset of the only match, or null unless there is exactly one.
+	 */
+	private static function find_unique_offset( string $find, string $content ): ?int {
+		$count = preg_match_all( self::quick_fix_pattern( $find ), $content, $matches, PREG_OFFSET_CAPTURE );
+
+		return 1 === $count ? $matches[0][0][1] : null;
+	}
+
+	/**
+	 * Keep only the proofreading fixes on each block that can be applied
+	 * together, and beside the block's other quick fixes, without one
+	 * changing where another applies.
+	 *
+	 * Other quick fixes are never changed here: each one already appears
+	 * exactly once, and the editor checks it again before applying it, as
+	 * before proofreading existed. Grammar fixes are settled after them, in
+	 * review order, and give way to them. A grammar fix loses its quick fix
+	 * when its text overlaps another kept fix, when applying any one kept fix
+	 * moves its text or makes it missing or ambiguous (or the other way
+	 * round), when applying all the kept grammar fixes does, and once a block
+	 * has MAX_FIXES_PER_BLOCK grammar fixes. Other subsets are not checked, as
+	 * their number grows exponentially: applying some fixes one at a time can
+	 * still leave another ambiguous, and the editor then shows it as outdated
+	 * rather than applying it. Accept all locates every fix before replacing
+	 * any (src/utils/proofreading.js).
+	 *
+	 * @param  array<int, array<string, mixed>> $items      Feedback items.
+	 * @param  array<mixed>                     $block_info Map of block IDs to their info, with `content`.
+	 * @return array<int, array<string, mixed>> Items, some grammar items without their quick fix.
+	 */
+	private function resolve_fix_conflicts( array $items, array $block_info ): array {
+		$others  = array();
+		$grammar = array();
+		foreach ( $items as $index => $item ) {
+			$fix      = $item['quick_fix'] ?? null;
+			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
+			if ( ! is_array( $fix ) || ! is_string( $fix['find'] ?? null ) || ! is_string( $fix['replace'] ?? null ) || '' === $block_id ) {
+				continue;
+			}
+
+			$info    = $block_info[ $block_id ] ?? null;
+			$content = is_array( $info ) && is_string( $info['content'] ?? null ) ? $info['content'] : '';
+			// Byte offsets, compared only with each other; the editor works
+			// in UTF-16 units on its own copy of the text.
+			$start = self::find_unique_offset( $fix['find'], $content );
+
+			$located = null === $start ? null : array(
+				'find'    => $fix['find'],
+				'replace' => $fix['replace'],
+				'start'   => $start,
+				'end'     => $start + strlen( $fix['find'] ),
+			);
+
+			if ( self::GRAMMAR_CATEGORY === ( $item['category'] ?? null ) ) {
+				$grammar[] = array( $index, $block_id, $content, $located );
+			} elseif ( null !== $located ) {
+				$others[ $block_id ][] = $located;
+			}
+		}
+
+		$kept = array();
+		foreach ( $grammar as list( $index, $block_id, $content, $candidate ) ) {
+			$block_kept = $kept[ $block_id ] ?? array();
+			if (
+				null === $candidate
+				|| count( $block_kept ) >= self::MAX_FIXES_PER_BLOCK
+				|| ! self::fits_with( $candidate, $block_kept, $others[ $block_id ] ?? array(), $content )
+			) {
+				Logger::debug( 'Grammar fix conflicts with another fix on its block, dropping it' );
+				unset( $items[ $index ]['quick_fix'] );
+				continue;
+			}
+
+			$kept[ $block_id ][] = $candidate;
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Whether a grammar fix can join the fixes already kept for its block.
+	 *
+	 * @param  array{find: string, replace: string, start: int, end: int}       $candidate Grammar fix to add.
+	 * @param  list<array{find: string, replace: string, start: int, end: int}> $kept      Grammar fixes already kept.
+	 * @param  list<array{find: string, replace: string, start: int, end: int}> $others    The block's other quick fixes.
+	 * @param  string                                                           $content   Block content.
+	 * @return bool
+	 */
+	private static function fits_with( array $candidate, array $kept, array $others, string $content ): bool {
+		foreach ( array_merge( $others, $kept ) as $other ) {
+			if ( $candidate['start'] < $other['end'] && $other['start'] < $candidate['end'] ) {
+				return false;
+			}
+			if ( ! self::stays_put( $candidate, array( $other ), $content ) || ! self::stays_put( $other, array( $candidate ), $content ) ) {
+				return false;
+			}
+		}
+
+		// Kept grammar fixes already work with each other one at a time, so
+		// only the whole set Accept all applies is left to check.
+		$all = array_merge( $kept, array( $candidate ) );
+		if ( count( $all ) > 2 ) {
+			foreach ( $all as $index => $fix ) {
+				$rest = $all;
+				unset( $rest[ $index ] );
+				if ( ! self::stays_put( $fix, array_values( $rest ), $content ) ) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Whether a fix's text is still found once, at the same place, after
+	 * other fixes are applied.
+	 *
+	 * @param  array{find: string, replace: string, start: int, end: int}       $fix     Fix to look for.
+	 * @param  list<array{find: string, replace: string, start: int, end: int}> $applied Fixes to apply first, none overlapping it.
+	 * @param  string                                                           $content Block content.
+	 * @return bool
+	 */
+	private static function stays_put( array $fix, array $applied, string $content ): bool {
+		usort( $applied, static fn ( array $a, array $b ): int => $b['start'] <=> $a['start'] );
+
+		$expected = $fix['start'];
+		foreach ( $applied as $other ) {
+			$content = substr_replace( $content, $other['replace'], $other['start'], $other['end'] - $other['start'] );
+			if ( $other['end'] <= $fix['start'] ) {
+				$expected += strlen( $other['replace'] ) - ( $other['end'] - $other['start'] );
+			}
+		}
+
+		return self::find_unique_offset( $fix['find'], $content ) === $expected;
 	}
 
 	/**
@@ -1221,10 +1415,13 @@ class Response_Parser {
 	/**
 	 * Produce aggregated counts and flags for a set of parsed feedback items.
 	 *
+	 * Proofreading (grammar) items count toward their category only, not
+	 * toward the severity counts or `has_critical`.
+	 *
 	 * @param  array $feedback_items Parsed feedback items. Each item is expected to include at least the `category` and `severity` keys.
 	 * @return array{
 	 *     total_notes: int,
-	 *     by_category: array{content:int, tone:int, flow:int, design:int},
+	 *     by_category: array{content:int, tone:int, flow:int, design:int, grammar:int},
 	 *     by_severity: array{suggestion:int, important:int, critical:int},
 	 *     has_critical: bool
 	 * } Summary data with total counts by category and severity, and a boolean indicating presence of any critical items.
@@ -1237,6 +1434,7 @@ class Response_Parser {
 				'tone'    => 0,
 				'flow'    => 0,
 				'design'  => 0,
+				'grammar' => 0,
 			),
 			'by_severity'  => array(
 				'suggestion' => 0,
@@ -1250,6 +1448,12 @@ class Response_Parser {
 			// Count by category.
 			if ( isset( $summary['by_category'][ $item['category'] ] ) ) {
 				++$summary['by_category'][ $item['category'] ];
+			}
+
+			// Proofreading fixes stay out of the severity counts, so a draft
+			// full of typos doesn't read as one with many problems.
+			if ( self::GRAMMAR_CATEGORY === ( $item['category'] ?? null ) ) {
+				continue;
 			}
 
 			// Count by severity.
@@ -1490,9 +1694,12 @@ class Response_Parser {
 
 		$groups = array();
 
-		foreach ( $feedback as $item ) {
-			// Create a key based on category and normalized title.
-			$key = $this->create_group_key( $item );
+		foreach ( $feedback as $position => $item ) {
+			// Create a key based on category and normalized title. Each
+			// proofreading fix stands alone, even when titles match.
+			$key = self::GRAMMAR_CATEGORY === ( $item['category'] ?? null )
+				? self::GRAMMAR_CATEGORY . '#' . $position
+				: $this->create_group_key( $item );
 
 			if ( isset( $groups[ $key ] ) ) {
 				// Add to existing group.

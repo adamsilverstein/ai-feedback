@@ -12,6 +12,7 @@ import {
 	applyFixToContent,
 	getFixPreview,
 	getRichTextAttributeKey,
+	isFixInPlace,
 } from '../quick-fix';
 
 describe('getRichTextAttributeKey', () => {
@@ -131,5 +132,27 @@ describe('applyFixToContent replacements', () => {
 
 		expect(seen).toEqual([]);
 		expect(result.toHTMLString()).toBe('We use tools daily.');
+	});
+});
+
+describe('fixes that add words', () => {
+	const fix = { find: 'data', replace: 'the data' };
+
+	it('applies once, then reads as in place instead of applying again', () => {
+		const once = applyFixToContent('Read data now.', fix);
+		expect(once).toBe('Read the data now.');
+		expect(applyFixToContent(once, fix)).toBeNull();
+		expect(getFixPreview(once, fix)).toBeNull();
+		expect(isFixInPlace(once, fix)).toBe(true);
+		expect(isFixInPlace('Read data now.', fix)).toBe(false);
+	});
+
+	it('still applies where the replacement is elsewhere in the text', () => {
+		expect(
+			applyFixToContent('was not here, it was there', {
+				find: 'it was',
+				replace: 'it was not',
+			})
+		).toBe('was not here, it was not there');
 	});
 });

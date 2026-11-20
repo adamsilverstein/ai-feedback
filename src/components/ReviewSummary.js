@@ -7,6 +7,19 @@ import FeedbackList from './FeedbackList';
 import ModelName from './ModelName';
 
 /**
+ * Labels for the feedback categories, built at render time so translations apply.
+ *
+ * @return {Object} Labels keyed by category.
+ */
+const getCategoryLabels = () => ({
+	content: __('Content', 'fresh-eyes'),
+	tone: __('Tone', 'fresh-eyes'),
+	flow: __('Flow', 'fresh-eyes'),
+	design: __('Design', 'fresh-eyes'),
+	grammar: __('Grammar', 'fresh-eyes'),
+});
+
+/**
  * Review Summary component.
  *
  * @param {Object} props        Component props.
@@ -202,8 +215,9 @@ export default function ReviewSummary({ review }) {
 							.filter(([, count]) => count > 0)
 							.map(([category, count], index, array) => {
 								const categoryLabel =
+									getCategoryLabels()[category] ||
 									category.charAt(0).toUpperCase() +
-									category.slice(1);
+										category.slice(1);
 								return (
 									<li
 										key={category}

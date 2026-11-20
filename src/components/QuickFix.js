@@ -14,7 +14,12 @@ import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import { hasSuggestionMarkers } from '../utils/suggestions';
-import { getRichTextAttributeKey } from '../utils/quick-fix';
+import { getRichTextAttributeKey, isFixInPlace } from '../utils/quick-fix';
+import {
+	forgetApplied,
+	recordApplied,
+	trackSaves,
+} from '../utils/proofreading';
 import {
 	applyEditToContent,
 	describeEdit,
@@ -58,6 +63,30 @@ export function describeSuggestionStatus(status) {
 				'fresh-eyes'
 			);
 	}
+}
+
+/**
+ * Say why an edit can't be applied.
+ *
+ * @param {boolean}       isReplyEdit Whether the edit came from an AI reply.
+ * @param {string|Object} content     Block content, or rich text data.
+ * @param {Object}        fix         Edit or quick fix.
+ * @return {string} Message.
+ */
+function getUnavailableMessage(isReplyEdit, content, fix) {
+	if (isReplyEdit) {
+		return __(
+			'This change is outdated: the block text has changed since the reply.',
+			'fresh-eyes'
+		);
+	}
+	if (isFixInPlace(content, fix)) {
+		return __('The block already has this change.', 'fresh-eyes');
+	}
+	return __(
+		'The block text has changed, so this fix can no longer be applied.',
+		'fresh-eyes'
+	);
 }
 
 /**
@@ -252,7 +281,15 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 		updateBlockAttributes(item.block_id, { [attributeKey]: updated });
 		markLastChangeAsPersistent?.();
 		setApplied(true);
-		setResolved(true);
+		if (!isReplyEdit) {
+			recordApplied([item.id], {
+				clientId: item.block_id,
+				key: attributeKey,
+				before: previous,
+				after: updated,
+			});
+		}
+		trackSaves([item.id], setResolved(true));
 		setIsPreviewOpen(false);
 
 		createSuccessNotice(
@@ -286,6 +323,7 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 							updateBlockAttributes(item.block_id, {
 								[attributeKey]: previous,
 							});
+							forgetApplied([item.id]);
 							setApplied(false);
 							setResolved(false);
 						},
@@ -308,15 +346,7 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 			)}
 			{!canApply && !hasSuggestions && (
 				<p className="ai-feedback-quick-fix-unavailable description">
-					{isReplyEdit
-						? __(
-								'This change is outdated: the block text has changed since the reply.',
-								'fresh-eyes'
-							)
-						: __(
-								'The block text has changed, so this fix can no longer be applied.',
-								'fresh-eyes'
-							)}
+					{getUnavailableMessage(isReplyEdit, content, fix)}
 				</p>
 			)}
 			<div className="ai-feedback-item-actions">

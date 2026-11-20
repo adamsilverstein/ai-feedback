@@ -730,6 +730,68 @@ export function removeSuggestionMarkers(content, id) {
 }
 
 /**
+ * Applies one suggestion's markers in content, as Accept does: its deleted
+ * runs are dropped and its added runs keep their text.
+ *
+ * @param {string|RichTextData} content Attribute value.
+ * @param {number}              id      Suggestion (note) id.
+ * @return {string|RichTextData|null} New value, or null when the content holds no marker for the id.
+ */
+export function acceptSuggestionMarkers(content, id) {
+	const html = toHtml(content);
+	if (!html.includes(`data-suggestion-id="${Number(id)}"`)) {
+		return null;
+	}
+
+	// An inert document, so nothing in the content runs or loads.
+	const { body } = document.implementation.createHTMLDocument('');
+	body.innerHTML = html;
+	body.querySelectorAll(`mark[data-suggestion-id="${Number(id)}"]`).forEach(
+		(mark) => {
+			if (mark.classList.contains('wp-suggestion-del')) {
+				mark.remove();
+			} else {
+				mark.replaceWith(...mark.childNodes);
+			}
+		}
+	);
+
+	return content instanceof RichTextData
+		? new RichTextData(create({ html: body.innerHTML }))
+		: body.innerHTML;
+}
+
+/**
+ * Records a status on suggestions, in their notes and in the store.
+ *
+ * Used for suggestions accepted in the text by Accept all, marked
+ * `applied-unsaved` like Gutenberg's own Accept until the post is saved.
+ *
+ * @param {number[]} noteIds Suggestion (note) ids.
+ * @param {string}   status  Status to record.
+ * @return {Promise<number[]>} IDs whose status could not be saved.
+ */
+export async function saveSuggestionStatuses(noteIds, status) {
+	const results = await Promise.allSettled(
+		noteIds.map((noteId) =>
+			saveNoteMeta(noteId, { _wp_suggestion_status: status })
+		)
+	);
+	const failed = [];
+	results.forEach((result, index) => {
+		if (result.status === 'fulfilled') {
+			dataDispatch(STORE_NAME).setSuggestionStatus(
+				noteIds[index],
+				status
+			);
+		} else {
+			failed.push(noteIds[index]);
+		}
+	});
+	return failed;
+}
+
+/**
  * Reads a note's suggestion status from the record core-data has loaded.
  *
  * @param {number} noteId Note ID.

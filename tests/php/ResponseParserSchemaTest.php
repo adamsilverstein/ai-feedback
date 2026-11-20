@@ -39,7 +39,7 @@ class ResponseParserSchemaTest extends TestCase
     public function test_valid_categories_constant(): void
     {
         $this->assertSame(
-            array( 'content', 'tone', 'flow', 'design' ),
+            array( 'content', 'tone', 'flow', 'design', 'grammar' ),
             Response_Parser::VALID_CATEGORIES
         );
     }

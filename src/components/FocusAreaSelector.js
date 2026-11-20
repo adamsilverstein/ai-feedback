@@ -16,7 +16,7 @@ import { STORE_NAME } from '../store';
  */
 const getFocusAreaHelp = () => ({
 	content: __(
-		'Checks grammar, spelling, clarity, and factual accuracy.',
+		'Checks clarity, completeness, and factual accuracy.',
 		'fresh-eyes'
 	),
 	tone: __(
@@ -29,6 +29,10 @@ const getFocusAreaHelp = () => ({
 	),
 	design: __(
 		'Evaluates formatting, headings, lists, and visual hierarchy.',
+		'fresh-eyes'
+	),
+	grammar: __(
+		'Finds typos, spelling and grammar errors as fixes you can accept all at once. Spelling follows the feedback language.',
 		'fresh-eyes'
 	),
 });

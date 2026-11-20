@@ -354,6 +354,7 @@ class Notes_Manager {
 				'tone'    => __( 'Tone', 'fresh-eyes' ),
 				'flow'    => __( 'Flow', 'fresh-eyes' ),
 				'design'  => __( 'Design', 'fresh-eyes' ),
+				'grammar' => __( 'Grammar', 'fresh-eyes' ),
 			);
 
 			$category_label = $category_labels[ $category ] ?? $category;
@@ -1335,6 +1336,7 @@ class Notes_Manager {
 			'tone'    => 0,
 			'flow'    => 0,
 			'design'  => 0,
+			'grammar' => 0,
 		);
 
 		foreach ( $notes as $note ) {
@@ -1346,7 +1348,9 @@ class Notes_Manager {
 			$severity = $note['severity'] ?? '';
 			$category = $note['category'] ?? '';
 
-			if ( isset( $by_severity[ $severity ] ) ) {
+			// Proofreading fixes are left out of the severity counts, as in
+			// Response_Parser::get_feedback_summary().
+			if ( is_string( $severity ) && isset( $by_severity[ $severity ] ) && Response_Parser::GRAMMAR_CATEGORY !== $category ) {
 				++$by_severity[ $severity ];
 			}
 

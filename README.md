@@ -16,7 +16,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 
 ## Features
 
-- 🤖 **AI-Powered Reviews**: Get intelligent feedback on content quality, tone, flow, and design
+- 🤖 **AI-Powered Reviews**: Get intelligent feedback on content quality, tone, flow, design, and grammar and spelling
 - 📝 **Native Notes Integration**: Feedback appears as WordPress block comments
 - 🔌 **Core Connectors API**: Reuses the credentials configured in Settings → Connectors
 - 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other provider registered with the core AI Client

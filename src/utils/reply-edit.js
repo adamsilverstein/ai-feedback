@@ -21,6 +21,7 @@ import {
 	findMatches,
 	findUniqueOffset,
 	getFixPreview,
+	isFixInPlace,
 	toHtml,
 } from './quick-fix';
 import { isReplyEdit } from './is-reply-edit';
@@ -85,9 +86,12 @@ export function isEditApplied(content, edit) {
 	if (!edit?.replace) {
 		return false;
 	}
+	// An edit that adds words ("data" → "the data") leaves its `find` in
+	// place, inside the replacement.
 	return (
-		findMatches(value.text, edit.find).length === 0 &&
-		findMatches(value.text, edit.replace).length === 1
+		(findMatches(value.text, edit.find).length === 0 &&
+			findMatches(value.text, edit.replace).length === 1) ||
+		isFixInPlace(content, edit)
 	);
 }
 

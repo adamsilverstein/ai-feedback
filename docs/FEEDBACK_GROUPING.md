@@ -85,7 +85,7 @@ ReviewSummary
 ## Grouping Rules
 
 ### Items are grouped when:
-✅ Same category (content, tone, flow, design)
+✅ Same category (content, tone, flow, design). Grammar items are never grouped: each one is a single fix
 ✅ Similar normalized title
 ✅ Multiple occurrences detected
 

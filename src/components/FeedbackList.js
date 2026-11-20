@@ -10,13 +10,16 @@ import { SelectControl } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import FeedbackItem from './FeedbackItem';
+import ProofreadingGroup from './ProofreadingGroup';
 import useReplyThreads from '../hooks/useReplyThreads';
+import useRevertedFixes from '../hooks/useRevertedFixes';
 import {
 	SORT_CATEGORY,
 	SORT_DOCUMENT,
 	SORT_PRIORITY,
 	sortFeedback,
 } from '../utils/priority';
+import { splitProofreading } from '../utils/proofreading';
 
 /**
  * Feedback list component.
@@ -28,9 +31,14 @@ import {
 export default function FeedbackList({ feedbackItems }) {
 	const [sortBy, setSortBy] = useState(SORT_PRIORITY);
 
+	// Proofreading fixes share one row at the top; the rest are sorted.
+	const { proofreading, others } = useMemo(
+		() => splitProofreading(feedbackItems || []),
+		[feedbackItems]
+	);
 	const sortedItems = useMemo(
-		() => sortFeedback(feedbackItems || [], sortBy),
-		[feedbackItems, sortBy]
+		() => sortFeedback(others, sortBy),
+		[others, sortBy]
 	);
 
 	const postId = useSelect(
@@ -38,6 +46,7 @@ export default function FeedbackList({ feedbackItems }) {
 		[]
 	);
 	const { threads, onReplyComplete } = useReplyThreads(postId);
+	useRevertedFixes(feedbackItems);
 
 	if (!feedbackItems || feedbackItems.length === 0) {
 		return null;
@@ -74,6 +83,15 @@ export default function FeedbackList({ feedbackItems }) {
 				role="list"
 				aria-label={__('Feedback items', 'fresh-eyes')}
 			>
+				{proofreading.length > 0 && (
+					<div role="listitem">
+						<ProofreadingGroup
+							items={proofreading}
+							threads={threads}
+							onReplyComplete={onReplyComplete}
+						/>
+					</div>
+				)}
 				{sortedItems.map((item, index) => {
 					// For grouped items, use the first block_id from block_ids array.
 					// For single items, use block_id directly.

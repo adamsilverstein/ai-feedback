@@ -27,6 +27,8 @@ import {
 	isSuggestionModeAvailable,
 	removeOrphanedSuggestions,
 	removeSuggestionMarkers,
+	acceptSuggestionMarkers,
+	saveSuggestionStatuses,
 	suggestQuickFix,
 	suggestQuickFixes,
 	suggestReplyEdit,
@@ -985,5 +987,73 @@ describe('supersedeSuggestions', () => {
 		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
 		warn.mockRestore();
+	});
+});
+
+describe('acceptSuggestionMarkers', () => {
+	it('keeps the added run and drops the deleted text, as Accept does', () => {
+		expect(
+			acceptSuggestionMarkers(`We met ${ADD_40}${DEL_40} plan.`, 40)
+		).toBe('We met to plan.');
+	});
+
+	it('leaves other suggestions in place', () => {
+		const other =
+			'<mark class="wp-suggestion-del" data-suggestion-id="41" data-suggestion-type="del">soon</mark>';
+		expect(
+			acceptSuggestionMarkers(
+				`We met ${ADD_40}${DEL_40} plan ${other}.`,
+				40
+			)
+		).toBe(`We met to plan ${other}.`);
+	});
+
+	it('keeps formatting inside the added run', () => {
+		expect(
+			acceptSuggestionMarkers(
+				'A <mark class="wp-suggestion-add" data-suggestion-id="7"><strong>b</strong></mark><mark class="wp-suggestion-del" data-suggestion-id="7">c</mark> d',
+				7
+			)
+		).toBe('A <strong>b</strong> d');
+	});
+
+	it('returns null without a marker for the id', () => {
+		expect(acceptSuggestionMarkers('Plain text.', 40)).toBeNull();
+	});
+
+	it('keeps rich text data as rich text data', () => {
+		const result = acceptSuggestionMarkers(
+			RichTextData.fromHTMLString(`We met ${ADD_40}${DEL_40} plan.`),
+			40
+		);
+		expect(result).toBeInstanceOf(RichTextData);
+		expect(result.toHTMLString()).toBe('We met to plan.');
+	});
+});
+
+describe('saveSuggestionStatuses', () => {
+	it('saves each status and reports the notes that failed', async () => {
+		mocks.saveEntityRecord.mockReset();
+		mocks.setSuggestionStatus.mockReset();
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			record.id === 2
+				? Promise.reject(new Error('nope'))
+				: Promise.resolve(record)
+		);
+
+		const failed = await saveSuggestionStatuses([1, 2], 'applied-unsaved');
+
+		expect(failed).toEqual([2]);
+		expect(mocks.saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			{ id: 1, meta: { _wp_suggestion_status: 'applied-unsaved' } },
+			{ throwOnError: true }
+		);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledTimes(1);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(
+			1,
+			'applied-unsaved'
+		);
 	});
 });

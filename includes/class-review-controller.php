@@ -393,7 +393,7 @@ class Review_Controller extends WP_REST_Controller {
 				'default'  => array( 'content', 'tone', 'flow' ),
 				'items'    => array(
 					'type' => 'string',
-					'enum' => array( 'content', 'tone', 'flow', 'design' ),
+					'enum' => Response_Parser::VALID_CATEGORIES,
 				),
 			),
 			'target_tone'        => array(

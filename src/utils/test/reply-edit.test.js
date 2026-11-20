@@ -98,6 +98,16 @@ describe('rewrites of formatted blocks', () => {
 });
 
 describe('isEditApplied', () => {
+	it('reads an edit that adds words as applied, not outdated', () => {
+		const edit = {
+			type: 'replace_text',
+			find: 'data',
+			replace: 'the data',
+		};
+		expect(isEditApplied('Read the data now.', edit)).toBe(true);
+		expect(isEditApplied('Read data now.', edit)).toBe(false);
+	});
+
 	it('recognizes a text edit already in the block', () => {
 		expect(isEditApplied('Revenue grew 40% in 2025.', TEXT_EDIT)).toBe(
 			true
