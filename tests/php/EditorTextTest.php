@@ -46,4 +46,23 @@ class EditorTextTest extends TestCase {
 			Editor_Text::read( "<!-- wp:paragraph {\"className\":\"x\"} -->\n<p>a<!-- note -->b</p>\n<!-- /wp:paragraph -->" )
 		);
 	}
+
+	/**
+	 * When PCRE gives up on the HTML, the rest is read as plain text, not
+	 * dropped.
+	 */
+	public function test_keeps_the_text_when_the_tokenizer_fails(): void {
+		$jit       = ini_get( 'pcre.jit' );
+		$backtrack = ini_get( 'pcre.backtrack_limit' );
+		ini_set( 'pcre.jit', '0' );
+		ini_set( 'pcre.backtrack_limit', '1' );
+		try {
+			$text = Editor_Text::read( '<p>Revenue <strong>grew</strong> 40% last year.</p>' );
+		} finally {
+			ini_set( 'pcre.jit', (string) $jit );
+			ini_set( 'pcre.backtrack_limit', (string) $backtrack );
+		}
+
+		$this->assertSame( 'Revenue grew 40% last year.', $text );
+	}
 }

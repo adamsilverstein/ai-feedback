@@ -21,7 +21,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * markup as one object character (U+FFFC) instead of its text: a format
  * the user can't edit, like a footnote or a formula, a comment, a script,
  * and an empty element its format keeps, like an anchor with an id. That
- * depends on the formats the editor registers, listed in FORMATS.
+ * depends on the formats the editor registers, listed in FORMATS. Only
+ * core's formats are listed: a plugin that registers its own non-editable
+ * format can still read differently in the editor.
  */
 class Editor_Text {
 
@@ -203,12 +205,21 @@ class Editor_Text {
 		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
 		// Block delimiters mark blocks, not text. Their attributes never
 		// hold `--`, so the first `-->` ends one.
-		$html   = (string) preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html );
+		$html   = preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html ) ?? $html;
 		$stack  = array( self::frame( '', null, false ) );
 		$offset = 0;
 		$length = strlen( $html );
 
-		while ( $offset < $length && 1 === preg_match( self::TOKEN, $html, $token, 0, $offset ) ) {
+		while ( $offset < $length ) {
+			if ( 1 !== preg_match( self::TOKEN, $html, $token, 0, $offset ) ) {
+				// The pattern matches any input, so this is a PCRE limit.
+				// Keep the rest as plain text rather than dropping it.
+				Logger::debug( 'Editor text: could not tokenize block HTML, reading the rest as plain text' );
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- wp_strip_all_tags() uses PCRE too, which just failed.
+				$stack  = self::append( $stack, self::decode( strip_tags( substr( $html, $offset ) ) ) );
+				$offset = $length;
+				break;
+			}
 			$offset += strlen( $token[0] );
 
 			if ( isset( $token['text'] ) ) {
