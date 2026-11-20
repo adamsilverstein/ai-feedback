@@ -497,3 +497,51 @@ add_filter(
 	40,
 	2
 );
+
+// A reply that mentions sentence case states a standing preference, so the
+// mock reply offers to remember it as a house style rule.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/sentence case/i', $asked[1] )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply'    => 'Got it, sentence case it is.',
+				'edit'     => null,
+				'remember' => 'Headings use sentence case, except product names such as WordPress and Gutenberg, which keep their own capital letters',
+			)
+		);
+	},
+	40,
+	2
+);
+
+// A review whose prompt carries the sentence case house style rule flags the
+// first block for breaking it, so tests can see a saved rule reach the
+// next review.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks, string $prompt = '' ): array {
+		$block = $blocks[0] ?? null;
+		if ( ! str_contains( $prompt, "HOUSE STYLE:\n" ) || ! preg_match( '/^- "Headings use sentence case\b/mi', $prompt ) || ! is_array( $block ) ) {
+			return $response;
+		}
+
+		$response['feedback'][] = array(
+			'block_id' => $block['clientId'] ?? '',
+			'category' => 'tone',
+			'severity' => 'suggestion',
+			'title'    => 'Follow the house style',
+			'feedback' => 'House style: headings use sentence case.',
+		);
+		return $response;
+	},
+	30,
+	3
+);

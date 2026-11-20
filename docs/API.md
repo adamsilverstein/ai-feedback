@@ -326,6 +326,8 @@ A thread a person started is listed once a note in it mentions Fresh Eyes. It is
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
+`proposal` is a house style rule an AI reply offers to remember, as `{ "text": "Headings use sentence case", "status": "" }`, or null. `status` is `saved` or `dismissed` once the current user acts on it. Each user decides for themselves, since a personal rule one user saves does not apply to others, and dismissing never undoes a save. See [house style](#get-house-style).
+
 `revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is counted from the thread's order each time the thread is read, not stored, so two edits saved at the same moment still number one after the other (a `feedback_revision` comment meta stored by earlier versions is ignored). The Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
 Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
@@ -760,6 +762,46 @@ A follow-up review adds feedback to a block's open thread as a reply. When the b
 
 Returns one history entry plus the notes that review created, as `notes`. Notes deleted since the review ran are omitted. Returns `404` when the review is not in the post's history. Requires `edit_post` on the post.
 
+### GET /house-style
+
+House style rules: short plain text style preferences that every review and reply follows. Reviews flag writing that breaks a rule and leave alone what a rule allows. Site rules apply to everyone and are stored in the `ai_feedback_house_style` option; personal rules apply to one user's reviews and replies and are stored in that user's site-prefixed `ai_feedback_personal_house_style` meta. Requires `edit_posts`.
+
+```json
+{
+  "site": [ { "id": "6f1c...", "text": "Use the Oxford comma" } ],
+  "user": [ { "id": "9a2b...", "text": "Headings use sentence case" } ],
+  "can_manage_site": false,
+  "max_rules": 20,
+  "max_length": 150
+}
+```
+
+Rules are sanitized to single-line plain text (tags, line breaks and control and zero-width characters removed, except a zero-width joiner between two emoji), at most `max_length` characters and `max_rules` per list, and checked again when read. In prompts they sit in a `HOUSE STYLE` section, quoted one per line and framed as preferences rather than instructions, ahead of the output format. Personal rules are part of the core personal data export and eraser tools. Both kinds belong to one site: a house style belongs to a publication, so on multisite a user's personal rules are stored under a site-prefixed meta key (`{table prefix}ai_feedback_personal_house_style`, as `update_user_option()` stores per-site options) and a rule saved on one site is neither listed nor used on another. This differs from the plugin's other personal preferences (model, tone, focus areas and language), which follow the user across the network. The privacy exporter and eraser find a user's rules from their own user meta, so rules on every site are covered, including sites the user has left and any unprefixed key.
+
+### POST /house-style
+
+Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and closing punctuation) returns that rule with `200`. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
+
+```json
+{ "text": "Headings use sentence case", "scope": "user", "note_id": 790 }
+```
+
+`note_id` is optional: the AI reply that proposed the rule, which is then marked `saved`. It requires `edit_post` on that reply's post.
+
+### PUT /house-style/{id}, DELETE /house-style/{id}
+
+Change a rule's `text`, or remove it. Pass the rule's `scope` (`user` by default; `site` requires `manage_options`). Returns the lists, or `404` when the rule is gone.
+
+### POST /house-style/proposals/{note_id}/dismiss
+
+Record that the author doesn't want to keep a rule an AI reply proposed, so the thread stops offering it. Requires `edit_post` on the reply's post.
+
+### How replies propose a rule
+
+The reply prompt lists the rules and lets the AI add `"remember": "short rule"` to its JSON when the author states a standing preference, such as "we always write WordPress with a capital P". The rule is sanitized like a saved one and stored in the reply's `feedback_house_rule` comment meta, unless the author's reviews already follow it. Nothing is saved as a rule until the author clicks **Remember**, after editing the text if they like.
+
+---
+
 ### GET /analytics
 
 Usage summary for the Settings > AI Feedback Analytics page. Requires `manage_options`.
@@ -1063,6 +1105,17 @@ Choose which block types a structural edit may insert. By default `core/paragrap
 add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
     return array_diff( $blocks, array( 'core/list' ) );
 } );
+```
+
+#### `ai_feedback_house_style_rules`
+
+Change the house style rules added to a user's review and reply prompts, for example to load them from elsewhere. Returned rules are sanitized and capped like saved ones.
+
+```php
+add_filter( 'ai_feedback_house_style_rules', function( array $rules, int $user_id ): array {
+    $rules[] = 'Write WordPress with a capital P';
+    return $rules;
+}, 10, 2 );
 ```
 
 #### `ai_feedback_max_review_images`
