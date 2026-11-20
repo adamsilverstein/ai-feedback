@@ -858,7 +858,25 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
-	 * A JSON reply with neither text nor a usable edit is an error.
+	 * A reply meant as JSON that can't be decoded gets its own error.
+	 */
+	public function test_unreadable_json_reply_returns_its_own_error(): void {
+		$this->seed_parent_and_reply();
+
+		$fake_notes               = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_response = '{"edit": {"type": ';
+
+		$result = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ai_unreadable_reply', $result->get_error_code() );
+		$this->assertSame( 'The AI reply could not be read. Please try again.', $result->get_error_message() );
+		$this->assertSame( array(), $fake_notes->last_reply );
+	}
+
+	/**
+	 * A JSON reply with neither text nor a usable edit is an empty reply.
 	 */
 	public function test_json_reply_without_text_returns_wp_error(): void {
 		$this->seed_parent_and_reply();

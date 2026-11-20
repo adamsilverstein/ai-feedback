@@ -105,6 +105,17 @@ class ResponseParserReplyTest extends TestCase {
 	}
 
 	/**
+	 * Only a broken JSON object is unreadable.
+	 */
+	public function test_is_readable_reply(): void {
+		$this->assertFalse( $this->parser->is_readable_reply( '{"edit": {"type": ' ) );
+		$this->assertFalse( $this->parser->is_readable_reply( "```json\n{\"reply\": \n```" ) );
+		$this->assertTrue( $this->parser->is_readable_reply( '{"reply": "", "edit": null}' ) );
+		$this->assertTrue( $this->parser->is_readable_reply( 'Plain prose.' ) );
+		$this->assertTrue( $this->parser->is_readable_reply( '  ' ) );
+	}
+
+	/**
 	 * Prose that mentions braces is still prose.
 	 */
 	public function test_prose_with_braces_is_prose(): void {

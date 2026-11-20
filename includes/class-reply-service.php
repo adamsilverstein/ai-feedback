@@ -400,6 +400,10 @@ class Reply_Service {
 
 		$block_content = is_string( $context['block_content'] ?? null ) ? $context['block_content'] : '';
 		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ) );
+		if ( null === $parsed && ! $this->response_parser->is_readable_reply( $ai_text ) ) {
+			Logger::debug( 'Reply_Service: AI reply could not be read.' );
+			return new WP_Error( 'ai_unreadable_reply', __( 'The AI reply could not be read. Please try again.', 'fresh-eyes' ) );
+		}
 		if ( null === $parsed ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
 			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'fresh-eyes' ) );

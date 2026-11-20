@@ -642,6 +642,21 @@ class Response_Parser {
 	}
 
 	/**
+	 * Whether a non-empty reply could be read, as JSON or as prose.
+	 *
+	 * False for a reply meant as JSON whose object can't be decoded, which
+	 * parse_reply() rejects rather than posting it raw.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return bool
+	 */
+	public function is_readable_reply( string $response ): bool {
+		return '' === trim( $response )
+			|| null !== $this->decode_reply_json( $response )
+			|| ! self::looks_like_json( $response );
+	}
+
+	/**
 	 * Whether a response that did not decode was meant to be JSON.
 	 *
 	 * @param  string $response Raw AI response.
