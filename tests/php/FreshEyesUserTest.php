@@ -232,6 +232,11 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertSame( 0, Fresh_Eyes_User::get_id() );
 		$this->assertSame( AI_FEEDBACK_VERSION . ':off', $GLOBALS['test_options'][ Fresh_Eyes_User::CHECKED_OPTION ] );
 		$this->assertArrayNotHasKey( 'ai_feedback_user_retry', $GLOBALS['test_transients'] );
+
+		// With no account, user queries get no extra SQL.
+		$query = new \WP_User_Query();
+		Fresh_Eyes_User::filter_user_query( $query );
+		$this->assertSame( 'WHERE 1=1', $query->query_where );
 	}
 
 	public function test_turning_the_filter_off_removes_the_account_at_the_next_check(): void {
@@ -245,6 +250,9 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertSame( array( array( $id, null ) ), $GLOBALS['test_deleted_users'] );
 		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
 		$this->assertSame( 0, Fresh_Eyes_User::get_id() );
+		$query = new \WP_User_Query();
+		Fresh_Eyes_User::filter_user_query( $query );
+		$this->assertSame( 'WHERE 1=1', $query->query_where );
 
 		// Deleting it does not bring it back while the filter says no.
 		Fresh_Eyes_User::on_deleted_user( $id );
