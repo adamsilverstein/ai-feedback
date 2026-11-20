@@ -296,7 +296,11 @@ class Review_History {
 	 * @return list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>
 	 */
 	public static function sanitize_strengths( mixed $strengths ): array {
+		$max   = Response_Parser::get_max_strengths();
 		$clean = array();
+		if ( 0 === $max ) {
+			return array();
+		}
 		foreach ( is_array( $strengths ) ? $strengths : array() as $strength ) {
 			if ( ! is_array( $strength ) || ! is_string( $strength['block_id'] ?? null ) || '' === $strength['block_id'] ) {
 				continue;
@@ -316,7 +320,7 @@ class Review_History {
 				'block_anchor' => is_string( $strength['block_anchor'] ?? null ) && 1 === preg_match( '/^[a-z0-9]{1,32}$/', $strength['block_anchor'] ) ? $strength['block_anchor'] : '',
 				'text'         => $text,
 			);
-			if ( count( $clean ) >= Response_Parser::MAX_STRENGTHS ) {
+			if ( count( $clean ) >= $max ) {
 				break;
 			}
 		}

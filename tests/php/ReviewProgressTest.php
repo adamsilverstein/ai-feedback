@@ -42,7 +42,7 @@ class ReviewProgressTest extends TestCase {
 	 * Reset globals.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_current_user_can'] );
+		unset( $GLOBALS['test_current_user_can'], $GLOBALS['test_filter_results'] );
 		parent::tearDown();
 	}
 
@@ -328,6 +328,26 @@ class ReviewProgressTest extends TestCase {
 
 		$this->assertSame( array( 'Kept.', 'Bad anchor dropped.' ), array_column( $strengths, 'text' ) );
 		$this->assertSame( '', $strengths[1]['block_anchor'] );
+	}
+
+	/**
+	 * The strengths filter also caps what history keeps, including the
+	 * strengths merged from a chunked review's parts.
+	 */
+	public function test_history_caps_strengths_by_filter(): void {
+		$review              = $this->review( 'r1', array() );
+		$review['strengths'] = array(
+			$this->strength( 'b1', 'One.' ),
+			$this->strength( 'b2', 'Two.' ),
+		);
+
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_max_strengths' => 1 );
+		$this->assertSame( array( 'One.' ), array_column( Review_History::build_entry( $review )['strengths'], 'text' ) );
+
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_max_strengths' => 0 );
+		$this->assertSame( array(), Review_History::build_entry( $review )['strengths'] );
+
+		unset( $GLOBALS['test_filter_results'] );
 	}
 
 	/**

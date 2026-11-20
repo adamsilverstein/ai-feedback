@@ -152,7 +152,7 @@ class Prompt_Builder {
 
 		$instruction  = "\n\nSTRENGTHS:\n";
 		$instruction .= '- Also return a "strengths" array next to "summary" and "feedback", listing up to ' . $max . ' things the document already does well, so the author knows to keep them.' . "\n";
-		$instruction .= '- Each strength is one sentence (max ' . ( Response_Parser::MAX_STRENGTH_LENGTH - 10 ) . ' chars) about one block, saying what works: { "block_id": "abc123-def456", "text": "The opening example makes the problem concrete." }' . "\n";
+		$instruction .= '- Each strength is one sentence (max ' . Response_Parser::STRENGTH_PROMPT_LENGTH . ' chars) about one block, saying what works: { "block_id": "abc123-def456", "text": "The opening example makes the problem concrete." }' . "\n";
 		$instruction .= '- Only list strengths that are specific to this document and true. Return an empty array rather than generic praise, and never repeat a strength as feedback.';
 
 		return $instruction;

@@ -130,6 +130,12 @@ class Response_Parser {
 	public const MAX_STRENGTH_LENGTH = 160;
 
 	/**
+	 * Length the prompt asks strengths to stay under, leaving the model some
+	 * room before MAX_STRENGTH_LENGTH cuts them.
+	 */
+	public const STRENGTH_PROMPT_LENGTH = 150;
+
+	/**
 	 * Maximum character lengths for feedback fields.
 	 */
 	public const FIELD_MAX_LENGTHS = array(
