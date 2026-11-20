@@ -1118,6 +1118,14 @@ class ReplyServiceTest extends TestCase {
 				"<p>A <mark>\x000\x00</mark><mark class=\"wp-suggestion-add\">x</mark></p>",
 				'<p>A <mark>0</mark></p>',
 			),
+			'space before closing >'   => array(
+				'<p>A <mark class="wp-suggestion-add">b</mark ><mark class="wp-suggestion-del">c</mark	> d</p>',
+				'<p>A c d</p>',
+			),
+			'> in an attribute value'  => array(
+				'<p>A <mark title="x > y" class="wp-suggestion-add" data-note=\'a>b\'>b</mark>c</p>',
+				'<p>A c</p>',
+			),
 			'no markers'               => array(
 				'<p>A <mark>b</mark></p>',
 				'<p>A <mark>b</mark></p>',

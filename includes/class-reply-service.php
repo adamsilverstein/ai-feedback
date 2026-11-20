@@ -626,8 +626,11 @@ class Reply_Service {
 		// Placeholders below use NUL bytes, which block HTML never needs.
 		$html = str_replace( "\x00", '', $html );
 		$kept = array();
-		$pattern = '#<mark\b([^>]*)>((?:(?!<mark\b).)*?)</mark>#si';
-		// Each pass unwraps one level of nesting; the cap guards odd markup.
+		// Quoted attribute values may hold `>`, and closing tags may have
+		// whitespace before it.
+		$pattern = '#<mark\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>((?:(?!<mark\b).)*?)</mark\s*>#si';
+		// Each pass unwraps one level of nesting. The cap guards odd markup:
+		// suggestions nested more than 20 deep keep their outer markers.
 		$passes = 0;
 		do {
 			$html = preg_replace_callback(
