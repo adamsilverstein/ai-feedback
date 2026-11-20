@@ -662,8 +662,17 @@ EOT;
 					$is_ai ? 'AI' : $author,
 					wp_strip_all_tags( $content )
 				);
+				if ( $is_ai && is_array( $entry['edit'] ?? null ) ) {
+					$prompt .= '  (Suggested edit: ' . self::describe_edit( $entry['edit'] ) . ")\n";
+				}
 			}
 			$prompt .= "\n";
+		}
+
+		$pending_edit = is_array( $context['pending_edit'] ?? null ) ? $context['pending_edit'] : null;
+		if ( null !== $pending_edit ) {
+			$prompt .= "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\n";
+			$prompt .= self::describe_edit( $pending_edit ) . "\n\n";
 		}
 
 		$prompt .= "NEW USER REPLY:\n" . wp_strip_all_tags( $user_reply ) . "\n\n";
@@ -675,7 +684,7 @@ EOT;
 		$prompt .= '- Keep the ' . $target_tone . " tone.\n";
 		$prompt .= "- Do NOT restate the original feedback verbatim.\n\n";
 
-		$prompt .= $this->get_reply_edit_instructions( '' !== trim( $block_content ), true === ( $context['block_can_rewrite'] ?? false ) );
+		$prompt .= $this->get_reply_edit_instructions( '' !== trim( $block_content ), true === ( $context['block_can_rewrite'] ?? false ), null !== $pending_edit );
 
 		$language_instruction = $this->get_language_instruction( $locale );
 		if ( '' !== trim( $language_instruction ) ) {
@@ -700,9 +709,10 @@ EOT;
 	 *
 	 * @param bool $has_block   Whether the block content is known, so an edit can target it.
 	 * @param bool $can_rewrite Whether the block can take a `rewrite_block` edit.
+	 * @param bool $has_pending Whether the thread has a suggested edit the author has not acted on.
 	 * @return string Instructions.
 	 */
-	private function get_reply_edit_instructions( bool $has_block, bool $can_rewrite ): string {
+	private function get_reply_edit_instructions( bool $has_block, bool $can_rewrite, bool $has_pending = false ): string {
 		$text  = "RESPONSE FORMAT:\n";
 		$text .= "Respond with a single JSON object and nothing else:\n";
 		$text .= "{ \"reply\": \"your reply as plain text - no markdown headers, no bullet list\", \"edit\": null }\n\n";
@@ -723,8 +733,33 @@ EOT;
 		}
 		$text .= "- Make only the change the user asked for, and keep the rest of the text as it is.\n";
 		$text .= "- When there is an edit, \"reply\" says briefly what you changed. The author reviews it before it is applied.\n";
+		if ( $has_pending ) {
+			$text .= "- The user may be asking you to adjust your pending suggested edit, for example to make it shorter, keep a detail or try another wording. Then return a new edit that replaces it. Write the new edit against the block content above, not against your earlier suggestion, and include all of the change the user still wants.\n";
+			$text .= "- When the user only asks about your pending suggested edit, \"edit\" is null and that suggestion stays as it is.\n";
+		}
 
 		return $text;
+	}
+
+	/**
+	 * Describe a suggested edit for the reply prompt.
+	 *
+	 * @param array<mixed> $edit `replace_text` or `rewrite_block` edit.
+	 * @return string Description.
+	 */
+	private static function describe_edit( array $edit ): string {
+		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
+			return sprintf(
+				'rewrite the block as "%s"',
+				self::truncate( wp_strip_all_tags( self::to_string( $edit['content'] ?? '' ) ), self::REPLY_BLOCK_CONTENT_LIMIT )
+			);
+		}
+
+		return sprintf(
+			'replace "%s" with "%s"',
+			self::to_string( $edit['find'] ?? '' ),
+			self::to_string( $edit['replace'] ?? '' )
+		);
 	}
 
 	/**

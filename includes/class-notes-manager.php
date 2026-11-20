@@ -22,6 +22,28 @@ class Notes_Manager {
 	public const REPLY_EDIT_META_KEY = 'feedback_reply_edit';
 
 	/**
+	 * Comment meta key holding which revision of its thread's suggested edit
+	 * an AI reply's edit is: 1 for the first edit in the thread, counting the
+	 * review's quick fix, and 2 or more for a revised one.
+	 */
+	public const REVISION_META_KEY = 'feedback_revision';
+
+	/**
+	 * Label for a revision of a thread's suggested edit.
+	 *
+	 * @param  int $revision Revision number, from 1.
+	 * @return string Label.
+	 */
+	public static function revision_label( int $revision ): string {
+		if ( $revision <= 1 ) {
+			return __( 'Suggested edit', 'fresh-eyes' );
+		}
+
+		/* translators: %d: revision number of a suggested edit, 2 or more. */
+		return sprintf( __( 'Revised suggestion (%d)', 'fresh-eyes' ), $revision );
+	}
+
+	/**
 	 * Create notes from feedback items.
 	 *
 	 * @param  array $feedback_items Parsed feedback items.
@@ -232,6 +254,7 @@ class Notes_Manager {
 			array(
 				'category' => self::first_meta( $meta, 'feedback_category' ),
 				'severity' => self::first_meta( $meta, 'feedback_severity' ),
+				'revision' => self::first_meta( $meta, self::REVISION_META_KEY ),
 			)
 		);
 		if ( '' === $badges ) {
@@ -315,6 +338,15 @@ class Notes_Manager {
 			);
 		}
 
+		// Revision badge, so a thread of suggested edits reads in order.
+		$revision = $feedback_item['revision'] ?? '';
+		if ( is_numeric( $revision ) && (int) $revision > 0 ) {
+			$badges[] = sprintf(
+				'<span class="ai-feedback-badge ai-feedback-revision">%s</span>',
+				esc_html( self::revision_label( (int) $revision ) )
+			);
+		}
+
 		return implode( ' ', $badges );
 	}
 
@@ -360,6 +392,10 @@ class Notes_Manager {
 
 		if ( ! empty( $feedback_item['reply_edit'] ) && is_array( $feedback_item['reply_edit'] ) ) {
 			$meta[ self::REPLY_EDIT_META_KEY ] = wp_json_encode( $feedback_item['reply_edit'] );
+		}
+
+		if ( isset( $feedback_item['revision'] ) && is_int( $feedback_item['revision'] ) && $feedback_item['revision'] > 0 ) {
+			$meta[ self::REVISION_META_KEY ] = $feedback_item['revision'];
 		}
 
 		// Add block ID (clientId) if available.

@@ -181,23 +181,35 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			}
 		}
 
-		$threads = array();
+		$threads   = array();
+		$revisions = array();
 		foreach ( $replies as $comment ) {
 			$parent_id = (int) $comment->comment_parent;
 			if ( ! isset( $ai_note_ids[ $parent_id ] ) ) {
 				continue;
 			}
 
-			$id    = (int) $comment->comment_ID;
-			$is_ai = (bool) get_comment_meta( $id, 'ai_feedback', true );
+			$id       = (int) $comment->comment_ID;
+			$is_ai    = (bool) get_comment_meta( $id, 'ai_feedback', true );
+			$edit     = $is_ai ? Notes_Manager::decode_reply_edit( get_comment_meta( $id, Notes_Manager::REPLY_EDIT_META_KEY, true ) ) : null;
+			$revision = null;
+			if ( null !== $edit ) {
+				// Edits saved before revisions were stored are counted in
+				// order, with the review's quick fix as the first.
+				$revisions[ $parent_id ] = ( $revisions[ $parent_id ] ?? ( self::has_quick_fix( $parent_id ) ? 1 : 0 ) ) + 1;
+
+				$stored   = get_comment_meta( $id, Notes_Manager::REVISION_META_KEY, true );
+				$revision = is_numeric( $stored ) && (int) $stored > 0 ? (int) $stored : $revisions[ $parent_id ];
+			}
 
 			$threads[ $parent_id ]['replies'][] = array(
-				'id'      => $id,
-				'author'  => $comment->comment_author,
-				'content' => trim( wp_strip_all_tags( $comment->comment_content ) ),
-				'is_ai'   => $is_ai,
-				'date'    => $comment->comment_date,
-				'edit'    => $is_ai ? Notes_Manager::decode_reply_edit( get_comment_meta( $id, Notes_Manager::REPLY_EDIT_META_KEY, true ) ) : null,
+				'id'       => $id,
+				'author'   => $comment->comment_author,
+				'content'  => trim( wp_strip_all_tags( $comment->comment_content ) ),
+				'is_ai'    => $is_ai,
+				'date'     => $comment->comment_date,
+				'edit'     => $edit,
+				'revision' => $revision,
 			);
 
 			if ( ! $is_ai ) {
@@ -220,6 +232,16 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Whether a note carries a review quick fix.
+	 *
+	 * @param int $note_id Note ID.
+	 * @return bool
+	 */
+	private static function has_quick_fix( int $note_id ): bool {
+		return null !== ( new Notes_Manager() )->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
 	}
 
 	/**

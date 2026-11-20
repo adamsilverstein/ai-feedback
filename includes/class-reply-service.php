@@ -380,7 +380,8 @@ class Reply_Service {
 	 * @return int|WP_Error New AI reply comment ID on success, WP_Error on failure.
 	 */
 	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ): int|WP_Error {
-		$context = $this->build_context( $comment_id, $parent_id, $post_id );
+		$edits   = $this->get_thread_edits( $parent_id, $post_id );
+		$context = $this->build_context( $comment_id, $parent_id, $post_id, $edits );
 		if ( is_wp_error( $context ) ) {
 			Logger::debug( 'Reply_Service: failed to build context: ' . $context->get_error_message() );
 			return $context;
@@ -419,6 +420,9 @@ class Reply_Service {
 		);
 		if ( null !== $parsed['edit'] ) {
 			$feedback_item['reply_edit'] = $parsed['edit'];
+			// A new edit supersedes the thread's earlier ones; the editor
+			// takes their markers out and keeps only this one pending.
+			$feedback_item['revision'] = count( $edits ) + 1;
 		}
 		$review_data = array(
 			'review_id' => 'reply-' . $comment_id,
@@ -436,9 +440,10 @@ class Reply_Service {
 	 * @param  int $comment_id Reply comment ID.
 	 * @param  int $parent_id  Parent (original AI note) comment ID.
 	 * @param  int $post_id    Post ID - used to scope the siblings query.
+	 * @param  list<array{id: int, edit: array<string, string>}> $edits Edits proposed in the thread, oldest first.
 	 * @return array<string, mixed>|WP_Error Context for Prompt_Builder::build_reply_prompt(), or error.
 	 */
-	private function build_context( int $comment_id, int $parent_id, int $post_id ): array|WP_Error {
+	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits = array() ): array|WP_Error {
 		$reply = get_comment( $comment_id );
 		if ( ! is_object( $reply ) ) {
 			return new WP_Error( 'reply_not_found', 'Reply comment not found.' );
@@ -468,15 +473,22 @@ class Reply_Service {
 
 		$user_id = self::author_id( $reply );
 
+		$edits_by_id = array();
+		foreach ( $edits as $entry ) {
+			$edits_by_id[ $entry['id'] ] = $entry['edit'];
+		}
+
 		$thread = array();
 		foreach ( array_reverse( $siblings ) as $sibling ) {
-			if ( (int) $sibling->comment_ID === $comment_id ) {
+			$sibling_id = (int) $sibling->comment_ID;
+			if ( $sibling_id === $comment_id ) {
 				continue;
 			}
 			$thread[] = array(
 				'author'  => $sibling->comment_author,
 				'content' => $sibling->comment_content,
-				'is_ai'   => (bool) get_comment_meta( (int) $sibling->comment_ID, 'ai_feedback', true ),
+				'is_ai'   => (bool) get_comment_meta( $sibling_id, 'ai_feedback', true ),
+				'edit'    => $edits_by_id[ $sibling_id ] ?? null,
 			);
 		}
 		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
@@ -487,7 +499,10 @@ class Reply_Service {
 			$block_type = $block['blockName'];
 		}
 
-		$block_content = null !== $block ? self::block_text( $block ) : '';
+		// The text as it reads without any pending suggestion, which is how
+		// the editor leaves it once a new edit supersedes that suggestion.
+		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
+		$block_content = null !== $block ? self::html_text( $block_html ) : '';
 
 		return array(
 			'block_content'     => $block_content,
@@ -498,13 +513,14 @@ class Reply_Service {
 			// prompt truncates it, and not when links, formatting or line
 			// breaks would be lost.
 			'block_can_rewrite' => '' !== $block_content
-				&& ! self::has_inline_markup( $block )
+				&& ! self::has_inline_markup( $block_html )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),
 			'original_feedback' => $parent->comment_content,
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
 			'thread'            => $thread,
+			'pending_edit'      => $this->find_pending_edit( $edits, $block_content ),
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
@@ -512,14 +528,111 @@ class Reply_Service {
 	}
 
 	/**
-	 * Whether a block's text holds any markup inside its wrapper element,
-	 * such as a link, bold text or a line break.
+	 * List the edits proposed in a thread, oldest first.
 	 *
-	 * @param array<mixed> $block Parsed block.
+	 * The review's quick fix on the root note comes first, then each AI
+	 * reply's edit. Only the newest can be pending: each new edit supersedes
+	 * the ones before it.
+	 *
+	 * @param int $parent_id Root note ID.
+	 * @param int $post_id   Post ID.
+	 * @return list<array{id: int, edit: array<string, string>}> Note ID and edit.
+	 */
+	private function get_thread_edits( int $parent_id, int $post_id ): array {
+		$edits = array();
+
+		$quick_fix = $this->notes_manager->decode_quick_fix( get_comment_meta( $parent_id, 'feedback_quick_fix', true ) );
+		if ( null !== $quick_fix ) {
+			$edits[] = array(
+				'id'   => $parent_id,
+				'edit' => array( 'type' => 'replace_text' ) + $quick_fix,
+			);
+		}
+
+		$replies = get_comments(
+			array(
+				'parent'  => $parent_id,
+				'post_id' => $post_id,
+				'type'    => 'note',
+				'status'  => 'all',
+				'orderby' => array(
+					'comment_date' => 'ASC',
+					'comment_ID'   => 'ASC',
+				),
+			)
+		);
+
+		foreach ( $replies as $reply ) {
+			$reply_id = (int) $reply->comment_ID;
+			if ( ! get_comment_meta( $reply_id, 'ai_feedback', true ) ) {
+				continue;
+			}
+			$edit = Notes_Manager::decode_reply_edit( get_comment_meta( $reply_id, Notes_Manager::REPLY_EDIT_META_KEY, true ) );
+			if ( null !== $edit ) {
+				$edits[] = array(
+					'id'   => $reply_id,
+					'edit' => $edit,
+				);
+			}
+		}
+
+		return $edits;
+	}
+
+	/**
+	 * Find the thread's suggested edit that the author has not acted on yet.
+	 *
+	 * That is the newest edit, unless the author accepted or rejected its
+	 * suggestion or the block text no longer matches it, for example
+	 * because the author applied it.
+	 *
+	 * @param list<array{id: int, edit: array<string, string>}> $edits         Edits in the thread, oldest first.
+	 * @param string                                            $block_content Block text without pending suggestions.
+	 * @return array<string, string>|null Pending edit, or null.
+	 */
+	private function find_pending_edit( array $edits, string $block_content ): ?array {
+		$latest = end( $edits );
+		if ( false === $latest || '' === $block_content ) {
+			return null;
+		}
+
+		$status = ( new Suggestions() )->get_status( $latest['id'] );
+		if ( null !== $status && 'pending' !== $status ) {
+			return null;
+		}
+
+		return $this->response_parser->edit_applies( $latest['edit'], $block_content ) ? $latest['edit'] : null;
+	}
+
+	/**
+	 * Take Gutenberg suggestion markers out of block HTML, leaving the text
+	 * as it reads with the suggestions rejected: added runs are dropped and
+	 * deleted or reformatted runs keep their text.
+	 *
+	 * @param string $html Block HTML.
+	 * @return string HTML without suggestion markers.
+	 */
+	private static function strip_suggestion_markers( string $html ): string {
+		if ( ! str_contains( $html, 'wp-suggestion-' ) ) {
+			return $html;
+		}
+
+		return (string) preg_replace_callback(
+			'#<mark\b[^>]*\bclass="[^"]*\bwp-suggestion-(add|del|format)\b[^"]*"[^>]*>(.*?)</mark>#s',
+			static fn ( array $matches ): string => 'add' === $matches[1] ? '' : $matches[2],
+			$html
+		);
+	}
+
+	/**
+	 * Whether block HTML holds any markup inside its wrapper element, such
+	 * as a link, bold text or a line break.
+	 *
+	 * @param string $html Block HTML.
 	 * @return bool
 	 */
-	private static function has_inline_markup( array $block ): bool {
-		$html  = trim( self::get_block_html( $block ) );
+	private static function has_inline_markup( string $html ): bool {
+		$html  = trim( $html );
 		$inner = (string) preg_replace( '#^<[a-zA-Z][^>]*>|</[a-zA-Z][a-zA-Z0-9-]*>$#', '', $html );
 		return str_contains( $inner, '<' );
 	}
@@ -624,17 +737,17 @@ class Reply_Service {
 	}
 
 	/**
-	 * Get a parsed block's plain text with entities decoded and whitespace collapsed.
+	 * Get block HTML's plain text with entities decoded and whitespace collapsed.
 	 *
 	 * With the `u` flag, `\s` also matches the non-breaking spaces that
 	 * `&nbsp;` decodes to.
 	 *
-	 * @param array<mixed> $block Parsed block.
+	 * @param string $html Block HTML.
 	 * @return string Block text.
 	 */
-	private static function block_text( array $block ): string {
+	private static function html_text( string $html ): string {
 		// Keep a break between cells, lines and list items once tags are stripped.
-		$html = (string) preg_replace( '#<(?:br|/(?:p|li|td|th|tr|h[1-6]|div|figcaption|blockquote|pre))\b[^>]*>#i', '$0 ', self::get_block_html( $block ) );
+		$html = (string) preg_replace( '#<(?:br|/(?:p|li|td|th|tr|h[1-6]|div|figcaption|blockquote|pre))\b[^>]*>#i', '$0 ', $html );
 		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
