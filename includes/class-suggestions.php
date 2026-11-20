@@ -193,6 +193,10 @@ class Suggestions {
 			if ( str_contains( $content, 'data-suggestion-id="' . $note_id . '"' ) ) {
 				return true;
 			}
+			// A structural suggestion's marker sits in the block's attributes.
+			if ( 1 === preg_match( '/"commentId":' . $note_id . '(?![0-9])/', $content ) ) {
+				return true;
+			}
 		}
 		return false;
 	}

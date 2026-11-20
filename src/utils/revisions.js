@@ -1,8 +1,8 @@
 /**
  * Revisions of a thread's suggested edit.
  *
- * A thread's first edit is the review's quick fix on the note, or the first
- * AI reply's edit. Each later AI reply's edit revises it, and only the newest
+ * A thread's first edit is the review's quick fix or structural edit on the
+ * note, or the first AI reply's edit. Each later AI reply's edit revises it, and only the newest
  * can be applied or accepted: the earlier ones are superseded.
  */
 import { __, sprintf } from '@wordpress/i18n';
@@ -11,15 +11,17 @@ import { isReplyEdit } from './is-reply-edit';
 /**
  * Lists the edits proposed in a thread, oldest first.
  *
- * @param {Object|null} note    The thread's note, with `id`, `parent` and `quick_fix`.
+ * @param {Object|null} note    The thread's note, with `id`, `parent` and `quick_fix` or `block_action`.
  * @param {Object[]}    replies The thread's replies, oldest first.
  * @return {Array<{ownerId: number, edit: Object}>} Note that owns each edit, and the edit.
  */
 export function getThreadEdits(note, replies = []) {
 	const edits = [];
-	// A secondary note's quick fix is not the thread's first edit.
-	if (note?.id && !note.parent && note.quick_fix) {
-		edits.push({ ownerId: note.id, edit: note.quick_fix });
+	// A secondary note's quick fix is not the thread's first edit. A review
+	// note has a structural edit or a quick fix, never both.
+	const first = note?.block_action ?? note?.quick_fix;
+	if (note?.id && !note.parent && first) {
+		edits.push({ ownerId: note.id, edit: first });
 	}
 	for (const reply of replies || []) {
 		if (reply.is_ai && isReplyEdit(reply.edit)) {
@@ -113,14 +115,26 @@ export function isEditPending(latest, { status = null, isApplied = false }) {
  * show depends on whether the thread has an edit waiting on the author.
  *
  * @param {boolean} hasPendingEdit Whether the thread's newest edit is pending.
+ * @param {boolean} [isStructural] Whether that edit adds, removes or moves a block.
  * @return {Array<{key: string, label: string, message: string}>} Quick replies.
  */
-export function getQuickReplies(hasPendingEdit) {
+export function getQuickReplies(hasPendingEdit, isStructural = false) {
 	const why = {
 		key: 'why',
 		label: __('Why?', 'fresh-eyes'),
 		message: __('Why do you suggest this?', 'fresh-eyes'),
 	};
+
+	const tryAnother = {
+		key: 'try-another',
+		label: __('Try another', 'fresh-eyes'),
+		message: __('Try a different version.', 'fresh-eyes'),
+	};
+
+	// Adding, removing or moving a block can't be made shorter.
+	if (hasPendingEdit && isStructural) {
+		return [tryAnother, why];
+	}
 
 	if (hasPendingEdit) {
 		return [
@@ -129,11 +143,7 @@ export function getQuickReplies(hasPendingEdit) {
 				label: __('Shorter', 'fresh-eyes'),
 				message: __('Make it shorter.', 'fresh-eyes'),
 			},
-			{
-				key: 'try-another',
-				label: __('Try another', 'fresh-eyes'),
-				message: __('Try a different version.', 'fresh-eyes'),
-			},
+			tryAnother,
 			why,
 		];
 	}

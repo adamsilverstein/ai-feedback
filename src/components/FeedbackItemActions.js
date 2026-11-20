@@ -15,11 +15,13 @@ import useRequestReply from '../hooks/useRequestReply';
 import { hasReplyEdit } from '../utils/revisions';
 import { getFeedbackContent } from '../utils/feedback-content';
 import QuickFix from './QuickFix';
+import BlockAction from './BlockAction';
+import { isBlockAction } from '../utils/is-reply-edit';
 
 /**
  * Whether a note can offer "Make this change".
  *
- * Notes with a suggestion but no quick fix qualify, while nothing in their
+ * Notes with a suggestion but no quick fix or structural edit qualify, while nothing in their
  * thread already answers it: no reply is waiting on the AI and no AI reply
  * has proposed an edit.
  *
@@ -34,6 +36,7 @@ export function canRequestChange(item, thread) {
 		!item.is_group &&
 		!item.is_resolved &&
 		!item.quick_fix &&
+		!item.block_action &&
 		!!getFeedbackContent(item).suggestion &&
 		!thread?.pending_reply_id &&
 		!(thread?.replies || []).some((reply) => reply.is_ai && reply.edit)
@@ -110,10 +113,23 @@ export default function FeedbackItemActions({
 
 	const showQuickFix =
 		!!item.quick_fix && !item.is_group && !isDismissed && !!item.block_id;
+	const showBlockAction =
+		isBlockAction(item.block_action) &&
+		!item.is_group &&
+		!isDismissed &&
+		!!item.block_id;
 
 	return (
 		<>
-			{showQuickFix && (
+			{showBlockAction && (
+				<BlockAction
+					item={item}
+					action={item.block_action}
+					// Any reply edit in the thread revises it.
+					isSuperseded={hasReplyEdit(thread?.replies)}
+				/>
+			)}
+			{!showBlockAction && showQuickFix && (
 				<QuickFix
 					item={item}
 					// Any reply edit in the thread revises the review's quick

@@ -254,6 +254,20 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * A structural suggestion's marker, in a block's attributes, anchors
+		 * it; a longer id that starts with the same digits does not.
+		 */
+		public function test_saved_pending_ids_skip_structural_suggestions(): void {
+			$content = '<!-- wp:paragraph {"metadata":{"suggestion":{"type":"pending-remove","commentId":401,"authorId":0},"noteId":401}} --><p>x</p><!-- /wp:paragraph -->'
+				. '<!-- wp:paragraph {"metadata":{"suggestion":{"type":"pending-move","commentId":4021}}} --><p>y</p><!-- /wp:paragraph -->';
+			$this->set_post_modified( $this->ago( HOUR_IN_SECONDS ), $content );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$this->add_suggestion( 402, $this->ago( 2 * HOUR_IN_SECONDS ) );
+
+			$this->assertSame( array( 402 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
 		 * The cleanup delay can be filtered.
 		 */
 		public function test_saved_pending_ids_delay_is_filterable(): void {

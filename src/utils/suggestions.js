@@ -27,6 +27,12 @@ import {
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
 import { getRewriteRuns } from './reply-edit';
 import { resolveBlockClientId } from './navigate-to-block';
+import { isBlockAction } from './is-reply-edit';
+import {
+	findNoteBlock,
+	getBlockActionState,
+	getMovePosition,
+} from './block-action';
 
 const STORE_NAME = 'ai-feedback/store';
 
@@ -73,7 +79,12 @@ export function hasSuggestionMarkers(content) {
  * @return {boolean} True if a marker carries the id.
  */
 export function hasSuggestionMarker(html, id) {
-	return (html || '').includes(`data-suggestion-id="${id}"`);
+	const content = html || '';
+	return (
+		content.includes(`data-suggestion-id="${id}"`) ||
+		// A structural suggestion's marker sits in the block's attributes.
+		new RegExp(`"commentId":${Number(id)}(?![0-9])`).test(content)
+	);
 }
 
 /**
@@ -388,6 +399,196 @@ export async function suggestReplyEdit(reply, threadId, blockId = null) {
 }
 
 /**
+ * Structural edits that can become Gutenberg suggestions.
+ *
+ * An insert would have to move the note onto the new block, so it stays
+ * with Preview and Apply in the sidebar.
+ */
+const SUGGESTABLE_BLOCK_ACTIONS = ['remove_block', 'move_block'];
+
+/**
+ * Checks whether a note's structural edit can become a suggestion.
+ *
+ * Only a review note qualifies: Gutenberg's Notes UI finds a suggestion's
+ * block through the thread's root note, which is linked to the block that
+ * is removed or moved.
+ *
+ * @param {Object} note Feedback note.
+ * @return {boolean} True for top-level, single-block notes that remove or move their block.
+ */
+export function canSuggestBlockAction(note) {
+	return (
+		!!note?.id &&
+		!!note.block_id &&
+		!note.is_group &&
+		!note.parent &&
+		!note.is_resolved &&
+		!note.suggestion_status &&
+		isBlockAction(note.block_action) &&
+		SUGGESTABLE_BLOCK_ACTIONS.includes(note.block_action.type)
+	);
+}
+
+/**
+ * Builds the `_wp_suggestion` payload for a structural edit, in the shape
+ * Gutenberg's own structural capture writes.
+ *
+ * @param {string} blockName Block name.
+ * @param {Object} operation `block-remove` or `block-move` operation.
+ * @return {Object} Suggestion payload.
+ */
+export function buildStructuralPayload(blockName, operation) {
+	return {
+		schemaVersion: SCHEMA_VERSION,
+		blockName,
+		baseRevision: null,
+		operations: [operation],
+	};
+}
+
+/**
+ * Turns a review note's remove or move into a Gutenberg structural
+ * suggestion.
+ *
+ * Like Gutenberg's own capture, the change is made and tagged: a removal
+ * keeps the block and marks it `pending-remove`, and a move puts the block
+ * in its new place, marked `pending-move` with where it came from. Accept
+ * then removes the block or keeps it where it is; Reject clears the mark
+ * or moves it back. The marker carries the note's id, so the suggestion is
+ * found again after a reload.
+ *
+ * @param {Object} note Feedback note with `id`, `block_id` and `block_action`.
+ * @return {Promise<boolean>} Whether the suggestion was added.
+ */
+export async function suggestBlockAction(note) {
+	const action = note.block_action;
+	const selectors = dataSelect(blockEditorStore);
+	const clientId = findNoteBlock(selectors, note.block_id, note.id);
+	const block = clientId ? selectors.getBlock(clientId) : null;
+	if (
+		!block ||
+		block.attributes?.metadata?.suggestion ||
+		getBlockActionState(selectors, action, clientId).state !== 'ready'
+	) {
+		return false;
+	}
+
+	const operation =
+		action.type === 'remove_block'
+			? { type: 'block-remove', clientId, blockName: block.name }
+			: { type: 'block-move', clientId, blockName: block.name };
+	const saved = await saveNoteMeta(note.id, {
+		_wp_suggestion: JSON.stringify(
+			buildStructuralPayload(block.name, operation)
+		),
+		_wp_suggestion_status: 'pending',
+	});
+
+	// The blocks may have changed while the request ran.
+	const current = dataSelect(blockEditorStore);
+	const { state, targetId } = getBlockActionState(current, action, clientId);
+	if (
+		!saved?.meta?._wp_suggestion ||
+		state !== 'ready' ||
+		current.getBlock(clientId)?.attributes?.metadata?.suggestion
+	) {
+		await removeSuggestion(note.id);
+		return false;
+	}
+
+	const editor = dataDispatch(blockEditorStore);
+	const marker = {
+		type:
+			action.type === 'remove_block' ? 'pending-remove' : 'pending-move',
+		commentId: note.id,
+		authorId: saved.author ?? null,
+	};
+
+	if (action.type === 'move_block') {
+		const fromParentClientId = current.getBlockRootClientId(clientId);
+		const fromIndex = current.getBlockIndex(clientId);
+		const fromOrder = current.getBlockOrder(fromParentClientId ?? '');
+		Object.assign(marker, {
+			fromParentClientId: fromParentClientId || null,
+			fromIndex,
+			fromAnchorClientId: fromOrder[fromIndex - 1] ?? null,
+		});
+
+		const { fromRootClientId, toRootClientId, index } = getMovePosition(
+			current,
+			action,
+			clientId,
+			targetId
+		);
+		editor.moveBlocksToPosition(
+			[clientId],
+			fromRootClientId,
+			toRootClientId,
+			index
+		);
+	}
+
+	const metadata =
+		dataSelect(blockEditorStore).getBlock(clientId)?.attributes?.metadata;
+	editor.updateBlockAttributes(clientId, {
+		metadata: { ...(metadata || {}), suggestion: marker },
+	});
+	dataDispatch(STORE_NAME).setSuggestionStatus(note.id, 'pending');
+	return true;
+}
+
+/**
+ * Finds the block holding a note's structural suggestion marker.
+ *
+ * @param {number} noteId Suggestion (note) id.
+ * @return {string|null} Client id, or null when no block is marked for it.
+ */
+function findStructuralMarker(noteId) {
+	const selectors = dataSelect(blockEditorStore);
+	return (
+		selectors
+			.getClientIdsWithDescendants()
+			.find(
+				(id) =>
+					Number(
+						selectors.getBlock(id)?.attributes?.metadata?.suggestion
+							?.commentId
+					) === Number(noteId)
+			) ?? null
+	);
+}
+
+/**
+ * Takes a structural suggestion out of the post, as Reject does: a removal
+ * keeps its block, and a move goes back to where it came from.
+ *
+ * @param {string} clientId Client id of the marked block.
+ */
+function rejectStructuralMarker(clientId) {
+	const selectors = dataSelect(blockEditorStore);
+	const editor = dataDispatch(blockEditorStore);
+	const { suggestion, ...metadata } =
+		selectors.getBlock(clientId)?.attributes?.metadata || {};
+
+	editor.updateBlockAttributes(clientId, { metadata });
+	if (suggestion?.type === 'pending-move') {
+		const liveParent = selectors.getBlockRootClientId(clientId) ?? '';
+		const recorded = suggestion.fromParentClientId ?? '';
+		// A recorded parent only exists in the session that made the move.
+		const restoreParent =
+			recorded === '' || selectors.getBlock(recorded)
+				? recorded
+				: liveParent;
+		editor.moveBlocksToPosition(
+			[clientId],
+			liveParent,
+			restoreParent,
+			suggestion.fromIndex ?? 0
+		);
+	}
+}
+
+/**
  * Takes one suggestion's markers out of content, as Reject does: its added
  * runs are dropped and its deleted runs keep their text.
  *
@@ -477,9 +678,12 @@ export async function supersedeSuggestions(threadId, noteIds) {
 		const withoutMarkers = target
 			? removeSuggestionMarkers(target.content, noteId)
 			: null;
+		const structural = findStructuralMarker(noteId);
 		if (
 			supersedingIds.has(noteId) ||
-			(!withoutMarkers && getLoadedSuggestionStatus(noteId) !== 'pending')
+			(!withoutMarkers &&
+				!structural &&
+				getLoadedSuggestionStatus(noteId) !== 'pending')
 		) {
 			continue;
 		}
@@ -492,6 +696,9 @@ export async function supersedeSuggestions(threadId, noteIds) {
 				dataDispatch(blockEditorStore).updateBlockAttributes(clientId, {
 					[target.key]: withoutMarkers,
 				});
+			}
+			if (structural) {
+				rejectStructuralMarker(structural);
 			}
 			await saveNoteMeta(noteId, {
 				_wp_suggestion_status: 'rejected-unsaved',
@@ -570,14 +777,18 @@ export async function suggestQuickFixes(notes) {
 	}
 
 	let added = 0;
-	// One at a time, so each write sees the block as the last one left it.
-	for (const note of (notes || []).filter(canSuggest)) {
+	// One at a time, so each write sees the blocks as the last one left them.
+	for (const note of notes || []) {
 		try {
-			if (await suggestQuickFix(note)) {
+			if (canSuggestBlockAction(note)) {
+				if (await suggestBlockAction(note)) {
+					added++;
+				}
+			} else if (canSuggest(note) && (await suggestQuickFix(note))) {
 				added++;
 			}
 		} catch {
-			// The quick fix stays available in the sidebar.
+			// The edit stays available in the sidebar.
 		}
 	}
 

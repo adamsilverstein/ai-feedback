@@ -121,3 +121,42 @@ describe('getQuickReplies', () => {
 		).toBe('Make it shorter.');
 	});
 });
+
+describe('structural edits', () => {
+	const remove = { type: 'remove_block' };
+	const move = {
+		type: 'move_block',
+		position: 'before',
+		target_block_id: '',
+		target_name: 'core/heading',
+		target_text: 'Intro',
+	};
+
+	it('count a review note’s structural edit as the first edit', () => {
+		expect(
+			getThreadEdits({ id: 300, block_action: remove }, [
+				{ id: 302, is_ai: true, edit: move },
+			])
+		).toEqual([
+			{ ownerId: 300, edit: remove },
+			{ ownerId: 302, edit: move },
+		]);
+		expect(
+			getSupersededOwnerIds({ id: 300, block_action: remove }, [
+				{ id: 302, is_ai: true, edit: move },
+			])
+		).toEqual([300]);
+	});
+
+	it('offer no “Shorter” for a pending structural edit', () => {
+		expect(getQuickReplies(true, true).map(({ key }) => key)).toEqual([
+			'try-another',
+			'why',
+		]);
+		expect(getQuickReplies(false, true).map(({ key }) => key)).toEqual([
+			'make-change',
+			'example',
+			'why',
+		]);
+	});
+});
