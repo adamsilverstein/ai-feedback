@@ -195,6 +195,7 @@ class Response_Parser {
 	 * @return array<string, mixed>|\WP_Error On success, an array with keys:
 	 *                         - `summary` (string): sanitized summary text.
 	 *                         - `feedback` (array): list of validated, sanitized, and enriched feedback items.
+	 *                         - `persona_takeaway` (string): the reader persona's one line takeaway, or ''.
 	 *                         On schema validation failure (when $validate_schema is true), returns a WP_Error.
 	 */
 	public function parse_feedback( string $response, array $blocks, bool $validate_schema = false, array $image_blocks = array() ) {
@@ -349,8 +350,9 @@ class Response_Parser {
 		$grouped = $this->sort_by_priority( $grouped );
 
 		return array(
-			'summary'  => $this->sanitize_summary( $summary ),
-			'feedback' => $grouped,
+			'summary'          => $this->sanitize_summary( $summary ),
+			'feedback'         => $grouped,
+			'persona_takeaway' => Personas::sanitize_takeaway( $data['persona_takeaway'] ?? '' ),
 		);
 	}
 

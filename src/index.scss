@@ -1013,6 +1013,24 @@ $ai-feedback-reply-error: #cc1818;
 		background: #edfaef;
 		color: #005c12;
 	}
+
+	&.ai-feedback-persona {
+		background: #f0f6fc;
+		color: #0a4b78;
+		font-weight: 600;
+	}
+}
+
+/* Which reader persona a note in the sidebar came from. */
+.ai-feedback-persona-badge {
+	display: inline-block;
+	margin-left: 4px;
+	padding: 0 6px;
+	border-radius: 2px;
+	background: #f0f6fc;
+	color: #0a4b78;
+	font-size: 11px;
+	line-height: 18px;
 }
 
 /* Grammar & Spelling: one row for every proofreading fix, with Accept all. */

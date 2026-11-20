@@ -94,6 +94,22 @@ export function* updateSettings(settings) {
 }
 
 /**
+ * Set the "Who is this for?" audience in the store without saving it.
+ *
+ * Keeps the next review in step with the field while the user types; the
+ * field saves it when it loses focus.
+ *
+ * @param {string} audience Audience.
+ * @return {Object} Action object.
+ */
+export function setReviewAudience(audience) {
+	return {
+		type: TYPES.UPDATE_SETTINGS,
+		settings: { reviewAudience: audience },
+	};
+}
+
+/**
  * Link blocks to their new notes and refresh the notes shown in the editor.
  *
  * @param {Object} response Review response with block_mapping and notes.
@@ -246,6 +262,8 @@ function applyReviewResponse(response, postId) {
  * @param {Array}   options.focusAreas Focus areas.
  * @param {string}  options.targetTone Target tone.
  * @param {string}  options.locale     Feedback locale.
+ * @param {string}  options.persona    Reader persona ID.
+ * @param {string}  options.audience   Who the document is for.
  * @param {number}  options.chunkSize  Blocks per review request.
  * @param {boolean} options.isRetry    Whether this retries a review that failed because the AI service was unavailable.
  * @return {Object} Action object.
@@ -258,6 +276,8 @@ export function* startReview({
 	focusAreas,
 	targetTone,
 	locale,
+	persona,
+	audience,
 	chunkSize = DEFAULT_CHUNK_SIZE,
 	isRetry = false,
 }) {
@@ -308,6 +328,14 @@ export function* startReview({
 				locale,
 				existing_feedback: existingFeedback,
 			};
+
+			// Optional: the server falls back to the copy editor and no audience.
+			if (persona) {
+				data.persona = persona;
+			}
+			if (audience) {
+				data.audience = audience;
+			}
 
 			if (total > 1) {
 				data.chunk_index = index;
