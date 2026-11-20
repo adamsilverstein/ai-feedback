@@ -26,6 +26,7 @@
 	},
 	"files": [
 		"fresh-eyes.php",
+		"uninstall.php",
 		"includes/",
 		"build/",
 		"assets/",
@@ -47,6 +48,7 @@
 		"@wordpress/edit-post": "~9.1.0",
 		"@wordpress/editor": "~16.1.0",
 		"@wordpress/element": "~10.1.0",
+		"@wordpress/hooks": "~5.1.0",
 		"@wordpress/i18n": "~7.1.0",
 		"@wordpress/icons": "~20.0.0",
 		"@wordpress/keyboard-shortcuts": "~6.1.0",

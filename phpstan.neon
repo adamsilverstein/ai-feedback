@@ -3,6 +3,7 @@ parameters:
     paths:
         - includes/
         - fresh-eyes.php
+        - uninstall.php
     scanFiles:
         - fresh-eyes.php
     bootstrapFiles:

@@ -600,7 +600,8 @@ class Reply_Service {
 	}
 
 	/**
-	 * Drop a text change outside the text the note is anchored to.
+	 * Drop a text change outside the text the note is anchored to, and any
+	 * structural change (remove, move or insert a block) to it.
 	 *
 	 * The prompt asks for changes scoped to the selection; this holds the
 	 * AI to it. A note on a whole block has no selection and is left alone.
@@ -612,15 +613,22 @@ class Reply_Service {
 	 */
 	private static function keep_edit_in_selection( array $parsed, array $context, int $parent_id ): array {
 		$edit = $parsed['edit'];
-		if ( null === $edit || 'replace_text' !== ( $edit['type'] ?? null ) || ! is_string( $edit['find'] ?? null ) ) {
+		if ( null === $edit ) {
+			return $parsed;
+		}
+		$is_text = 'replace_text' === ( $edit['type'] ?? null ) && is_string( $edit['find'] ?? null );
+		if ( ! $is_text && ! Response_Parser::is_block_action( $edit ) ) {
 			return $parsed;
 		}
 
 		$block_html = is_string( $context['block_html'] ?? null ) ? $context['block_html'] : '';
 		// The whole selection, not the prompt's shortened copy.
 		$selection = Mentions::get_selected_text( $block_html, $parent_id, PHP_INT_MAX );
-		$find      = trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) );
-		if ( '' === $selection || ( '' !== $find && str_contains( $selection, $find ) ) ) {
+		if ( '' === $selection ) {
+			return $parsed;
+		}
+		$find = $is_text ? trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) ) : '';
+		if ( '' !== $find && str_contains( $selection, $find ) ) {
 			return $parsed;
 		}
 

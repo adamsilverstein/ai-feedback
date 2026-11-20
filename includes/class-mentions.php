@@ -92,13 +92,19 @@ class Mentions {
 	 * Whether note content mentions Fresh Eyes.
 	 *
 	 * Reads the note's text, leaving out quoted text, so a mention someone
-	 * quotes or pastes as code does not trigger an answer. An email address
+	 * quotes or pastes as code does not trigger an answer. A completer chip
+	 * for the Fresh Eyes user counts whatever name it shows. An email address
 	 * or a longer name that starts with a handle is not a mention.
 	 *
 	 * @param string $content Note content, as stored.
 	 * @return bool
 	 */
 	public static function mentions_fresh_eyes( string $content ): bool {
+		// A chip the Notes `@` completer saved for the Fresh Eyes user.
+		if ( self::has_user_chip( $content ) ) {
+			return true;
+		}
+
 		// Most notes have no at sign, plain or encoded; skip the regex work for them.
 		if ( ! str_contains( $content, '@' ) && false === stripos( $content, '&#64;' ) && false === stripos( $content, '&#x40;' ) && false === stripos( $content, '&commat;' ) ) {
 			return false;
@@ -131,15 +137,29 @@ class Mentions {
 	 */
 	public static function note_text( string $content ): string {
 		// Bound the work before any regex runs on user input.
-		$content = mb_substr( $content, 0, self::MAX_SCAN_LENGTH * 2 );
+		$content = self::strip_quoted( mb_substr( $content, 0, self::MAX_SCAN_LENGTH * 2 ) );
+		if ( null === $content ) {
+			return '';
+		}
 
+		$text = html_entity_decode( wp_strip_all_tags( $content ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), 0, self::MAX_SCAN_LENGTH );
+	}
+
+	/**
+	 * Remove quoted elements from note HTML.
+	 *
+	 * @param string $content Note content, already bounded.
+	 * @return string|null HTML without quoted elements, or null when it could not be read.
+	 */
+	private static function strip_quoted( string $content ): ?string {
 		// Inner quotes go first, so each pass removes one level of nesting.
 		for ( $pass = 0; $pass < 5; $pass++ ) {
 			$stripped = preg_replace( '#<(' . self::QUOTED_TAGS . ')\b[^>]*>(?:(?!<(?:' . self::QUOTED_TAGS . ')\b).)*?</\1\s*>#is', ' ', $content );
 			if ( null === $stripped ) {
 				// The regex failed, eg. on the backtrack limit. Read nothing
 				// rather than text that may still hold a quoted mention.
-				return '';
+				return null;
 			}
 			if ( $stripped === $content ) {
 				break;
@@ -147,13 +167,41 @@ class Mentions {
 			$content = $stripped;
 		}
 		// An unclosed quote runs to the end of the note.
-		$content = preg_replace( '#<(?:' . self::QUOTED_TAGS . ')\b.*$#is', ' ', $content );
-		if ( null === $content ) {
-			return '';
+		return preg_replace( '#<(?:' . self::QUOTED_TAGS . ')\b.*$#is', ' ', $content );
+	}
+
+	/**
+	 * Whether note content holds a Notes `@` completer chip for the Fresh Eyes user:
+	 * `<span class="wp-note-mention user-N">`, outside quoted text.
+	 *
+	 * @param string $content Note content, as stored.
+	 * @return bool
+	 */
+	public static function has_user_chip( string $content ): bool {
+		$user_id = Fresh_Eyes_User::get_id();
+		if ( $user_id <= 0 || ! str_contains( $content, 'wp-note-mention' ) ) {
+			return false;
 		}
 
-		$text = html_entity_decode( wp_strip_all_tags( $content ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-		return mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), 0, self::MAX_SCAN_LENGTH );
+		$html = self::strip_quoted( mb_substr( $content, 0, self::MAX_SCAN_LENGTH * 2 ) );
+		if ( null === $html || ! preg_match_all( '#<span\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#i', $html, $tags ) ) {
+			return false;
+		}
+
+		foreach ( $tags[1] as $attributes ) {
+			foreach ( self::parse_attributes( $attributes ) as list( $name, $value ) ) {
+				if ( 'class' !== $name ) {
+					continue;
+				}
+				// A browser uses the first class attribute.
+				$tokens = preg_split( '/\s+/', trim( $value ) );
+				if ( is_array( $tokens ) && in_array( 'wp-note-mention', $tokens, true ) && in_array( 'user-' . $user_id, $tokens, true ) ) {
+					return true;
+				}
+				break;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -343,15 +391,12 @@ class Mentions {
 
 		$targets = array();
 		preg_match_all( '#<[a-zA-Z][a-zA-Z0-9:-]*((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#', $html, $tags );
+		$link_names = explode( '|', self::LINK_ATTRIBUTES );
 		foreach ( $tags[1] as $attributes ) {
-			preg_match_all(
-				'#(?:^|[\s/])(' . self::LINK_ATTRIBUTES . ')\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i',
-				$attributes,
-				$found,
-				PREG_SET_ORDER
-			);
-			foreach ( $found as $attribute ) {
-				$raw    = ( $attribute[2] ?? '' ) . ( $attribute[3] ?? '' ) . ( $attribute[4] ?? '' );
+			foreach ( self::parse_attributes( $attributes ) as list( $name, $raw ) ) {
+				if ( ! in_array( $name, $link_names, true ) ) {
+					continue;
+				}
 				$target = self::normalize_link( $raw );
 				if ( '' !== $target && ! str_starts_with( $target, '#' ) ) {
 					$targets[] = $target;
@@ -360,6 +405,26 @@ class Mentions {
 		}
 
 		return array_values( array_unique( $targets ) );
+	}
+
+	/**
+	 * Split a tag's attributes into names and values, left to right.
+	 *
+	 * Each quoted value is consumed whole, so a name inside another
+	 * attribute's value, as in `title="class='x'"`, is not an attribute,
+	 * while one right after a closing quote, as in `title="x"href="y"`, is.
+	 *
+	 * @param string $attributes Everything between a tag's name and its `>`.
+	 * @return list<array{string, string}> Lowercase names and raw values, in order.
+	 */
+	private static function parse_attributes( string $attributes ): array {
+		preg_match_all( '#([^\s"\'>/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?#', $attributes, $found, PREG_SET_ORDER );
+
+		$pairs = array();
+		foreach ( $found as $attribute ) {
+			$pairs[] = array( strtolower( $attribute[1] ), ( $attribute[2] ?? '' ) . ( $attribute[3] ?? '' ) . ( $attribute[4] ?? '' ) );
+		}
+		return $pairs;
 	}
 
 	/**

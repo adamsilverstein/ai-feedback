@@ -72,6 +72,10 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 
 When the selected model can see images (the built-in Claude, GPT and Gemini models can, and the AI client's model information is checked first), a review also sends up to four Media Library images that have no alt text, so the model can propose some. Images from other sites are never fetched or sent. Developers can turn this off by returning 0 from the `ai_feedback_max_review_images` filter.
 
+= Why is there a Fresh Eyes user? =
+
+So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter; typing `@fresh-eyes` still works.
+
 == Screenshots ==
 
 1. A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar
