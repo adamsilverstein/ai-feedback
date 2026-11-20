@@ -51,6 +51,11 @@ const MOCK_FOCUS_AREAS = [
 		label: 'Design & Formatting',
 		description: 'Visual hierarchy',
 	},
+	{
+		id: 'grammar',
+		label: 'Grammar & Spelling',
+		description: 'Typos',
+	},
 ];
 
 const mockUpdateSettings = vi.fn();
@@ -128,12 +133,24 @@ describe('FocusAreaSelector', () => {
 		setupMocks();
 		render(<FocusAreaSelector />);
 
-		expect(
-			screen.getByText(/grammar, spelling, clarity/i)
-		).toBeInTheDocument();
+		expect(screen.getByText(/clarity, completeness/i)).toBeInTheDocument();
 		expect(screen.getByText(/voice consistency/i)).toBeInTheDocument();
 		expect(screen.getByText(/logical progression/i)).toBeInTheDocument();
 		expect(screen.getByText(/formatting, headings/i)).toBeInTheDocument();
+		expect(
+			screen.getByText(/spelling follows the feedback language/i)
+		).toBeInTheDocument();
+	});
+
+	it('saves Grammar & Spelling like the other focus areas', async () => {
+		setupMocks(['content']);
+		render(<FocusAreaSelector />);
+
+		await userEvent.click(screen.getByLabelText('Grammar & Spelling'));
+
+		expect(mockUpdateSettings).toHaveBeenCalledWith({
+			default_focus_areas: ['content', 'grammar'],
+		});
 	});
 
 	it('renders the fieldset legend', () => {

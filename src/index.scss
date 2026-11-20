@@ -1014,3 +1014,32 @@ $ai-feedback-reply-error: #cc1818;
 		color: #005c12;
 	}
 }
+
+/* Grammar & Spelling: one row for every proofreading fix, with Accept all. */
+.ai-feedback-proofreading {
+	.ai-feedback-proofreading-header {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+
+		.expand-group-button {
+			flex: 1;
+			width: auto;
+		}
+	}
+
+	.ai-feedback-proofreading-preview {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: 12px;
+
+		li {
+			margin: 0 0 4px;
+		}
+	}
+
+	.ai-feedback-proofreading-items [role="listitem"] + [role="listitem"] {
+		margin-top: 8px;
+	}
+}

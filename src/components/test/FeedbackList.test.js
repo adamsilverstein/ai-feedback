@@ -28,6 +28,12 @@ vi.mock('../../hooks/useReplyThreads', () => ({
 }));
 // The item actions are covered by FeedbackItem.test.js.
 vi.mock('../FeedbackItemActions', () => ({ default: () => null }));
+// Covered by ProofreadingGroup.test.js.
+vi.mock('../ProofreadingGroup', () => ({
+	default: ({ items: fixes }) => (
+		<span>{`Proofreading: ${fixes.map((fix) => fix.id).join(',')}`}</span>
+	),
+}));
 
 /**
  * Render the list with a registry that has the feedback store.
@@ -118,6 +124,26 @@ describe('FeedbackList', () => {
 		const rows = renderedIds();
 		expect(rows[0]).toContain('Late suggestion');
 		expect(rows[1]).toContain('Factual error');
+	});
+
+	it('groups proofreading fixes into one row at the top', () => {
+		const grammar = (id, priority) => ({
+			id,
+			block_id: `b${id}`,
+			title: `Typo ${id}`,
+			category: 'grammar',
+			severity: 'suggestion',
+			priority,
+			quick_fix: { find: 'teh', replace: 'the' },
+		});
+		renderList([grammar(3, 500), ...items, grammar(4, 1)]);
+
+		const rows = renderedIds();
+		expect(rows).toHaveLength(3);
+		expect(rows[0]).toBe('Proofreading: 3,4');
+		expect(rows[1]).toContain('Factual error');
+		expect(rows[2]).toContain('Late suggestion');
+		expect(screen.queryByText('Typo 3')).not.toBeInTheDocument();
 	});
 
 	it('renders nothing without items', () => {

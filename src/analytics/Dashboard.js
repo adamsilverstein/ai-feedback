@@ -199,6 +199,7 @@ export default function Dashboard() {
 		tone: __('Tone', 'fresh-eyes'),
 		flow: __('Flow', 'fresh-eyes'),
 		design: __('Design', 'fresh-eyes'),
+		grammar: __('Grammar', 'fresh-eyes'),
 	};
 
 	return (
