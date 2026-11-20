@@ -19,10 +19,10 @@ trait Backslash_Text_Provider {
 	 */
 	public static function backslash_text_provider(): array {
 		return array(
-			'windows path'   => array( 'Save it to C:\\path\\new instead.' ),
-			'literal \\n'    => array( 'End each line with \\n, not a real line break.' ),
-			'regex'          => array( 'Match versions with \\d+\\.\\d+ - café "déjà vu".' ),
-			'escaped JSON'   => array( 'Send {"title":"Say \\"hi\\"","path":"a\\\\b"} as the body.' ),
+			'windows path' => array( 'Save it to C:\\path\\new instead.' ),
+			'literal \\n'  => array( 'End each line with \\n, not a real line break.' ),
+			'regex'        => array( 'Match versions with \\d+\\.\\d+ - café "déjà vu".' ),
+			'escaped JSON' => array( 'Send {"title":"Say \\"hi\\"","path":"a\\\\b"} as the body.' ),
 		);
 	}
 }
