@@ -492,7 +492,7 @@ class PromptBuilderTest extends TestCase {
 
 		$prompt = $this->builder->build_review_prompt( $blocks );
 
-		$this->assertStringContainsString( '"block_action": { "type": "move", "target_block_id":', $prompt );
+		$this->assertStringContainsString( '{ "type": "move", "target_block_id": "<another block_id from the document>", "position": "before|after" }', $prompt );
 		$this->assertStringContainsString( '{ "type": "remove" } deletes the block', $prompt );
 		$this->assertStringContainsString( '{ "name": "core/heading", "level": 2, "content": "text" }', $prompt );
 		$this->assertStringContainsString( '"items": [ "text", "text" ]', $prompt );

@@ -108,8 +108,7 @@ class Prompt_Builder {
 		$prompt           .= '      "title": "Brief title (max 50 chars)",' . "\n";
 		$prompt           .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
 		$prompt           .= '      "suggestion": "Specific action to take (max 200 chars, optional)",' . "\n";
-		$prompt           .= '      "quick_fix": { "find": "exact text copied from the block", "replace": "replacement text" },' . "\n";
-		$prompt           .= '      "block_action": { "type": "move", "target_block_id": "ghi789-jkl012", "position": "before" }' . "\n";
+		$prompt           .= '      "quick_fix": { "find": "exact text copied from the block", "replace": "replacement text" }' . "\n";
 		$prompt           .= "    }\n";
 		$prompt           .= "  ]\n";
 		$prompt           .= "}\n\n";
