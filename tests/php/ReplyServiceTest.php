@@ -615,7 +615,8 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
-	 * Line breaks and table cells don't run their text together.
+	 * Table cells don't run their text together, and a line break stays a
+	 * line break.
 	 */
 	public function test_block_content_keeps_breaks_between_cells_and_lines(): void {
 		$this->seed_parent_and_reply();
@@ -626,7 +627,7 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( "Block content: 10 20 First Second\n", $service->captured_prompt );
+		$this->assertStringContainsString( "Block content: 10 20 First\nSecond\n", $service->captured_prompt );
 	}
 
 	/**
@@ -764,6 +765,78 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
 		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * Data provider for the ways a line break is written in block HTML.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function line_break_provider(): array {
+		return array(
+			'br'             => array( '<p>Revenue grew 40%<br>last year.</p>' ),
+			'self-closing'   => array( '<p>Revenue grew 40%<br/>last year.</p>' ),
+			'spaced closing' => array( '<p>Revenue grew 40%<br />last year.</p>' ),
+		);
+	}
+
+	/**
+	 * The editor reads a line break as a newline, so a `find` that runs
+	 * across one with a space never matches there and is dropped.
+	 *
+	 * @dataProvider line_break_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_text_edit_spanning_a_line_break_is_dropped( string $html ): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "40% last year", "replace": "40% in 2025"}}', $html );
+
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A `find` that keeps the line break as a newline matches the editor's
+	 * text, and is kept.
+	 *
+	 * @dataProvider line_break_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_text_edit_with_the_line_break_is_kept( string $html ): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "40%\nlast year", "replace": "40%\nin 2025"}}', $html );
+
+		$this->assertSame(
+			array(
+				'type'    => 'replace_text',
+				'find'    => "40%\nlast year",
+				'replace' => "40%\nin 2025",
+			),
+			$notes->last_reply['feedback_item']['reply_edit']
+		);
+	}
+
+	/**
+	 * A `find` on one side of a line break is kept.
+	 */
+	public function test_text_edit_beside_a_line_break_is_kept(): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}', '<p>Revenue grew 40%<br>last year.</p>' );
+
+		$this->assertSame( 'last year', $notes->last_reply['feedback_item']['reply_edit']['find'] );
+	}
+
+	/**
+	 * The prompt shows a line break as a newline, so the AI can copy text
+	 * from one line.
+	 */
+	public function test_prompt_shows_line_break_as_newline(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% <br>last year.</p>', 100 ) ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% \nlast year.\n", $service->captured_prompt );
 	}
 
 	/**

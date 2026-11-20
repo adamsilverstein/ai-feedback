@@ -67,6 +67,11 @@ class Reply_Service {
 	public const MOCK_REPLY = 'This is a mock AI reply for testing purposes. The conversation loop is working correctly.';
 
 	/**
+	 * Stands in for a line break while editor_text() strips a block's tags.
+	 */
+	private const LINE_BREAK_MARK = "\u{E000}";
+
+	/**
 	 * Prompt builder instance.
 	 *
 	 * @var Prompt_Builder
@@ -715,7 +720,7 @@ class Reply_Service {
 		// The text as it reads without any pending suggestion, which is how
 		// the editor leaves it once a new edit supersedes that suggestion.
 		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
-		$block_content = null !== $block ? self::html_text( $block_html ) : '';
+		$block_content = null !== $block ? self::editor_text( $block_html ) : '';
 		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
@@ -1222,6 +1227,23 @@ class Reply_Service {
 		$html = (string) preg_replace( '#<(?:br|/(?:p|li|td|th|tr|h[1-6]|div|figcaption|blockquote|pre))\b[^>]*>#i', '$0 ', $html );
 		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
+	}
+
+	/**
+	 * Get block HTML's plain text as the editor reads it, with each line
+	 * break as a newline.
+	 *
+	 * The editor's rich text holds a `<br>` as "\n", so read as a space, a
+	 * `find` running across the break would pass here and never match there.
+	 *
+	 * @param string $html Block HTML.
+	 * @return string Block text.
+	 */
+	private static function editor_text( string $html ): string {
+		// A private use character stands in for each break, so collapsing
+		// whitespace and trimming leave the spaces beside it, as the editor does.
+		$html = (string) preg_replace( '#<br\b[^>]*>#i', self::LINE_BREAK_MARK, $html );
+		return str_replace( self::LINE_BREAK_MARK, "\n", self::html_text( $html ) );
 	}
 
 	/**
