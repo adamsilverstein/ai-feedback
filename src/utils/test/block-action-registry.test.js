@@ -107,4 +107,30 @@ describe('structural edits with the real block editor', () => {
 			after.clientId,
 		]);
 	}, 10000);
+
+	it('keeps a group whose inner block is linked to another note', () => {
+		const { registry, group, first } = setUp();
+		const editor = registry.dispatch(blockEditorStore);
+		editor.updateBlockAttributes(first.clientId, {
+			metadata: { noteId: 99 },
+		});
+		const selectors = registry.select(blockEditorStore);
+
+		expect(
+			getBlockActionState(
+				selectors,
+				{ type: 'remove_block' },
+				group.clientId
+			)
+		).toMatchObject({ state: 'blocked', inside: 2 });
+		expect(
+			applyBlockAction(
+				selectors,
+				editor,
+				{ type: 'remove_block' },
+				group.clientId
+			)
+		).toBe(false);
+		expect(selectors.getBlock(first.clientId)).not.toBeNull();
+	}, 10000);
 });

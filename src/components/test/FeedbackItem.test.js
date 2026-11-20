@@ -114,7 +114,8 @@ function renderItem(
 			getBlockRootClientId: () => null,
 			getBlockIndex: (state, clientId) =>
 				Object.keys(state).indexOf(clientId),
-			getBlockOrder: (state) => Object.keys(state),
+			getBlockOrder: (state, parent) =>
+				parent ? [] : Object.keys(state),
 		},
 	});
 	registry.registerStore('core/blocks', {

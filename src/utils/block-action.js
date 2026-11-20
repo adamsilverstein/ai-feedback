@@ -18,7 +18,7 @@
  * Helpers take the block editor's selectors and actions as arguments, so
  * they work with any registry.
  */
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import { createBlock, serialize } from '@wordpress/blocks';
 import { extractTextContent } from './block-utils';
 import { isBlockAction } from './is-reply-edit';
@@ -95,13 +95,25 @@ function getInsertedText(spec) {
 /**
  * Describe a structural edit in one line, eg. "Move above “Why this matters”".
  *
- * @param {Object} action Structural edit.
+ * @param {Object} action     Structural edit.
+ * @param {number} [inside=0] Blocks inside the block a removal takes with it.
  * @return {string} Description.
  */
-export function describeBlockAction(action) {
+export function describeBlockAction(action, inside = 0) {
 	const isBefore = action?.position === 'before';
 	if (action?.type === 'remove_block') {
-		return __('Remove this block', 'fresh-eyes');
+		return inside > 0
+			? sprintf(
+					/* translators: %d: number of blocks inside the block to remove. */
+					_n(
+						'Remove this block and the %d block inside it',
+						'Remove this block and the %d blocks inside it',
+						inside,
+						'fresh-eyes'
+					),
+					inside
+				)
+			: __('Remove this block', 'fresh-eyes');
 	}
 	if (action?.type === 'move_block') {
 		const target = excerpt(action.target_text);
@@ -153,6 +165,19 @@ function linksNote(block, noteId) {
 	return (Array.isArray(linked) ? linked : [linked]).some(
 		(id) => id !== undefined && id !== null && Number(id) === Number(noteId)
 	);
+}
+
+/**
+ * Every block inside a block, at any depth.
+ *
+ * @param {Object} selectors Block editor selectors.
+ * @param {string} clientId  Client ID.
+ * @return {string[]} Client IDs of the inner blocks.
+ */
+export function getInnerBlockIds(selectors, clientId) {
+	return selectors
+		.getBlockOrder(clientId)
+		.flatMap((id) => [id, ...getInnerBlockIds(selectors, id)]);
 }
 
 /**
@@ -297,12 +322,15 @@ function getNeighbor(selectors, clientId, offset) {
  * - `missing`: the note's block is gone, which an applied removal also leaves.
  * - `outdated`: a move's target can't be found.
  * - `applied`: the post already reads as the edit would leave it.
+ * - `blocked`: a removal would take blocks linked to other notes with it.
  * - `ready`: the edit can be applied.
+ *
+ * A removal also reports how many blocks are `inside` the block.
  *
  * @param {Object}      selectors Block editor selectors.
  * @param {Object}      action    Structural edit.
  * @param {string|null} clientId  Client ID of the note's block, from findNoteBlock().
- * @return {{state: string, targetId: (string|null)}} State, and a move's target.
+ * @return {{state: string, targetId: (string|null), inside: (number|undefined)}} State, a move's target, and a removal's inner block count.
  */
 export function getBlockActionState(selectors, action, clientId) {
 	if (!clientId || !selectors.getBlock(clientId)) {
@@ -341,7 +369,19 @@ export function getBlockActionState(selectors, action, clientId) {
 		return { state: isThere ? 'applied' : 'ready', targetId: null };
 	}
 
-	return { state: 'ready', targetId: null };
+	// A removal takes every inner block with it. Removing one linked to
+	// another note would leave that note pointing at nothing.
+	const inside = getInnerBlockIds(selectors, clientId);
+	const linksOtherNote = inside.some(
+		(id) =>
+			(selectors.getBlock(id)?.attributes?.metadata?.noteId ?? null) !==
+			null
+	);
+	return {
+		state: linksOtherNote ? 'blocked' : 'ready',
+		targetId: null,
+		inside: inside.length,
+	};
 }
 
 /**
@@ -540,7 +580,22 @@ export function getBlockActionOutline(
 		)
 	);
 	if (action.type === 'remove_block') {
-		before[order.indexOf(clientId)].mark = 'removed';
+		const removed = before[order.indexOf(clientId)];
+		const inside = getInnerBlockIds(selectors, clientId).length;
+		removed.mark = 'removed';
+		if (inside > 0) {
+			removed.label = sprintf(
+				/* translators: 1: block label, 2: number of blocks inside it. */
+				_n(
+					'%1$s, with %2$d block inside',
+					'%1$s, with %2$d blocks inside',
+					inside,
+					'fresh-eyes'
+				),
+				removed.label,
+				inside
+			);
+		}
 	}
 
 	let after = order.map((id) => line(id));

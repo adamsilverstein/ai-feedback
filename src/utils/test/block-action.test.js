@@ -603,3 +603,54 @@ describe('getBlockActionOutline', () => {
 		});
 	});
 });
+
+describe('removing a block that holds other blocks', () => {
+	it('counts the blocks that go with it', () => {
+		const selectors = doc();
+		expect(
+			getBlockActionState(selectors, { type: 'remove_block' }, 'group')
+		).toEqual({ state: 'ready', targetId: null, inside: 1 });
+		expect(describeBlockAction({ type: 'remove_block' }, 1)).toBe(
+			'Remove this block and the 1 block inside it'
+		);
+		expect(describeBlockAction({ type: 'remove_block' }, 6)).toBe(
+			'Remove this block and the 6 blocks inside it'
+		);
+		const { before } = getBlockActionOutline(
+			selectors,
+			() => undefined,
+			{ type: 'remove_block' },
+			'group'
+		);
+		expect(before.find((line) => line.mark === 'removed').label).toBe(
+			'core/group, with 1 block inside'
+		);
+	});
+
+	it('is blocked when a block inside is linked to another note', () => {
+		const selectors = treeSelectors(
+			{ '': ['group'], group: ['inner'] },
+			{
+				group: ['core/group', '', { noteId: 5 }],
+				inner: ['core/paragraph', 'Noted.', { noteId: [99] }],
+			}
+		);
+		expect(
+			getBlockActionState(selectors, { type: 'remove_block' }, 'group')
+				.state
+		).toBe('blocked');
+		const actions = {
+			removeBlocks: vi.fn(),
+			__unstableMarkLastChangeAsPersistent: vi.fn(),
+		};
+		expect(
+			applyBlockAction(
+				selectors,
+				actions,
+				{ type: 'remove_block' },
+				'group'
+			)
+		).toBe(false);
+		expect(actions.removeBlocks).not.toHaveBeenCalled();
+	});
+});

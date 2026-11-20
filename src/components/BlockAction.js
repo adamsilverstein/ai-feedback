@@ -120,7 +120,7 @@ export default function BlockAction({
 		isReplyEdit ? { id: ownerId } : item
 	);
 
-	const { clientId, state, targetId, isApplied } = useSelect(
+	const { clientId, state, targetId, inside, isApplied } = useSelect(
 		(select) => {
 			const selectors = select(blockEditorStore);
 			const id = findNoteBlock(selectors, item.block_id, item.id);
@@ -155,7 +155,7 @@ export default function BlockAction({
 
 	const summary = (
 		<p className="ai-feedback-quick-fix-summary">
-			{describeBlockAction(action)}
+			{describeBlockAction(action, inside)}
 		</p>
 	);
 	const status = (className, message) => (
@@ -298,6 +298,14 @@ export default function BlockAction({
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
 						'This change is outdated: its block is no longer in the post.',
+						'fresh-eyes'
+					)}
+				</p>
+			)}
+			{state === 'blocked' && (
+				<p className="ai-feedback-quick-fix-unavailable description">
+					{__(
+						'This block holds blocks with notes of their own, so it can’t be removed from here.',
 						'fresh-eyes'
 					)}
 				</p>

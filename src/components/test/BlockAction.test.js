@@ -63,6 +63,9 @@ function renderAction(props, options = {}) {
 					attributes: {
 						content: blocks[id].content,
 						level: blocks[id].level,
+						metadata: options.noteIds?.[id]
+							? { noteId: options.noteIds[id] }
+							: undefined,
 					},
 					innerBlocks: [],
 				}
@@ -146,7 +149,15 @@ function renderAction(props, options = {}) {
 			getClientIdsWithDescendants: () => order,
 			getBlockRootClientId: () => null,
 			getBlockIndex: (state, id) => order.indexOf(id),
-			getBlockOrder: () => order,
+			getBlockOrder: (state, parent) =>
+				parent
+					? (options.innerOf?.[parent] ?? [])
+					: order.filter(
+							(id) =>
+								!Object.values(options.innerOf ?? {})
+									.flat()
+									.includes(id)
+						),
 		},
 	});
 	registry.registerStore('core/blocks', {
@@ -367,5 +378,31 @@ describe('BlockAction', () => {
 
 		expect(spies.undo).not.toHaveBeenCalled();
 		expect(spies.setFixApplied).not.toHaveBeenCalledWith(7, false);
+	});
+
+	it('explains why a removal that would take noted blocks with it is not offered', () => {
+		renderAction(
+			{ action: { type: 'remove_block' } },
+			{
+				order: ['intro', 'bg', 'rep', 'inner'],
+				blocks: {
+					inner: { name: 'core/paragraph', content: 'Noted.' },
+				},
+				innerOf: { rep: ['inner'] },
+				noteIds: { inner: 99 },
+			}
+		);
+
+		expect(
+			screen.getByText('Remove this block and the 1 block inside it')
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				'This block holds blocks with notes of their own, so it can’t be removed from here.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole('button', { name: 'Apply change' })
+		).toHaveAttribute('aria-disabled', 'true');
 	});
 });
