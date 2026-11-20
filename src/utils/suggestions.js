@@ -17,14 +17,17 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import {
-	concat,
-	create,
-	RichTextData,
-	slice,
-	toHTMLString,
-} from '@wordpress/rich-text';
+import { concat, create, RichTextData, slice } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
+import {
+	fromSourceHTML,
+	markReplacement,
+	markSource,
+	readSource,
+	readValue,
+	toContent,
+	toSourceHTML,
+} from './source-newlines';
 import { getRewriteRuns } from './reply-edit';
 import { resolveBlockClientId } from './navigate-to-block';
 import { isBlockAction } from './is-reply-edit';
@@ -124,8 +127,8 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 		return null;
 	}
 
-	const value = create({ html: toHtml(content) });
-	const start = findUniqueOffset(value, fix);
+	const { value, marker } = readSource(toHtml(content), [fix.replace]);
+	const start = findUniqueOffset(readValue(value, marker), fix);
 	if (start === -1) {
 		return null;
 	}
@@ -134,27 +137,30 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 	let markup = '';
 	if (fix.replace) {
 		const length = fix.replace.length;
-		const added = toHTMLString({
-			value: {
-				text: fix.replace,
+		const added = toSourceHTML(
+			{
+				text: markReplacement(
+					value.text.slice(start, end),
+					fix.replace,
+					marker
+				),
 				formats: Array.from({ length }, () => value.formats[start]),
 				replacements: new Array(length),
 			},
-		});
+			marker
+		);
 		markup += `${openMarker('add', id, authorId)}${added}</mark>`;
 	}
-	const removed = toHTMLString({ value: slice(value, start, end) });
+	const removed = toSourceHTML(slice(value, start, end), marker);
 	markup += `${openMarker('del', id, authorId)}${removed}</mark>`;
 
 	const updated = concat(
 		slice(value, 0, start),
-		create({ html: markup }),
+		(marker && markSource(markup, marker)) || create({ html: markup }),
 		slice(value, end, value.text.length)
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	return toContent(content, updated, marker);
 }
 
 /**
@@ -199,11 +205,9 @@ export function buildRewriteSuggestionContent(
 			return added + removed;
 		})
 		.join('');
-	const updated = create({ html: markup });
 
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	const { value, marker } = readSource(markup);
+	return toContent(content, value, marker);
 }
 
 /**
@@ -742,9 +746,7 @@ export function removeSuggestionMarkers(content, id) {
 		}
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(create({ html: body.innerHTML }))
-		: body.innerHTML;
+	return fromSourceHTML(content, body.innerHTML);
 }
 
 /**
@@ -774,9 +776,7 @@ export function acceptSuggestionMarkers(content, id) {
 		}
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(create({ html: body.innerHTML }))
-		: body.innerHTML;
+	return fromSourceHTML(content, body.innerHTML);
 }
 
 /**

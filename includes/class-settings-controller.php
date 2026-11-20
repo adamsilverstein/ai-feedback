@@ -39,7 +39,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v3';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v4';
 
 	/**
 	 * Cache duration for models (1 hour).
@@ -374,13 +374,23 @@ class Settings_Controller extends WP_REST_Controller {
 	 * @return bool False for unknown models.
 	 */
 	public function model_has_capability( string $model_id, string $capability ): bool {
+		$capabilities = $this->get_model( $model_id )['capabilities'] ?? array();
+		return is_array( $capabilities ) && in_array( $capability, $capabilities, true );
+	}
+
+	/**
+	 * A model the plugin lists, with its provider and capabilities.
+	 *
+	 * @param  string $model_id Model ID.
+	 * @return array<string, mixed>|null Model, or null for unknown models.
+	 */
+	public function get_model( string $model_id ): ?array {
 		foreach ( $this->get_available_models() as $model ) {
 			if ( ( $model['id'] ?? null ) === $model_id ) {
-				$capabilities = $model['capabilities'] ?? array();
-				return is_array( $capabilities ) && in_array( $capability, $capabilities, true );
+				return $model;
 			}
 		}
-		return false;
+		return null;
 	}
 
 	/**
@@ -418,6 +428,9 @@ class Settings_Controller extends WP_REST_Controller {
 	/**
 	 * Lists every model the plugin knows about.
 	 *
+	 * `vision` marks models that read images. Model_Capabilities asks core
+	 * first and only falls back to it when core has no metadata for a model.
+	 *
 	 * @return list<array<string, mixed>> Models.
 	 */
 	private function get_model_catalog(): array {
@@ -426,14 +439,14 @@ class Settings_Controller extends WP_REST_Controller {
 				'id'           => 'claude-sonnet-5-5',
 				'name'         => 'Claude Sonnet 5.5',
 				'provider'     => 'anthropic',
-				'capabilities' => array( 'text' ),
+				'capabilities' => array( 'text', 'vision' ),
 				'max_tokens'   => 200000,
 			),
 			array(
 				'id'           => 'claude-opus-4',
 				'name'         => 'Claude Opus 4',
 				'provider'     => 'anthropic',
-				'capabilities' => array( 'text' ),
+				'capabilities' => array( 'text', 'vision' ),
 				'max_tokens'   => 200000,
 			),
 			array(
@@ -447,7 +460,7 @@ class Settings_Controller extends WP_REST_Controller {
 				'id'           => 'gemini-2.0-flash',
 				'name'         => 'Gemini 2.0 Flash',
 				'provider'     => 'google',
-				'capabilities' => array( 'text' ),
+				'capabilities' => array( 'text', 'vision' ),
 				'max_tokens'   => 1000000,
 			),
 		);
