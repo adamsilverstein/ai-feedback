@@ -21,23 +21,28 @@ const EDITED = 'Revenue grew 40% in 2025.';
  * @param {Object} fixtures.requestUtils Request utils fixture.
  * @param {Object} fixtures.aiFeedback   AI Feedback fixture.
  * @param {string} [content]             Paragraph HTML.
+ * @param {Object} [extra]               Optional block after the paragraph and post meta.
+ * @param {string} [extra.after]         Block markup after the paragraph.
+ * @param {Object} [extra.meta]          Post meta.
  * @return {Promise<number>} ID of the review's note on the paragraph.
  */
 async function reviewPost(
 	{ editor, admin, requestUtils, aiFeedback },
-	content = CONTENT
+	content = CONTENT,
+	{ after = '', meta } = {}
 ) {
 	// Create the post over REST: content added in a freshly loaded editor is
 	// sometimes lost before the save, which leaves nothing to review.
 	const post = await requestUtils.createPost({
 		title: 'Reply edit',
-		content: `<!-- wp:paragraph --><p>${content}</p><!-- /wp:paragraph -->`,
+		content: `<!-- wp:paragraph --><p>${content}</p><!-- /wp:paragraph -->${after}`,
 		status: 'draft',
+		...(meta ? { meta } : {}),
 	});
 	await admin.editPost(post.id);
 	await expect
 		.poll(() => editor.getBlocks().then((blocks) => blocks.length))
-		.toBe(1);
+		.toBe(after ? 2 : 1);
 	await aiFeedback.openSidebar();
 
 	const response = await aiFeedback.runReview();
@@ -223,5 +228,103 @@ test.describe('Reply edits', () => {
 		await expect
 			.poll(() => paragraphContent(editor))
 			.toBe('Revenue grew 40%<br>in 2025.');
+	});
+
+	test.describe('beside a footnote', () => {
+		const FOOTNOTE =
+			'<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+		const FOOTNOTED = `Revenue growth${FOOTNOTE} was 40% last year.`;
+		const withFootnote = {
+			after: '<!-- wp:footnotes /-->',
+			meta: {
+				footnotes: JSON.stringify([
+					{ id: 'f1', content: 'Annual report.' },
+				]),
+			},
+		};
+		const footnotes = (html) => html.split('data-fn="f1"').length - 1;
+
+		test('an edit beside a footnote applies and keeps the footnote', async ({
+			page,
+			editor,
+			admin,
+			requestUtils,
+			aiFeedback,
+		}) => {
+			const noteId = await reviewPost(
+				{ editor, admin, requestUtils, aiFeedback },
+				FOOTNOTED,
+				withFootnote
+			);
+
+			// The editor reads the footnote as one object, not its number.
+			expect(
+				await page.evaluate(() => {
+					const [block] = window.wp.data
+						.select('core/block-editor')
+						.getBlocks();
+					return window.wp.richText.create({
+						html: block.attributes.content.toString(),
+					}).text;
+				})
+			).toBe('Revenue growth\ufffc was 40% last year.');
+
+			await replyToNote(page, noteId, 'Make this change.');
+
+			const thread = page.getByRole('list', {
+				name: 'Conversation replies',
+			});
+			const aiReply = thread.locator('.ai-feedback-reply-ai');
+			await expect(aiReply).toContainText('now reads "in 2025"', {
+				timeout: 30000,
+			});
+			await expect(aiReply).not.toContainText('This change is outdated');
+
+			await aiReply.getByRole('button', { name: 'Apply change' }).click();
+
+			await expect
+				.poll(() => paragraphContent(editor).then(String))
+				.toContain('was 40% in 2025.');
+			const content = String(await paragraphContent(editor));
+			expect(content).toContain('Revenue growth<sup');
+			expect(content).toContain('>1</a></sup> was 40% in 2025.');
+			expect(footnotes(content)).toBe(1);
+		});
+
+		test('an edit across the footnote number is dropped', async ({
+			page,
+			editor,
+			admin,
+			requestUtils,
+			aiFeedback,
+		}) => {
+			const noteId = await reviewPost(
+				{ editor, admin, requestUtils, aiFeedback },
+				FOOTNOTED,
+				withFootnote
+			);
+
+			await replyToNote(
+				page,
+				noteId,
+				'Make this change across the footnote number.'
+			);
+
+			const thread = page.getByRole('list', {
+				name: 'Conversation replies',
+			});
+			const aiReply = thread.locator('.ai-feedback-reply-ai');
+			await expect(aiReply).toContainText('growth is', {
+				timeout: 30000,
+			});
+			// Dropped on the server, not stored and then outdated.
+			await expect(aiReply).not.toContainText('This change is outdated');
+			await expect(
+				aiReply.getByRole('button', { name: 'Apply change' })
+			).toHaveCount(0);
+			const content = String(await paragraphContent(editor));
+			expect(content).toContain('was 40% last year.');
+			expect(footnotes(content)).toBe(1);
+		});
 	});
 });

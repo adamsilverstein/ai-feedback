@@ -25,9 +25,9 @@ export function extractTextContent(innerHTML) {
  *
  * A quick fix's `find` is matched against this text on the server and
  * against `create( { html } ).text` in the editor, so a line break is "\n",
- * whitespace is kept as written and an inline image is U+FFFC. Comments
- * are block delimiters here, not text, so they are dropped. Shares its
- * cases with Reply_Service::editor_text() through
+ * whitespace is kept as written and a footnote, an inline image or a
+ * comment is U+FFFC. Block delimiters mark blocks, not text, so they are
+ * dropped. Shares its cases with Reply_Service::editor_text() through
  * tests/fixtures/editor-text.json.
  *
  * @param {string} innerHTML The block's HTML.
@@ -37,7 +37,8 @@ export function extractEditorText(innerHTML) {
 	if (!innerHTML) {
 		return '';
 	}
-	return create({ html: innerHTML.replace(/<!--[\s\S]*?-->/g, '') }).text;
+	return create({ html: innerHTML.replace(/<!--\s+\/?wp:[\s\S]*?-->/g, '') })
+		.text;
 }
 
 /**
