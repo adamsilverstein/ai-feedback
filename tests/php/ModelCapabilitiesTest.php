@@ -89,8 +89,10 @@ class Stub_Model_Metadata {
 	 *
 	 * @param list<string>            $capabilities Capability IDs.
 	 * @param list<list<Stub_Enum>>|null $modalities Input modality sets, or null for no input modalities option.
+	 * @param string                     $option     Name of the input modalities option. Core 7.0
+	 *                                               reports `inputModalities`.
 	 */
-	public function __construct( private array $capabilities, private ?array $modalities ) {}
+	public function __construct( private array $capabilities, private ?array $modalities, private string $option = 'inputModalities' ) {}
 
 	/**
 	 * Supported capabilities.
@@ -109,7 +111,7 @@ class Stub_Model_Metadata {
 	public function getSupportedOptions(): array { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid -- Mirrors the AI Client API.
 		$options = array( new Stub_Supported_Option( 'temperature', array() ) );
 		if ( null !== $this->modalities ) {
-			$options[] = new Stub_Supported_Option( 'input_modalities', $this->modalities );
+			$options[] = new Stub_Supported_Option( $this->option, $this->modalities );
 		}
 		return $options;
 	}
@@ -378,6 +380,22 @@ class ModelCapabilitiesTest extends TestCase {
 		$this->assertFalse( $capabilities->core_supports_images( 'image-only', 'anthropic' ) );
 		$this->assertFalse( $capabilities->core_supports_images( 'image-maker', 'anthropic' ) );
 		$this->assertFalse( $capabilities->core_supports_images( 'no-options', 'anthropic' ) );
+	}
+
+	/**
+	 * The option name matches as OptionEnum's constant spells it too.
+	 */
+	public function test_core_option_name_spellings(): void {
+		$sets         = array( array( new Stub_Enum( 'text' ), new Stub_Enum( 'image' ) ) );
+		$capabilities = self::with_anthropic(
+			array(
+				'snake' => new Stub_Model_Metadata( array( 'text_generation' ), $sets, 'input_modalities' ),
+				'other' => new Stub_Model_Metadata( array( 'text_generation' ), $sets, 'outputModalities' ),
+			)
+		);
+
+		$this->assertTrue( $capabilities->core_supports_images( 'snake', 'anthropic' ) );
+		$this->assertFalse( $capabilities->core_supports_images( 'other', 'anthropic' ) );
 	}
 
 	/**

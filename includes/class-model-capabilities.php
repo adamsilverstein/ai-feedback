@@ -22,14 +22,16 @@ namespace AI_Feedback;
 class Model_Capabilities {
 
 	/**
-	 * Core's ID for the text generation capability.
+	 * Core's ID for the text generation capability, normalized by enum_key().
 	 */
-	private const TEXT_GENERATION = 'text_generation';
+	private const TEXT_GENERATION = 'textgeneration';
 
 	/**
-	 * Core's ID for the input modalities option.
+	 * Core's ID for the input modalities option, normalized by enum_key().
+	 * Core 7.0 reports it as `inputModalities`, while the OptionEnum
+	 * constant reads `input_modalities`.
 	 */
-	private const INPUT_MODALITIES = 'input_modalities';
+	private const INPUT_MODALITIES = 'inputmodalities';
 
 	/**
 	 * Input modalities of a review request with images.
@@ -181,7 +183,7 @@ class Model_Capabilities {
 		$capabilities = $metadata->getSupportedCapabilities();
 		$generates    = false;
 		foreach ( is_array( $capabilities ) ? $capabilities : array() as $capability ) {
-			if ( self::TEXT_GENERATION === self::enum_value( $capability ) ) {
+			if ( self::TEXT_GENERATION === self::enum_key( $capability ) ) {
 				$generates = true;
 				break;
 			}
@@ -196,7 +198,7 @@ class Model_Capabilities {
 				is_object( $option )
 				&& method_exists( $option, 'getName' )
 				&& method_exists( $option, 'isSupportedValue' )
-				&& self::INPUT_MODALITIES === self::enum_value( $option->getName() )
+				&& self::INPUT_MODALITIES === self::enum_key( $option->getName() )
 			) {
 				// Core compares a set of modalities by value, so strings match its enums.
 				return true === $option->isSupportedValue( self::IMAGE_REVIEW_MODALITIES );
@@ -208,14 +210,16 @@ class Model_Capabilities {
 	}
 
 	/**
-	 * The string value of a core enum.
+	 * A core enum's value, lowercased without underscores, so
+	 * `input_modalities` and `inputModalities` match.
 	 *
 	 * @param  mixed $value Enum, or anything else.
-	 * @return string Value, or '' when there is none.
+	 * @return string Key, or '' when there is none.
 	 */
-	private static function enum_value( mixed $value ): string {
+	private static function enum_key( mixed $value ): string {
 		// Core enums cast to their value.
-		return is_string( $value ) || $value instanceof \Stringable ? (string) $value : '';
+		$value = is_string( $value ) || $value instanceof \Stringable ? (string) $value : '';
+		return strtolower( str_replace( '_', '', $value ) );
 	}
 
 	/**
