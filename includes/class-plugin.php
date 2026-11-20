@@ -145,6 +145,8 @@ class Plugin {
 		// Add custom avatar for AI Feedback comments/notes.
 		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
 
+		Fresh_Eyes_User::register();
+
 		$this->reply_detector = new Reply_Detector();
 		$this->reply_detector->register();
 
@@ -231,6 +233,7 @@ class Plugin {
 				'suggestions'           => Suggestions::is_available(),
 				'structuralSuggestions' => Suggestions::is_structural_available(),
 				'mentionHandles'        => Mentions::get_handles(),
+				'mentionUserId'         => Fresh_Eyes_User::get_id(),
 				'priorityThresholds'    => array(
 					'high'   => Response_Parser::PRIORITY_HIGH_THRESHOLD,
 					'medium' => Response_Parser::PRIORITY_MEDIUM_THRESHOLD,

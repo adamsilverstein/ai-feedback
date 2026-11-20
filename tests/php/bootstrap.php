@@ -34,6 +34,13 @@ if (! defined('ABSPATH') ) {
 
 // Loaded after ABSPATH, which it requires.
 require_once $includes_dir . 'class-suggestions.php';
+if ( ! function_exists( 'get_network_option' ) ) {
+	// Network options share the site option store, as on a single site.
+	function get_network_option( $network_id, $name, $default = false ) {
+		return $GLOBALS['test_options'][ $name ] ?? $default;
+	}
+}
+require_once $includes_dir . 'class-fresh-eyes-user.php';
 require_once $includes_dir . 'class-mentions.php';
 
 // Mock WordPress core functions.
@@ -323,6 +330,21 @@ require_once $includes_dir . 'class-settings-controller.php';
 if ( ! class_exists( 'WP_REST_Request' ) ) {
 	class WP_REST_Request {
 		private array $params = array();
+		private string $method = 'GET';
+		private string $route = '';
+		public function __construct( $method = 'GET', $route = '' ) {
+			$this->method = $method;
+			$this->route  = $route;
+		}
+		public function get_method() {
+			return $this->method;
+		}
+		public function get_route() {
+			return $this->route;
+		}
+		public function get_query_params() {
+			return $this->params;
+		}
 		public function has_param( $key ) {
 			return array_key_exists( $key, $this->params );
 		}
@@ -439,6 +461,9 @@ if ( ! function_exists( 'wp_delete_comment' ) ) {
 
 if ( ! function_exists( 'get_user_meta' ) ) {
 	function get_user_meta( $user_id, $key = '', $single = false ) {
+		if ( '' === $key ) {
+			return array_map( static fn ( $value ): array => array( $value ), $GLOBALS['test_user_meta'][ $user_id ] ?? array() );
+		}
 		return $GLOBALS['test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
 	}
 }
@@ -473,6 +498,12 @@ if ( ! class_exists( 'Test_WPDB' ) ) {
 	 */
 	class Test_WPDB {
 		public $options = 'wp_options';
+		public $users = 'wp_users';
+		public $base_prefix = 'wp_';
+
+		public function get_blog_prefix( $blog_id = null ) {
+			return null === $blog_id || 1 === (int) $blog_id ? 'wp_' : 'wp_' . (int) $blog_id . '_';
+		}
 
 		public function prepare( $query, ...$args ) {
 			return array( 'query' => $query, 'args' => $args );
@@ -670,6 +701,9 @@ if ( ! function_exists( 'current_time' ) ) {
 
 if ( ! function_exists( 'get_userdata' ) ) {
 	function get_userdata( $user_id ) {
+		if ( isset( $GLOBALS['test_user_objects'][ $user_id ] ) ) {
+			return $GLOBALS['test_user_objects'][ $user_id ];
+		}
 		$name = $GLOBALS['test_users'][ $user_id ] ?? null;
 		return null === $name ? false : (object) array( 'display_name' => $name );
 	}
