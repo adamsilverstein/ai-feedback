@@ -88,6 +88,36 @@ export function getTargetTone(state) {
 }
 
 /**
+ * Get the reader personas a review can run as.
+ *
+ * @param {Object} state Store state.
+ * @return {Array} Available personas.
+ */
+export function getAvailablePersonas(state) {
+	return state.availablePersonas;
+}
+
+/**
+ * Get the reader persona the next review runs as.
+ *
+ * @param {Object} state Store state.
+ * @return {string} Persona ID.
+ */
+export function getPersona(state) {
+	return state.settings.defaultPersona;
+}
+
+/**
+ * Get the "Who is this for?" audience.
+ *
+ * @param {Object} state Store state.
+ * @return {string} Audience, or an empty string.
+ */
+export function getReviewAudience(state) {
+	return state.settings.reviewAudience;
+}
+
+/**
  * Get available locales.
  *
  * @param {Object} state Store state.
