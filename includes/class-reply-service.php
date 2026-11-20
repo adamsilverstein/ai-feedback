@@ -543,7 +543,7 @@ class Reply_Service {
 	 */
 	private static function context_sources( array $context ): string {
 		$sources = array();
-		foreach ( array( 'block_html', 'block_content', 'user_reply', 'original_feedback' ) as $key ) {
+		foreach ( array( 'block_html', 'block_content', 'selected_text', 'user_reply', 'original_feedback' ) as $key ) {
 			$sources[] = is_string( $context[ $key ] ?? null ) ? $context[ $key ] : '';
 		}
 		foreach ( array( 'thread', 'nearby_blocks' ) as $key ) {

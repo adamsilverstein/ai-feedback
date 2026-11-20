@@ -361,6 +361,8 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		// Finish the answer even if the editor navigates away mid-request.
 		ignore_user_abort( true );
 		self::raise_time_limit( Reply_Service::REQUEST_TIME_LIMIT );
+		// Serialized blocks, kept raw: the service only parses them for a
+		// note that mentions Fresh Eyes, as prompt input, and never saves them.
 		$content = $request->get_param( 'content' );
 		$this->reply_service->process(
 			$comment_id,

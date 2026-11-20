@@ -57,7 +57,7 @@ class Mentions {
 	 * @return list<string> Handles, as lowercase words separated by spaces.
 	 */
 	public static function get_handles(): array {
-		$handles = array( 'fresh eyes', strtolower( __( 'Fresh Eyes', 'fresh-eyes' ) ) );
+		$handles = array( 'fresh eyes', mb_strtolower( __( 'Fresh Eyes', 'fresh-eyes' ) ) );
 
 		/**
 		 * Filters the names that mention Fresh Eyes in a note.
@@ -94,6 +94,11 @@ class Mentions {
 	 * @return bool
 	 */
 	public static function mentions_fresh_eyes( string $content ): bool {
+		// Most notes have no at sign, plain or encoded; skip the regex work for them.
+		if ( ! str_contains( $content, '@' ) && false === stripos( $content, '&#64;' ) && false === stripos( $content, '&#x40;' ) && false === stripos( $content, '&commat;' ) ) {
+			return false;
+		}
+
 		$text = self::note_text( $content );
 		if ( '' === $text || ! str_contains( $text, '@' ) ) {
 			return false;
@@ -126,13 +131,21 @@ class Mentions {
 		// Inner quotes go first, so each pass removes one level of nesting.
 		for ( $pass = 0; $pass < 5; $pass++ ) {
 			$stripped = preg_replace( '#<(' . self::QUOTED_TAGS . ')\b[^>]*>(?:(?!<(?:' . self::QUOTED_TAGS . ')\b).)*?</\1\s*>#is', ' ', $content );
-			if ( null === $stripped || $stripped === $content ) {
+			if ( null === $stripped ) {
+				// The regex failed, eg. on the backtrack limit. Read nothing
+				// rather than text that may still hold a quoted mention.
+				return '';
+			}
+			if ( $stripped === $content ) {
 				break;
 			}
 			$content = $stripped;
 		}
 		// An unclosed quote runs to the end of the note.
-		$content = (string) preg_replace( '#<(?:' . self::QUOTED_TAGS . ')\b.*$#is', ' ', $content );
+		$content = preg_replace( '#<(?:' . self::QUOTED_TAGS . ')\b.*$#is', ' ', $content );
+		if ( null === $content ) {
+			return '';
+		}
 
 		$text = html_entity_decode( wp_strip_all_tags( $content ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), 0, self::MAX_SCAN_LENGTH );
