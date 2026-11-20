@@ -102,7 +102,9 @@ class Block_Change {
 
 	/**
 	 * Text allowed between two list items: separators, then an optional
-	 * conjunction. Matches LIST_GAP in src/utils/block-change.js.
+	 * conjunction. Matches LIST_GAP in src/utils/block-change.js. The
+	 * conjunctions are deliberately few; any other text between items drops
+	 * the change rather than the text.
 	 */
 	private const LIST_GAP = '/^[\s,;、，；]+(?:(?:and|or|&|und|oder|et|ou|y|o|e|en)\s+)?$/iu';
 

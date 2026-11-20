@@ -54,7 +54,9 @@ export const TRANSFORMS = {
 };
 
 /**
- * Text allowed between two list items. Matches Block_Change::LIST_GAP.
+ * Text allowed between two list items. Matches Block_Change::LIST_GAP. The
+ * conjunctions are deliberately few; any other text between items means
+ * the change isn't offered.
  */
 const LIST_GAP =
 	/^[\s,;、，；]+(?:(?:and|or|&|und|oder|et|ou|y|o|e|en)\s+)?$/iu;

@@ -295,6 +295,7 @@ class BlockChangeTest extends TestCase {
 			'words dropped between'     => array( 'Node, then npm', array( 'Node', 'npm' ) ),
 			'text dropped after'        => array( 'Node and npm are needed.', array( 'Node', 'npm' ) ),
 			'item starts inside a word' => array( 'Nodes, npm', array( 'odes', 'npm' ) ),
+			'item ends inside a word'   => array( 'Node, npmx, Git', array( 'Node', 'npm', 'Git' ) ),
 			'one item'                  => array( 'Node, npm', array( 'Node' ) ),
 			'markup in an item'         => array( 'Node, npm', array( '<b>Node</b>', 'npm' ) ),
 			'items not strings'         => array( 'Node, npm', array( 'Node', 2 ) ),
