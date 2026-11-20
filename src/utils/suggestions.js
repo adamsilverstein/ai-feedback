@@ -649,7 +649,10 @@ export async function suggestBlockAction(note) {
 		if (
 			siblings.some((id, i) => {
 				const tag = moved.getBlockAttributes(id)?.metadata?.suggestion;
-				return tag !== markersBefore[i] && isCapturedMoveMarker(tag);
+				return (
+					tag !== markersBefore[i] &&
+					isCapturedMoveMarker(tag, note.id)
+				);
 			})
 		) {
 			await removeSuggestion(note.id);

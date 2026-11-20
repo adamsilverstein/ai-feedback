@@ -132,7 +132,7 @@ export default function BlockAction({
 					isApplied: select(STORE_NAME).isFixApplied(ownerId),
 					isCaptured:
 						action.type === 'move_block' &&
-						hasCapturedMove(selectors, id),
+						hasCapturedMove(selectors, id, item.id),
 				};
 			},
 			[item.block_id, item.id, action, ownerId]

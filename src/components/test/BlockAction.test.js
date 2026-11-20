@@ -315,6 +315,25 @@ describe('BlockAction', () => {
 		).not.toBeInTheDocument();
 	});
 
+	it('still reads the move as pending once Gutenberg saved its note', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				// Gutenberg's auto-save adds its own note's id to its marker.
+				markers: {
+					rep: { type: 'pending-move', commentId: 55, authorId: 1 },
+				},
+			}
+		);
+
+		expect(
+			screen.getByText(
+				'Suggested in the post. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+	});
+
 	it('reads a move as applied when the marker is the plugin’s own', () => {
 		renderAction(
 			{ action: move },
