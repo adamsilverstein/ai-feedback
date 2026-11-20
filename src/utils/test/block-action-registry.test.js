@@ -47,6 +47,11 @@ function setUp() {
 	const group = createBlock('core/group', {}, [first, second]);
 	const after = createBlock('core/paragraph', { content: 'After.' });
 	registry.dispatch(blockEditorStore).resetBlocks([group, after]);
+	// The editor sets this once the group's inner blocks render; without
+	// it the block editor refuses any move into the group anyway.
+	registry
+		.dispatch(blockEditorStore)
+		.updateBlockListSettings(group.clientId, {});
 	return { registry, group, first, after };
 }
 
