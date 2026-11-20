@@ -24,6 +24,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 - 🙋 **Ask Fresh Eyes**: Type `@fresh-eyes` in any note to ask about the selected text or blocks, and get suggested changes to accept
 - ✏️ **Suggested Edits**: Simple fixes arrive as tracked suggestions you accept or reject (with Gutenberg's Suggestion Mode experiment)
 - 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
+- ✅ **What's Working**: Each review also names up to three strengths to keep, and tracks how many notes you have addressed
 
 ## Requirements
 
@@ -139,6 +140,12 @@ You can change these in the plugin sidebar within the block editor.
    - Set target tone
 4. Click **Review Document**
 5. AI will analyze your content and attach notes to relevant blocks
+
+### What's Working and Progress
+
+- **What's working** lists up to three things the draft already does well. Click one to jump to its block. They stay in the sidebar rather than becoming notes, so there is nothing to resolve.
+- **5 of 12 notes addressed** counts the review's notes you have dismissed, applied, accepted or rejected, or whose thread you resolved in the Notes panel. Deleted notes drop out of the count. Once every note is addressed, the list gives way to a short done state with **Review again**; **Show feedback** brings the list back.
+- After a follow-up review, the summary says what changed: "Since the last review: 3 addressed, 1 new, 2 still open". Review History shows the same line for each review.
 
 ### Keyboard Shortcuts
 

@@ -176,6 +176,16 @@ By leveraging the native Notes system, feedback becomes a first-class collaborat
    c. Make changes based on feedback
 ```
 
+### Strengths and Progress
+
+Every note is a problem to fix, so the sidebar also says what is working and how far along the author is:
+
+- The review response carries up to three `strengths`, each one line about one block. They are validated like feedback (the block must be in the review, text is plain and capped) and shown in the sidebar under "What's working". They are never notes and never count toward the feedback totals.
+- A progress row counts the review's notes that are addressed: dismissed or fixed in the sidebar, a suggested edit accepted or rejected, or the thread resolved in the Notes panel. Deleted notes are left out. When all are addressed the list gives way to a done state with **Review again**.
+- Each history entry keeps the notes still open after its review. The next review checks them and reports "3 addressed, 1 new, 2 still open". The counts come only from note state, never from the AI, so they don't shift between runs.
+
+A readiness score (eg. 82/100) is left out for now: a number from a language model moves between runs and could send authors chasing it. Strengths also stay out of the Notes panel for now; they carry the block ID, name and anchor a note needs, so posting them as encouraging notes later is a small change.
+
 ### Secondary Flow: Reply to Feedback
 
 ```

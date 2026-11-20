@@ -156,11 +156,25 @@ The sidebar groups them in one row ("8 proofreading fixes") with **Accept all**,
       "critical": 0
     }
   },
+  "strengths": [
+    {
+      "block_id": "abc123-def456",
+      "block_name": "core/paragraph",
+      "block_index": 0,
+      "block_anchor": "1x2y3z",
+      "text": "The opening example makes the problem concrete."
+    }
+  ],
+  "progress": { "addressed": 3, "still_open": 1 },
   "model_used": "claude-sonnet-5-5",
   "tokens_used": 1523,
   "created_at": "2025-12-06T14:30:00Z"
 }
 ```
+
+`strengths` lists up to three things the draft already does well, each one line of plain text about one block. They are shown in the sidebar under "What's working", never created as notes, and never counted in `note_count` or `summary`. Strengths that name a block outside the request, or have no text, are dropped; longer ones are cut to 160 characters. The `ai_feedback_max_strengths` filter lowers the cap or turns them off.
+
+`progress` compares this review with the previous one in the post's history: of the notes still open after the previous review, how many are now addressed and how many are still open. It is `null` for a post's first review. See [Progress](#progress) for what counts as addressed.
 
 **Error Responses:**
 
@@ -694,12 +708,32 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
       "summary": {
         "by_severity": { "critical": 0, "important": 1, "suggestion": 2 },
         "by_category": { "content": 1, "tone": 0, "flow": 2, "design": 0, "grammar": 0 }
-      }
+      },
+      "strengths": [
+        { "block_id": "abc123-def456", "block_name": "core/paragraph", "block_index": 0, "block_anchor": "1x2y3z", "text": "The opening example makes the problem concrete." }
+      ],
+      "progress": { "addressed": 3, "still_open": 1 },
+      "open_note_ids": [456, 457, 812]
     }
   ],
   "total": 1
 }
 ```
+
+The parts of a chunked review share one entry: their counts add up, their strengths are merged in order (one per block, at most three) and the last part's summary wins. `GET /notes/post/{post_id}/latest-review` adds the latest review's `strengths` and `progress` from here, since notes don't hold them. It also uses the history to pick the latest review, and lists all of that review's notes, including feedback a follow-up review added to an earlier thread.
+
+#### Progress
+
+Each entry keeps `open_note_ids`: the notes still open right after that review ran, its own and those left over from earlier reviews (at most 500). The next review checks those notes and stores the counts in its `progress`:
+
+| Count | Meaning |
+|-------|---------|
+| `addressed` | Notes left open by the previous review that are now dismissed (or had their quick fix applied), whose suggested edit was accepted or rejected, or whose thread was resolved in the Notes panel. |
+| `still_open` | Notes left open by the previous review that are none of those. |
+
+Deleted notes are not counted at all. The new review's own notes are its `note_count`. Entries recorded before `open_note_ids` existed fall back to the notes the previous review created. The sidebar's "5 of 12 notes addressed" row applies the same rules to the latest review's notes, reading thread and suggestion status live from the editor.
+
+A follow-up review adds feedback to a block's open thread as a reply. When the block's thread is resolved it starts a new thread instead, so the new feedback is not hidden in a resolved thread or counted as addressed.
 
 ### GET /history/post/{post_id}/review/{review_id}
 
@@ -998,6 +1032,16 @@ How many images a review request may show a vision model so it can propose alt t
 ```php
 add_filter( 'ai_feedback_max_review_images', function(): int {
     return 0;
+} );
+```
+
+#### `ai_feedback_max_strengths`
+
+How many strengths a review asks for and keeps, from 0 to 3. Default 3; return 0 to leave strengths out of the prompt and the response.
+
+```php
+add_filter( 'ai_feedback_max_strengths', function(): int {
+    return 1;
 } );
 ```
 
