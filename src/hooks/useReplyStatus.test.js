@@ -12,13 +12,24 @@ vi.mock('@wordpress/api-fetch', () => ({
 		args.method === 'POST' ? mockProcess(args) : mockApiFetch(args),
 }));
 
+// The editor's content, sent with a mention.
+let mockEditedContent = '<!-- wp:paragraph -->x';
+vi.mock('@wordpress/data', () => ({
+	select: (store) =>
+		store === 'core/editor'
+			? { getEditedPostContent: () => mockEditedContent }
+			: undefined,
+}));
+
 import useReplyStatus, {
+	MAX_EDITOR_CONTENT_LENGTH,
 	MAX_PENDING_MS,
 	MAX_POLL_INTERVAL_MS,
 	MAX_UNKNOWN_POLLS,
 	POLL_INTERVAL_MS,
 	RETRY_COOLDOWN_BUFFER_MS,
 	SLOW_REPLY_MS,
+	getEditorContent,
 } from './useReplyStatus';
 
 describe('useReplyStatus', () => {
@@ -47,6 +58,32 @@ describe('useReplyStatus', () => {
 			method: 'POST',
 			data: { retry: false },
 		});
+	});
+
+	it("sends the editor's content to answer a mention", async () => {
+		mockApiFetch.mockResolvedValue({ reply_id: 200, status: 'pending' });
+		mockEditedContent = '<!-- wp:paragraph {"metadata":{"noteId":200}} -->';
+
+		renderHook(() => useReplyStatus(200, { sendContent: true }));
+
+		await waitFor(() => expect(mockProcess).toHaveBeenCalledTimes(1));
+		expect(mockProcess).toHaveBeenCalledWith({
+			path: '/ai-feedback/v1/replies/200/process',
+			method: 'POST',
+			data: {
+				retry: false,
+				content: '<!-- wp:paragraph {"metadata":{"noteId":200}} -->',
+			},
+		});
+	});
+
+	it('sends no content outside the post editor', () => {
+		expect(getEditorContent()).toBe(mockEditedContent);
+		mockEditedContent = undefined;
+		expect(getEditorContent()).toBe('');
+		mockEditedContent = 'x'.repeat(MAX_EDITOR_CONTENT_LENGTH + 1);
+		expect(getEditorContent()).toBe('');
+		mockEditedContent = '<!-- wp:paragraph -->x';
 	});
 
 	it('keeps polling when the answer request fails', async () => {

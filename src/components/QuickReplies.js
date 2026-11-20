@@ -25,10 +25,13 @@ import {
 	getQuickReplies,
 	isEditPending,
 } from '../utils/revisions';
+import { MENTION_HANDLE } from '../utils/mentions';
 
 /**
  * @param {Object}   props         Component props.
- * @param {Object}   props.note    The thread's note, with `id` and `block_id`.
+ * @param {Object}   props.note    The thread's note, with `id` and `block_id`. In a
+ *                                 thread a person started (`is_mention`), each quick
+ *                                 reply mentions Fresh Eyes so it is answered.
  * @param {Object[]} props.replies Replies in the thread, oldest first.
  * @return {Element|null} Quick replies, or null when there are none to offer.
  */
@@ -104,7 +107,10 @@ export default function QuickReplies({ note, replies }) {
 
 	const send = async (message) => {
 		setSentAt(replies.length);
-		if (!(await requestReply(message))) {
+		const content = note.is_mention
+			? `${MENTION_HANDLE} ${message}`
+			: message;
+		if (!(await requestReply(content))) {
 			setSentAt(null);
 		}
 	};

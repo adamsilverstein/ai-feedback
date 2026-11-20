@@ -5,7 +5,7 @@
  * External dependencies
  */
 import { beforeAll, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 /**
  * WordPress dependencies
@@ -25,9 +25,10 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 import QuickReplies from '../QuickReplies';
 
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+const mockRequestReply = vi.fn(() => Promise.resolve(true));
 vi.mock('../../hooks/useRequestReply', () => ({
 	default: () => ({
-		requestReply: vi.fn(),
+		requestReply: mockRequestReply,
 		isRequesting: false,
 		canRequest: true,
 	}),
@@ -49,9 +50,10 @@ const CHANGE = {
 /**
  * Render the quick replies for a note on a heading at the given level.
  *
- * @param {number} level Heading level.
+ * @param {number} level       Heading level.
+ * @param {Object} [noteProps] Extra note fields.
  */
-function renderChips(level) {
+function renderChips(level, noteProps = {}) {
 	const registry = createRegistry();
 	registry.register(blocksStore);
 	registry.register(blockEditorStore);
@@ -69,6 +71,7 @@ function renderChips(level) {
 					id: 7,
 					block_id: heading.clientId,
 					block_change: CHANGE,
+					...noteProps,
 				}}
 				replies={[]}
 			/>
@@ -94,5 +97,33 @@ describe('QuickReplies with a formatting fix', () => {
 			'Show me an example',
 			'Why?',
 		]);
+	});
+});
+
+describe('QuickReplies in a thread a person started', () => {
+	it('mentions Fresh Eyes, so the quick reply is answered', async () => {
+		mockRequestReply.mockClear();
+		renderChips(4, { is_mention: true });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Why?' }));
+
+		await waitFor(() =>
+			expect(mockRequestReply).toHaveBeenCalledWith(
+				'@fresh-eyes Why do you suggest this?'
+			)
+		);
+	});
+
+	it('sends the message as it is in a thread Fresh Eyes started', async () => {
+		mockRequestReply.mockClear();
+		renderChips(4);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Why?' }));
+
+		await waitFor(() =>
+			expect(mockRequestReply).toHaveBeenCalledWith(
+				'Why do you suggest this?'
+			)
+		);
 	});
 });

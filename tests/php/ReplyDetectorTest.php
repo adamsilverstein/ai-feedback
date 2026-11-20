@@ -8,9 +8,11 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Mentions;
 use AI_Feedback\Reply_Detector;
 
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-detector.php';
+require_once __DIR__ . '/reply-cron-mocks.php';
 
 /**
  * Test cases for Reply_Detector.
@@ -43,7 +45,7 @@ class ReplyDetectorTest extends TestCase {
 	 * Clean up globals after each test.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_dispatched_calls'], $GLOBALS['test_comments'] );
+		unset( $GLOBALS['test_comment_meta'], $GLOBALS['test_dispatched_calls'], $GLOBALS['test_comments'], $GLOBALS['test_user_can'] );
 		parent::tearDown();
 	}
 
@@ -361,5 +363,131 @@ class ReplyDetectorTest extends TestCase {
 			),
 			$calls
 		);
+	}
+
+	/**
+	 * Build a note by user 7 on post 42.
+	 *
+	 * @param string $content Note content.
+	 * @param int    $parent  Parent note ID, or 0 for a new thread.
+	 * @return object
+	 */
+	private static function note( string $content, int $parent = 0 ): object {
+		return (object) array(
+			'comment_type'    => 'note',
+			'comment_parent'  => $parent,
+			'comment_post_ID' => 42,
+			'comment_content' => $content,
+			'user_id'         => '7',
+		);
+	}
+
+	/**
+	 * A new note that mentions Fresh Eyes starts a conversation in its own thread.
+	 */
+	public function test_top_level_mention_dispatches_in_its_own_thread(): void {
+		$this->detector->maybe_dispatch_reply( 300, self::note( '@fresh-eyes simplify this' ) );
+
+		$this->assertSame(
+			array(
+				array(
+					'hook' => Reply_Detector::ACTION_REPLY_RECEIVED,
+					'args' => array( 300, 300, 42, '' ),
+				),
+			),
+			$GLOBALS['test_dispatched_calls']
+		);
+		$this->assertSame( '1', $GLOBALS['test_comment_meta'][300][ Mentions::META_KEY ] ?? null );
+	}
+
+	/**
+	 * A reply that mentions Fresh Eyes in a thread a person started is answered there.
+	 */
+	public function test_reply_mention_in_human_thread_dispatches_to_root(): void {
+		$GLOBALS['test_comments'][301] = (object) array( 'comment_parent' => 300 );
+
+		$this->detector->maybe_dispatch_reply( 302, self::note( 'Agreed. @FreshEyes can you shorten it?', 301 ) );
+
+		$this->assertSame( array( 302, 300, 42, '' ), $GLOBALS['test_dispatched_calls'][0]['args'] ?? null );
+	}
+
+	/**
+	 * The thread's block ID is passed on when the root note has one.
+	 */
+	public function test_mention_uses_root_block_id(): void {
+		$GLOBALS['test_comment_meta'][300] = array( 'block_id' => 'block-9' );
+
+		$this->detector->maybe_dispatch_reply( 302, self::note( '@fresh-eyes thoughts?', 300 ) );
+
+		$this->assertSame( array( 302, 300, 42, 'block-9' ), $GLOBALS['test_dispatched_calls'][0]['args'] ?? null );
+	}
+
+	/**
+	 * In a thread a person started, notes that do not mention Fresh Eyes are left alone.
+	 */
+	public function test_reply_without_mention_in_human_thread_is_ignored(): void {
+		$this->detector->maybe_dispatch_reply( 302, self::note( 'I think fresh eyes would help.', 300 ) );
+
+		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
+		$this->assertArrayNotHasKey( 302, $GLOBALS['test_comment_meta'] );
+	}
+
+	/**
+	 * A mention someone quotes does not ask Fresh Eyes anything.
+	 */
+	public function test_quoted_mention_is_ignored(): void {
+		$this->detector->maybe_dispatch_reply( 300, self::note( '<blockquote>@fresh-eyes simplify this</blockquote> That was a bad idea.' ) );
+
+		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * A note by someone who could not run a review is not answered.
+	 */
+	public function test_mention_by_user_who_cannot_review_is_ignored(): void {
+		$GLOBALS['test_user_can'] = static fn ( int $user_id, string $cap ): bool => 'edit_posts' === $cap;
+
+		$this->detector->maybe_dispatch_reply( 300, self::note( '@fresh-eyes simplify this' ) );
+
+		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
+		$this->assertArrayNotHasKey( 300, $GLOBALS['test_comment_meta'] );
+	}
+
+	/**
+	 * A note without a user, such as one inserted by code, is not answered.
+	 */
+	public function test_mention_without_user_is_ignored(): void {
+		$note          = self::note( '@fresh-eyes simplify this' );
+		$note->user_id = '0';
+
+		$this->detector->maybe_dispatch_reply( 300, $note );
+
+		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * An AI note that mentions Fresh Eyes never triggers another answer.
+	 */
+	public function test_ai_note_mentioning_fresh_eyes_is_ignored(): void {
+		$GLOBALS['test_comment_meta'][303] = array( 'ai_feedback' => '1' );
+
+		$this->detector->maybe_dispatch_reply( 303, self::note( 'Ask @fresh-eyes again any time.', 300 ) );
+
+		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * In a thread Fresh Eyes started, a mention is an ordinary reply.
+	 */
+	public function test_mention_in_ai_thread_is_an_ordinary_reply(): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+
+		$this->detector->maybe_dispatch_reply( 200, self::note( '@fresh-eyes why?', 100 ) );
+
+		$this->assertSame( array( 200, 100, 42, 'abc-123' ), $GLOBALS['test_dispatched_calls'][0]['args'] ?? null );
+		$this->assertArrayNotHasKey( Mentions::META_KEY, $GLOBALS['test_comment_meta'][200] ?? array() );
 	}
 }

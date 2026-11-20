@@ -1,0 +1,30 @@
+{
+	"mentions": [
+		"@fresh-eyes simplify this",
+		"@FreshEyes adjust the tone",
+		"Can @Fresh Eyes help here?",
+		"@fresh_eyes, shorten this.",
+		"Thoughts, @fresh-eyes?",
+		"<p>Hey <strong>@fresh-eyes</strong> simplify</p>",
+		"<span class=\"wp-note-mention user-9\">@Fresh Eyes</span> simplify",
+		"&#64;fresh-eyes simplify",
+		"First line\n@fresh-eyes second",
+		"Simplify (@fresh-eyes)"
+	],
+	"others": [
+		"Simplify this paragraph.",
+		"Fresh Eyes said this was fine.",
+		"Write to editor@fresh-eyes.example",
+		"See @fresh-eyes.com for details",
+		"@fresh-eyesight is a different user",
+		"@jane can you look?",
+		"<blockquote>@fresh-eyes simplify this</blockquote> I disagree.",
+		"She wrote <q>@fresh-eyes rewrite</q> earlier.",
+		"Type <code>@fresh-eyes</code> to ask.",
+		"<blockquote><p><q>x</q> @fresh-eyes</p></blockquote>",
+		"Earlier: <blockquote>@fresh-eyes do it",
+		"<span class=\"wp-note-mention fresh-eyes user-0\" data-fresh-eyes=\"1\">@jane</span>",
+		"<a href=\"https://example.com/@fresh-eyes\">link</a>",
+		""
+	]
+}

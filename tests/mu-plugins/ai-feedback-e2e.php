@@ -38,7 +38,8 @@ add_filter(
 	'rest_pre_dispatch',
 	static function ( mixed $result, WP_REST_Server $server, WP_REST_Request $request ): mixed {
 		$user_id = get_current_user_id();
-		if ( $user_id && '/ai-feedback/v1/review' === $request->get_route() ) {
+		// Answering a mention shares the hourly review limit.
+		if ( $user_id && ( '/ai-feedback/v1/review' === $request->get_route() || preg_match( '#^/ai-feedback/v1/replies/\d+/process$#', $request->get_route() ) ) ) {
 			delete_user_meta( $user_id, 'ai_feedback_reviews' );
 		}
 		return $result;
@@ -46,6 +47,10 @@ add_filter(
 	10,
 	3
 );
+
+// Queue mentions for right away, so the cron run after each test drains
+// them in mock mode even when a test fails before the editor answers.
+add_filter( 'ai_feedback_mention_reply_delay', '__return_zero' );
 
 // Let tests set a UTC offset site timezone through the settings endpoint.
 add_action(
@@ -326,5 +331,53 @@ add_filter(
 		return $response;
 	},
 	10,
+	2
+);
+
+// A note that mentions Fresh Eyes and asks to simplify gets an edit that
+// shortens the text the note is on, and names that text so tests can tell
+// the selection reached the AI. Asking for sources gets an answer with a
+// made-up link, which the plugin must take out.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! str_contains( $prompt, 'mentioned you, Fresh Eyes' )
+			|| ! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+		) {
+			return $reply;
+		}
+
+		if ( preg_match( '/link to the sources/i', $asked[1] ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'See https://made-up.example/study for the numbers.',
+					'edit'  => null,
+				)
+			);
+		}
+
+		if ( ! preg_match( '/simplify/i', $asked[1] ) || ! preg_match( '/^Block content: (.*)$/m', $prompt, $block ) ) {
+			return $reply;
+		}
+
+		$selected = preg_match( "/^SELECTED TEXT \\(the part of the block the user's note is about\\):\n(.+)$/m", $prompt, $match ) ? $match[1] : '';
+		$find     = '' !== $selected ? $selected : 'very long and winding';
+		if ( ! str_contains( $block[1], $find ) ) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply' => '' !== $selected ? "Simplified \"{$selected}\"." : 'Simplified the paragraph.',
+				'edit'  => array(
+					'type'    => 'replace_text',
+					'find'    => $find,
+					'replace' => 'short',
+				),
+			)
+		);
+	},
+	30,
 	2
 );

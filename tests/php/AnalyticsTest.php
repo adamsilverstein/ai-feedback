@@ -311,4 +311,26 @@ class AnalyticsTest extends TestCase {
 		$this->assertSame( '7days', $data['period'] );
 		$this->assertSame( 1, $data['total_reviews'] );
 	}
+
+	/**
+	 * Answered mentions are counted apart from reviews.
+	 */
+	public function test_track_mention_counts_apart_from_reviews(): void {
+		Analytics::track_review( 1, $this->review() );
+		Analytics::track_mention(
+			1,
+			array(
+				'user_id' => 3,
+				'model'   => 'model-a',
+			)
+		);
+		Analytics::track_mention( 2, array() );
+
+		$summary = Analytics::get_summary( '7days' );
+
+		$this->assertSame( 2, $summary['total_mentions'] );
+		$this->assertSame( 1, $summary['total_reviews'] );
+		$this->assertSame( array( 'model-a' => 1 ), $summary['by_model'] );
+		$this->assertSame( 2, array_sum( array_column( $summary['by_day'], 'mentions' ) ) );
+	}
 }
