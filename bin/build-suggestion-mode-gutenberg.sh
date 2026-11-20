@@ -10,8 +10,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PIN="$ROOT/tests/e2e/suggestion-mode/gutenberg.json"
-REPOSITORY="$(node -p "require('$PIN').repository")"
-SHA="$(node -p "require('$PIN').sha")"
+REPOSITORY="$(node -p 'require(process.argv[1]).repository' "$PIN")"
+SHA="$(node -p 'require(process.argv[1]).sha' "$PIN")"
 CACHE="$ROOT/.cache/suggestion-mode"
 PLUGIN="$CACHE/gutenberg"
 SOURCE="$CACHE/source"
