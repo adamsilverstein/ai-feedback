@@ -32,6 +32,7 @@ import {
 	findNoteBlock,
 	getBlockActionState,
 	getMovePosition,
+	isCapturedMoveMarker,
 } from './block-action';
 
 const STORE_NAME = 'ai-feedback/store';
@@ -622,11 +623,10 @@ export async function suggestBlockAction(note) {
 		// block or a neighbor, and saves its own suggestion for it.
 		const moved = dataSelect(blockEditorStore);
 		if (
-			fromOrder.some(
-				(id, i) =>
-					moved.getBlockAttributes(id)?.metadata?.suggestion !==
-					markersBefore[i]
-			)
+			fromOrder.some((id, i) => {
+				const tag = moved.getBlockAttributes(id)?.metadata?.suggestion;
+				return tag !== markersBefore[i] && isCapturedMoveMarker(tag);
+			})
 		) {
 			await removeSuggestion(note.id);
 			return false;

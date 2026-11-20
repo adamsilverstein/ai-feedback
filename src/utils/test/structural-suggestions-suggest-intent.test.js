@@ -434,6 +434,41 @@ describe('structural suggestions in Edit intent', () => {
 		).toMatchObject({ type: 'pending-move', commentId: 13 });
 		expect(pendingSuggestions(new Map())).toBe(1);
 	});
+
+	it('still suggests the move when something else rewrites a marker as it lands', async () => {
+		// Another editor extension updates a neighbor's marker on the move.
+		const stop = subscribe(() => {
+			const attributes = select(blockEditorStore).getBlockAttributes(
+				blocks.bg.clientId
+			);
+			if (!attributes.metadata?.suggestion) {
+				dispatch(blockEditorStore).updateBlockAttributes(
+					blocks.bg.clientId,
+					{
+						metadata: {
+							...attributes.metadata,
+							suggestion: {
+								type: 'pending-remove',
+								commentId: 99,
+							},
+						},
+					}
+				);
+			}
+		}, blockEditorStore);
+
+		try {
+			expect(await suggestBlockAction(moveNote('intro'))).toBe(true);
+		} finally {
+			stop();
+		}
+
+		expect(
+			select(blockEditorStore).getBlockAttributes(blocks.open.clientId)
+				.metadata.suggestion
+		).toMatchObject({ type: 'pending-move', commentId: 13 });
+		expect(savedNotes.get(13).meta._wp_suggestion_status).toBe('pending');
+	});
 });
 
 describe('structural suggestions in Suggest intent', () => {

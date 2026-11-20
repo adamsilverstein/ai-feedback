@@ -20,6 +20,7 @@ import {
 	findNoteBlock,
 	getBlockActionOutline,
 	getBlockActionState,
+	hasCapturedMove,
 } from '../utils/block-action';
 import { navigateToBlock } from '../utils/navigate-to-block';
 
@@ -120,18 +121,22 @@ export default function BlockAction({
 		isReplyEdit ? { id: ownerId } : item
 	);
 
-	const { clientId, state, targetId, inside, isApplied } = useSelect(
-		(select) => {
-			const selectors = select(blockEditorStore);
-			const id = findNoteBlock(selectors, item.block_id, item.id);
-			return {
-				clientId: id,
-				...getBlockActionState(selectors, action, id),
-				isApplied: select(STORE_NAME).isFixApplied(ownerId),
-			};
-		},
-		[item.block_id, item.id, action, ownerId]
-	);
+	const { clientId, state, targetId, inside, isApplied, isCaptured } =
+		useSelect(
+			(select) => {
+				const selectors = select(blockEditorStore);
+				const id = findNoteBlock(selectors, item.block_id, item.id);
+				return {
+					clientId: id,
+					...getBlockActionState(selectors, action, id),
+					isApplied: select(STORE_NAME).isFixApplied(ownerId),
+					isCaptured:
+						action.type === 'move_block' &&
+						hasCapturedMove(selectors, id),
+				};
+			},
+			[item.block_id, item.id, action, ownerId]
+		);
 
 	const registry = useRegistry();
 	const blockEditorActions = useDispatch(blockEditorStore);
@@ -184,6 +189,14 @@ export default function BlockAction({
 		return status(
 			'ai-feedback-quick-fix-suggested',
 			describeStructuralSuggestionStatus(suggestionStatus)
+		);
+	}
+
+	// Gutenberg took the move as its own suggestion in Suggest intent.
+	if (wasApplied && isCaptured) {
+		return status(
+			'ai-feedback-quick-fix-suggested',
+			describeStructuralSuggestionStatus('pending')
 		);
 	}
 
