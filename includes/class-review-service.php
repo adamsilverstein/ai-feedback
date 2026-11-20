@@ -793,6 +793,12 @@ class Review_Service {
 					$block_name,
 					$block_index
 				);
+
+				// New feedback in a resolved thread would stay hidden and count
+				// as addressed, so it starts a thread of its own.
+				if ( null !== $existing_note_id && $this->notes_manager->is_thread_resolved( $existing_note_id ) ) {
+					$existing_note_id = null;
+				}
 			}
 
 			if ( null !== $existing_note_id ) {
