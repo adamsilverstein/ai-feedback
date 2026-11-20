@@ -1163,6 +1163,14 @@ add_filter( 'ai_feedback_mention_handles', function( array $handles ): array {
 } );
 ```
 
+#### `ai_feedback_create_mention_user` (filter)
+
+Filters whether to create the hidden [Fresh Eyes user](#the-fresh-eyes-user) the Notes `@` completer offers. Default `true`. Return `false` to go without it: the account is not created, and one that already exists is removed, with its stored ID, at the next activation or admin page load. Typing `@fresh-eyes` still asks Fresh Eyes; only picking it from the `@` menu goes away. Returning `true` again creates a new account at the next admin page load.
+
+```php
+add_filter( 'ai_feedback_create_mention_user', '__return_false' );
+```
+
 #### `ai_feedback_reply_received`
 
 Fires when a user replies to a note.
@@ -1327,7 +1335,7 @@ Typing `@fresh-eyes` in a note asks Fresh Eyes about the text or blocks the note
 
 The Notes `@` completer (WordPress 7.1+) lists site users, so the plugin creates a hidden user named Fresh Eyes for it to offer. Typing `@fr` in a note lists it; picking it saves a `<span class="wp-note-mention user-N">@Fresh Eyes</span>` chip, which asks Fresh Eyes like the typed handle.
 
-- **Created** on activation, and on the first admin page load after an update. Its ID is kept in the `ai_feedback_user_id` network option (a site option on single sites) and the account carries the `ai_feedback_user` user meta. The ID is only trusted while that account still carries the meta, and the login is never used to find it: when `fresh-eyes` is taken, the plugin picks `fresh-eyes-2` and so on, and leaves the other account alone. If the account is deleted while the plugin is active, it is created again, with a new ID; chips for the old ID are in notes that were already answered, since a note is only read when it is added. Creation runs under a lock (in the main site's options on multisite), and an account carrying the meta is adopted rather than made twice. When creation can't run, the next try waits five minutes.
+- **Created** on activation, and on the first admin page load after an update, unless the [`ai_feedback_create_mention_user`](#ai_feedback_create_mention_user-filter) filter returns `false`, which also removes an existing account. Its ID is kept in the `ai_feedback_user_id` network option (a site option on single sites) and the account carries the `ai_feedback_user` user meta. The ID is only trusted while that account still carries the meta, and the login is never used to find it: when `fresh-eyes` is taken, the plugin picks `fresh-eyes-2` and so on, and leaves the other account alone. If the account is deleted while the plugin is active, it is created again, with a new ID; chips for the old ID are in notes that were already answered, since a note is only read when it is added. Creation runs under a lock (in the main site's options on multisite), and an account carrying the meta is adopted rather than made twice. When creation can't run, the next try waits five minutes.
 - **Inert:** no role or capabilities, no email address, and a random 64-character password nobody is given. It cannot log in (`authenticate`), never becomes the current user, whatever authenticated the request (`determine_current_user`), and gets no application passwords or password resets. Nobody can edit, delete, promote or remove it (`map_meta_cap`), and a role, capability, super admin grant or email address given to it through code or WP-CLI is taken back. AI notes are still saved with `user_id` 0, not as this user.
 - **Hidden:** every `WP_User_Query` leaves it out (`pre_user_query`), which covers the Users screen, author dropdowns, `wp_list_authors()`, sitemaps, WP-CLI's `wp user list` and `/wp/v2/users`. The Users screen counts leave it out (`pre_count_users`). `/wp/v2/users/<id>` and its application password routes answer 404, and its author archive, also reached through `?author=<id>`, is a 404.
 - **Revealed** only to the Notes completer's search. The completer asks `GET /wp/v2/users?context=view&search=<typed text>` (plus `_locale=user`) on each keystroke. The user is listed when a request has exactly those parameters, comes from someone with `edit_posts`, and the typed text, at least two characters, starts its display name, its login or a mention handle, ignoring case and hyphens, underscores or spaces between words: `fr`, `fresh-e`, `Fresh Ey` and `FreshEy` do, `f` and `eyes` do not. It is listed for people without `list_users` too, who otherwise only see users with published posts. The block editor's own `@` completer, in paragraphs and other blocks, sends the same request, so the editor script removes the user from that completer's list. Any other plugin that sends this exact request with a matching search also sees the user.

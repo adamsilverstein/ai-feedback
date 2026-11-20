@@ -73,7 +73,7 @@ When the selected model can see images, a review also sends up to four Media Lib
 
 = Why is there a Fresh Eyes user? =
 
-So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it.
+So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter; typing `@fresh-eyes` still works.
 
 == Screenshots ==
 
