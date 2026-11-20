@@ -31,9 +31,9 @@ const FRANK = {
  * Run steps with a user that exists only for them, removed afterwards
  * even when a step fails, and first if an earlier run left it behind.
  *
- * @param {Object}   requestUtils Request utils.
- * @param {Object}   user         User to create.
- * @param {(user: Object) => Promise<void>} steps Steps, given the created user.
+ * @param {Object}                          requestUtils Request utils.
+ * @param {Object}                          user         User to create.
+ * @param {(user: Object) => Promise<void>} steps        Steps, given the created user.
  */
 async function withUser(requestUtils, user, steps) {
 	const remove = async (id) =>
