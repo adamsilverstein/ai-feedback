@@ -193,13 +193,13 @@ class Notes_Manager {
 			'comment_parent'   => $parent_id,
 			'user_id'          => 0, // System-generated (AI).
 			'comment_author'   => Plugin::get_ai_feedback_author(),
-			// add_comment_meta() unslashes each value, which would strip the
-			// backslashes from JSON escapes such as \" and \u00e9.
-			'comment_meta'     => wp_slash( $note_meta ),
+			'comment_meta'     => $note_meta,
 		);
 
-		// Insert comment as note.
-		$note_id = wp_insert_comment( $comment_data );
+		// wp_insert_comment() unslashes the fields, and add_comment_meta() each
+		// meta value, which would strip backslashes such as those in C:\path or
+		// the JSON escape \".
+		$note_id = wp_insert_comment( wp_slash( $comment_data ) );
 
 		if ( ! $note_id ) {
 			Logger::debug( 'Note creation failed - wp_insert_comment returned false' );
