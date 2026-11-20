@@ -174,6 +174,8 @@ class Uninstaller {
 	/**
 	 * Run a callback on every site of every network, a batch of sites at a time.
 	 *
+	 * A site that fails is logged and skipped, so the rest are still cleaned.
+	 *
 	 * @param callable $callback Called with no arguments while switched to each site.
 	 */
 	public static function each_site( callable $callback ): void {
@@ -192,6 +194,8 @@ class Uninstaller {
 				switch_to_blog( (int) $site_id );
 				try {
 					$callback();
+				} catch ( \Throwable $error ) {
+					Logger::debug( sprintf( 'Uninstaller: could not clean site %d: %s', (int) $site_id, $error->getMessage() ) );
 				} finally {
 					restore_current_blog();
 				}
@@ -218,6 +222,8 @@ class Uninstaller {
 		foreach ( self::TRANSIENTS as $transient ) {
 			delete_transient( $transient );
 		}
+		// Only transients stored in the database can be found by prefix. With
+		// a persistent object cache they live there instead, and expire.
 		foreach ( self::TRANSIENT_PREFIXES as $prefix ) {
 			foreach ( self::options_starting_with( '_transient_' . $prefix ) as $option ) {
 				delete_transient( substr( $option, strlen( '_transient_' ) ) );

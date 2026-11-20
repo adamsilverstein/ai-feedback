@@ -253,6 +253,26 @@ class UninstallerTest extends TestCase {
 	}
 
 	/**
+	 * A site that fails is skipped, and the other sites are still cleaned.
+	 */
+	public function test_a_failing_site_does_not_stop_the_others(): void {
+		$GLOBALS['test_site_ids'] = array( 1, 2, 3 );
+		$cleaned                  = array();
+
+		Uninstaller::each_site(
+			static function () use ( &$cleaned ): void {
+				if ( 2 === $GLOBALS['test_blog_id'] ) {
+					throw new \RuntimeException( 'Table missing' );
+				}
+				$cleaned[] = $GLOBALS['test_blog_id'];
+			}
+		);
+
+		$this->assertSame( array( 1, 3 ), $cleaned );
+		$this->assertSame( 1, $GLOBALS['test_blog_id'] );
+	}
+
+	/**
 	 * Every key the plugin writes is on the uninstaller's lists, as removed
 	 * or kept, so a new setting can't be left behind by mistake.
 	 *

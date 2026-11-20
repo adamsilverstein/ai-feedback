@@ -220,7 +220,7 @@ Deactivating the plugin keeps everything. Deleting it removes its settings and p
 | Scheduled AI replies | |
 | The hidden Fresh Eyes user, unless it somehow owns posts | |
 
-On multisite every site is cleaned, a batch of sites at a time, then the network-wide data once. The full list of keys lives in `includes/class-uninstaller.php`, and a test fails when the plugin stores a key that isn't on it.
+On multisite every site of the network is cleaned, a batch of sites at a time, including sites where the plugin was never activated (the plugin's files are shared, so deleting it removes it everywhere), then the network-wide data once. The full list of keys lives in `includes/class-uninstaller.php`, and a test fails when the plugin stores a key that isn't on it.
 
 ## Development
 
