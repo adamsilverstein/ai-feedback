@@ -333,6 +333,9 @@ class ModelPinTest extends TestCase {
 			'ISO dated'              => array( array( 'gpt-4o-mini', 'gpt-4o-2024-05-13', 'gpt-4o-2024-08-06' ), 'gpt-4o', 'gpt-4o-2024-08-06' ),
 			'latest'                 => array( array( 'claude-opus-4-latest' ), 'claude-opus-4', 'claude-opus-4-latest' ),
 			'models/ prefix'         => array( array( 'models/gemini-2.0-flash' ), 'gemini-2.0-flash', 'models/gemini-2.0-flash' ),
+			'compact date is newer'  => array( array( 'gpt-4o-2024-08-06', 'gpt-4o-20241120' ), 'gpt-4o', 'gpt-4o-20241120' ),
+			'ISO date is newer'      => array( array( 'gpt-4o-20240806', 'gpt-4o-2024-11-20' ), 'gpt-4o', 'gpt-4o-2024-11-20' ),
+			'latest beats dated'     => array( array( 'gpt-4o-20991231', 'gpt-4o-latest', 'gpt-4o-2024-11-20' ), 'gpt-4o', 'gpt-4o-latest' ),
 			'other model, no match'  => array( array( 'gpt-4o-mini', 'claude-opus-4-1-20250805' ), 'claude-opus-4', null ),
 			'longer name, no match'  => array( array( 'gemini-2.0-flash-lite' ), 'gemini-2.0-flash', null ),
 		);
@@ -380,9 +383,26 @@ class ModelPinTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertSame( 'claude-opus-4-0', $result['model_id'] );
 
+		// Listed by the other provider only, so not an ID this one runs.
 		$GLOBALS['test_filter_results']['ai_feedback_provider_model_id'] = 'other-model-1';
 		$result = ( new Model_Pin() )->resolve( 'claude-opus-4' );
 		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( Model_Pin::ERROR_MODEL_UNAVAILABLE, $result->get_error_code() );
+	}
+
+	/**
+	 * A filter can't swap a listed model for an ID the provider doesn't
+	 * list, even when the model would have matched on its own.
+	 */
+	public function test_filter_value_not_listed_is_ignored(): void {
+		$this->providers( array( 'claude-opus-4-20250514' ) );
+		$GLOBALS['test_filter_results']['ai_feedback_provider_model_id'] = 'claude-opus-4-made-up';
+
+		$result = ( new Model_Pin() )->resolve( 'claude-opus-4' );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( Model_Pin::ERROR_MODEL_UNAVAILABLE, $result->get_error_code() );
+		$this->assertArrayNotHasKey( 'using_model', $GLOBALS['fake_ai_builder']->calls ?? array() );
 	}
 
 	/**

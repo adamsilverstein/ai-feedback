@@ -207,9 +207,16 @@ class Model_Capabilities {
 			}
 		}
 
-		$pattern = '/^(?:models\/)?' . preg_quote( $model_id, '/' ) . '(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest)?$/';
-		$matches = array_values( array_filter( $listed, static fn ( string $id ): bool => 1 === preg_match( $pattern, $id ) ) );
-		rsort( $matches, SORT_STRING );
+		$pattern = '/^(?:models\/)?' . preg_quote( $model_id, '/' ) . '(?:-(\d{4})-?(\d{2})-?(\d{2})|-(latest))?$/';
+		$ranked  = array();
+		foreach ( $listed as $id ) {
+			if ( 1 === preg_match( $pattern, $id, $parts ) ) {
+				$ranked[ $id ] = self::release_rank( $parts );
+			}
+		}
+		// Highest rank first; dates compare as dates, whichever way they're written.
+		arsort( $ranked, SORT_NUMERIC );
+		$matches = array_map( 'strval', array_keys( $ranked ) );
 
 		/**
 		 * Filters the ID a provider runs a model under, for a model the
@@ -225,6 +232,24 @@ class Model_Capabilities {
 		$filtered = apply_filters( 'ai_feedback_provider_model_id', $matches[0] ?? null, $model_id, $provider_id, $listed );
 
 		return is_string( $filtered ) && in_array( $filtered, $listed, true ) ? $filtered : null;
+	}
+
+	/**
+	 * How a listed ID ranks among the releases of one model: the bare ID
+	 * (such as Google's `models/<id>`) first, then `-latest`, then dated
+	 * releases, newest first.
+	 *
+	 * @param  array<int|string, string> $parts Matches from find_listed_id()'s pattern.
+	 * @return int Rank, higher first.
+	 */
+	private static function release_rank( array $parts ): int {
+		if ( 'latest' === ( $parts[4] ?? '' ) ) {
+			return 99999998;
+		}
+		if ( '' === ( $parts[1] ?? '' ) ) {
+			return 99999999;
+		}
+		return (int) ( $parts[1] . $parts[2] . $parts[3] );
 	}
 
 	/**
