@@ -53,6 +53,8 @@ function setup({
 			getFocusAreas: () => ['tone'],
 			getTargetTone: () => 'casual',
 			getFeedbackLocale: () => 'auto',
+			getPersona: () => 'busy_skimmer',
+			getReviewAudience: () => 'plugin developers',
 			getChunkSize: () => 20,
 		},
 		actions: {
@@ -88,6 +90,8 @@ describe('useStartReview', () => {
 			focusAreas: ['tone'],
 			targetTone: 'casual',
 			locale: 'auto',
+			persona: 'busy_skimmer',
+			audience: 'plugin developers',
 			chunkSize: 20,
 		});
 	});

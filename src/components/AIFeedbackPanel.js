@@ -16,6 +16,7 @@ import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
 import FocusAreaSelector from './FocusAreaSelector';
 import ToneSelector from './ToneSelector';
+import PersonaSelector from './PersonaSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import ExportReview from './ExportReview';
@@ -50,6 +51,8 @@ export default function AIFeedbackPanel() {
 		focusAreas,
 		targetTone,
 		feedbackLocale,
+		persona,
+		audience,
 		postTitle,
 		availableModels,
 		unavailableRetries,
@@ -71,6 +74,8 @@ export default function AIFeedbackPanel() {
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
+			persona: select(STORE_NAME).getPersona(),
+			audience: select(STORE_NAME).getReviewAudience(),
 			postTitle: select(editorStore).getEditedPostAttribute('title'),
 			availableModels: select(STORE_NAME).getAvailableModels(),
 			unavailableRetries: select(STORE_NAME).getUnavailableRetries(),
@@ -141,6 +146,8 @@ export default function AIFeedbackPanel() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				persona,
+				audience,
 				chunkSize,
 				isRetry,
 			});
@@ -213,6 +220,7 @@ export default function AIFeedbackPanel() {
 					)}
 					<LanguageSelector />
 					<ToneSelector />
+					<PersonaSelector />
 					<FocusAreaSelector />
 				</PanelBody>
 			</div>

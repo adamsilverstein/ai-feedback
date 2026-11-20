@@ -160,6 +160,9 @@ class Settings_Controller extends WP_REST_Controller {
 			'default_focus_areas'   => User_Preferences::get( 'ai_feedback_default_focus_areas', array( 'content', 'tone', 'flow' ) ),
 			'default_tone'          => User_Preferences::get( 'ai_feedback_default_tone', 'professional' ),
 			'feedback_locale'       => User_Preferences::get( 'ai_feedback_feedback_locale', 'auto' ),
+			'default_persona'       => Personas::normalize( User_Preferences::get( 'ai_feedback_default_persona', Personas::DEFAULT_PERSONA ) ),
+			'review_audience'       => Personas::sanitize_audience( User_Preferences::get( 'ai_feedback_review_audience', '' ) ),
+			'available_personas'    => Personas::get_for_rest(),
 			'available_models'      => $this->get_available_models(),
 			'available_focus_areas' => $this->get_available_focus_areas(),
 			'available_tones'       => $this->get_available_tones(),
@@ -257,6 +260,30 @@ class Settings_Controller extends WP_REST_Controller {
 			$updated['feedback_locale'] = $locale;
 		}
 
+		// Update default persona if provided.
+		if ( $request->has_param( 'default_persona' ) ) {
+			$persona = $request->get_param( 'default_persona' );
+
+			if ( ! Personas::is_valid( $persona ) ) {
+				return new WP_Error(
+					'invalid_persona',
+					__( 'The specified persona is not available.', 'fresh-eyes' ),
+					array( 'status' => 400 )
+				);
+			}
+
+			$save( 'ai_feedback_default_persona', $persona );
+			$updated['default_persona'] = $persona;
+		}
+
+		// Update the "Who is this for?" audience if provided.
+		if ( $request->has_param( 'review_audience' ) ) {
+			$audience = Personas::sanitize_audience( $request->get_param( 'review_audience' ) );
+
+			$save( 'ai_feedback_review_audience', $audience );
+			$updated['review_audience'] = $audience;
+		}
+
 		// Return updated settings.
 		return $this->get_settings( $request );
 	}
@@ -326,6 +353,15 @@ class Settings_Controller extends WP_REST_Controller {
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
 				'validate_callback' => array( $this, 'is_valid_locale' ),
+			),
+			'default_persona'     => array(
+				'type'              => 'string',
+				'validate_callback' => array( Personas::class, 'is_valid' ),
+			),
+			'review_audience'     => array(
+				'type'              => 'string',
+				'maxLength'         => Personas::MAX_AUDIENCE_LENGTH,
+				'sanitize_callback' => array( Personas::class, 'sanitize_audience' ),
 			),
 		);
 	}
