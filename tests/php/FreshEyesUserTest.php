@@ -163,6 +163,16 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertSame( 9, $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
 	}
 
+	public function test_a_marked_account_with_another_login_is_not_adopted(): void {
+		$this->add_person( 9, 'jane' );
+		$GLOBALS['test_user_meta'][9][ Fresh_Eyes_User::MARKER_META ] = '1';
+
+		$id = $this->create_user();
+
+		$this->assertNotSame( 9, $id );
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+	}
+
 	public function test_a_failed_insert_releases_the_lock(): void {
 		$GLOBALS['test_insert_user_error'] = new \WP_Error( 'existing_user_login', 'Taken.' );
 

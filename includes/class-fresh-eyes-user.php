@@ -236,7 +236,13 @@ class Fresh_Eyes_User {
 			)
 		);
 		$id  = $ids[0] ?? 0;
-		return is_numeric( $id ) ? (int) $id : 0;
+		if ( ! is_numeric( $id ) ) {
+			return 0;
+		}
+
+		// The marker is not a secret, so also want a login this plugin would pick.
+		$user = get_userdata( (int) $id );
+		return $user instanceof WP_User && str_starts_with( $user->user_login, self::LOGIN ) ? (int) $id : 0;
 	}
 
 	/**
@@ -779,12 +785,15 @@ class Fresh_Eyes_User {
 
 			$user = get_userdata( $user_id );
 			if ( $user instanceof WP_User && '' !== $user->user_email ) {
-				wp_update_user(
+				$updated = wp_update_user(
 					array(
 						'ID'         => $user_id,
 						'user_email' => '',
 					)
 				);
+				if ( is_wp_error( $updated ) ) {
+					Logger::debug( 'Fresh_Eyes_User: could not clear the email address: ' . $updated->get_error_message() );
+				}
 			}
 
 			clean_user_cache( $user_id );
