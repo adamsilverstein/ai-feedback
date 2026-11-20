@@ -631,7 +631,9 @@ export async function suggestBlockAction(note) {
 			clientId,
 			targetId
 		);
-		const markersBefore = fromOrder.map(
+		// A move here stays in its parent, so only these blocks can be tagged.
+		const siblings = current.getBlockOrder(fromRootClientId);
+		const markersBefore = siblings.map(
 			(id) => current.getBlockAttributes(id)?.metadata?.suggestion
 		);
 		editor.moveBlocksToPosition(
@@ -645,7 +647,7 @@ export async function suggestBlockAction(note) {
 		// block or a neighbor, and saves its own suggestion for it.
 		const moved = dataSelect(blockEditorStore);
 		if (
-			fromOrder.some((id, i) => {
+			siblings.some((id, i) => {
 				const tag = moved.getBlockAttributes(id)?.metadata?.suggestion;
 				return tag !== markersBefore[i] && isCapturedMoveMarker(tag);
 			})
