@@ -423,8 +423,9 @@ class Review_Service {
 	 *
 	 * Images are only sent to a model that reads them: given an image, core
 	 * would otherwise switch to another model that does, or refuse the prompt.
-	 * The model is only asked about once there are images to send, since the
-	 * answer can need a request to the provider for its model list. That
+	 * The model is only asked about once there are images to send or report
+	 * as left out, since the answer can need a request to the provider for
+	 * its model list. A model that refused images recently gets none. That
 	 * request uses the WordPress HTTP timeout (`http_request_timeout`, 5
 	 * seconds by default), as core's `wp_ai_client_default_request_timeout`
 	 * only applies to prompt requests.
