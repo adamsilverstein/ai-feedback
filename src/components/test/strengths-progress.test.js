@@ -24,7 +24,11 @@ vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 vi.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
 vi.mock('../FeedbackList', () => ({
-	default: () => <div>Feedback list</div>,
+	default: () => (
+		<div>
+			Feedback list <button>Dismiss</button>
+		</div>
+	),
 }));
 vi.mock('../../hooks/use-start-review', () => ({
 	default: () => ({ startReview }),
@@ -197,6 +201,65 @@ describe('ReviewSummary strengths and progress', () => {
 			screen.getByRole('button', { name: 'Review again' })
 		).toBeInTheDocument();
 		expect(screen.queryByText('Feedback list')).toBeNull();
+	});
+});
+
+describe('ReviewSummary focus', () => {
+	beforeEach(() => {
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		findStrengthBlock.mockReturnValue(null);
+	});
+
+	it('moves focus from the list to Review again once the last note is addressed', () => {
+		const { rerender } = renderSummary({
+			review,
+			progress: { addressed: 1, total: 2 },
+		});
+		screen.getByRole('button', { name: 'Dismiss' }).focus();
+
+		rerender(
+			<ReviewSummary
+				review={review}
+				progress={{ addressed: 2, total: 2 }}
+			/>
+		);
+		expect(document.activeElement).toBe(
+			screen.getByRole('button', { name: 'Review again' })
+		);
+
+		fireEvent.click(screen.getByRole('button', { name: 'Show feedback' }));
+		expect(document.activeElement).toBe(
+			screen.getByLabelText('Feedback Details')
+		);
+	});
+
+	it('leaves focus alone when the done state shows on load', () => {
+		const outside = document.createElement('button');
+		document.body.appendChild(outside);
+		outside.focus();
+
+		renderSummary({ review, progress: { addressed: 2, total: 2 } });
+		expect(document.activeElement).toBe(outside);
+		outside.remove();
+	});
+
+	it('leaves focus alone when the last note is addressed elsewhere', () => {
+		const outside = document.createElement('button');
+		document.body.appendChild(outside);
+		const { rerender } = renderSummary({
+			review,
+			progress: { addressed: 1, total: 2 },
+		});
+		outside.focus();
+
+		rerender(
+			<ReviewSummary
+				review={review}
+				progress={{ addressed: 2, total: 2 }}
+			/>
+		);
+		expect(document.activeElement).toBe(outside);
+		outside.remove();
 	});
 });
 

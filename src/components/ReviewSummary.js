@@ -2,7 +2,7 @@
  * Review Summary Component
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import FeedbackList from './FeedbackList';
 import ModelName from './ModelName';
 import ReviewStrengths from './ReviewStrengths';
@@ -32,6 +32,22 @@ const getCategoryLabels = () => ({
  */
 export default function ReviewSummary({ review, progress = null }) {
 	const [showAddressed, setShowAddressed] = useState(false);
+
+	// The done state and the list replace each other, so focus inside the one
+	// that goes away is moved to the one that appears.
+	const doneRef = useRef(null);
+	const detailsRef = useRef(null);
+	const wasDoneRef = useRef(null);
+	const focusTargetRef = useRef(null);
+	useEffect(() => {
+		const target = focusTargetRef.current;
+		focusTargetRef.current = null;
+		if (target === 'done') {
+			doneRef.current?.querySelector('button')?.focus();
+		} else if (target === 'list') {
+			detailsRef.current?.focus();
+		}
+	});
 
 	// Debug logging when review changes
 	useEffect(() => {
@@ -79,6 +95,22 @@ export default function ReviewSummary({ review, progress = null }) {
 	if (!isDone && showAddressed) {
 		setShowAddressed(false);
 	}
+
+	// Addressing the last note from the list removes the button that had focus
+	// (a busy button may already have dropped it to the page). Focus isn't
+	// taken when the done state shows on load, or when the last note was
+	// addressed elsewhere, such as the Notes panel.
+	if (isDone && wasDoneRef.current === false) {
+		const active = detailsRef.current?.ownerDocument?.activeElement;
+		if (
+			!active ||
+			active === active.ownerDocument.body ||
+			detailsRef.current.contains(active)
+		) {
+			focusTargetRef.current = 'done';
+		}
+	}
+	wasDoneRef.current = isDone;
 
 	const mappedBlockCount = blockMapping
 		? Object.keys(blockMapping).length
@@ -330,15 +362,25 @@ export default function ReviewSummary({ review, progress = null }) {
 			)}
 
 			{isDone && !showAddressed && (
-				<FeedbackDone
-					progress={progress}
-					onShowFeedback={() => setShowAddressed(true)}
-				/>
+				<div ref={doneRef}>
+					<FeedbackDone
+						progress={progress}
+						onShowFeedback={() => {
+							focusTargetRef.current = 'list';
+							setShowAddressed(true);
+						}}
+					/>
+				</div>
 			)}
 
 			{/* Detailed feedback list */}
 			{hasNotes && (!isDone || showAddressed) && (
-				<div className="feedback-details">
+				<div
+					className="feedback-details"
+					ref={detailsRef}
+					tabIndex={-1}
+					aria-label={__('Feedback Details', 'fresh-eyes')}
+				>
 					<h4>{__('Feedback Details', 'fresh-eyes')}</h4>
 					<FeedbackList feedbackItems={notes} />
 				</div>

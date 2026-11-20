@@ -151,16 +151,31 @@ test.describe('Strengths and progress', () => {
 		// Addressing the rest shows the done state.
 		await toggleItem(page, 'Dismiss');
 		await expect(progress).toHaveText('2 of 3 notes addressed');
-		await toggleItem(page, 'Dismiss');
+
+		// The last one from the keyboard: focus moves to the done state
+		// rather than dropping to the page with the removed button.
+		await page
+			.locator('.ai-feedback-list')
+			.getByRole('button', { name: /^Dismiss feedback/ })
+			.focus();
+		await page.keyboard.press('Enter');
 		const done = page.locator('.ai-feedback-done');
 		await expect(done).toContainText(
 			'All 3 notes from this review are addressed.'
 		);
 		await expect(page.locator('.ai-feedback-list')).toHaveCount(0);
+		await expect(
+			done.getByRole('button', { name: 'Review again' })
+		).toBeFocused();
 
-		// The list can come back, to restore a note.
-		await done.getByRole('button', { name: 'Show feedback' }).click();
+		// The list can come back, to restore a note, and takes focus.
+		await page.keyboard.press('Tab');
+		await expect(
+			done.getByRole('button', { name: 'Show feedback' })
+		).toBeFocused();
+		await page.keyboard.press('Enter');
 		await expect(page.locator('.ai-feedback-list')).toBeVisible();
+		await expect(page.locator('.feedback-details')).toBeFocused();
 		await toggleItem(page, 'Restore');
 		await expect(progress).toHaveText('2 of 3 notes addressed');
 		await expect(done).toHaveCount(0);
@@ -228,6 +243,43 @@ test.describe('Strengths and progress', () => {
 		);
 		await expect(page.locator('.ai-feedback-comparison')).toHaveText(
 			`Since the last review: 1 addressed, ${review.note_count} new, 2 still open`
+		);
+	});
+
+	test('a note trashed in the Notes panel drops out of the counts', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		await openFixturePost({
+			admin,
+			editor,
+			requestUtils,
+			aiFeedback,
+			title: 'Trashed note progress',
+		});
+
+		const first = await (await aiFeedback.runReview()).json();
+		expect(first.note_ids).toHaveLength(3);
+
+		// The Notes panel deletes a note by moving it to the trash.
+		const trashed = await requestUtils.rest({
+			method: 'DELETE',
+			path: `/wp/v2/comments/${first.note_ids[0]}`,
+		});
+		expect(trashed.status).toBe('trash');
+
+		const progress = page.locator('.ai-feedback-progress-text');
+		await page.reload();
+		await aiFeedback.openSidebar();
+		await expect(progress).toHaveText('0 of 2 notes addressed');
+
+		const second = await (await aiFeedback.runReview()).json();
+		expect(second.progress).toEqual({ addressed: 0, still_open: 2 });
+		await expect(page.locator('.ai-feedback-comparison')).toHaveText(
+			`Since the last review: 0 addressed, ${second.note_count} new, 2 still open`
 		);
 	});
 
