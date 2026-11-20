@@ -900,6 +900,10 @@ EOT;
 				);
 		}
 
+		if ( Block_Change::is_change( $edit ) ) {
+			return self::describe_block_change( $edit );
+		}
+
 		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
 			return sprintf(
 				'rewrite the block as "%s"',
@@ -912,6 +916,40 @@ EOT;
 			self::to_string( $edit['find'] ?? '' ),
 			self::to_string( $edit['replace'] ?? '' )
 		);
+	}
+
+	/**
+	 * Describe a formatting fix for the reply prompt.
+	 *
+	 * @param  array<mixed> $edit Formatting fix.
+	 * @return string Description.
+	 */
+	private static function describe_block_change( array $edit ): string {
+		if ( 'split' === ( $edit['type'] ?? null ) ) {
+			return sprintf( 'split this paragraph in two after "%s"', self::to_string( $edit['after'] ?? '' ) );
+		}
+		if ( 'transform' === ( $edit['type'] ?? null ) ) {
+			return match ( $edit['to'] ?? null ) {
+				'core/list'    => sprintf(
+					'turn this paragraph into a %s list of: %s',
+					true === ( $edit['ordered'] ?? false ) ? 'numbered' : 'bulleted',
+					implode( '; ', array_filter( is_array( $edit['items'] ?? null ) ? $edit['items'] : array(), 'is_string' ) )
+				),
+				'core/heading' => sprintf( 'turn this paragraph into a level %d heading', is_int( $edit['level'] ?? null ) ? $edit['level'] : 2 ),
+				default        => 'turn this heading into a paragraph',
+			};
+		}
+
+		$parts = array();
+		foreach ( is_array( $edit['attributes'] ?? null ) ? $edit['attributes'] : array() as $key => $value ) {
+			$parts[] = match ( $key ) {
+				'level'   => sprintf( 'change this heading to level %d', is_int( $value ) ? $value : 2 ),
+				'ordered' => true === $value ? 'make this a numbered list' : 'make this a bulleted list',
+				'alt'     => sprintf( 'add the alt text "%s"', self::to_string( $value ) ),
+				default   => sprintf( 'add the caption "%s"', self::to_string( $value ) ),
+			};
+		}
+		return implode( ' and ', $parts );
 	}
 
 	/**

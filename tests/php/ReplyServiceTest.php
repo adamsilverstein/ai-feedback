@@ -1295,6 +1295,47 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * A review note's formatting fix is the thread's pending edit, described
+	 * in the prompt, and a reply's edit after it is revision 2.
+	 */
+	public function test_review_block_change_is_pending_edit(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['block_name']                           = 'core/heading';
+		$GLOBALS['test_comment_meta'][100][ Notes_Manager::BLOCK_CHANGE_META_KEY ] = '{"type":"set_attributes","attributes":{"level":3},"from":{"level":4}}';
+		$heading                  = self::leaf_block( 'core/heading', '<h4 class="wp-block-heading">Setup</h4>', 100 );
+		$heading['attrs']['level'] = 4;
+		$this->seed_post_blocks( array( $heading ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Shorter title.", "edit": {"type": "replace_text", "find": "Setup", "replace": "Set up"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nchange this heading to level 3", $service->captured_prompt );
+		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
+	}
+
+	/**
+	 * A formatting fix the saved post already shows is not pending, but
+	 * still counts as the thread's first revision.
+	 */
+	public function test_applied_block_change_is_not_pending(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['block_name']                           = 'core/paragraph';
+		$GLOBALS['test_comment_meta'][100][ Notes_Manager::BLOCK_CHANGE_META_KEY ] = '{"type":"transform","to":"core/list","items":["Node","npm"],"ordered":false}';
+		$list = self::leaf_block( 'core/list', '<ul><li>Node</li><li>npm</li></ul>', 100 );
+		$this->seed_post_blocks( array( $list ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Numbered.", "edit": {"type": "replace_text", "find": "Node", "replace": "Node.js"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
+		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
+	}
+
+	/**
 	 * A move the saved post already shows is not pending.
 	 */
 	public function test_applied_move_is_not_pending(): void {

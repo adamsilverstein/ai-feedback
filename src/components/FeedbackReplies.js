@@ -111,7 +111,8 @@ export default function FeedbackReplies({
 		!hasPendingSlot &&
 		(lastReply
 			? lastReply.is_ai
-			: !note.parent && !!(note.quick_fix || note.block_action));
+			: !note.parent &&
+				!!(note.quick_fix || note.block_action || note.block_change));
 
 	if (replies.length === 0 && !hasPendingSlot && !showQuickReplies) {
 		return null;

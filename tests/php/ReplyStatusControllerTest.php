@@ -439,6 +439,20 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * A review note's formatting fix counts as the first revision too.
+	 */
+	public function test_threads_count_block_change_as_first_revision(): void {
+		$this->seed_thread( 'complete' );
+		$GLOBALS['test_comment_meta'][300][ \AI_Feedback\Notes_Manager::BLOCK_CHANGE_META_KEY ] = '{"type":"split","after":"One.","next":"Two.","next_length":4}';
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY ]   = '{"type":"remove_block"}';
+
+		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$replies = ( (array) $data['threads'] )[300]['replies'];
+
+		$this->assertSame( array( null, 2, null ), array_column( $replies, 'revision' ) );
+	}
+
+	/**
 	 * The newest user reply awaiting an AI response is exposed for polling.
 	 */
 	public function test_threads_expose_pending_reply_id(): void {

@@ -120,6 +120,16 @@ class Block_Change {
 	private const SENTENCE_END = '/[.!?…。！？]["\'”’»)\]]*$/u';
 
 	/**
+	 * Whether an edit is a formatting fix.
+	 *
+	 * @param  array<mixed> $edit Edit.
+	 * @return bool
+	 */
+	public static function is_change( array $edit ): bool {
+		return in_array( $edit['type'] ?? null, self::TYPES, true );
+	}
+
+	/**
 	 * Read the attributes the editor sent for a block, keeping only the ones
 	 * formatting fixes use, with their types checked.
 	 *

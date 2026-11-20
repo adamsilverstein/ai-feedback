@@ -36,6 +36,25 @@ describe('getThreadEdits', () => {
 		]);
 	});
 
+	it('lists a formatting fix as the first edit, like a quick fix', () => {
+		const change = {
+			type: 'set_attributes',
+			attributes: { level: 3 },
+			from: { level: 4 },
+		};
+
+		expect(
+			getThreadEdits({ id: 300, block_change: change }, replies)
+		).toEqual([
+			{ ownerId: 300, edit: change },
+			{ ownerId: 302, edit },
+			{ ownerId: 305, edit },
+		]);
+		expect(
+			getSupersededOwnerIds({ id: 300, block_change: change }, replies)
+		).toEqual([300, 302]);
+	});
+
 	it('leaves out a secondary note’s quick fix', () => {
 		expect(
 			getThreadEdits({ id: 310, parent: 300, quick_fix: quickFix }, [])
