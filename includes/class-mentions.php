@@ -38,8 +38,13 @@ class Mentions {
 	public const META_KEY = 'ai_feedback_mention';
 
 	/**
-	 * A web address: `http(s)://` or `www.` up to whitespace, quotes,
-	 * brackets or a backslash.
+	 * HTML attributes that hold a link or load something from an address.
+	 */
+	private const LINK_ATTRIBUTES = 'href|src|srcset|cite|action|formaction|poster|data|background|longdesc|usemap|xlink:href|ping';
+
+	/**
+	 * A web address in text: `http(s)://` or `www.` up to whitespace,
+	 * quotes, brackets or a backslash.
 	 */
 	private const URL_PATTERN = '#\b(?:https?://|www\.)[^\s"\'<>()\[\]\\\\]+#i';
 
@@ -175,34 +180,70 @@ class Mentions {
 	 *
 	 * @param string $block_html Block HTML, without suggestion markers.
 	 * @param int    $note_id    Root note ID.
+	 * @param int    $limit      Optional. Most characters kept before the text is cut with "...".
 	 * @return string Selected text, or '' for a note on the whole block.
 	 */
-	public static function get_selected_text( string $block_html, int $note_id ): string {
+	public static function get_selected_text( string $block_html, int $note_id, int $limit = self::MAX_SELECTION_LENGTH ): string {
 		if ( $note_id <= 0 || ! str_contains( $block_html, 'wp-note' ) ) {
 			return '';
 		}
 
-		$count = preg_match_all( '#<mark\b((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>(.*?)</mark\s*>#is', $block_html, $matches, PREG_SET_ORDER );
+		// Walk the tags, keeping a stack of open marks, so other marks inside
+		// or around the note's marker, including another note's, keep its text whole.
+		$count = preg_match_all( '#<(/?)([a-zA-Z][a-zA-Z0-9-]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#', $block_html, $tags, PREG_SET_ORDER | PREG_OFFSET_CAPTURE );
 		if ( ! $count ) {
 			return '';
 		}
 
-		$parts = array();
-		foreach ( $matches as $match ) {
-			$attributes = $match[1];
-			if ( 1 !== preg_match( '#\bclass\s*=\s*(["\'])(?:[^"\']*\s)?wp-note(?:\s[^"\']*)?\1#i', $attributes ) ) {
+		$stack  = array();
+		$inside = 0;
+		$text   = '';
+		$offset = 0;
+		foreach ( $tags as $tag ) {
+			if ( $inside > 0 ) {
+				$text .= substr( $block_html, $offset, $tag[0][1] - $offset );
+			}
+			$offset = $tag[0][1] + strlen( $tag[0][0] );
+
+			if ( 'mark' !== strtolower( $tag[2][0] ) ) {
+				// Other tags separate words, eg. a line break.
+				$text .= $inside > 0 ? ' ' : '';
 				continue;
 			}
-			if ( 1 !== preg_match( '#\bdata-id\s*=\s*(["\'])\s*(\d+)\s*\1#i', $attributes, $id ) || (int) $id[2] !== $note_id ) {
+
+			if ( '/' === $tag[1][0] ) {
+				if ( true === array_pop( $stack ) ) {
+					--$inside;
+				}
 				continue;
 			}
-			$parts[] = $match[2];
+
+			$is_note = self::is_note_marker( $tag[3][0], $note_id );
+			if ( $is_note && 0 === $inside && '' !== $text ) {
+				// Another stretch of the same note.
+				$text .= ' ';
+			}
+			$stack[] = $is_note;
+			$inside += $is_note ? 1 : 0;
 		}
 
-		$text = html_entity_decode( wp_strip_all_tags( implode( ' ', $parts ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$text = html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$text = trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 
-		return mb_strlen( $text ) > self::MAX_SELECTION_LENGTH ? mb_substr( $text, 0, self::MAX_SELECTION_LENGTH ) . '...' : $text;
+		return mb_strlen( $text ) > $limit ? mb_substr( $text, 0, $limit ) . '...' : $text;
+	}
+
+	/**
+	 * Whether a mark's attributes make it the marker of a note.
+	 *
+	 * @param string $attributes Attributes of a `<mark>` tag.
+	 * @param int    $note_id    Note ID.
+	 * @return bool
+	 */
+	private static function is_note_marker( string $attributes, int $note_id ): bool {
+		return 1 === preg_match( '#\bclass\s*=\s*(["\'])(?:[^"\']*\s)?wp-note(?:\s[^"\']*)?\1#i', $attributes )
+			&& 1 === preg_match( '#\bdata-id\s*=\s*(["\'])\s*(\d+)\s*\1#i', $attributes, $id )
+			&& (int) $id[2] === $note_id;
 	}
 
 	/**
@@ -258,10 +299,104 @@ class Mentions {
 	 * @return bool
 	 */
 	public static function edit_has_unsourced_url( array $edit, string $sources ): bool {
-		$encoded = wp_json_encode( $edit, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-		$urls    = self::find_urls( is_string( $encoded ) ? $encoded : '' );
+		$known = array_merge( self::find_urls( self::decode( $sources ) ), self::find_link_attributes( $sources ) );
 
-		return array() !== array_diff( $urls, self::find_urls( $sources ) );
+		foreach ( self::string_values( $edit ) as $value ) {
+			$targets = array_merge( self::find_urls( self::decode( $value ) ), self::find_link_attributes( $value ) );
+			foreach ( $targets as $target ) {
+				if ( ! in_array( $target, $known, true ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Find the targets of link-bearing attributes, such as `href`, in HTML.
+	 *
+	 * Values are decoded and read the way a browser does: whitespace and
+	 * control characters are dropped, and a scheme-less `//host` link is
+	 * the web address it points to. A value that still holds an entity a
+	 * browser might decode is kept as it is, so it never matches a source.
+	 *
+	 * @param string $html HTML.
+	 * @return list<string> Normalized targets. Links to a spot on the page (`#id`) are left out.
+	 */
+	public static function find_link_attributes( string $html ): array {
+		if ( ! str_contains( $html, '<' ) ) {
+			return array();
+		}
+
+		$targets = array();
+		preg_match_all( '#<[a-zA-Z][a-zA-Z0-9:-]*((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#', $html, $tags );
+		foreach ( $tags[1] as $attributes ) {
+			preg_match_all(
+				'#(?:^|[\s/])(' . self::LINK_ATTRIBUTES . ')\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i',
+				$attributes,
+				$found,
+				PREG_SET_ORDER
+			);
+			foreach ( $found as $attribute ) {
+				$raw    = ( $attribute[2] ?? '' ) . ( $attribute[3] ?? '' ) . ( $attribute[4] ?? '' );
+				$target = self::normalize_link( $raw );
+				if ( '' !== $target && ! str_starts_with( $target, '#' ) ) {
+					$targets[] = $target;
+				}
+			}
+		}
+
+		return array_values( array_unique( $targets ) );
+	}
+
+	/**
+	 * Read a link attribute's value as a browser would, for comparison.
+	 *
+	 * @param string $value Raw attribute value.
+	 * @return string Normalized target.
+	 */
+	private static function normalize_link( string $value ): string {
+		$decoded = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// Browsers drop tabs and line breaks anywhere in a URL, and spaces and
+		// control characters around it.
+		$link = strtolower( (string) preg_replace( '/[\x00-\x20\x7f]+/', '', $decoded ) );
+		if ( str_contains( $link, '&' ) ) {
+			// An entity without its semicolon, which a browser may still decode.
+			return 'unreadable:' . $link;
+		}
+		if ( str_starts_with( $link, '//' ) ) {
+			$link = 'https:' . $link;
+		}
+		return preg_match( '#^https?://#', $link ) ? self::normalize_url( $link ) : $link;
+	}
+
+	/**
+	 * Decode entities in text, so an encoded address reads as one.
+	 *
+	 * @param string $text Text or HTML.
+	 * @return string
+	 */
+	private static function decode( string $text ): string {
+		return html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+	}
+
+	/**
+	 * Every string in a nested array.
+	 *
+	 * @param array<mixed> $values Values.
+	 * @return list<string>
+	 */
+	private static function string_values( array $values ): array {
+		$strings = array();
+		foreach ( $values as $value ) {
+			if ( is_string( $value ) ) {
+				$strings[] = $value;
+			} elseif ( is_array( $value ) ) {
+				$strings = array_merge( $strings, self::string_values( $value ) );
+			}
+		}
+		return $strings;
 	}
 
 	/**

@@ -171,4 +171,102 @@ class MentionsTest extends TestCase {
 		$this->assertTrue( Mentions::mentions_fresh_eyes( '@c++-bot help' ) );
 		$this->assertFalse( Mentions::mentions_fresh_eyes( '@ccc-bot help' ) );
 	}
+
+	/**
+	 * Links an edit can hide in its markup, none of which the AI was given.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function hidden_links(): array {
+		return array(
+			'protocol-relative'         => array( '<a href="//evil.example/x">this</a>' ),
+			'encoded colon'             => array( '<a href="https&#58;//evil.example/x">this</a>' ),
+			'named colon entity'        => array( '<a href="https&colon;//evil.example/x">this</a>' ),
+			'colon entity, no semicolon' => array( '<a href="https&#58//evil.example/x">this</a>' ),
+			'uppercase scheme'          => array( '<a href="HTTPS://EVIL.EXAMPLE/x">this</a>' ),
+			'tab inside'                => array( "<a href=\"ht\ttps://evil.example/x\">this</a>" ),
+			'line break inside'         => array( "<a href=\"https:/\n/evil.example/x\">this</a>" ),
+			'leading control character' => array( "<a href=\"\x01 https://evil.example/x\">this</a>" ),
+			'unquoted'                  => array( '<a href=//evil.example/x>this</a>' ),
+			'single quotes'             => array( "<a href='//evil.example/x'>this</a>" ),
+			'slash before attribute'    => array( '<a/href="//evil.example/x">this</a>' ),
+			'uppercase attribute'       => array( '<a HREF="//evil.example/x">this</a>' ),
+			'relative path'             => array( '<a href="/wp-admin/x">this</a>' ),
+			'script scheme'             => array( '<a href="javascript:alert(1)">this</a>' ),
+			'image source'              => array( '<img src="//evil.example/x.png">' ),
+			'quote source'              => array( '<q cite="//evil.example/x">this</q>' ),
+			'encoded text address'      => array( 'Read https&#58;//evil.example/x' ),
+		);
+	}
+
+	/**
+	 * An edit that adds a link the AI was not given is caught, however the
+	 * link is written.
+	 *
+	 * @dataProvider hidden_links
+	 *
+	 * @param string $content Edit content.
+	 */
+	public function test_edit_with_hidden_link( string $content ): void {
+		$edit = array(
+			'type'    => 'rewrite_block',
+			'content' => $content,
+		);
+
+		$this->assertTrue( Mentions::edit_has_unsourced_url( $edit, '<p>Read <a href="https://good.example/x">this</a>.</p>' ) );
+	}
+
+	/**
+	 * A link from the sources may be written another way, and a link to a
+	 * spot on the page is not a source at all.
+	 */
+	public function test_edit_with_known_link(): void {
+		$sources = '<p>Read <a href="https://good.example/x">this</a>.</p>';
+		foreach ( array( '<a href="//good.example/x">this</a>', '<a href="HTTPS&#58;//www.good.example/x/">this</a>', '<a href="#notes">notes</a>' ) as $content ) {
+			$this->assertFalse(
+				Mentions::edit_has_unsourced_url(
+					array(
+						'type'    => 'rewrite_block',
+						'content' => $content,
+					),
+					$sources
+				),
+				$content
+			);
+		}
+	}
+
+	/**
+	 * Marks nested in or around the note's marker keep its text whole.
+	 *
+	 * @return array<string, array{string, string}>
+	 */
+	public static function nested_marks(): array {
+		return array(
+			'highlight inside the note'      => array(
+				'<p><mark class="wp-note" data-id="300">simplify <mark class="has-inline-color">this</mark> long sentence</mark> please</p>',
+				'simplify this long sentence',
+			),
+			'note inside a highlight'        => array(
+				'<p><mark class="has-inline-color">Some <mark class="wp-note" data-id="300">selected words</mark> here</mark></p>',
+				'selected words',
+			),
+			'another note inside this note'  => array(
+				'<p><mark class="wp-note" data-id="300">outer <mark class="wp-note" data-id="301">inner</mark> after inner</mark> outside</p>',
+				'outer inner after inner',
+			),
+		);
+	}
+
+	/**
+	 * The selection reads across nested marks.
+	 *
+	 * @dataProvider nested_marks
+	 *
+	 * @param string $html     Block HTML.
+	 * @param string $expected Selected text.
+	 */
+	public function test_selected_text_with_nested_marks( string $html, string $expected ): void {
+		$this->assertSame( $expected, Mentions::get_selected_text( $html, 300 ) );
+	}
 }
