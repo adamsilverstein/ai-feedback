@@ -56,10 +56,21 @@ function escapeRegExp(text) {
 }
 
 /**
+ * Replace non-breaking spaces with plain ones.
+ *
+ * @param {string} text Text.
+ * @return {string} Text with plain spaces.
+ */
+function withPlainSpaces(text) {
+	return text.replace(/\u00a0/g, ' ');
+}
+
+/**
  * Find every match of a quick fix's text.
  *
  * Text that starts or ends with a letter or digit only matches at a word
- * boundary there, the same rule the server uses (Response_Parser).
+ * boundary there, the same rule the server uses (Response_Parser). A space
+ * matches a non-breaking one, which the server reads as a space.
  *
  * @param {string} text Plain text to search.
  * @param {string} find Text to find.
@@ -70,7 +81,7 @@ export function findMatches(text, find) {
 		return [];
 	}
 
-	let pattern = escapeRegExp(find);
+	let pattern = escapeRegExp(find).replace(/[ \u00a0]/g, '[ \\u00a0]');
 	if (/^[\p{L}\p{N}]/u.test(find)) {
 		pattern = '(?<![\\p{L}\\p{N}])' + pattern;
 	}
@@ -104,7 +115,8 @@ export function isReplacementAt(text, fix, start) {
 		const from = start - at;
 		if (
 			from >= 0 &&
-			text.slice(from, from + fix.replace.length) === fix.replace
+			withPlainSpaces(text.slice(from, from + fix.replace.length)) ===
+				withPlainSpaces(fix.replace)
 		) {
 			return true;
 		}

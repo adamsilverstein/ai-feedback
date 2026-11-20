@@ -159,6 +159,42 @@ class ResponseParserQuickFixTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for block text with line breaks and non-breaking spaces,
+	 * read as the editor reads it.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function editor_text_provider(): array {
+		return array(
+			'find across a line break'      => array( "Revenue grew 40%\nlast year.", '40% last year', false ),
+			'find holding the line break'   => array( "Revenue grew 40%\nlast year.", "40%\nlast year", true ),
+			'find beside a line break'      => array( "Revenue grew 40%\nlast year.", 'last year', true ),
+			'space over non-breaking space' => array( "Revenue grew\u{00A0}40%.", 'grew 40%', true ),
+			'non-breaking space in find'    => array( 'Revenue grew 40%.', "grew\u{00A0}40%", true ),
+			'space matching twice'          => array( "Revenue grew\u{00A0}40%, then grew 40%.", 'grew 40%', false ),
+		);
+	}
+
+	/**
+	 * A quick fix is kept only when it matches once in the editor too
+	 * (findMatches() in src/utils/quick-fix.js): a space never matches a
+	 * line break, and matches a non-breaking space.
+	 *
+	 * @param string $content Block text.
+	 * @param string $find    Text to find.
+	 * @param bool   $kept    Whether the fix is kept.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'editor_text_provider' )]
+	public function test_quick_fix_matches_editor_text( string $content, string $find, bool $kept ): void {
+		$fix = array(
+			'find'    => $find,
+			'replace' => 'changed',
+		);
+
+		$this->assertSame( $kept ? $fix : null, $this->parser->validate_quick_fix( $fix, $content ) );
+	}
+
+	/**
 	 * A valid quick fix survives parsing; a bad one is dropped without losing the item.
 	 */
 	public function test_parse_feedback_keeps_valid_quick_fix(): void {
