@@ -8,7 +8,7 @@
  * section two" and adding a heading above "Next steps", and a reply asking
  * to "move it" moves the block above the first nearby block. Suggestion
  * Mode is off in wp-env, so each edit shows as Preview and Apply in the
- * sidebar; the Suggestion Mode path is covered by unit tests.
+ * sidebar; the Suggestion Mode path is in tests/e2e/suggestion-mode.
  */
 const { test, expect } = require('../fixtures');
 
