@@ -37,13 +37,15 @@ class MockModeReviewService extends Review_Service {
 	 * @param  string $system_instruction System instruction.
 	 * @param  string $model              Model to use.
 	 * @param  int    $max_retries        Maximum number of retry attempts.
+	 * @param  array  $images             Images to attach.
 	 * @return string|WP_Error Always an error.
 	 */
 	protected function call_ai_with_retry(
 		string $prompt,
 		string $system_instruction,
 		string $model,
-		int $max_retries = 3
+		int $max_retries = 3,
+		array $images = array()
 	): string|WP_Error {
 		++$this->ai_calls;
 		return new WP_Error( 'invalid_request', 'Bad request.' );

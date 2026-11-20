@@ -194,22 +194,35 @@ class Review_Service {
 			Logger::debug( sprintf( 'Continuation review with %d existing feedback items', count( $existing_feedback ) ) );
 		}
 
-		// Build prompt with existing feedback context if available.
-		$prompt             = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
-		$system_instruction = $this->prompt_builder->get_system_instruction( $is_continuation );
-
 		// Get AI model.
-		$model = $options['model'] ?? AI_FEEDBACK_DEFAULT_MODEL;
+		$model    = $options['model'] ?? AI_FEEDBACK_DEFAULT_MODEL;
+		$is_mock  = self::is_mock_mode();
+		$images   = $is_mock || ! is_array( $blocks ) || ! is_string( $model ) ? array() : $this->get_review_images( $blocks, $model );
+		$attached = array_column( $images, 'block_id' );
+
+		// Build prompt with existing feedback context if available.
+		$options['image_blocks'] = $attached;
+		$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
+		$system_instruction      = $this->prompt_builder->get_system_instruction( $is_continuation );
 
 		Logger::debug( sprintf( 'Calling AI model: %s', $model ) );
 
 		// Check if using mock mode.
-		if ( defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE ) {
+		if ( $is_mock ) {
 			$ai_response = $this->get_mock_response( $blocks );
 			Logger::debug( 'Using mock response mode' );
 		} else {
 			// Call AI with retry logic.
-			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model );
+			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 3, $images );
+
+			// A model may refuse image input; review the text alone then.
+			if ( is_wp_error( $ai_response ) && array() !== $images && ! $this->is_service_unavailable_error( $ai_response ) ) {
+				Logger::debug( sprintf( 'AI request with images failed (%s), retrying without them', $ai_response->get_error_code() ) );
+				$attached                = array();
+				$options['image_blocks'] = array();
+				$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
+				$ai_response             = $this->call_ai_with_retry( $prompt, $system_instruction, $model );
+			}
 
 			if ( is_wp_error( $ai_response ) ) {
 				Logger::debug( sprintf( 'AI request failed: %s', $ai_response->get_error_message() ) );
@@ -222,7 +235,7 @@ class Review_Service {
 		Logger::debug( 'AI response received, parsing feedback' );
 
 		// Parse response (now returns summary + feedback).
-		$parsed_response = $this->response_parser->parse_feedback( $ai_response, $blocks );
+		$parsed_response = $this->response_parser->parse_feedback( $ai_response, $blocks, false, $attached );
 
 		$ai_summary     = $parsed_response['summary'] ?? '';
 		$feedback_items = $parsed_response['feedback'] ?? array();
@@ -309,6 +322,29 @@ class Review_Service {
 	}
 
 	/**
+	 * Whether reviews use the built-in mock response.
+	 *
+	 * @return bool
+	 */
+	private static function is_mock_mode(): bool {
+		return defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE;
+	}
+
+	/**
+	 * Images to show the model so it can propose alt text, when it can see.
+	 *
+	 * @param  array<mixed> $blocks Blocks being reviewed.
+	 * @param  string       $model  Model ID.
+	 * @return list<array{block_id: string, mime: string, data: string}> Images.
+	 */
+	protected function get_review_images( array $blocks, string $model ): array {
+		if ( ! ( new Settings_Controller() )->model_has_capability( $model, 'vision' ) ) {
+			return array();
+		}
+		return ( new Review_Images() )->collect( $blocks );
+	}
+
+	/**
 	 * Announce a completed review so history and other listeners can record it.
 	 *
 	 * @param int                  $post_id Post ID.
@@ -361,12 +397,13 @@ class Review_Service {
 	 *
 	 * Raises core's AI request timeout for the duration of this call only.
 	 *
-	 * @param  string $prompt             User prompt.
-	 * @param  string $system_instruction System instruction.
-	 * @param  string $model              Model to use.
+	 * @param  string                                                    $prompt             User prompt.
+	 * @param  string                                                    $system_instruction System instruction.
+	 * @param  string                                                    $model              Model to use.
+	 * @param  list<array{block_id: string, mime: string, data: string}> $images             Images to attach, in order, from Review_Images.
 	 * @return string|WP_Error AI response or error.
 	 */
-	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
+	protected function call_ai( string $prompt, string $system_instruction, string $model, array $images = array() ): string|WP_Error {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
@@ -388,7 +425,12 @@ class Review_Service {
 		try {
 			// Lower temperature keeps feedback consistent. Max tokens covers large
 			// documents while staying within all supported models' limits.
-			return wp_ai_client_prompt( $prompt )
+			$builder = wp_ai_client_prompt( $prompt );
+			// Inline data built here from local files, never a URL or path.
+			foreach ( $images as $image ) {
+				$builder = $builder->with_file( 'data:' . $image['mime'] . ';base64,' . $image['data'], $image['mime'] );
+			}
+			return $builder
 				->using_system_instruction( $system_instruction )
 				->using_model_preference( $model )
 				->using_temperature( 0.3 )
@@ -411,17 +453,19 @@ class Review_Service {
 	/**
 	 * Call AI service with retry logic and exponential backoff.
 	 *
-	 * @param  string $prompt             User prompt.
-	 * @param  string $system_instruction System instruction.
-	 * @param  string $model              Model to use.
-	 * @param  int    $max_retries        Maximum number of retry attempts.
+	 * @param  string                                                    $prompt             User prompt.
+	 * @param  string                                                    $system_instruction System instruction.
+	 * @param  string                                                    $model              Model to use.
+	 * @param  int                                                       $max_retries        Maximum number of retry attempts.
+	 * @param  list<array{block_id: string, mime: string, data: string}> $images Images to attach, see call_ai().
 	 * @return string|WP_Error AI response or error.
 	 */
 	protected function call_ai_with_retry(
 		string $prompt,
 		string $system_instruction,
 		string $model,
-		int $max_retries = 3
+		int $max_retries = 3,
+		array $images = array()
 	): string|WP_Error {
 		$delay_ms   = 1000; // Start at 1 second (1000ms).
 		$last_error = null;
@@ -441,7 +485,7 @@ class Review_Service {
 				$delay_ms *= 2; // Exponential backoff for next attempt.
 			}
 
-			$response = $this->call_ai( $prompt, $system_instruction, $model );
+			$response = $this->call_ai( $prompt, $system_instruction, $model, $images );
 
 			// Success - return immediately.
 			if ( ! is_wp_error( $response ) ) {

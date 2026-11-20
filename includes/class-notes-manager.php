@@ -35,6 +35,11 @@ class Notes_Manager {
 	public const BLOCK_ACTION_META_KEY = 'feedback_block_action';
 
 	/**
+	 * Comment meta key for a review note's formatting fix (`block_change`).
+	 */
+	public const BLOCK_CHANGE_META_KEY = 'feedback_block_change';
+
+	/**
 	 * Label for a revision of a thread's suggested edit.
 	 *
 	 * @param  int $revision Revision number, from 1.
@@ -79,12 +84,12 @@ class Notes_Manager {
 			$grouped_feedback[ $block_id ][] = $item;
 		}
 
-		// Only a thread's root note keeps a structural edit, so the item
-		// carrying one leads its block's thread.
+		// Only a thread's root note keeps a structural edit or formatting
+		// fix, so the item carrying one leads its block's thread.
 		foreach ( $grouped_feedback as $block_id => $items ) {
 			usort(
 				$items,
-				static fn ( mixed $a, mixed $b ): int => (int) self::has_block_action( $b ) <=> (int) self::has_block_action( $a )
+				static fn ( mixed $a, mixed $b ): int => (int) self::has_block_edit( $b ) <=> (int) self::has_block_edit( $a )
 			);
 			$grouped_feedback[ $block_id ] = $items;
 		}
@@ -131,13 +136,16 @@ class Notes_Manager {
 	}
 
 	/**
-	 * Whether a feedback item carries a structural edit.
+	 * Whether a feedback item carries a structural edit or a formatting fix.
 	 *
 	 * @param  mixed $item Feedback item.
 	 * @return bool
 	 */
-	private static function has_block_action( mixed $item ): bool {
-		return is_array( $item ) && ! empty( $item['block_action'] ) && is_array( $item['block_action'] );
+	private static function has_block_edit( mixed $item ): bool {
+		return is_array( $item ) && (
+			( ! empty( $item['block_action'] ) && is_array( $item['block_action'] ) )
+			|| ( ! empty( $item['block_change'] ) && is_array( $item['block_change'] ) )
+		);
 	}
 
 	/**
@@ -155,9 +163,11 @@ class Notes_Manager {
 
 		// A structural edit is only kept on a thread's root note: the thread's
 		// edits supersede one another from the root on, so one on a later
-		// note in the thread could not be told apart from the root's.
+		// note in the thread could not be told apart from the root's. A
+		// formatting fix may replace the block, which keeps only the root
+		// note's link.
 		if ( $parent_id > 0 ) {
-			unset( $feedback_item['block_action'] );
+			unset( $feedback_item['block_action'], $feedback_item['block_change'] );
 		}
 
 		// Build metadata first so we can log it.
@@ -425,6 +435,10 @@ class Notes_Manager {
 
 		if ( ! empty( $feedback_item['block_action'] ) && is_array( $feedback_item['block_action'] ) ) {
 			$meta[ self::BLOCK_ACTION_META_KEY ] = wp_json_encode( $feedback_item['block_action'] );
+		}
+
+		if ( ! empty( $feedback_item['block_change'] ) && is_array( $feedback_item['block_change'] ) ) {
+			$meta[ self::BLOCK_CHANGE_META_KEY ] = wp_json_encode( $feedback_item['block_change'] );
 		}
 
 		if ( ! empty( $feedback_item['reply_edit'] ) && is_array( $feedback_item['reply_edit'] ) ) {
@@ -1006,6 +1020,12 @@ class Notes_Manager {
 		$values['quick_fix'] = $this->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) );
 
 		$values['block_action'] = self::decode_block_action( get_comment_meta( $note_id, self::BLOCK_ACTION_META_KEY, true ) );
+
+		$block_name             = get_comment_meta( $note_id, 'block_name', true );
+		$values['block_change'] = Block_Change::decode(
+			get_comment_meta( $note_id, self::BLOCK_CHANGE_META_KEY, true ),
+			is_string( $block_name ) ? $block_name : ''
+		);
 
 		$values['suggestion_status'] = ( new Suggestions() )->get_status( $note_id );
 

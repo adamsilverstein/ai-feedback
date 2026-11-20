@@ -340,28 +340,43 @@ class Review_Controller extends WP_REST_Controller {
 				'items'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'clientId' => array(
+						'clientId'   => array(
 							'type'     => 'string',
 							'required' => true,
 							'format'   => 'text-field',
 						),
-						'name'     => array(
+						'name'       => array(
 							'type'     => 'string',
 							'required' => true,
 							'format'   => 'text-field',
 						),
-						'content'  => array(
+						'content'    => array(
 							'type'     => 'string',
 							'required' => true,
 							'format'   => 'text-field',
 						),
-						'anchor'   => array(
+						'anchor'     => array(
 							'type'    => 'string',
 							'pattern' => '^[a-z0-9]{1,32}$',
 						),
-						'parent'   => array(
+						'parent'     => array(
 							'type'   => 'string',
 							'format' => 'text-field',
+						),
+						'attributes' => array(
+							'description' => __( 'Attributes formatting fixes depend on: heading level, list type, and an image block\'s alt text, attachment ID and URL.', 'fresh-eyes' ),
+							'type'        => 'object',
+							'properties'  => array(
+								'level'   => array(
+									'type'    => 'integer',
+									'minimum' => 1,
+									'maximum' => 6,
+								),
+								'ordered' => array( 'type' => 'boolean' ),
+								'alt'     => array( 'type' => 'string' ),
+								'id'      => array( 'type' => 'integer' ),
+								'url'     => array( 'type' => 'string' ),
+							),
 						),
 					),
 				),

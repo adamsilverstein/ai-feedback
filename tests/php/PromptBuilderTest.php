@@ -145,7 +145,7 @@ class PromptBuilderTest extends TestCase {
 
 		$result = $this->invoke_private( 'format_blocks_for_prompt', array( $blocks ) );
 
-		$this->assertStringContainsString( '[core/heading - review for hierarchy and SEO]', $result );
+		$this->assertStringContainsString( '[core/heading - review for hierarchy and SEO; level 2]', $result );
 		$this->assertStringContainsString( 'Block ID: abc-123', $result );
 		$this->assertStringContainsString( 'My Heading', $result );
 	}
@@ -245,7 +245,7 @@ class PromptBuilderTest extends TestCase {
 		$prompt = $this->builder->build_review_prompt( $blocks );
 
 		$this->assertStringContainsString( '[core/paragraph - review for readability and clarity]', $prompt );
-		$this->assertStringContainsString( '[core/list - review for parallel structure]', $prompt );
+		$this->assertStringContainsString( '[core/list - review for parallel structure; bulleted]', $prompt );
 	}
 
 	/**

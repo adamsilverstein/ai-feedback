@@ -331,6 +331,23 @@ class Settings_Controller extends WP_REST_Controller {
 	}
 
 	/**
+	 * Whether a model the plugin lists has a capability, eg. `vision`.
+	 *
+	 * @param  string $model_id   Model ID.
+	 * @param  string $capability Capability.
+	 * @return bool False for unknown models.
+	 */
+	public function model_has_capability( string $model_id, string $capability ): bool {
+		foreach ( $this->get_available_models() as $model ) {
+			if ( ( $model['id'] ?? null ) === $model_id ) {
+				$capabilities = $model['capabilities'] ?? array();
+				return is_array( $capabilities ) && in_array( $capability, $capabilities, true );
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Get available AI models.
 	 *
 	 * @return list<array<string, mixed>>
