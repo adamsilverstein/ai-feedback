@@ -263,6 +263,10 @@ describe('matchesTargetText', () => {
 	it('needs the whole text when it was short, and the start otherwise', () => {
 		expect(matchesTargetText('Step 1 of setup.', 'Step 1')).toBe(false);
 		expect(matchesTargetText(' Step  1 ', 'Step 1')).toBe(true);
+		// 79 characters, 80 UTF-16 units: still the whole text.
+		const emoji = `${'a'.repeat(78)}🙂`;
+		expect(matchesTargetText(`${emoji} and more`, emoji)).toBe(false);
+		expect(matchesTargetText(emoji, emoji)).toBe(true);
 		expect(matchesTargetText(`${LONG} here.`, LONG.slice(0, 80))).toBe(
 			true
 		);

@@ -220,7 +220,8 @@ const TARGET_TEXT_LENGTH = 80;
  */
 export function matchesTargetText(blockText, targetText) {
 	const text = normalizeText(blockText);
-	return targetText.length < TARGET_TEXT_LENGTH
+	// Counted in characters, as the server cuts it, not UTF-16 units.
+	return Array.from(targetText).length < TARGET_TEXT_LENGTH
 		? text === targetText
 		: text.startsWith(targetText);
 }
