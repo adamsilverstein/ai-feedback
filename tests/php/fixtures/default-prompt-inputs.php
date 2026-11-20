@@ -7,6 +7,10 @@
  * can be checked against the prompts it sent then. reply.txt was rebuilt
  * when house style (#285) added REMEMBERING PREFERENCES to every reply.
  *
+ * After a deliberate change to the default prompts, such as the line break
+ * instruction for `find`, rebuild them with regenerate-default-prompts.php
+ * and check the diff holds only the intended lines.
+ *
  * @package AI_Feedback\Tests
  */
 

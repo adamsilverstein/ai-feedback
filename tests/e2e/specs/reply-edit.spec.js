@@ -20,14 +20,18 @@ const EDITED = 'Revenue grew 40% in 2025.';
  * @param {Object} fixtures.admin        Admin fixture.
  * @param {Object} fixtures.requestUtils Request utils fixture.
  * @param {Object} fixtures.aiFeedback   AI Feedback fixture.
+ * @param {string} [content]             Paragraph HTML.
  * @return {Promise<number>} ID of the review's note on the paragraph.
  */
-async function reviewPost({ editor, admin, requestUtils, aiFeedback }) {
+async function reviewPost(
+	{ editor, admin, requestUtils, aiFeedback },
+	content = CONTENT
+) {
 	// Create the post over REST: content added in a freshly loaded editor is
 	// sometimes lost before the save, which leaves nothing to review.
 	const post = await requestUtils.createPost({
 		title: 'Reply edit',
-		content: `<!-- wp:paragraph --><p>${CONTENT}</p><!-- /wp:paragraph -->`,
+		content: `<!-- wp:paragraph --><p>${content}</p><!-- /wp:paragraph -->`,
 		status: 'draft',
 	});
 	await admin.editPost(post.id);
@@ -72,6 +76,34 @@ async function setParagraphContent(page, content) {
 			content: html,
 		});
 	}, content);
+}
+
+/**
+ * Reply to a note as the author.
+ *
+ * @param {import('@playwright/test').Page} page    Page.
+ * @param {number}                          parent  Note to reply to.
+ * @param {string}                          content Reply text.
+ */
+async function replyToNote(page, parent, content) {
+	await page.evaluate(
+		async (reply) => {
+			const { select, dispatch } = window.wp.data;
+			await dispatch('core').saveEntityRecord(
+				'root',
+				'comment',
+				{
+					post: select('core/editor').getCurrentPostId(),
+					content: reply.content,
+					status: 'hold',
+					type: 'note',
+					parent: reply.parent,
+				},
+				{ throwOnError: true }
+			);
+		},
+		{ parent, content }
+	);
 }
 
 test.describe('Reply edits', () => {
@@ -151,24 +183,7 @@ test.describe('Reply edits', () => {
 			aiFeedback,
 		});
 
-		await page.evaluate(
-			async ({ parent }) => {
-				const { select, dispatch } = window.wp.data;
-				await dispatch('core').saveEntityRecord(
-					'root',
-					'comment',
-					{
-						post: select('core/editor').getCurrentPostId(),
-						content: 'Which figure do you mean?',
-						status: 'hold',
-						type: 'note',
-						parent,
-					},
-					{ throwOnError: true }
-				);
-			},
-			{ parent: noteId }
-		);
+		await replyToNote(page, noteId, 'Which figure do you mean?');
 
 		const thread = page.getByRole('list', { name: 'Conversation replies' });
 		await expect(thread.locator('.ai-feedback-reply-ai')).toContainText(
@@ -179,5 +194,34 @@ test.describe('Reply edits', () => {
 			thread.getByRole('button', { name: 'Apply change' })
 		).toHaveCount(0);
 		expect(await paragraphContent(editor)).toBe(CONTENT);
+	});
+
+	test('an edit across a line break applies and keeps the break', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const content = 'Revenue grew 40%<br>last year.';
+		const noteId = await reviewPost(
+			{ editor, admin, requestUtils, aiFeedback },
+			content
+		);
+
+		await replyToNote(page, noteId, 'Make this change on both lines.');
+
+		const thread = page.getByRole('list', { name: 'Conversation replies' });
+		const aiReply = thread.locator('.ai-feedback-reply-ai');
+		await expect(aiReply).toContainText('both lines now read', {
+			timeout: 30000,
+		});
+		await expect(aiReply).not.toContainText('This change is outdated');
+
+		await aiReply.getByRole('button', { name: 'Apply change' }).click();
+
+		await expect
+			.poll(() => paragraphContent(editor))
+			.toBe('Revenue grew 40%<br>in 2025.');
 	});
 });

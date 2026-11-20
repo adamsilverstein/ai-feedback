@@ -72,6 +72,26 @@ describe('isEditCurrent', () => {
 			false
 		);
 	});
+	it('reads a line break as the server does', () => {
+		const html = 'Revenue grew 40%<br>last year.';
+		const edit = { type: 'replace_text', replace: 'x' };
+		expect(isEditCurrent(html, { ...edit, find: '40% last year' })).toBe(
+			false
+		);
+		expect(isEditCurrent(html, { ...edit, find: '40%\nlast year' })).toBe(
+			true
+		);
+	});
+
+	it('matches a space in the find to a non-breaking space', () => {
+		expect(
+			isEditCurrent('Revenue grew&nbsp;40% last year.', {
+				type: 'replace_text',
+				find: 'grew 40%',
+				replace: 'grew 45%',
+			})
+		).toBe(true);
+	});
 });
 
 describe('rewrites of formatted blocks', () => {

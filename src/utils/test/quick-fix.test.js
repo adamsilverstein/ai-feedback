@@ -156,3 +156,79 @@ describe('fixes that add words', () => {
 		).toBe('was not here, it was not there');
 	});
 });
+
+// The server reads the block the same way (Reply_Service::editor_text()), so
+// a `find` it accepts always matches here.
+describe('line breaks', () => {
+	it.each([
+		['br', 'Revenue grew 40%<br>last year.'],
+		['self-closing', 'Revenue grew 40%<br/>last year.'],
+		['spaced closing', 'Revenue grew 40%<br />last year.'],
+	])('does not match a find across a %s with a space', (_label, html) => {
+		expect(
+			applyFixToContent(html, { find: '40% last year', replace: 'x' })
+		).toBeNull();
+	});
+
+	it('applies a find that holds the break and keeps it', () => {
+		expect(
+			applyFixToContent('Revenue grew 40%<br />last year.', {
+				find: '40%\nlast year',
+				replace: '40%\nin 2025',
+			})
+		).toBe('Revenue grew 40%<br>in 2025.');
+	});
+
+	it('applies a find on one side of the break', () => {
+		expect(
+			applyFixToContent('Revenue grew 40%<br>last year.', {
+				find: 'last year',
+				replace: 'in 2025',
+			})
+		).toBe('Revenue grew 40%<br>in 2025.');
+	});
+
+	it('shows the break in the preview', () => {
+		expect(
+			getFixPreview('Revenue grew 40%<br>last year.', {
+				find: 'last year',
+				replace: 'in 2025',
+			})
+		).toEqual({
+			before: 'Revenue grew 40%\n',
+			removed: 'last year',
+			added: 'in 2025',
+			after: '.',
+		});
+	});
+});
+
+// The server reads `&nbsp;` as a space, so a `find` written with spaces
+// matches non-breaking ones here too.
+describe('non-breaking spaces', () => {
+	it.each([
+		['space in find', 'grew 40%', 'grew 40%', [0]],
+		['nbsp in find', 'grew 40%', 'grew 40%', [0]],
+		['still one character', 'a  b', 'a b', []],
+	])('matches with a %s', (_label, text, find, expected) => {
+		expect(findMatches(text, find)).toEqual(expected);
+	});
+
+	it('applies a fix over a non-breaking space', () => {
+		expect(
+			applyFixToContent('Revenue grew&nbsp;40% last year.', {
+				find: 'grew 40%',
+				replace: 'grew 45%',
+			})
+		).toBe('Revenue grew 45% last year.');
+	});
+
+	it('sees a fix that adds words as in place', () => {
+		expect(
+			isFixInPlace('We read the&nbsp;data.', {
+				find: 'data',
+				replace: 'the data',
+			})
+		).toBe(true);
+	});
+});
