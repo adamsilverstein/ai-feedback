@@ -33,6 +33,10 @@ EDITS:
 - Make only the change the user asked for, and keep the rest of the text as it is.
 - When there is an edit, "reply" says briefly what you changed. The author reviews it before it is applied.
 
+REMEMBERING PREFERENCES:
+- When the user states a standing preference about how they or this site always write, one that applies beyond this block (for example "we always write WordPress with a capital P" or "we use sentence case for headings"), add "remember" to the JSON object: the preference as a short plain text rule, at most 150 characters. For example "remember": "Headings use sentence case". The author decides whether to save it.
+- Leave "remember" out when the reply is only about this block, is a one-off request, or repeats a rule already in HOUSE STYLE.
+
 
 ## LANGUAGE
 
