@@ -65,7 +65,9 @@ export default function ReviewSummary({ review, progress = null }) {
 		note_count: noteCount,
 		model,
 		block_mapping: blockMapping,
+		persona_label: personaLabel,
 	} = review;
+	const personaTakeaway = personaLabel ? review.persona_takeaway : '';
 
 	const hasNotes = notes && notes.length > 0;
 	const comparison = describeComparison(review.progress, noteCount ?? 0);
@@ -114,9 +116,21 @@ export default function ReviewSummary({ review, progress = null }) {
 			)}
 
 			{/* AI-generated summary text */}
-			{summaryText && (
+			{(summaryText || personaTakeaway) && (
 				<div className="ai-summary-text">
-					<p>{summaryText}</p>
+					{personaTakeaway && (
+						<p className="ai-feedback-persona-takeaway">
+							<strong>
+								{sprintf(
+									/* translators: %s: reader persona, such as "Busy skimmer". */
+									__('%s:', 'fresh-eyes'),
+									personaLabel
+								)}
+							</strong>{' '}
+							{personaTakeaway}
+						</p>
+					)}
+					{summaryText && <p>{summaryText}</p>}
 				</div>
 			)}
 

@@ -108,6 +108,13 @@ export function mergeChunkResponses(responses) {
 			.filter(Boolean)
 			.join(' ');
 
+	// Every part runs as the same persona; the last part's takeaway covers
+	// the whole document, like its summary.
+	const takeaway =
+		last.persona_takeaway ||
+		[...responses].reverse().find((response) => response.persona_takeaway)
+			?.persona_takeaway;
+
 	return {
 		...last,
 		...merged,
@@ -117,6 +124,7 @@ export function mergeChunkResponses(responses) {
 		),
 		// The first part compared the notes the last review left open.
 		progress: responses[0].progress ?? null,
+		...(takeaway ? { persona_takeaway: takeaway } : {}),
 		chunks: responses.length,
 	};
 }

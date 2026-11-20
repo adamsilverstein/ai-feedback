@@ -1,0 +1,216 @@
+Please review the following document and provide actionable editorial feedback.
+
+DOCUMENT TITLE: Why our plugin is faster
+
+DOCUMENT BLOCKS:
+Block ID: block-1 [core/heading - review for hierarchy and SEO; level 2]
+Why our plugin is faster
+
+---
+
+Block ID: block-2 [core/paragraph - review for readability and clarity]
+Our plugin is 40% faster than the alternatives, in order to save you time.
+
+FOCUS AREAS:
+- Content Quality - Evaluate clarity, accuracy, completeness, and value. Look for vague statements, missing context, unsupported claims, or areas that need more detail.
+- Tone & Voice - Assess consistency of voice, appropriateness for audience, and alignment with target tone. Flag jarring shifts in formality or inconsistent terminology.
+- Flow & Structure - Analyze logical progression, transitions between ideas, paragraph structure, and overall organization. Identify awkward jumps or missing connections.
+- Grammar & Spelling - Proofread for typos, misspellings, wrong words (its/it's, their/there), agreement errors and missing or doubled words. Each one is a single "grammar" item with a quick_fix.
+
+TARGET TONE:
+Professional - Clear, authoritative, and polished. Suitable for business content, technical documentation, and formal communications. Use industry-standard terminology and maintain objectivity.
+
+## LANGUAGE
+
+Provide feedback in English.
+
+
+## PROOFREADING
+
+- Report each spelling, typo or grammar error as its own item with "category": "grammar" and "severity": "suggestion", not under "content".
+- Every "grammar" item must have a "quick_fix" that corrects just that error; items without one are discarded. Keep "find" short: the word or phrase with the error. When that text appears more than once in the block, even correctly elsewhere, widen "find" with a neighboring word so it matches only the error; a "find" that matches twice is discarded.
+- Two errors in one block are two items. Their "find" texts must not overlap.
+- Keep the title to the correction itself, for example "teh → the", and the feedback to one short sentence.
+- Spelling and grammar follow American English (en_US). Do not flag a spelling that is correct there, even if another variant of the language spells it differently.
+- Leave style, word choice and tone to the other focus areas; only correct what is wrong.
+
+BLOCK-TYPE SPECIFIC GUIDANCE:
+When reviewing blocks, apply these type-specific criteria in addition to the general review focus areas:
+
+Headings (core/heading):
+- Verify proper heading hierarchy (H1 → H2 → H3, no skipped levels). Each heading's level is shown with it; fix a skipped level with a block_change that sets "level"
+- Check that headings are descriptive and support scannability
+- Evaluate SEO value of heading text
+
+Paragraphs (core/paragraph):
+- Assess readability and sentence length variation
+- Check for clarity, conciseness, and unnecessary jargon
+- Look for passive voice overuse
+- A paragraph listing several items separated by commas or semicolons can become a list (block_change transform to core/list)
+- A wall of text can be split after a sentence (block_change split)
+
+Lists (core/list):
+- Verify parallel grammatical structure across items
+- Check consistent punctuation and capitalization
+- Ensure logical ordering of items
+- Steps that must happen in order belong in a numbered list (block_change set_attributes ordered)
+
+Quotes (core/quote):
+- Verify attribution is present and accurate
+- Check that the quote supports the surrounding context
+
+Images (core/image):
+- Evaluate alt text quality (descriptive, concise, not redundant). Flag an image with no alt text; propose alt text only for an attached image
+- Check that the image supports the surrounding content
+
+Tables (core/table):
+- Review data organization and header clarity
+- Check for consistent formatting across cells
+
+Code (core/code):
+- Check that code blocks have sufficient context or explanation
+- Verify language is specified when relevant
+
+INSTRUCTIONS:
+- Provide specific, actionable feedback for each issue you identify
+- Reference blocks by their block_id (the unique identifier shown for each block)
+- Prioritize the most impactful suggestions
+- Be encouraging but honest
+- Each feedback item should explain WHY it matters and HOW to improve it
+- Include an overall summary of the document quality
+
+OUTPUT FORMAT:
+Return your response as a JSON object with two properties: "summary" and "feedback".
+
+{
+  "summary": "A one-paragraph overall assessment of the document (max 300 chars). Include the total number of notes, overall tone assessment, and key improvement areas.",
+  "feedback": [
+    {
+      "block_id": "abc123-def456",
+      "category": "content|tone|flow|design|grammar",
+      "severity": "suggestion|important|critical",
+      "title": "Brief title (max 50 chars)",
+      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",
+      "suggestion": "Specific action to take (max 200 chars, optional)",
+      "quick_fix": { "find": "exact text copied from the block", "replace": "replacement text" }
+    }
+  ]
+}
+
+REFERENCE EXAMPLES:
+Use these as a guide for the quality, format, and tone of your feedback.
+Each item in the "feedback" array should follow this format:
+
+Content quality example (severity: important):
+{
+  "summary": "The document has strong structure but several claims lack supporting evidence.",
+  "feedback": [
+    {
+      "block_id": "example-1",
+      "category": "content",
+      "severity": "important",
+      "title": "Cite your source",
+      "feedback": "The statistic '80% of users prefer...' needs attribution. Unsourced data weakens credibility.",
+      "suggestion": "Add source: 'According to [Study Name, Year], 80% of users prefer...'"
+    }
+  ]
+}
+
+Tone example (severity: suggestion):
+{
+  "summary": "Good content overall, but a few phrases break the formal tone.",
+  "feedback": [
+    {
+      "block_id": "example-2",
+      "category": "tone",
+      "severity": "suggestion",
+      "title": "Match formal tone",
+      "feedback": "The phrase 'pretty cool feature' is too casual for this technical document.",
+      "suggestion": "Replace with: 'This feature significantly improves...'"
+    }
+  ]
+}
+
+Flow example (severity: important):
+{
+  "summary": "Content is well-written but transitions between sections need work.",
+  "feedback": [
+    {
+      "block_id": "example-3",
+      "category": "flow",
+      "severity": "important",
+      "title": "Add transition",
+      "feedback": "Abrupt topic shift between pricing and features. Readers need context.",
+      "suggestion": "Add transition: 'Beyond pricing benefits, the feature also offers...'"
+    }
+  ]
+}
+
+Design example (severity: suggestion):
+{
+  "summary": "Content reads well but formatting could improve scannability.",
+  "feedback": [
+    {
+      "block_id": "example-4",
+      "category": "design",
+      "severity": "suggestion",
+      "title": "Use a list for scannability",
+      "feedback": "Five items listed in one paragraph are hard to scan.",
+      "suggestion": "Convert to a bulleted list with one item per benefit."
+    }
+  ]
+}
+
+When content is well-written, return minimal or no feedback:
+{
+  "summary": "Well-structured content with clear arguments and consistent tone.",
+  "feedback": []
+}
+
+Grammar example (severity: suggestion):
+{
+  "summary": "Clear post with two typos in the opening.",
+  "feedback": [
+    {
+      "block_id": "example-5",
+      "category": "grammar",
+      "severity": "suggestion",
+      "title": "teh → the",
+      "feedback": "Typo.",
+      "quick_fix": { "find": "teh", "replace": "the" }
+    },
+    {
+      "block_id": "example-5",
+      "category": "grammar",
+      "severity": "suggestion",
+      "title": "it's → its",
+      "feedback": "The possessive has no apostrophe.",
+      "quick_fix": { "find": "it's lid", "replace": "its lid" }
+    }
+  ]
+}
+
+
+IMPORTANT:
+- The "block_id" must exactly match one of the block IDs provided in the document
+- Return ONLY valid JSON, no additional text or explanation
+- If no feedback is needed for a block, don't include it in the array
+- "quick_fix" is optional. Include it only for a simple, mechanical text change inside one block, such as replacing a word or phrase, fixing a typo, or deleting filler words. Never for rewrites or structural changes
+- "find" must be copied exactly, character for character, from that block's content, and long enough to appear only once in the block (max 200 chars)
+- "replace" is the text that takes its place (max 200 chars). Use an empty string to delete the text. To insert text, include a nearby phrase in "find" and the phrase plus the new text in "replace"
+- "block_action" is optional, for a structural change the feedback asks for. Include it only when the structure clearly needs to change, at most one per block, and leave out "quick_fix" when you include it. The author accepts or rejects each one:
+  - { "type": "remove" } deletes the block, for example when it repeats another block or adds nothing.
+  - { "type": "move", "target_block_id": "<another block_id from the document>", "position": "before|after" } moves the block next to another block, for example to make it the opening.
+  - { "type": "insert", "position": "before|after", "block": { "name": "core/paragraph", "content": "text" } or { "name": "core/heading", "level": 2, "content": "text" } (level 2-6) or { "name": "core/list", "ordered": false, "items": [ "text", "text" ] } (at most 20 items) } adds a new block next to this one, for example a missing heading.
+  - Inserted text may only use inline formatting tags (<strong>, <em>, <a href>, <code>), at most 1000 characters.
+- "block_change" is optional, for a one-click formatting fix to the block that keeps its text exactly as it is. Use it instead of "quick_fix" and "block_action", at most one per block:
+  - { "type": "set_attributes", "attributes": { "level": 3 } } for a heading at the wrong level (2-6), for example one that skips a level after the heading before it. Lists can take { "ordered": true|false }.
+  - { "type": "transform", "to": "core/list", "items": [ "text", "text" ] } turns a paragraph that runs several items together, separated by commas or semicolons, into a list. Each item must be copied exactly from the paragraph, in order; only the separators and a final "and" or "or" between them are dropped, and any text before the first item stays as an introduction.
+  - { "type": "transform", "to": "core/heading", "level": 2 } turns a short paragraph that works as a section title into a heading; { "type": "transform", "to": "core/paragraph" } turns a heading that is really body text into a paragraph.
+  - { "type": "split", "after": "exact end of a sentence." } splits a long paragraph in two after that sentence. Copy the end of the sentence exactly, including its final punctuation, long enough to appear only once.
+  - You cannot see the images. For an image without alt text, give feedback saying alt text is missing, but do not propose any.
+
+STRENGTHS:
+- Also return a "strengths" array next to "summary" and "feedback", listing up to 3 things the document already does well, so the author knows to keep them.
+- Each strength is one sentence (max 150 chars) about one block, saying what works: { "block_id": "abc123-def456", "text": "The opening example makes the problem concrete." }
+- Only list strengths that are specific to this document and true. Return an empty array rather than generic praise, and never repeat a strength as feedback.

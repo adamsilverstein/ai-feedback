@@ -128,3 +128,46 @@ describe('mergeChunkResponses', () => {
 		expect(mergeChunkResponses([{}]).progress).toBeNull();
 	});
 });
+
+describe('mergeChunkResponses persona takeaway', () => {
+	const part = (overrides) => ({
+		notes: [],
+		note_ids: [],
+		block_mapping: {},
+		note_count: 0,
+		summary: {},
+		...overrides,
+	});
+
+	it("keeps the last part's persona takeaway", () => {
+		const merged = mergeChunkResponses([
+			part({ persona_takeaway: 'First part.' }),
+			part({
+				persona: 'busy_skimmer',
+				persona_label: 'Busy skimmer',
+				persona_takeaway: 'Got the point by the second heading.',
+			}),
+		]);
+
+		expect(merged.persona_label).toBe('Busy skimmer');
+		expect(merged.persona_takeaway).toBe(
+			'Got the point by the second heading.'
+		);
+	});
+
+	it('falls back to the latest earlier takeaway', () => {
+		const merged = mergeChunkResponses([
+			part({ persona_takeaway: 'First part.' }),
+			part({ persona_takeaway: 'Second part.' }),
+			part({ persona_label: 'Busy skimmer', persona_takeaway: '' }),
+		]);
+
+		expect(merged.persona_takeaway).toBe('Second part.');
+	});
+
+	it('adds no takeaway to a default review', () => {
+		expect(mergeChunkResponses([part({}), part({})])).not.toHaveProperty(
+			'persona_takeaway'
+		);
+	});
+});

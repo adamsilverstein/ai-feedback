@@ -180,6 +180,10 @@ class Review_Service {
 			$options['locale'] = get_locale();
 		}
 
+		// An unknown persona, such as one a filter removed, reviews as the default.
+		$options['persona']  = Personas::normalize( $options['persona'] ?? null );
+		$options['audience'] = Personas::sanitize_audience( $options['audience'] ?? '' );
+
 		// Get existing feedback for continuation reviews if not already provided.
 		$existing_feedback = $options['existing_feedback'] ?? array();
 		$is_continuation   = ! empty( $existing_feedback );
@@ -209,7 +213,7 @@ class Review_Service {
 
 		// Check if using mock mode.
 		if ( $is_mock ) {
-			$ai_response = $this->get_mock_response( $blocks );
+			$ai_response = $this->get_mock_response( is_array( $blocks ) ? $blocks : array(), $options['persona'] );
 			Logger::debug( 'Using mock response mode' );
 		} else {
 			// Call AI with retry logic.
@@ -241,6 +245,7 @@ class Review_Service {
 		$ai_summary     = $parsed_response['summary'] ?? '';
 		$feedback_items = $parsed_response['feedback'] ?? array();
 		$strengths      = is_array( $parsed_response ) ? $parsed_response['strengths'] ?? array() : array();
+		$persona        = $this->build_persona_result( $options['persona'], is_array( $parsed_response ) ? ( $parsed_response['persona_takeaway'] ?? '' ) : '' );
 
 		if ( empty( $feedback_items ) ) {
 			Logger::debug( 'No feedback items parsed from AI response' );
@@ -260,6 +265,7 @@ class Review_Service {
 			'post_id'   => $post_id,
 			'model'     => $model,
 			'timestamp' => current_time( 'c', true ),
+			'persona'   => $options['persona'],
 		);
 
 		// Create WordPress Notes from feedback.
@@ -288,7 +294,7 @@ class Review_Service {
 				'block_mapping' => array(),
 				'note_count'    => count( $feedback_items ),
 				'notes_error'   => $note_result->get_error_message(),
-			);
+			) + $persona;
 
 			$this->fire_review_completed( $post_id, $result );
 
@@ -318,7 +324,7 @@ class Review_Service {
 			'strengths'     => $strengths,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
-		);
+		) + $persona;
 
 		$this->fire_review_completed( $post_id, $result );
 
@@ -338,6 +344,25 @@ class Review_Service {
 		$result['progress'] = Review_History::get_review_extras( $post_id, $review_id )['progress'];
 
 		return $result;
+	}
+
+	/**
+	 * Build the persona fields of a review result.
+	 *
+	 * @param  string $persona  Persona ID the review ran as.
+	 * @param  mixed  $takeaway The persona's takeaway from the AI response.
+	 * @return array{persona?: string, persona_label?: string, persona_takeaway?: string} Persona fields, empty for the default persona.
+	 */
+	private function build_persona_result( string $persona, mixed $takeaway ): array {
+		if ( ! Personas::is_custom( $persona ) ) {
+			return array();
+		}
+
+		return array(
+			'persona'          => $persona,
+			'persona_label'    => Personas::get_label( $persona ),
+			'persona_takeaway' => Personas::sanitize_takeaway( $takeaway ),
+		);
 	}
 
 	/**
@@ -682,10 +707,11 @@ class Review_Service {
 	/**
 	 * Get mock AI response for testing.
 	 *
-	 * @param  array $blocks Document blocks with clientId, name, content.
+	 * @param  array<mixed> $blocks  Document blocks with clientId, name, content.
+	 * @param  string       $persona Persona ID the review runs as.
 	 * @return string Mock JSON response.
 	 */
-	private function get_mock_response( array $blocks ): string {
+	private function get_mock_response( array $blocks, string $persona = Personas::DEFAULT_PERSONA ): string {
 		$feedback = array();
 
 		// Generate mock feedback for first 3 blocks.
@@ -722,6 +748,10 @@ class Review_Service {
 			),
 			'feedback' => $feedback,
 		);
+
+		if ( Personas::is_custom( $persona ) ) {
+			$response['persona_takeaway'] = sprintf( 'Mock takeaway from the %s.', Personas::get_label( $persona ) );
+		}
 
 		/**
 		 * Filters the mock review response used when AI_FEEDBACK_MOCK_MODE is on.

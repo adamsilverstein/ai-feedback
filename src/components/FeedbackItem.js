@@ -119,6 +119,11 @@ function SingleFeedbackItem({ item, thread, onNavigate, onReplyComplete }) {
 					</span>
 					<PriorityBadge priority={item.priority} />
 					<strong className="feedback-title">{title}</strong>
+					{item.persona_label && (
+						<span className="ai-feedback-persona-badge">
+							{item.persona_label}
+						</span>
+					)}
 					{isDismissed && (
 						<span className="feedback-dismissed-label">
 							{isFixApplied

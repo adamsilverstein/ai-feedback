@@ -24,6 +24,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 - 🙋 **Ask Fresh Eyes**: Type `@fresh-eyes` in any note to ask about the selected text or blocks, and get suggested changes to accept
 - ✏️ **Suggested Edits**: Simple fixes arrive as tracked suggestions you accept or reject (with Gutenberg's Suggestion Mode experiment)
 - 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
+- 👀 **Reader Personas**: Read it as a Copy editor, Skeptical expert, First-time visitor or Busy skimmer, and say who the post is for
 - ✅ **What's Working**: Each review also names up to three strengths to keep, and tracks how many notes you have addressed
 
 ## Requirements
@@ -138,6 +139,7 @@ You can change these in the plugin sidebar within the block editor.
    - Select AI model
    - Choose focus areas
    - Set target tone
+   - Pick who reads it under **Read it as**, and optionally **Who is this for?**
 4. Click **Review Document**
 5. AI will analyze your content and attach notes to relevant blocks
 

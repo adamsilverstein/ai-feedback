@@ -66,6 +66,8 @@ export default function useStartReview() {
 				focusAreas: feedback.getFocusAreas(),
 				targetTone: feedback.getTargetTone(),
 				locale: feedback.getFeedbackLocale(),
+				persona: feedback.getPersona(),
+				audience: feedback.getReviewAudience(),
 				chunkSize: feedback.getChunkSize(),
 			});
 		} catch {
