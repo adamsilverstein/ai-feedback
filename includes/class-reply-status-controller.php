@@ -261,6 +261,8 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				'date'     => $comment->comment_date,
 				'edit'     => $edit,
 				'revision' => $revision,
+				// A rule the AI offers to remember, with what the author did about it.
+				'proposal' => $is_ai ? House_Style::get_proposal( $id ) : null,
 			);
 
 			if ( $is_ai ) {

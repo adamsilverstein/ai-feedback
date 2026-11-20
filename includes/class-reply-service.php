@@ -525,6 +525,12 @@ class Reply_Service {
 			'feedback' => $parsed['reply'],
 			'block_id' => $block_id,
 		);
+		// Offer to remember a stated preference unless the author's reviews
+		// already follow it.
+		$house_rule = $this->response_parser->parse_reply_rule( $ai_text );
+		if ( null !== $house_rule && ! House_Style::list_has_rule( $context['house_style'] ?? array(), $house_rule ) ) {
+			$feedback_item['house_rule'] = $house_rule;
+		}
 		if ( null !== $parsed['edit'] ) {
 			$feedback_item['reply_edit'] = $parsed['edit'];
 		}
@@ -765,6 +771,7 @@ class Reply_Service {
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
+			'house_style'       => House_Style::get_prompt_rules( $user_id ),
 			'persona'           => self::meta_string( $parent_id, Personas::META_KEY ),
 		);
 	}

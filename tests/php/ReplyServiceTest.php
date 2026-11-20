@@ -1675,4 +1675,47 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
 	}
+
+	/**
+	 * A reply that proposes a house style rule saves it with the reply.
+	 */
+	public function test_reply_saves_proposed_house_rule(): void {
+		$notes = $this->reply_with( '{"reply": "Got it, sentence case it is.", "edit": null, "remember": "Headings use <b>sentence case</b>"}' );
+
+		$this->assertSame( 'Headings use sentence case', $notes->last_reply['feedback_item']['house_rule'] );
+	}
+
+	/**
+	 * A proposed rule the author's reviews already follow is not offered again.
+	 */
+	public function test_reply_skips_rule_that_already_exists(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Headings use sentence case',
+			),
+		);
+
+		$notes = $this->reply_with( '{"reply": "Got it.", "edit": null, "remember": "headings use sentence case."}' );
+
+		$this->assertArrayNotHasKey( 'house_rule', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * The reply prompt carries the house style rules.
+	 */
+	public function test_reply_prompt_includes_house_style(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Write WordPress with a capital P',
+			),
+		);
+		$this->seed_parent_and_reply();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( '- "Write WordPress with a capital P"', $service->captured_prompt );
+	}
 }
