@@ -36,6 +36,8 @@ import { getRevisionLabel, getSupersededOwnerIds } from '../utils/revisions';
  * @param {number|null} [props.pendingReplyId]  User reply whose AI response is being generated.
  * @param {Function}    [props.onReplyComplete] Called once the pending AI reply has been saved.
  * @param {Object}      [props.note]            The thread's note, with `id` and `block_id`. Edits are shown only when given.
+ *                                              `is_mention` marks a thread a person started, whose answer
+ *                                              is requested with the editor's content.
  * @return {Element|null} The reply thread, or `null` when there is nothing to show.
  */
 export default function FeedbackReplies({
@@ -44,7 +46,9 @@ export default function FeedbackReplies({
 	onReplyComplete,
 	note = null,
 }) {
-	const { status, isSlow, canRetry, retry } = useReplyStatus(pendingReplyId);
+	const { status, isSlow, canRetry, retry } = useReplyStatus(pendingReplyId, {
+		sendContent: !!note?.is_mention,
+	});
 	const hasPendingSlot = Boolean(pendingReplyId);
 	const isPolling =
 		hasPendingSlot && status !== 'complete' && status !== 'failed';

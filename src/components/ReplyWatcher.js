@@ -8,19 +8,21 @@ import { useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import useReplyStatus from '../hooks/useReplyStatus';
 import useReplyThreads, { getNotesQuery } from '../hooks/useReplyThreads';
+import { mayAwaitAnswer } from '../utils/mentions';
 
 const SIDEBAR_ID = 'ai-feedback/ai-feedback-sidebar';
 
 /**
  * Waits for one AI reply.
  *
- * @param {Object}   props            Component props.
- * @param {number}   props.replyId    User reply awaiting an AI response.
- * @param {Function} props.onComplete Called once the AI reply is saved.
+ * @param {Object}     props             Component props.
+ * @param {number}     props.replyId     User reply awaiting an AI response.
+ * @param {boolean}    props.sendContent Whether to send the editor's content, for a mention.
+ * @param {() => void} props.onComplete  Called once the AI reply is saved.
  * @return {null} Renders nothing.
  */
-function PendingReply({ replyId, onComplete }) {
-	const { status } = useReplyStatus(replyId);
+function PendingReply({ replyId, sendContent, onComplete }) {
+	const { status } = useReplyStatus(replyId, { sendContent });
 
 	useEffect(() => {
 		if (status === 'complete') {
@@ -42,12 +44,12 @@ function ThreadWatcher({ postId }) {
 	const { threads, onReplyComplete } = useReplyThreads(postId);
 
 	return Object.values(threads)
-		.map((thread) => thread.pending_reply_id)
-		.filter(Boolean)
-		.map((replyId) => (
+		.filter((thread) => thread.pending_reply_id)
+		.map((thread) => (
 			<PendingReply
-				key={replyId}
-				replyId={replyId}
+				key={thread.pending_reply_id}
+				replyId={thread.pending_reply_id}
+				sendContent={!!thread.is_mention}
 				onComplete={onReplyComplete}
 			/>
 		));
@@ -56,7 +58,7 @@ function ThreadWatcher({ postId }) {
 /**
  * Reply watcher component.
  *
- * @return {Element|null} Watcher, or null while the post has no note replies.
+ * @return {Element|null} Watcher, or null while the post has no note replies or mentions.
  */
 export default function ReplyWatcher() {
 	const { postId, hasReplies, isSidebarOpen } = useSelect((select) => {
@@ -72,7 +74,7 @@ export default function ReplyWatcher() {
 			: null;
 		return {
 			postId: id,
-			hasReplies: (notes || []).some((note) => note.parent > 0),
+			hasReplies: (notes || []).some(mayAwaitAnswer),
 			isSidebarOpen: activeArea === SIDEBAR_ID,
 		};
 	}, []);

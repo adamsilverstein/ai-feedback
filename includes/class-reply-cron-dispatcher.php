@@ -85,6 +85,13 @@ class Reply_Cron_Dispatcher {
 	public const PENDING_TIMEOUT = 600;
 
 	/**
+	 * Seconds WP-Cron waits before answering a mention. The editor answers
+	 * it sooner with its unsaved content, which links a new note to its
+	 * block; the saved post may not yet.
+	 */
+	public const MENTION_DELAY = 60;
+
+	/**
 	 * Register hooks.
 	 */
 	public function register(): void {
@@ -128,7 +135,17 @@ class Reply_Cron_Dispatcher {
 		// Lets the editor answer the reply without waiting for WP-Cron.
 		update_comment_meta( $comment_id, self::JOB_META_KEY, array( $parent_id, $post_id, $block_id ) );
 
-		$scheduled = wp_schedule_single_event( time(), self::CRON_HOOK, $args, true );
+		$delay = 0;
+		if ( get_comment_meta( $comment_id, Mentions::META_KEY, true ) ) {
+			/**
+			 * Filters how many seconds WP-Cron waits before answering a mention.
+			 *
+			 * @param int $delay      Seconds. Default Reply_Cron_Dispatcher::MENTION_DELAY.
+			 * @param int $comment_id Note ID.
+			 */
+			$delay = max( 0, (int) apply_filters( 'ai_feedback_mention_reply_delay', self::MENTION_DELAY, $comment_id ) );
+		}
+		$scheduled = wp_schedule_single_event( time() + $delay, self::CRON_HOOK, $args, true );
 		if ( true !== $scheduled ) {
 			// Without an event nothing would ever move the reply out of pending.
 			update_comment_meta( $comment_id, self::STATUS_META_KEY, 'failed' );

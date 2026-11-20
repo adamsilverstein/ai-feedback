@@ -21,6 +21,7 @@ The AI Feedback plugin integrates AI-powered content review directly into the Wo
 - 🔌 **Core Connectors API**: Reuses the credentials configured in Settings → Connectors
 - 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other provider registered with the core AI Client
 - 💬 **Conversational Feedback**: Reply to AI feedback and get clarifications
+- 🙋 **Ask Fresh Eyes**: Type `@fresh-eyes` in any note to ask about the selected text or blocks, and get suggested changes to accept
 - ✏️ **Suggested Edits**: Simple fixes arrive as tracked suggestions you accept or reject (with Gutenberg's Suggestion Mode experiment)
 - 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
 
@@ -181,6 +182,14 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 3. The AI answers in the same thread, using the block's content and the conversation so far
 
 ![A note thread with an author's reply and the AI's answer](docs/images/reply-thread.png)
+
+### Ask Fresh Eyes in a Note
+
+1. Select text or blocks and add a note, or reply in any note thread
+2. Type `@fresh-eyes` and a request, for example "@fresh-eyes simplify this" or "@fresh-eyes adjust the tone"
+3. Fresh Eyes answers in the thread. A change it suggests is offered for you to accept, in the **Ask Fresh Eyes** panel or as a suggestion with Suggestion Mode on
+
+Fresh Eyes can't search the web, so it declines requests to research or link to sources. The name doesn't autocomplete in the Notes `@` menu, since Fresh Eyes isn't a site user; type it out.
 
 ### Usage Analytics
 

@@ -8,6 +8,7 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Mentions;
 use AI_Feedback\Reply_Cron_Dispatcher;
 
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-cron-dispatcher.php';
@@ -143,5 +144,32 @@ class ReplyCronDispatcherTest extends TestCase {
 		$this->assertSame( 'failed', $GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::STATUS_META_KEY ] );
 		$this->assertNotEmpty( $GLOBALS['test_comment_meta'][200][ Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ] );
 		$this->assertCount( 0, $GLOBALS['test_scheduled_events'] );
+	}
+
+	/**
+	 * WP-Cron waits on a mention, so the editor answers it with its content.
+	 */
+	public function test_mention_is_scheduled_after_a_delay(): void {
+		$GLOBALS['test_comment_meta'][300] = array( Mentions::META_KEY => '1' );
+
+		$before = time();
+		$this->dispatcher->schedule_reply( 300, 300, 42, '' );
+		$after = time();
+
+		$event = $GLOBALS['test_scheduled_events'][0] ?? array();
+		$this->assertSame( array( 300, 300, 42, '' ), $event['args'] ?? null );
+		$this->assertGreaterThanOrEqual( $before + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? 0 );
+		$this->assertLessThanOrEqual( $after + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? PHP_INT_MAX );
+		$this->assertSame( 'pending', $GLOBALS['test_comment_meta'][300][ Reply_Cron_Dispatcher::STATUS_META_KEY ] ?? null );
+	}
+
+	/**
+	 * A reply in a thread Fresh Eyes started is scheduled right away.
+	 */
+	public function test_reply_is_scheduled_right_away(): void {
+		$this->dispatcher->schedule_reply( 200, 100, 42, 'abc-123' );
+		$after = time();
+
+		$this->assertLessThanOrEqual( $after, $GLOBALS['test_scheduled_events'][0]['timestamp'] ?? PHP_INT_MAX );
 	}
 }

@@ -95,16 +95,25 @@ class Reply_Service {
 	private ?string $claim_token = null;
 
 	/**
+	 * Review service, for the hourly limit a mention shares with reviews.
+	 *
+	 * @var Review_Service|null
+	 */
+	private ?Review_Service $review_service;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Prompt_Builder|null  $prompt_builder Optional prompt builder (for testing).
 	 * @param Notes_Manager|null   $notes_manager   Optional notes manager (for testing).
 	 * @param Response_Parser|null $response_parser Optional response parser (for testing).
+	 * @param Review_Service|null  $review_service  Optional review service (for testing).
 	 */
-	public function __construct( ?Prompt_Builder $prompt_builder = null, ?Notes_Manager $notes_manager = null, ?Response_Parser $response_parser = null ) {
+	public function __construct( ?Prompt_Builder $prompt_builder = null, ?Notes_Manager $notes_manager = null, ?Response_Parser $response_parser = null, ?Review_Service $review_service = null ) {
 		$this->prompt_builder  = $prompt_builder ?? new Prompt_Builder();
 		$this->notes_manager   = $notes_manager ?? new Notes_Manager();
 		$this->response_parser = $response_parser ?? new Response_Parser();
+		$this->review_service  = $review_service;
 	}
 
 	/**
@@ -145,14 +154,33 @@ class Reply_Service {
 	 * Lets the editor get an answer on sites where WP-Cron does not run. The
 	 * fallback cron event is dropped once the reply is claimed.
 	 *
-	 * @param int  $comment_id Reply comment ID.
-	 * @param bool $retry      Whether to also take over a failed reply or a stale claim.
+	 * The editor sends its unsaved post content with a mention, since a new
+	 * note is linked to its block in the editor before the post is saved.
+	 *
+	 * A mention is only answered here for the person who wrote it: the
+	 * answer counts against their limit and may read their unsaved content.
+	 * Anyone else's request leaves it to that person's editor or to WP-Cron.
+	 *
+	 * @param int    $comment_id     Reply comment ID.
+	 * @param bool   $retry          Whether to also take over a failed reply or a stale claim.
+	 * @param string $editor_content Optional. The editor's post content, used to find the note's block.
+	 * @param int    $requester_id   Optional. User making the request.
 	 * @return bool Whether this request answered the reply.
 	 */
-	public function process( int $comment_id, bool $retry = false ): bool {
+	public function process( int $comment_id, bool $retry = false, string $editor_content = '', int $requester_id = 0 ): bool {
 		$job = $this->get_job( $comment_id );
 		if ( null === $job ) {
 			return false;
+		}
+
+		if ( get_comment_meta( $comment_id, Mentions::META_KEY, true ) ) {
+			$note = get_comment( $comment_id );
+			if ( ! is_object( $note ) || $requester_id <= 0 || self::author_id( $note ) !== $requester_id ) {
+				return false;
+			}
+		} else {
+			// Only a mention's block is looked up in the editor's content.
+			$editor_content = '';
 		}
 
 		list( $parent_id, $post_id, $block_id ) = $job;
@@ -167,7 +195,7 @@ class Reply_Service {
 			wp_unschedule_event( $timestamp, Reply_Cron_Dispatcher::CRON_HOOK, $args );
 		}
 
-		$this->generate( $comment_id, $parent_id, $post_id, $block_id );
+		$this->generate( $comment_id, $parent_id, $post_id, $block_id, $editor_content );
 		return true;
 	}
 
@@ -337,10 +365,11 @@ class Reply_Service {
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
 	 * @param  int    $post_id    Post ID.
 	 * @param  string $block_id   Block ID from the parent note.
+	 * @param  string $editor_content Optional. The editor's post content.
 	 */
-	private function generate( int $comment_id, int $parent_id, int $post_id, string $block_id ): void {
+	private function generate( int $comment_id, int $parent_id, int $post_id, string $block_id, string $editor_content = '' ): void {
 		try {
-			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id );
+			$result = $this->handle_reply( $comment_id, $parent_id, $post_id, $block_id, $editor_content );
 		} catch ( \Throwable $e ) {
 			// Record a terminal state so the frontend stops waiting.
 			Logger::debug( sprintf( 'Reply_Service: reply %d threw %s: %s', $comment_id, get_class( $e ), $e->getMessage() ) );
@@ -384,11 +413,22 @@ class Reply_Service {
 	 * @param  int    $parent_id  Parent (original AI note) comment ID.
 	 * @param  int    $post_id    Post ID.
 	 * @param  string $block_id   Block ID from the parent note.
+	 * @param  string $editor_content Optional. The editor's post content, used to find the block of a mention.
 	 * @return int|WP_Error New AI reply comment ID on success, WP_Error on failure.
 	 */
-	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id ): int|WP_Error {
+	public function handle_reply( int $comment_id, int $parent_id, int $post_id, string $block_id, string $editor_content = '' ): int|WP_Error {
+		// Reply_Detector flags a note it queued because it mentions Fresh Eyes.
+		$is_mention = (bool) get_comment_meta( $comment_id, Mentions::META_KEY, true );
+		$reply      = get_comment( $comment_id );
+		$user_id    = is_object( $reply ) ? self::author_id( $reply ) : 0;
+
+		// Checked again here: the author's role can change before cron runs.
+		if ( $is_mention && ! Mentions::can_ask( $user_id, $post_id ) ) {
+			return new WP_Error( 'mention_forbidden', __( 'Only someone who can review this post can ask Fresh Eyes about it.', 'fresh-eyes' ) );
+		}
+
 		$edits   = $this->get_thread_edits( $parent_id, $post_id );
-		$context = $this->build_context( $comment_id, $parent_id, $post_id, $edits );
+		$context = $this->build_context( $comment_id, $parent_id, $post_id, $edits, $is_mention, $is_mention ? $editor_content : '' );
 		if ( is_wp_error( $context ) ) {
 			Logger::debug( 'Reply_Service: failed to build context: ' . $context->get_error_message() );
 			return $context;
@@ -396,10 +436,65 @@ class Reply_Service {
 
 		$prompt             = $this->prompt_builder->build_reply_prompt( $context );
 		$system_instruction = $this->prompt_builder->get_reply_system_instruction();
-		$reply              = get_comment( $comment_id );
-		$user_id            = is_object( $reply ) ? self::author_id( $reply ) : 0;
 		$model              = self::preference_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL, $user_id );
 
+		if ( ! $is_mention ) {
+			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, false );
+		}
+
+		// A mention starts a new request, so it counts against the review limit.
+		$allowed = $this->get_review_service()->check_rate_limit( $user_id );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
+		$result = null;
+		try {
+			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, true );
+		} finally {
+			// No answer was saved by this request, so give the slot back.
+			if ( ! is_int( $result ) || $result <= 0 ) {
+				$this->get_review_service()->refund_rate_limit( $user_id );
+			}
+		}
+
+		if ( is_int( $result ) && $result > 0 ) {
+			/**
+			 * Fires after Fresh Eyes answers a note that mentions it.
+			 *
+			 * @param int                  $post_id Post ID.
+			 * @param array<string, mixed> $answer  `user_id` who asked, `model`, and the answer's `note_id`.
+			 */
+			do_action(
+				'ai_feedback_after_mention',
+				$post_id,
+				array(
+					'user_id' => $user_id,
+					'model'   => $model,
+					'note_id' => $result,
+				)
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Call the AI for a reply and save its answer in the thread.
+	 *
+	 * @param int                  $comment_id         Reply comment ID.
+	 * @param int                  $parent_id          Root note ID.
+	 * @param int                  $post_id            Post ID.
+	 * @param string               $block_id           Block ID from the root note.
+	 * @param array<string, mixed> $context            Reply context.
+	 * @param array<mixed>         $edits              Edits proposed in the thread, oldest first.
+	 * @param string               $prompt             Prompt.
+	 * @param string               $system_instruction System instruction.
+	 * @param string               $model              Model preference.
+	 * @param bool                 $is_mention         Whether the reply asks Fresh Eyes through a mention.
+	 * @return int|WP_Error New AI reply comment ID, or error.
+	 */
+	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, array $edits, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI call failed: ' . $ai_text->get_error_message() );
@@ -416,6 +511,11 @@ class Reply_Service {
 		if ( null === $parsed ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
 			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'fresh-eyes' ) );
+		}
+
+		if ( $is_mention ) {
+			$parsed = self::remove_unsourced_links( $parsed, self::context_sources( $context ) );
+			$parsed = self::keep_edit_in_selection( $parsed, $context, $parent_id );
 		}
 
 		if ( ! $this->owns_claim( $comment_id ) ) {
@@ -443,16 +543,102 @@ class Reply_Service {
 	}
 
 	/**
+	 * Get the review service, created on first use.
+	 *
+	 * @return Review_Service
+	 */
+	private function get_review_service(): Review_Service {
+		$this->review_service ??= new Review_Service();
+		return $this->review_service;
+	}
+
+	/**
+	 * Everything the AI was given for a reply, to check its links against.
+	 *
+	 * @param array<string, mixed> $context Reply context.
+	 * @return string
+	 */
+	private static function context_sources( array $context ): string {
+		$unsaved = ! empty( $context['unsaved_block'] );
+		$sources = array();
+		$keys    = $unsaved ? array( 'user_reply', 'original_feedback' ) : array( 'block_html', 'block_content', 'selected_text', 'user_reply', 'original_feedback' );
+		foreach ( $keys as $key ) {
+			$sources[] = is_string( $context[ $key ] ?? null ) ? $context[ $key ] : '';
+		}
+		foreach ( $unsaved ? array( 'thread' ) : array( 'thread', 'nearby_blocks' ) as $key ) {
+			foreach ( is_array( $context[ $key ] ?? null ) ? $context[ $key ] : array() as $entry ) {
+				$text      = is_array( $entry ) ? ( $entry['content'] ?? $entry['text'] ?? null ) : null;
+				$sources[] = is_string( $text ) ? $text : '';
+			}
+		}
+		return implode( "\n", $sources );
+	}
+
+	/**
+	 * Take made-up links out of an answer to a mention.
+	 *
+	 * Fresh Eyes answers without web search, so a link that is not in the
+	 * post or the thread was invented. It is removed from the reply, and an
+	 * edit that would add one is dropped.
+	 *
+	 * @param array{reply: string, edit: array<string, mixed>|null} $parsed  Parsed reply.
+	 * @param string                                                $sources Everything the AI was given.
+	 * @return array{reply: string, edit: array<string, mixed>|null} Parsed reply without made-up links.
+	 */
+	private static function remove_unsourced_links( array $parsed, string $sources ): array {
+		$parsed['reply'] = Mentions::remove_unsourced_urls( $parsed['reply'], $sources );
+		if ( null !== $parsed['edit'] && Mentions::edit_has_unsourced_url( $parsed['edit'], $sources ) ) {
+			Logger::debug( 'Reply_Service: dropped an edit that adds a link the AI was not given.' );
+			$parsed['edit']   = null;
+			$parsed['reply'] .= ' ' . __( '(The suggested change was left out because it added a link Fresh Eyes could not check.)', 'fresh-eyes' );
+		}
+		return $parsed;
+	}
+
+	/**
+	 * Drop a text change outside the text the note is anchored to.
+	 *
+	 * The prompt asks for changes scoped to the selection; this holds the
+	 * AI to it. A note on a whole block has no selection and is left alone.
+	 *
+	 * @param array{reply: string, edit: array<string, mixed>|null} $parsed    Parsed reply.
+	 * @param array<string, mixed>                                  $context   Reply context.
+	 * @param int                                                   $parent_id Root note ID.
+	 * @return array{reply: string, edit: array<string, mixed>|null} Parsed reply.
+	 */
+	private static function keep_edit_in_selection( array $parsed, array $context, int $parent_id ): array {
+		$edit = $parsed['edit'];
+		if ( null === $edit || 'replace_text' !== ( $edit['type'] ?? null ) || ! is_string( $edit['find'] ?? null ) ) {
+			return $parsed;
+		}
+
+		$block_html = is_string( $context['block_html'] ?? null ) ? $context['block_html'] : '';
+		// The whole selection, not the prompt's shortened copy.
+		$selection = Mentions::get_selected_text( $block_html, $parent_id, PHP_INT_MAX );
+		$find      = trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) );
+		if ( '' === $selection || ( '' !== $find && str_contains( $selection, $find ) ) ) {
+			return $parsed;
+		}
+
+		Logger::debug( 'Reply_Service: dropped an edit outside the selected text.' );
+		$parsed['edit']   = null;
+		$parsed['reply'] .= ' ' . __( '(The suggested change was left out because it went beyond the selected text.)', 'fresh-eyes' );
+		return $parsed;
+	}
+
+	/**
 	 * Build the reply context array from a parent note and its thread.
 	 *
 	 * @param  int          $comment_id Reply comment ID.
 	 * @param  int          $parent_id  Parent (original AI note) comment ID.
 	 * @param  int          $post_id    Post ID - used to scope the siblings query.
 	 * @param  array<mixed> $edits      Edits proposed in the thread, oldest first, from get_thread_edits().
-	 * @phpstan-param list<array{id: int, edit: array<string, string>}> $edits
+	 * @param  bool         $is_mention Whether the reply asks Fresh Eyes through a mention.
+	 * @param  string       $editor_content Optional. The editor's post content, searched before the saved post for a mention's block.
+	 * @phpstan-param list<array{id: int, edit: array<string, mixed>}> $edits
 	 * @return array<string, mixed>|WP_Error Context for Prompt_Builder::build_reply_prompt(), or error.
 	 */
-	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits ): array|WP_Error {
+	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits, bool $is_mention = false, string $editor_content = '' ): array|WP_Error {
 		$reply = get_comment( $comment_id );
 		if ( ! is_object( $reply ) ) {
 			return new WP_Error( 'reply_not_found', 'Reply comment not found.' );
@@ -500,9 +686,27 @@ class Reply_Service {
 				'edit'    => $edits_by_id[ $sibling_id ] ?? null,
 			);
 		}
+		if ( $is_mention && $parent_id !== $comment_id && ! get_comment_meta( $parent_id, 'ai_feedback', true ) ) {
+			// The person who started the thread is part of the conversation.
+			array_unshift(
+				$thread,
+				array(
+					'author'  => $parent->comment_author,
+					'content' => $parent->comment_content,
+					'is_ai'   => false,
+					'edit'    => null,
+				)
+			);
+		}
 		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
 
-		$located    = $this->locate_note_block( $post_id, $parent_id );
+		// The saved post wins when it already links the note. The editor's
+		// content is only for a note not saved with the post yet.
+		$located     = $this->locate_note_block( $post_id, $parent_id );
+		$from_editor = null === $located && '' !== $editor_content;
+		if ( $from_editor ) {
+			$located = self::search_blocks( parse_blocks( $editor_content ), $parent_id );
+		}
 		$block      = $located['block'] ?? null;
 		$block_type = self::meta_string( $parent_id, 'block_name' );
 		if ( '' === $block_type && null !== $block && is_string( $block['blockName'] ?? null ) ) {
@@ -516,6 +720,11 @@ class Reply_Service {
 		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
+			'is_mention'        => $is_mention,
+			// Unsaved content is not a source a link can be credited to.
+			'unsaved_block'     => $from_editor && null !== $located,
+			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
+			'block_html'        => $block_html,
 			'block_content'     => $block_content,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
@@ -527,7 +736,7 @@ class Reply_Service {
 				&& ! self::has_inline_markup( $block_html )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),
-			'original_feedback' => $parent->comment_content,
+			'original_feedback' => $is_mention ? '' : $parent->comment_content,
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
 			'thread'            => $thread,

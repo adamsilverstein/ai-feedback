@@ -79,6 +79,28 @@ describe('useReplyThreads', () => {
 		await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(2));
 	});
 
+	it('refetches when a new note mentions Fresh Eyes', async () => {
+		mockApiFetch.mockResolvedValue({ post: 42, threads: {} });
+
+		const { rerender } = renderHook(() => useReplyThreads(42));
+		await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+
+		mockEditorNotes = [
+			...mockEditorNotes,
+			{ id: 310, parent: 0, content: { raw: 'A note to self' } },
+		];
+		rerender();
+		expect(mockApiFetch).toHaveBeenCalledTimes(1);
+
+		mockEditorNotes = [
+			...mockEditorNotes,
+			{ id: 311, parent: 0, content: { raw: '@fresh-eyes simplify' } },
+		];
+		rerender();
+
+		await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(2));
+	});
+
 	it('refetches and refreshes the Notes UI once an AI reply is saved', async () => {
 		mockApiFetch.mockResolvedValue({ post: 42, threads: THREADS });
 

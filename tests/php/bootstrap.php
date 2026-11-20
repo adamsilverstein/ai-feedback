@@ -34,6 +34,7 @@ if (! defined('ABSPATH') ) {
 
 // Loaded after ABSPATH, which it requires.
 require_once $includes_dir . 'class-suggestions.php';
+require_once $includes_dir . 'class-mentions.php';
 
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {
@@ -141,6 +142,23 @@ if ( ! function_exists( 'get_bloginfo' ) ) {
 			return '7.0';
 		}
 		return '';
+	}
+}
+
+if ( ! function_exists( 'user_can' ) ) {
+	/**
+	 * Mock user_can for tests.
+	 *
+	 * Defaults to true. Override via $GLOBALS['test_user_can'], either a bool
+	 * or a callable receiving the user ID, capability and its arguments.
+	 *
+	 * @param  int    $user_id    User ID.
+	 * @param  string $capability The capability to check.
+	 * @return bool Whether the user has the capability.
+	 */
+	function user_can( $user_id, $capability, ...$args ) {
+		$can = $GLOBALS['test_user_can'] ?? true;
+		return is_callable( $can ) ? (bool) $can( $user_id, $capability, ...$args ) : $can;
 	}
 }
 

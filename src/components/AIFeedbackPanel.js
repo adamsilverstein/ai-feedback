@@ -21,6 +21,7 @@ import ReviewSummary from './ReviewSummary';
 import ExportReview from './ExportReview';
 import ReviewHistory from './ReviewHistory';
 import EmptyState from './EmptyState';
+import MentionThreads from './MentionThreads';
 import StatusAnnouncer from './StatusAnnouncer';
 import ErrorNotice from './ErrorNotice';
 import WelcomeModal from './WelcomeModal';
@@ -244,6 +245,8 @@ export default function AIFeedbackPanel() {
 					</div>
 				</PanelBody>
 			)}
+
+			<MentionThreads />
 
 			<ReviewHistory />
 		</div>

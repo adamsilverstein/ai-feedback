@@ -35,6 +35,19 @@ namespace {
 		}
 	}
 
+	if ( ! function_exists( 'wp_mail' ) ) {
+		/**
+		 * wp_mail mock recording each message in $GLOBALS['test_mail'].
+		 *
+		 * @param mixed ...$args Message arguments.
+		 * @return bool
+		 */
+		function wp_mail( ...$args ) {
+			$GLOBALS['test_mail'][] = $args;
+			return true;
+		}
+	}
+
 	if ( ! function_exists( 'add_action' ) ) {
 		/**
 		 * No-op add_action stub — Reply_Service::register() calls this at

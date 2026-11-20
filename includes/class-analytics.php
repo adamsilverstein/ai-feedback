@@ -91,6 +91,34 @@ class Analytics {
 	}
 
 	/**
+	 * Record an answer to a note that mentions Fresh Eyes.
+	 *
+	 * Hooked to `ai_feedback_after_mention`.
+	 *
+	 * @param int                  $post_id Post ID.
+	 * @param array<string, mixed> $answer  Answer details, passed to the analytics filter.
+	 */
+	public static function track_mention( int $post_id, array $answer ): void {
+		/** This filter is documented in includes/class-analytics.php */
+		if ( ! apply_filters( 'ai_feedback_analytics_enabled', true, $post_id, $answer ) ) {
+			return;
+		}
+
+		$days = self::get_days();
+		$date = current_time( 'Y-m-d' );
+		$day  = $days[ $date ] ?? self::empty_day();
+
+		// Counted apart from reviews, so the per-review stats keep their meaning.
+		++$day['mentions'];
+		$days[ $date ] = $day;
+
+		ksort( $days );
+		$days = array_slice( $days, -self::MAX_DAYS, null, true );
+
+		update_option( self::OPTION_KEY, $days, false );
+	}
+
+	/**
 	 * Drop a deleted user's counts.
 	 *
 	 * Hooked to `deleted_user`.
@@ -226,7 +254,7 @@ class Analytics {
 	 * Summarize usage for a period.
 	 *
 	 * @param  string $period One of the PERIODS keys.
-	 * @return array{period: string, total_reviews: int, total_feedback: int, avg_feedback: float, by_model: array<array-key, int>, by_severity: array<array-key, int>, by_category: array<array-key, int>, by_day: list<array{date: string, reviews: int, feedback: int}>, top_users: list<array{user_id: int, name: string, reviews: int}>}
+	 * @return array{period: string, total_reviews: int, total_feedback: int, total_mentions: int, avg_feedback: float, by_model: array<array-key, int>, by_severity: array<array-key, int>, by_category: array<array-key, int>, by_day: list<array{date: string, reviews: int, feedback: int, mentions: int}>, top_users: list<array{user_id: int, name: string, reviews: int}>}
 	 */
 	public static function get_summary( string $period = '30days' ): array {
 		if ( ! isset( self::PERIODS[ $period ] ) ) {
@@ -252,10 +280,12 @@ class Analytics {
 				'date'     => $date,
 				'reviews'  => $day['reviews'],
 				'feedback' => $day['feedback'],
+				'mentions' => $day['mentions'],
 			);
 
 			$totals['reviews']  += $day['reviews'];
 			$totals['feedback'] += $day['feedback'];
+			$totals['mentions'] += $day['mentions'];
 			$totals['models']    = self::add_counts( $totals['models'], $day['models'] );
 			$totals['users']     = self::add_counts( $totals['users'], $day['users'] );
 			$totals['severity']  = self::add_counts( $totals['severity'], $day['severity'] );
@@ -269,6 +299,7 @@ class Analytics {
 			'period'         => $period,
 			'total_reviews'  => $totals['reviews'],
 			'total_feedback' => $totals['feedback'],
+			'total_mentions' => $totals['mentions'],
 			'avg_feedback'   => $totals['reviews'] > 0 ? round( $totals['feedback'] / $totals['reviews'], 1 ) : 0.0,
 			'by_model'       => $totals['models'],
 			'by_severity'    => $totals['severity'],
@@ -281,7 +312,7 @@ class Analytics {
 	/**
 	 * Read the stored daily buckets, discarding anything malformed.
 	 *
-	 * @return array<string, array{reviews: int, feedback: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}>
+	 * @return array<string, array{reviews: int, feedback: int, mentions: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}>
 	 */
 	public static function get_days(): array {
 		$stored = get_option( self::OPTION_KEY, array() );
@@ -298,6 +329,7 @@ class Analytics {
 			$days[ $date ] = array(
 				'reviews'  => is_numeric( $day['reviews'] ?? null ) ? (int) $day['reviews'] : 0,
 				'feedback' => is_numeric( $day['feedback'] ?? null ) ? (int) $day['feedback'] : 0,
+				'mentions' => is_numeric( $day['mentions'] ?? null ) ? (int) $day['mentions'] : 0,
 				'models'   => self::add_counts( array(), $day['models'] ?? array() ),
 				'users'    => self::add_counts( array(), $day['users'] ?? array() ),
 				'severity' => self::add_counts( array(), $day['severity'] ?? array() ),
@@ -311,12 +343,13 @@ class Analytics {
 	/**
 	 * An empty daily bucket.
 	 *
-	 * @return array{reviews: int, feedback: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}
+	 * @return array{reviews: int, feedback: int, mentions: int, models: array<array-key, int>, users: array<int, int>, severity: array<array-key, int>, category: array<array-key, int>}
 	 */
 	private static function empty_day(): array {
 		return array(
 			'reviews'  => 0,
 			'feedback' => 0,
+			'mentions' => 0,
 			'models'   => array(),
 			'users'    => array(),
 			'severity' => array(),
