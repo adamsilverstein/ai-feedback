@@ -367,7 +367,8 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		$this->reply_service->process(
 			$comment_id,
 			true === $request->get_param( 'retry' ),
-			is_string( $content ) ? $content : ''
+			is_string( $content ) ? $content : '',
+			get_current_user_id()
 		);
 
 		return new WP_REST_Response( $this->build_status( $comment_id ), 200 );

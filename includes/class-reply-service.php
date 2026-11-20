@@ -157,15 +157,30 @@ class Reply_Service {
 	 * The editor sends its unsaved post content with a mention, since a new
 	 * note is linked to its block in the editor before the post is saved.
 	 *
+	 * A mention is only answered here for the person who wrote it: the
+	 * answer counts against their limit and may read their unsaved content.
+	 * Anyone else's request leaves it to that person's editor or to WP-Cron.
+	 *
 	 * @param int    $comment_id     Reply comment ID.
 	 * @param bool   $retry          Whether to also take over a failed reply or a stale claim.
 	 * @param string $editor_content Optional. The editor's post content, used to find the note's block.
+	 * @param int    $requester_id   Optional. User making the request.
 	 * @return bool Whether this request answered the reply.
 	 */
-	public function process( int $comment_id, bool $retry = false, string $editor_content = '' ): bool {
+	public function process( int $comment_id, bool $retry = false, string $editor_content = '', int $requester_id = 0 ): bool {
 		$job = $this->get_job( $comment_id );
 		if ( null === $job ) {
 			return false;
+		}
+
+		if ( get_comment_meta( $comment_id, Mentions::META_KEY, true ) ) {
+			$note = get_comment( $comment_id );
+			if ( ! is_object( $note ) || $requester_id <= 0 || self::author_id( $note ) !== $requester_id ) {
+				return false;
+			}
+		} else {
+			// Only a mention's block is looked up in the editor's content.
+			$editor_content = '';
 		}
 
 		list( $parent_id, $post_id, $block_id ) = $job;
@@ -542,11 +557,13 @@ class Reply_Service {
 	 * @return string
 	 */
 	private static function context_sources( array $context ): string {
+		$unsaved = ! empty( $context['unsaved_block'] );
 		$sources = array();
-		foreach ( array( 'block_html', 'block_content', 'selected_text', 'user_reply', 'original_feedback' ) as $key ) {
+		$keys    = $unsaved ? array( 'user_reply', 'original_feedback' ) : array( 'block_html', 'block_content', 'selected_text', 'user_reply', 'original_feedback' );
+		foreach ( $keys as $key ) {
 			$sources[] = is_string( $context[ $key ] ?? null ) ? $context[ $key ] : '';
 		}
-		foreach ( array( 'thread', 'nearby_blocks' ) as $key ) {
+		foreach ( $unsaved ? array( 'thread' ) : array( 'thread', 'nearby_blocks' ) as $key ) {
 			foreach ( is_array( $context[ $key ] ?? null ) ? $context[ $key ] : array() as $entry ) {
 				$text      = is_array( $entry ) ? ( $entry['content'] ?? $entry['text'] ?? null ) : null;
 				$sources[] = is_string( $text ) ? $text : '';
@@ -650,8 +667,13 @@ class Reply_Service {
 		}
 		$thread = array_slice( $thread, -self::MAX_THREAD_ENTRIES );
 
-		$located    = '' !== $editor_content ? self::search_blocks( parse_blocks( $editor_content ), $parent_id ) : null;
-		$located    = $located ?? $this->locate_note_block( $post_id, $parent_id );
+		// The saved post wins when it already links the note. The editor's
+		// content is only for a note not saved with the post yet.
+		$located     = $this->locate_note_block( $post_id, $parent_id );
+		$from_editor = null === $located && '' !== $editor_content;
+		if ( $from_editor ) {
+			$located = self::search_blocks( parse_blocks( $editor_content ), $parent_id );
+		}
 		$block      = $located['block'] ?? null;
 		$block_type = self::meta_string( $parent_id, 'block_name' );
 		if ( '' === $block_type && null !== $block && is_string( $block['blockName'] ?? null ) ) {
@@ -666,6 +688,8 @@ class Reply_Service {
 
 		return array(
 			'is_mention'        => $is_mention,
+			// Unsaved content is not a source a link can be credited to.
+			'unsaved_block'     => $from_editor && null !== $located,
 			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
 			'block_html'        => $block_html,
 			'block_content'     => $block_content,

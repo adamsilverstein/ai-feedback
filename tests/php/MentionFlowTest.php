@@ -148,6 +148,8 @@ class MentionFlowTest extends TestCase {
 		parent::setUp();
 		$GLOBALS['test_current_user_can']   = true;
 		$GLOBALS['test_user_can']           = true;
+		// The mention's author, user 7, makes the editor's requests.
+		$GLOBALS['test_current_user_id']    = 7;
 		$GLOBALS['test_options']            = array();
 		$GLOBALS['test_user_meta']          = array();
 		$GLOBALS['test_comments']           = array();
@@ -180,6 +182,7 @@ class MentionFlowTest extends TestCase {
 		unset(
 			$GLOBALS['test_current_user_can'],
 			$GLOBALS['test_user_can'],
+			$GLOBALS['test_current_user_id'],
 			$GLOBALS['test_options'],
 			$GLOBALS['test_user_meta'],
 			$GLOBALS['test_comments'],
@@ -473,5 +476,97 @@ class MentionFlowTest extends TestCase {
 
 		$this->assertSame( array(), $GLOBALS['test_dispatched_calls'] );
 		$this->assertArrayNotHasKey( Mentions::META_KEY, $GLOBALS['test_comment_meta'][900] );
+	}
+
+	/**
+	 * Another editor's request neither answers a mention nor supplies its
+	 * content; the author's editor or WP-Cron answers it.
+	 */
+	public function test_other_users_request_does_not_answer(): void {
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+		$GLOBALS['test_current_user_id'] = 8;
+
+		$data = $this->process( 300, '<!-- wp:paragraph {"metadata":{"noteId":300}} -->planted' );
+
+		$this->assertSame( 'pending', $data['status'] );
+		$this->assertSame( array(), $this->service->prompts );
+		$this->assertCount( 1, $GLOBALS['test_scheduled_events'], 'The cron fallback stays.' );
+		$this->assertSame( array(), $GLOBALS['test_user_meta'][8]['ai_feedback_reviews'] ?? array(), 'Nothing is charged to the requester.' );
+
+		// WP-Cron answers from the saved post, which never saw the planted content.
+		$this->service->on_reply_received( ...$GLOBALS['test_scheduled_events'][0]['args'] );
+		$this->assertStringNotContainsString( 'very long sentence', $this->service->prompts[0] ?? '' );
+		$this->assertStringContainsString( 'the block content is not available', $this->service->prompts[0] ?? '' );
+	}
+
+	/**
+	 * When the saved post already links the note, its block is used rather
+	 * than the editor's copy.
+	 */
+	public function test_saved_block_wins_over_editor_content(): void {
+		$saved                                       = '<!-- wp:paragraph {"metadata":{"noteId":300}} -->saved';
+		$saved_html                                  = '<p>The saved text is here.</p>';
+		$GLOBALS['test_post_content'][42]            = $saved;
+		$GLOBALS['test_parsed_blocks'][ $saved ]     = array(
+			array(
+				'blockName'    => 'core/paragraph',
+				'attrs'        => array( 'metadata' => array( 'noteId' => 300 ) ),
+				'innerBlocks'  => array(),
+				'innerHTML'    => $saved_html,
+				'innerContent' => array( $saved_html ),
+			),
+		);
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->process( 300 );
+
+		$this->assertStringContainsString( 'Block content: The saved text is here.', $this->service->prompts[0] ?? '' );
+	}
+
+	/**
+	 * A link in content that is only in the editor is not a source, so the
+	 * answer cannot pass it off as checked.
+	 */
+	public function test_link_in_unsaved_content_is_not_a_source(): void {
+		$html                                            = '<p>See <mark class="wp-note" data-id="300">https://planted.example/study</mark> now.</p>';
+		$GLOBALS['test_parsed_blocks']['planted-editor'] = array(
+			array(
+				'blockName'    => 'core/paragraph',
+				'attrs'        => array( 'metadata' => array( 'noteId' => 300 ) ),
+				'innerBlocks'  => array(),
+				'innerHTML'    => $html,
+				'innerContent' => array( $html ),
+			),
+		);
+		$this->service->response = '{"reply": "The source is https://planted.example/study.", "edit": null}';
+		$this->insert_note( 300, '@fresh-eyes is this source good?' );
+
+		$this->process( 300, 'planted-editor' );
+
+		$this->assertStringContainsString( 'planted.example', $this->service->prompts[0] ?? '', 'The block still reaches the AI.' );
+		$this->assertSame( 'The source is [link removed]', $this->notes->saved[900]['feedback'] ?? null );
+	}
+
+	/**
+	 * A link in the saved post is a source.
+	 */
+	public function test_link_in_saved_post_is_a_source(): void {
+		$html                                     = '<p>See <mark class="wp-note" data-id="300">https://real.example/study</mark> now.</p>';
+		$GLOBALS['test_post_content'][42]         = 'saved-with-link';
+		$GLOBALS['test_parsed_blocks']['saved-with-link'] = array(
+			array(
+				'blockName'    => 'core/paragraph',
+				'attrs'        => array( 'metadata' => array( 'noteId' => 300 ) ),
+				'innerBlocks'  => array(),
+				'innerHTML'    => $html,
+				'innerContent' => array( $html ),
+			),
+		);
+		$this->service->response = '{"reply": "The source is https://real.example/study.", "edit": null}';
+		$this->insert_note( 300, '@fresh-eyes is this source good?' );
+
+		$this->process( 300 );
+
+		$this->assertSame( 'The source is https://real.example/study.', $this->notes->saved[900]['feedback'] ?? null );
 	}
 }
