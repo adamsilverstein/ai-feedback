@@ -116,6 +116,7 @@ class Fresh_Eyes_User {
 		add_filter( 'pre_count_users', array( self::class, 'filter_count_users' ), PHP_INT_MAX, 3 );
 		add_filter( 'rest_request_before_callbacks', array( self::class, 'hide_rest_user' ), 10, 3 );
 		add_action( 'wp', array( self::class, 'hide_author_archive' ) );
+		add_filter( 'rest_prepare_comment', array( self::class, 'drop_author_link' ), 10, 2 );
 
 		// Inert.
 		add_filter( 'authenticate', array( self::class, 'block_login' ), 100 );
@@ -746,6 +747,25 @@ class Fresh_Eyes_User {
 			return $response;
 		}
 		return new WP_Error( 'rest_user_invalid_id', __( 'Invalid user ID.', 'fresh-eyes' ), array( 'status' => 404 ) );
+	}
+
+	/**
+	 * Leave the author link off a note the Fresh Eyes user wrote.
+	 *
+	 * The note carries its author's name and avatar itself, and the user
+	 * is not found at `/wp/v2/users/<id>`, so following the link, or
+	 * embedding it with `_embed`, would only return an error. A note written
+	 * as 0 has no author link either.
+	 *
+	 * @param mixed $response Comment response.
+	 * @param mixed $comment  Comment.
+	 * @return mixed The response.
+	 */
+	public static function drop_author_link( mixed $response, mixed $comment ): mixed {
+		if ( $response instanceof \WP_REST_Response && $comment instanceof WP_Comment && self::is_user( (int) $comment->user_id ) ) {
+			$response->remove_link( 'author' );
+		}
+		return $response;
 	}
 
 	/**

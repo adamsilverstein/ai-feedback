@@ -135,6 +135,19 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		public $data;
 		public $status;
+		public $links = array();
+
+		public function add_link( $rel, $href, $attributes = array() ) {
+			$this->links[ $rel ][] = array( 'href' => $href ) + $attributes;
+		}
+
+		public function remove_link( $rel, $href = null ) {
+			unset( $this->links[ $rel ] );
+		}
+
+		public function get_links() {
+			return $this->links;
+		}
 
 		public function __construct( $data = null, $status = 200 ) {
 			$this->data   = $data;

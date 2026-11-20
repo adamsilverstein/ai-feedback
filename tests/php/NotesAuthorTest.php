@@ -188,6 +188,21 @@ class NotesAuthorTest extends TestCase {
 		}
 	}
 
+	public function test_notes_by_the_user_carry_no_author_link(): void {
+		$id = Fresh_Eyes_User::ensure();
+
+		foreach ( array( $id => true, 0 => false, 7 => false ) as $user_id => $dropped ) {
+			$response = new \WP_REST_Response( array() );
+			$response->add_link( 'author', 'http://example.test/wp-json/wp/v2/users/' . $user_id, array( 'embeddable' => true ) );
+			$response->add_link( 'up', 'http://example.test/wp-json/wp/v2/posts/10' );
+
+			Fresh_Eyes_User::drop_author_link( $response, $this->note( 1, 'Fresh Eyes', $user_id ) );
+
+			$this->assertSame( ! $dropped, isset( $response->get_links()['author'] ), "user {$user_id}" );
+			$this->assertArrayHasKey( 'up', $response->get_links() );
+		}
+	}
+
 	public function test_the_avatar_blinks_only_without_reduced_motion(): void {
 		$svg = (string) file_get_contents( dirname( __DIR__, 2 ) . '/assets/fresh-eyes-avatar.svg' );
 
