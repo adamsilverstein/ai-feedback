@@ -68,14 +68,23 @@ function initialState(id) {
 }
 
 /**
- * Get the editor's current post content, or '' outside the post editor.
+ * Longest editor content the server accepts with a request to answer.
+ */
+export const MAX_EDITOR_CONTENT_LENGTH = 1000000;
+
+/**
+ * Get the editor's current post content, or '' outside the post editor or
+ * when it is too long to send. The server then reads the saved post.
  *
  * @return {string} Serialized blocks.
  */
 export function getEditorContent() {
 	try {
 		const content = select('core/editor')?.getEditedPostContent?.();
-		return typeof content === 'string' ? content : '';
+		return typeof content === 'string' &&
+			content.length <= MAX_EDITOR_CONTENT_LENGTH
+			? content
+			: '';
 	} catch {
 		return '';
 	}

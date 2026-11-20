@@ -22,6 +22,7 @@ vi.mock('@wordpress/data', () => ({
 }));
 
 import useReplyStatus, {
+	MAX_EDITOR_CONTENT_LENGTH,
 	MAX_PENDING_MS,
 	MAX_POLL_INTERVAL_MS,
 	MAX_UNKNOWN_POLLS,
@@ -79,6 +80,8 @@ describe('useReplyStatus', () => {
 	it('sends no content outside the post editor', () => {
 		expect(getEditorContent()).toBe(mockEditedContent);
 		mockEditedContent = undefined;
+		expect(getEditorContent()).toBe('');
+		mockEditedContent = 'x'.repeat(MAX_EDITOR_CONTENT_LENGTH + 1);
 		expect(getEditorContent()).toBe('');
 		mockEditedContent = '<!-- wp:paragraph -->x';
 	});
