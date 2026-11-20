@@ -312,15 +312,23 @@ class Response_Parser {
 		// A block whose structural edit or formatting fix survived grouping
 		// gets no quick fix from any item, so the review proposes one change
 		// per block.
+		// A heading level or list type change leaves the text alone, so
+		// proofreading fixes stay beside it. Any other change rewrites, moves
+		// or removes the block, and its proofreading items are dropped below.
 		$changed = array();
 		foreach ( $grouped as $item ) {
 			if ( is_string( $item['block_id'] ?? null ) && ( isset( $item['block_action'] ) || isset( $item['block_change'] ) ) ) {
-				$changed[ $item['block_id'] ] = true;
+				$change                       = $item['block_change'] ?? null;
+				$keeps_text                   = ! isset( $item['block_action'] ) && is_array( $change ) && 'set_attributes' === ( $change['type'] ?? null );
+				$changed[ $item['block_id'] ] = $keeps_text && ( $changed[ $item['block_id'] ] ?? true );
 			}
 		}
 		foreach ( $grouped as $index => $item ) {
 			$block_id = is_string( $item['block_id'] ?? null ) ? $item['block_id'] : '';
-			if ( isset( $changed[ $block_id ] ) && ! isset( $item['block_action'] ) && ! isset( $item['block_change'] ) ) {
+			if ( ! isset( $changed[ $block_id ] ) || isset( $item['block_action'] ) || isset( $item['block_change'] ) ) {
+				continue;
+			}
+			if ( ! $changed[ $block_id ] || self::GRAMMAR_CATEGORY !== ( $item['category'] ?? null ) ) {
 				unset( $grouped[ $index ]['quick_fix'] );
 			}
 		}

@@ -391,6 +391,96 @@ class ResponseParserGrammarTest extends TestCase {
 	}
 
 	/**
+	 * Parse items against one heading.
+	 *
+	 * @param  array<int, array<string, mixed>> $items Feedback items.
+	 * @return array<mixed> Parsed feedback.
+	 */
+	private function parse_heading( array $items ): array {
+		$result = $this->parser->parse_feedback(
+			(string) wp_json_encode(
+				array(
+					'summary'  => 'Summary.',
+					'feedback' => $items,
+				)
+			),
+			array(
+				array(
+					'clientId'   => 'h1',
+					'name'       => 'core/heading',
+					'content'    => 'Instalation steps',
+					'attributes' => array( 'level' => 4 ),
+				),
+			)
+		);
+		$this->assertIsArray( $result );
+		$this->assertIsArray( $result['feedback'] );
+		return $result['feedback'];
+	}
+
+	/**
+	 * A heading level fix leaves the text alone, so a typo fix stays beside
+	 * it, while other quick fixes on the block still give way as before.
+	 */
+	public function test_grammar_fix_stays_beside_a_set_attributes_change(): void {
+		$level = array(
+			'block_id'     => 'h1',
+			'category'     => 'design',
+			'severity'     => 'suggestion',
+			'title'        => 'Fix heading level',
+			'feedback'     => 'Skips a level.',
+			'block_change' => array(
+				'type'       => 'set_attributes',
+				'attributes' => array( 'level' => 3 ),
+			),
+		);
+		$content = array(
+			'block_id'  => 'h1',
+			'category'  => 'content',
+			'severity'  => 'suggestion',
+			'title'     => 'Shorter',
+			'feedback'  => 'Shorter.',
+			'quick_fix' => array(
+				'find'    => 'steps',
+				'replace' => 'guide',
+			),
+		);
+
+		$feedback = $this->parse_heading( array( $level, self::grammar( 'h1', 'Instalation', 'Installation' ), $content ) );
+
+		$this->assertCount( 3, $feedback );
+		$this->assertSame( array( 'Instalation>Installation' ), self::fixes( $feedback ) );
+		$change = $this->item( $feedback, 'design' )['block_change'] ?? null;
+		$this->assertIsArray( $change );
+		$this->assertSame( 'set_attributes', $change['type'] ?? null );
+	}
+
+	/**
+	 * A change that rewrites or removes the block drops its typo items.
+	 */
+	public function test_grammar_item_dropped_beside_a_rewriting_change(): void {
+		$feedback = $this->parse_heading(
+			array(
+				array(
+					'block_id'     => 'h1',
+					'category'     => 'design',
+					'severity'     => 'suggestion',
+					'title'        => 'Make it a paragraph',
+					'feedback'     => 'Body text.',
+					'block_change' => array(
+						'type' => 'transform',
+						'to'   => 'core/paragraph',
+					),
+				),
+				self::grammar( 'h1', 'Instalation', 'Installation' ),
+			)
+		);
+
+		$this->assertCount( 1, $feedback );
+		$this->assertSame( 'design', $this->item( $feedback, 0 )['category'] );
+	}
+
+	/**
 	 * A content quick fix and a grammar fix that overlap on a block keep the
 	 * earlier one; the content note stays without its fix.
 	 */
