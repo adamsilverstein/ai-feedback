@@ -528,8 +528,7 @@ class Reply_Service {
 		// Offer to remember a stated preference unless the author's reviews
 		// already follow it.
 		$house_rule = $this->response_parser->parse_reply_rule( $ai_text );
-		$reply      = null !== $house_rule ? get_comment( $comment_id ) : null;
-		if ( null !== $house_rule && ! House_Style::has_rule( $house_rule, is_object( $reply ) ? self::author_id( $reply ) : 0 ) ) {
+		if ( null !== $house_rule && ! House_Style::list_has_rule( $context['house_style'] ?? array(), $house_rule ) ) {
 			$feedback_item['house_rule'] = $house_rule;
 		}
 		if ( null !== $parsed['edit'] ) {

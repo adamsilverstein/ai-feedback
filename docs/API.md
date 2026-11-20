@@ -725,7 +725,7 @@ Rules are sanitized to single-line plain text (tags, line breaks and control cha
 
 ### POST /house-style
 
-Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and a closing full stop) returns that rule with `200`. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
+Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and closing punctuation) returns that rule with `200`. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
 
 ```json
 { "text": "Headings use sentence case", "scope": "user", "note_id": 790 }

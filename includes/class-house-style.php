@@ -253,9 +253,20 @@ class House_Style {
 	 * @return bool
 	 */
 	public static function has_rule( string $text, int $user_id ): bool {
+		return self::list_has_rule( self::get_prompt_rules( $user_id ), $text );
+	}
+
+	/**
+	 * Whether a list of rule texts has one matching this text.
+	 *
+	 * @param  mixed  $rules Rule texts, such as get_prompt_rules() returns.
+	 * @param  string $text  Rule text.
+	 * @return bool
+	 */
+	public static function list_has_rule( mixed $rules, string $text ): bool {
 		$key = self::compare_key( $text );
-		foreach ( self::get_prompt_rules( $user_id ) as $rule ) {
-			if ( self::compare_key( $rule ) === $key ) {
+		foreach ( is_array( $rules ) ? $rules : array() as $rule ) {
+			if ( is_string( $rule ) && self::compare_key( $rule ) === $key ) {
 				return true;
 			}
 		}
@@ -508,7 +519,8 @@ class House_Style {
 			update_option( self::SITE_OPTION, $rules, false );
 			return;
 		}
-		User_Preferences::set( self::USER_META_KEY, $rules );
+		// update_user_meta() unslashes, which would drop backslashes from rules.
+		User_Preferences::set( self::USER_META_KEY, wp_slash( $rules ) );
 	}
 
 	/**
@@ -545,13 +557,13 @@ class House_Style {
 	}
 
 	/**
-	 * Key used to compare rules, ignoring case and trailing punctuation.
+	 * Key used to compare rules, ignoring case and closing punctuation.
 	 *
 	 * @param  string $text Rule text.
 	 * @return string
 	 */
 	private static function compare_key( string $text ): string {
-		return rtrim( mb_strtolower( $text ), " .!\t" );
+		return rtrim( mb_strtolower( $text ), " .!?;:,\t" );
 	}
 
 	/**

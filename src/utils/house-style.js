@@ -128,7 +128,7 @@ export function dismissProposal(noteId) {
 }
 
 /**
- * Key for comparing rules: case, spacing and a closing full stop ignored,
+ * Key for comparing rules: case, spacing and closing punctuation ignored,
  * like the server's duplicate check.
  *
  * @param {string} text Rule text.
@@ -139,7 +139,7 @@ export function ruleKey(text) {
 		.trim()
 		.replace(/\s+/g, ' ')
 		.toLowerCase()
-		.replace(/[\s.!]+$/, '');
+		.replace(/[\s.!?;:,]+$/, '');
 }
 
 /**

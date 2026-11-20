@@ -32,10 +32,11 @@ beforeEach(() => {
 });
 
 describe('ruleKey and hasRule', () => {
-	it('ignores case, spacing and a closing full stop', () => {
+	it('ignores case, spacing and closing punctuation', () => {
 		expect(ruleKey('  Headings  use Sentence case. ')).toBe(
 			'headings use sentence case'
 		);
+		expect(ruleKey('Use the Oxford comma?;')).toBe('use the oxford comma');
 	});
 
 	it('finds a rule in either list', () => {

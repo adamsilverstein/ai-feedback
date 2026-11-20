@@ -280,4 +280,28 @@ class HouseStyleTest extends TestCase {
 		$this->assertFalse( House_Style::erase_personal_data( 'jane@example.test' )['items_removed'] );
 		$this->assertSame( array(), House_Style::export_personal_data( 'nobody@example.test' )['data'] );
 	}
+
+	/**
+	 * Backslashes survive saving in both scopes, though update_user_meta()
+	 * unslashes what it saves.
+	 */
+	public function test_backslashes_survive_saving(): void {
+		House_Style::add_rule( House_Style::SCOPE_USER, 'Write paths as C:\\temp' );
+		House_Style::add_rule( House_Style::SCOPE_SITE, 'Write paths as D:\\data' );
+
+		$this->assertSame( 'Write paths as C:\\temp', House_Style::get_rules( House_Style::SCOPE_USER )[0]['text'] );
+		$this->assertSame( 'Write paths as D:\\data', House_Style::get_rules( House_Style::SCOPE_SITE )[0]['text'] );
+	}
+
+	/**
+	 * Duplicates are found whatever punctuation closes the rule.
+	 */
+	public function test_duplicates_ignore_closing_punctuation(): void {
+		$first = House_Style::add_rule( House_Style::SCOPE_USER, 'Use the Oxford comma' );
+
+		$this->assertSame( $first, House_Style::add_rule( House_Style::SCOPE_USER, 'Use the Oxford comma?' ) );
+		$this->assertSame( $first, House_Style::add_rule( House_Style::SCOPE_USER, 'use the oxford comma;' ) );
+		$this->assertTrue( House_Style::list_has_rule( array( 'Use the Oxford comma' ), 'USE THE OXFORD COMMA!' ) );
+		$this->assertFalse( House_Style::list_has_rule( 'not a list', 'Use the Oxford comma' ) );
+	}
 }
