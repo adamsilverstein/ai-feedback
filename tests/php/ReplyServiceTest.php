@@ -9,6 +9,7 @@ namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Reply_Service;
+use AI_Feedback\Editor_Text;
 use AI_Feedback\Prompt_Builder;
 use AI_Feedback\Notes_Manager;
 
@@ -1135,6 +1136,26 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertStringContainsString( "Block content: Revenue grew 40% last year. Nested item\n\n", $service->captured_prompt );
 		$this->assertStringNotContainsString( 'Blocks inside it', $service->captured_prompt );
+	}
+
+	/**
+	 * A block over Editor_Text::MAX_BYTES, like a large data table, still
+	 * shows in the reply prompt as context, but a text edit on it is
+	 * dropped, since the server can't read it as the editor does.
+	 */
+	public function test_block_over_the_size_cap_is_context_only(): void {
+		$html = '<p>Revenue grew 40% last year. ' . str_repeat( 'Row of data. ', intdiv( Editor_Text::MAX_BYTES, 13 ) + 1 ) . '</p>';
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year. Row of data.', $service->captured_prompt );
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
 	}
 
 	/**

@@ -51,6 +51,8 @@ class EditorTextTest extends TestCase {
 	 * When PCRE gives up on the HTML, the block reads as '', so no edit is
 	 * matched against text that might differ from the editor's.
 	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
 	public function test_fails_closed_when_the_tokenizer_fails(): void {
 		$jit       = ini_get( 'pcre.jit' );
 		$backtrack = ini_get( 'pcre.backtrack_limit' );
@@ -63,6 +65,33 @@ class EditorTextTest extends TestCase {
 			ini_set( 'pcre.backtrack_limit', (string) $backtrack );
 		}
 
+		$this->assertSame( '', $text );
+	}
+
+	/**
+	 * When PCRE gives up partway through the tokens, the block reads as '',
+	 * not as the text read so far. With no comment in the HTML, the block
+	 * delimiter strip doesn't run, so this reaches the tokenizer: at this
+	 * limit it reads "Revenue grew " and then fails on the link. Runs in its
+	 * own process, since PCRE caches a pattern compiled with JIT.
+	 */
+	#[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+	#[\PHPUnit\Framework\Attributes\PreserveGlobalState( false )]
+	public function test_fails_closed_when_the_tokenizer_fails_partway(): void {
+		$jit       = ini_get( 'pcre.jit' );
+		$backtrack = ini_get( 'pcre.backtrack_limit' );
+		ini_set( 'pcre.jit', '0' );
+		ini_set( 'pcre.backtrack_limit', '10' );
+		try {
+			$text  = Editor_Text::read( 'Revenue grew <a href="https://example.com/annual-report-for-the-year-2025-in-full" title="The annual report for 2025">40%</a> last year.' );
+			$token = preg_match( '~\G[^<]+~', 'Revenue grew ' );
+		} finally {
+			ini_set( 'pcre.jit', (string) $jit );
+			ini_set( 'pcre.backtrack_limit', (string) $backtrack );
+		}
+
+		// The limit still lets a simple token through.
+		$this->assertSame( 1, $token );
 		$this->assertSame( '', $text );
 	}
 

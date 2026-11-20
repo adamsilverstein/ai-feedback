@@ -731,7 +731,8 @@ class Reply_Service {
 		// What an edit's `find` is matched against: the block's own text as
 		// the editor holds it, without its inner blocks, like a list item's
 		// text without its nested list.
-		$block_text    = null !== $block ? self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) : '';
+		$own_html      = null !== $block ? self::strip_suggestion_markers( self::get_own_html( $block ) ) : '';
+		$block_text    = null !== $block ? self::editor_text( $own_html ) : '';
 		$block_content = '';
 		$inner_text    = '';
 		$inner_blocks  = null !== $block && is_array( $block['innerBlocks'] ?? null ) ? $block['innerBlocks'] : array();
@@ -753,6 +754,12 @@ class Reply_Service {
 				? $block_text
 				: self::html_text( $block_html );
 		}
+		if ( '' === $block_text && '' === $block_content ) {
+			// A block too large or odd to read as the editor does reads as
+			// '', so no text edit matches it. The prompt still shows its text
+			// as context.
+			$block_content = self::html_text( $own_html );
+		}
 		$nearby = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
@@ -771,6 +778,7 @@ class Reply_Service {
 			// prompt truncates it, and not when links, formatting or line
 			// breaks would be lost.
 			'block_can_rewrite' => '' !== $block_content
+				&& '' !== $block_text
 				&& ! self::has_inline_markup( $block_html )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),

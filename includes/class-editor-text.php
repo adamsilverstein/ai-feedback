@@ -185,7 +185,7 @@ class Editor_Text {
 	 * Largest block HTML read, in bytes. A larger block reads as '', so no
 	 * edit is matched against it.
 	 */
-	public const MAX_BYTES = 100000;
+	public const MAX_BYTES = 500000;
 
 	/**
 	 * Most elements open at once. A block nested deeper reads as '', so no
@@ -226,7 +226,9 @@ class Editor_Text {
 		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
 		// Block delimiters mark blocks, not text. Their attributes never
 		// hold `--`, so the first `-->` ends one.
-		$html = preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html );
+		if ( str_contains( $html, '<!--' ) ) {
+			$html = preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html );
+		}
 		if ( null === $html ) {
 			Logger::debug( 'Editor text: could not read block HTML' );
 			return '';
@@ -272,12 +274,21 @@ class Editor_Text {
 			// Blocks repeat the same tags, so read each one once.
 			$key   = $tag . ' ' . ( $token['attributes'] ?? '' );
 			$frame = $frames[ $key ] ?? self::open( $tag, $token['attributes'] ?? '' );
+			if ( null === $frame ) {
+				Logger::debug( 'Editor text: could not read block HTML' );
+				return '';
+			}
 			if ( count( $frames ) < 100 ) {
 				$frames[ $key ] = $frame;
 			}
 			if ( in_array( $tag, self::RAW_TEXT, true ) ) {
 				// Text up to the closing tag, read as text, not markup.
-				$closer = preg_match( '#</' . $tag . '[\s/>]#i', $html, $match, PREG_OFFSET_CAPTURE, $offset ) ? (int) $match[0][1] : $length;
+				$found = preg_match( '#</' . $tag . '[\s/>]#i', $html, $match, PREG_OFFSET_CAPTURE, $offset );
+				if ( false === $found ) {
+					Logger::debug( 'Editor text: could not read block HTML' );
+					return '';
+				}
+				$closer = 1 === $found ? (int) $match[0][1] : $length;
 				$raw    = substr( $html, $offset, $closer - $offset );
 				$end    = strpos( $html, '>', $closer );
 				$offset = false === $end ? $length : $end + 1;
@@ -364,11 +375,13 @@ class Editor_Text {
 	 *
 	 * @param string $tag        Lower case tag name.
 	 * @param string $attributes The tag's attributes as written.
-	 * @return array{tag: string, object: bool, kept: bool|null, text: string} Frame.
+	 * @return array{tag: string, object: bool, kept: bool|null, text: string}|null Frame, or null when PCRE can't read the attributes.
 	 */
-	private static function open( string $tag, string $attributes ): array {
+	private static function open( string $tag, string $attributes ): ?array {
 		$values = array();
-		preg_match_all( '~([^\s"\'>/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+)))?~', $attributes, $matches, PREG_SET_ORDER );
+		if ( false === preg_match_all( '~([^\s"\'>/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+)))?~', $attributes, $matches, PREG_SET_ORDER ) ) {
+			return null;
+		}
 		foreach ( $matches as $match ) {
 			$name = strtolower( $match[1] );
 			// The first of a repeated attribute wins.
