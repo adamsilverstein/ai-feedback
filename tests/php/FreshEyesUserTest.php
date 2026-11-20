@@ -440,10 +440,15 @@ class FreshEyesUserTest extends TestCase {
 		$this->add_person( 5, 'jane' );
 
 		$this->assertFalse( Fresh_Eyes_User::allow_for_user( true, $GLOBALS['test_user_objects'][ $id ] ) );
-		$this->assertFalse( Fresh_Eyes_User::allow_for_user( true, $id ) );
 		$this->assertTrue( Fresh_Eyes_User::allow_for_user( true, $GLOBALS['test_user_objects'][5] ) );
-		$this->assertTrue( Fresh_Eyes_User::allow_for_user( true, 5 ) );
-		$this->assertFalse( Fresh_Eyes_User::allow_for_user( false, 5 ) );
+		$this->assertFalse( Fresh_Eyes_User::allow_for_user( false, $GLOBALS['test_user_objects'][5] ) );
+
+		$this->assertFalse( Fresh_Eyes_User::allow_password_reset( true, $id ) );
+		$this->assertTrue( Fresh_Eyes_User::allow_password_reset( true, 5 ) );
+		// An error an earlier filter returned for someone else is kept.
+		$error = new \WP_Error( 'no_reset', 'No.' );
+		$this->assertSame( $error, Fresh_Eyes_User::allow_password_reset( $error, 5 ) );
+		$this->assertFalse( Fresh_Eyes_User::allow_password_reset( $error, $id ) );
 
 		$this->assertFalse( Fresh_Eyes_User::allow_email_for_user( true, array( 'ID' => $id ) ) );
 		$this->assertTrue( Fresh_Eyes_User::allow_email_for_user( true, array( 'ID' => 5 ) ) );
@@ -472,6 +477,26 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertSame( array(), $GLOBALS['test_user_meta'][ $id ]['wp_3_capabilities'] );
 		$this->assertSame( 0, $GLOBALS['test_user_meta'][ $id ]['wp_3_user_level'] );
 		$this->assertSame( '', $GLOBALS['test_user_objects'][ $id ]->user_email );
+	}
+
+	public function test_a_capability_written_to_meta_is_taken_back(): void {
+		$id = $this->create_user();
+		// What WP_User::add_cap() leaves behind, with no role or profile action.
+		$GLOBALS['test_user_meta'][ $id ]['wp_capabilities'] = array( 'edit_posts' => true );
+
+		Fresh_Eyes_User::on_user_meta( 1, $id, 'wp_capabilities' );
+
+		$this->assertSame( array(), $GLOBALS['test_user_meta'][ $id ]['wp_capabilities'] );
+
+		// Other meta and other users are left alone.
+		$this->add_person( 5, 'jane' );
+		Fresh_Eyes_User::on_user_meta( 2, 5, 'wp_capabilities' );
+		Fresh_Eyes_User::on_user_meta( 3, $id, 'nickname' );
+		$this->assertSame( array( 'editor' => true ), $GLOBALS['test_user_meta'][5]['wp_capabilities'] );
+	}
+
+	public function test_a_search_without_a_user_matches_nothing(): void {
+		$this->assertFalse( Fresh_Eyes_User::search_matches( 'fresh' ) );
 	}
 
 	public function test_other_users_are_not_enforced(): void {

@@ -108,7 +108,7 @@ class Fresh_Eyes_User {
 		add_filter( 'authenticate', array( self::class, 'block_login' ), 100 );
 		add_filter( 'determine_current_user', array( self::class, 'block_current_user' ), 100 );
 		add_filter( 'wp_is_application_passwords_available_for_user', array( self::class, 'allow_for_user' ), 10, 2 );
-		add_filter( 'allow_password_reset', array( self::class, 'allow_for_user' ), 10, 2 );
+		add_filter( 'allow_password_reset', array( self::class, 'allow_password_reset' ), 10, 2 );
 		add_filter( 'send_password_change_email', array( self::class, 'allow_email_for_user' ), 10, 2 );
 		add_filter( 'send_email_change_email', array( self::class, 'allow_email_for_user' ), 10, 2 );
 		add_filter( 'map_meta_cap', array( self::class, 'protect_caps' ), 10, 4 );
@@ -117,6 +117,8 @@ class Fresh_Eyes_User {
 		add_action( 'profile_update', array( self::class, 'enforce' ) );
 		add_action( 'granted_super_admin', array( self::class, 'enforce' ) );
 		add_action( 'add_user_to_blog', array( self::class, 'enforce' ) );
+		add_action( 'added_user_meta', array( self::class, 'on_user_meta' ), 10, 3 );
+		add_action( 'updated_user_meta', array( self::class, 'on_user_meta' ), 10, 3 );
 	}
 
 	/**
@@ -419,6 +421,8 @@ class Fresh_Eyes_User {
 		// The completer's search: list the user whatever else the query
 		// requires, such as having published posts. A join, such as site
 		// membership on multisite, could repeat its row, so rows are distinct.
+		// The OR also skips include, exclude, roles and the like; only
+		// is_reveal_request() allowing no such parameters keeps that safe.
 		$conditions = preg_replace( '/^\s*WHERE\s+/i', '', $where, 1 );
 		if ( null === $conditions ) {
 			return;
@@ -448,9 +452,10 @@ class Fresh_Eyes_User {
 	 * Whether a users request is the Notes completer searching for Fresh Eyes.
 	 *
 	 * The completer asks `GET /wp/v2/users?context=view&search=<typed text>`
-	 * on each keystroke. Only that exact shape, from someone who can run a
-	 * review, with typed text that starts the user's name, login or a
-	 * mention handle, lists the user.
+	 * on each keystroke. Only that exact shape, from someone who can edit
+	 * posts, with typed text that starts the user's name, login or a
+	 * mention handle, lists the user. REVEAL_PARAMS is what keeps the
+	 * query's `OR ID = N` from widening any other request.
 	 *
 	 * @param WP_REST_Request $request Users request.
 	 * @return bool
@@ -485,8 +490,13 @@ class Fresh_Eyes_User {
 			return false;
 		}
 
+		$id = self::get_id();
+		if ( $id <= 0 ) {
+			return false;
+		}
+
 		$names = Mentions::get_handles();
-		$user  = get_userdata( self::get_id() );
+		$user  = get_userdata( $id );
 		if ( $user instanceof WP_User ) {
 			$names[] = $user->display_name;
 			$names[] = $user->user_login;
@@ -537,8 +547,11 @@ class Fresh_Eyes_User {
 		}
 
 		$counting = true;
-		$counts   = count_users( 'memory' === $strategy ? 'memory' : 'time', $site_id );
-		$counting = false;
+		try {
+			$counts = count_users( 'memory' === $strategy ? 'memory' : 'time', $site_id );
+		} finally {
+			$counting = false;
+		}
 
 		$roles = array_keys( array_filter( $caps ) );
 		$roles = array() === $roles ? array( 'none' ) : $roles;
@@ -610,15 +623,40 @@ class Fresh_Eyes_User {
 	}
 
 	/**
-	 * Refuse application passwords and password resets for the user.
+	 * Refuse application passwords for the user.
 	 *
-	 * @param bool        $allow Whether it is allowed.
-	 * @param WP_User|int $user  User or user ID.
+	 * @param bool    $allow Whether they are available.
+	 * @param WP_User $user  User.
 	 * @return bool
 	 */
-	public static function allow_for_user( bool $allow, WP_User|int $user ): bool {
-		$user_id = $user instanceof WP_User ? (int) $user->ID : $user;
-		return $allow && ! self::is_user( $user_id );
+	public static function allow_for_user( bool $allow, WP_User $user ): bool {
+		return $allow && ! self::is_user( (int) $user->ID );
+	}
+
+	/**
+	 * Refuse a password reset for the user. Anything an earlier filter
+	 * returned for someone else, such as an error, is kept.
+	 *
+	 * @param mixed $allow   Whether a reset is allowed, or an error.
+	 * @param mixed $user_id User ID.
+	 * @return mixed
+	 */
+	public static function allow_password_reset( mixed $allow, mixed $user_id ): mixed {
+		return is_numeric( $user_id ) && self::is_user( (int) $user_id ) ? false : $allow;
+	}
+
+	/**
+	 * Take back a capability written straight to the user's meta, eg. by
+	 * `WP_User::add_cap()`, which fires no role or profile action.
+	 *
+	 * @param mixed $meta_id  Meta ID.
+	 * @param mixed $user_id  User ID.
+	 * @param mixed $meta_key Meta key.
+	 */
+	public static function on_user_meta( mixed $meta_id, mixed $user_id, mixed $meta_key ): void {
+		if ( is_numeric( $user_id ) && is_string( $meta_key ) && str_ends_with( $meta_key, 'capabilities' ) ) {
+			self::enforce( (int) $user_id );
+		}
 	}
 
 	/**
