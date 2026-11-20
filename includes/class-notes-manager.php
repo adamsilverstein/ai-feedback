@@ -446,6 +446,10 @@ class Notes_Manager {
 			$meta[ self::REPLY_EDIT_META_KEY ] = wp_json_encode( $feedback_item['reply_edit'] );
 		}
 
+		if ( ! empty( $feedback_item['house_rule'] ) && is_string( $feedback_item['house_rule'] ) ) {
+			$meta[ House_Style::PROPOSAL_META_KEY ] = House_Style::sanitize_rule( $feedback_item['house_rule'] );
+		}
+
 		if ( isset( $feedback_item['revision'] ) && is_int( $feedback_item['revision'] ) && $feedback_item['revision'] > 0 ) {
 			$meta[ self::REVISION_META_KEY ] = $feedback_item['revision'];
 		}
