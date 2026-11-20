@@ -16,7 +16,10 @@ use WP_Error;
  */
 class Notes_Manager {
 
-
+	/**
+	 * Comment meta key holding the edit an AI reply proposes, as JSON.
+	 */
+	public const REPLY_EDIT_META_KEY = 'feedback_reply_edit';
 
 	/**
 	 * Create notes from feedback items.
@@ -351,6 +354,10 @@ class Notes_Manager {
 
 		if ( ! empty( $feedback_item['quick_fix'] ) && is_array( $feedback_item['quick_fix'] ) ) {
 			$meta['feedback_quick_fix'] = wp_json_encode( $feedback_item['quick_fix'] );
+		}
+
+		if ( ! empty( $feedback_item['reply_edit'] ) && is_array( $feedback_item['reply_edit'] ) ) {
+			$meta[ self::REPLY_EDIT_META_KEY ] = wp_json_encode( $feedback_item['reply_edit'] );
 		}
 
 		// Add block ID (clientId) if available.
@@ -949,6 +956,38 @@ class Notes_Manager {
 			'find'    => $decoded['find'],
 			'replace' => $decoded['replace'],
 		);
+	}
+
+	/**
+	 * Decode the edit stored on an AI reply.
+	 *
+	 * @param  mixed $stored Stored meta value (JSON string).
+	 * @return array<string, string>|null Edit with `type` and its fields, or null if none.
+	 */
+	public static function decode_reply_edit( mixed $stored ): ?array {
+		$decoded = is_string( $stored ) && '' !== $stored ? json_decode( $stored, true ) : null;
+		if ( ! is_array( $decoded ) ) {
+			return null;
+		}
+
+		$fields = match ( $decoded['type'] ?? null ) {
+			'replace_text'  => array( 'find', 'replace' ),
+			'rewrite_block' => array( 'content', 'original' ),
+			default         => null,
+		};
+		if ( null === $fields ) {
+			return null;
+		}
+
+		$edit = array( 'type' => (string) $decoded['type'] );
+		foreach ( $fields as $field ) {
+			if ( ! is_string( $decoded[ $field ] ?? null ) ) {
+				return null;
+			}
+			$edit[ $field ] = $decoded[ $field ];
+		}
+
+		return $edit;
 	}
 
 	/**

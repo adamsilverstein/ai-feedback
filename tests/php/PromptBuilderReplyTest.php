@@ -141,14 +141,69 @@ class PromptBuilderReplyTest extends TestCase {
 	}
 
 	/**
-	 * System instruction is plain prose (no JSON, no markdown headers).
+	 * System instruction asks for the reply JSON object, not feedback items.
 	 */
 	public function test_reply_system_instruction_format(): void {
 		$instruction = $this->builder->get_reply_system_instruction();
 
-		$this->assertStringContainsString( 'Plain text only', $instruction );
-		$this->assertStringNotContainsString( '{', $instruction );
+		$this->assertStringContainsString( '{"reply": "...", "edit": null}', $instruction );
+		$this->assertStringContainsString( 'Only propose an edit when the user asks for a change', $instruction );
 		$this->assertStringNotContainsString( '"feedback"', $instruction );
+	}
+
+	/**
+	 * The prompt describes the reply format and the text replacement edit.
+	 */
+	public function test_reply_prompt_describes_edits(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content'     => 'Revenue grew 40% last year.',
+				'original_feedback' => 'Add a source.',
+				'user_reply'        => 'Make that change.',
+			)
+		);
+
+		$this->assertStringContainsString( 'RESPONSE FORMAT:', $prompt );
+		$this->assertStringContainsString( '"edit": null', $prompt );
+		$this->assertStringContainsString( '"type": "replace_text"', $prompt );
+		$this->assertStringContainsString( 'in any language', $prompt );
+		$this->assertStringContainsString( 'asks a short question', $prompt );
+		// Rewrites are off unless the block supports them.
+		$this->assertStringNotContainsString( 'rewrite_block', $prompt );
+	}
+
+	/**
+	 * A block that supports rewrites gets the rewrite_block edit.
+	 */
+	public function test_reply_prompt_offers_rewrite_when_block_supports_it(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content'     => 'Revenue grew 40% last year.',
+				'block_can_rewrite' => true,
+				'original_feedback' => 'Add a source.',
+				'user_reply'        => 'Rewrite it.',
+			)
+		);
+
+		$this->assertStringContainsString( '"type": "rewrite_block"', $prompt );
+		$this->assertStringContainsString( 'Only inline formatting tags', $prompt );
+	}
+
+	/**
+	 * Without the block content no edit is possible.
+	 */
+	public function test_reply_prompt_disallows_edits_without_block_content(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_can_rewrite' => true,
+				'original_feedback' => 'Add a source.',
+				'user_reply'        => 'Make that change.',
+			)
+		);
+
+		$this->assertStringContainsString( '"edit" must always be null', $prompt );
+		$this->assertStringNotContainsString( 'replace_text', $prompt );
+		$this->assertStringNotContainsString( 'rewrite_block', $prompt );
 	}
 
 	/**

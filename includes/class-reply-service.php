@@ -43,9 +43,10 @@ class Reply_Service {
 	public const AI_TEMPERATURE = 0.4;
 
 	/**
-	 * Token cap for replies, enough for the requested 2-3 sentences.
+	 * Token cap for replies: 2-3 sentences plus an edit that can rewrite a
+	 * block of up to Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT characters.
 	 */
-	public const AI_MAX_TOKENS = 400;
+	public const AI_MAX_TOKENS = 1500;
 
 	/**
 	 * Maximum number of prior thread replies sent to the AI as context.
@@ -54,6 +55,8 @@ class Reply_Service {
 
 	/**
 	 * Reply returned instead of calling the AI when AI_FEEDBACK_MOCK_MODE is on.
+	 *
+	 * Filterable through `ai_feedback_mock_reply`, so tests can return an edit.
 	 */
 	public const MOCK_REPLY = 'This is a mock AI reply for testing purposes. The conversation loop is working correctly.';
 
@@ -72,6 +75,13 @@ class Reply_Service {
 	private Notes_Manager $notes_manager;
 
 	/**
+	 * Response parser instance.
+	 *
+	 * @var Response_Parser
+	 */
+	private Response_Parser $response_parser;
+
+	/**
 	 * Claim token this request wrote, or null when it holds no claim.
 	 *
 	 * @var string|null
@@ -81,12 +91,14 @@ class Reply_Service {
 	/**
 	 * Constructor.
 	 *
-	 * @param Prompt_Builder|null $prompt_builder Optional prompt builder (for testing).
-	 * @param Notes_Manager|null  $notes_manager  Optional notes manager (for testing).
+	 * @param Prompt_Builder|null  $prompt_builder Optional prompt builder (for testing).
+	 * @param Notes_Manager|null   $notes_manager   Optional notes manager (for testing).
+	 * @param Response_Parser|null $response_parser Optional response parser (for testing).
 	 */
-	public function __construct( ?Prompt_Builder $prompt_builder = null, ?Notes_Manager $notes_manager = null ) {
-		$this->prompt_builder = $prompt_builder ?? new Prompt_Builder();
-		$this->notes_manager  = $notes_manager ?? new Notes_Manager();
+	public function __construct( ?Prompt_Builder $prompt_builder = null, ?Notes_Manager $notes_manager = null, ?Response_Parser $response_parser = null ) {
+		$this->prompt_builder  = $prompt_builder ?? new Prompt_Builder();
+		$this->notes_manager   = $notes_manager ?? new Notes_Manager();
+		$this->response_parser = $response_parser ?? new Response_Parser();
 	}
 
 	/**
@@ -386,7 +398,9 @@ class Reply_Service {
 			return $ai_text;
 		}
 
-		if ( '' === trim( $ai_text ) ) {
+		$block_content = is_string( $context['block_content'] ?? null ) ? $context['block_content'] : '';
+		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ) );
+		if ( null === $parsed ) {
 			Logger::debug( 'Reply_Service: AI returned an empty reply.' );
 			return new WP_Error( 'ai_empty_reply', __( 'The AI returned an empty reply.', 'fresh-eyes' ) );
 		}
@@ -396,10 +410,13 @@ class Reply_Service {
 		}
 
 		$feedback_item = array(
-			'feedback' => $ai_text,
+			'feedback' => $parsed['reply'],
 			'block_id' => $block_id,
 		);
-		$review_data   = array(
+		if ( null !== $parsed['edit'] ) {
+			$feedback_item['reply_edit'] = $parsed['edit'];
+		}
+		$review_data = array(
 			'review_id' => 'reply-' . $comment_id,
 			'post_id'   => $post_id,
 			'model'     => $model,
@@ -466,10 +483,16 @@ class Reply_Service {
 			$block_type = $block['blockName'];
 		}
 
+		$block_content = null !== $block ? self::block_text( $block ) : '';
+
 		return array(
-			'block_content'     => null !== $block ? self::block_text( $block ) : '',
+			'block_content'     => $block_content,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
+			// A rewrite must see the whole block, so not once the prompt truncates it.
+			'block_can_rewrite' => '' !== $block_content
+				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
+				&& self::supports_rewrite( $block_type ),
 			'original_feedback' => $parent->comment_content,
 			'original_category' => self::meta_string( $parent_id, 'feedback_category' ),
 			'original_severity' => self::meta_string( $parent_id, 'feedback_severity' ),
@@ -478,6 +501,36 @@ class Reply_Service {
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
 		);
+	}
+
+	/**
+	 * Whether a block type keeps its text in a rich text `content` attribute,
+	 * which a `rewrite_block` edit replaces.
+	 *
+	 * Matches getRichTextAttributeKey() in src/utils/quick-fix.js.
+	 *
+	 * @param string $block_name Block name.
+	 * @return bool
+	 */
+	private static function supports_rewrite( string $block_name ): bool {
+		$supported = false;
+
+		if ( '' !== $block_name && class_exists( 'WP_Block_Type_Registry' ) ) {
+			$block_type = \WP_Block_Type_Registry::get_instance()->get_registered( $block_name );
+			$attribute  = null !== $block_type && is_array( $block_type->attributes ) ? ( $block_type->attributes['content'] ?? null ) : null;
+			$supported  = is_array( $attribute ) && (
+				'rich-text' === ( $attribute['type'] ?? null )
+				|| in_array( $attribute['source'] ?? null, array( 'rich-text', 'html' ), true )
+			);
+		}
+
+		/**
+		 * Filters whether an AI reply may rewrite a whole block of this type.
+		 *
+		 * @param bool   $supported  Whether the block has a rich text `content` attribute.
+		 * @param string $block_name Block name.
+		 */
+		return (bool) apply_filters( 'ai_feedback_reply_can_rewrite_block', $supported, $block_name );
 	}
 
 	/**
@@ -650,7 +703,14 @@ class Reply_Service {
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
 		if ( defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE ) {
 			Logger::debug( 'Reply_Service: using mock reply' );
-			return self::MOCK_REPLY;
+
+			/**
+			 * Filters the mock reply returned in AI_FEEDBACK_MOCK_MODE.
+			 *
+			 * @param string $reply  Mock reply: prose, or the JSON a model returns.
+			 * @param string $prompt Reply prompt.
+			 */
+			return apply_filters( 'ai_feedback_mock_reply', self::MOCK_REPLY, $prompt );
 		}
 
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {

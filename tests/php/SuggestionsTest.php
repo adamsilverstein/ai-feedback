@@ -186,6 +186,17 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * An AI reply's suggestion is cleaned up like a top-level note's.
+		 */
+		public function test_saved_pending_ids_include_ai_replies(): void {
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$GLOBALS['test_comments'][401]->comment_parent = (string) self::NOTE_ID;
+
+			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
 		 * A save after the suggestion is not proof its markers are gone.
 		 *
 		 * Another editor can save without the markers while the one that
