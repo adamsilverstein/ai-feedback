@@ -1165,7 +1165,7 @@ add_filter( 'ai_feedback_mention_handles', function( array $handles ): array {
 
 #### `ai_feedback_create_mention_user` (filter)
 
-Filters whether to create the hidden [Fresh Eyes user](#the-fresh-eyes-user) the Notes `@` completer offers. Default `true`. Return `false` to go without it: the account is not created, and one that already exists is removed, with its stored ID, at the next activation or admin page load. Typing `@fresh-eyes` still asks Fresh Eyes; only picking it from the `@` menu goes away. Returning `true` again creates a new account at the next admin page load.
+Filters whether to create the hidden [Fresh Eyes user](#the-fresh-eyes-user) the Notes `@` completer offers. Default `true`. Return `false` to go without it: the account is not created, and one that already exists is removed, with its stored ID, at the next activation or admin page load. Typing `@fresh-eyes` still asks Fresh Eyes; only picking it from the `@` menu goes away. Returning `true` again creates a new account at the next admin page load. On multisite the account is shared by the whole network, so add the filter network-wide (a network-activated plugin or an mu-plugin): a value that differs from site to site would have one site remove the account and the next create it again. An account that has somehow authored posts is never deleted, here or on uninstall, since deleting a user deletes their posts; it is kept and the skip is logged.
 
 ```php
 add_filter( 'ai_feedback_create_mention_user', '__return_false' );
