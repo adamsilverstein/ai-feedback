@@ -74,7 +74,8 @@ class Reply_Detector {
 		$is_top_level = $parent_id <= 0;
 
 		// A reply to another reply belongs to the same conversation. A
-		// top-level note that mentions Fresh Eyes starts its own.
+		// top-level note that mentions Fresh Eyes starts its own, so from
+		// here on $parent_id is the thread's root, which may be the note itself.
 		$parent_id = $is_top_level ? $comment_id : self::find_thread_root( $parent_id );
 
 		// Ignore replies authored by AI Feedback itself.
@@ -140,6 +141,7 @@ class Reply_Detector {
 		}
 
 		if ( ! Mentions::can_ask( self::int_field( $comment, 'user_id' ), $post_id ) ) {
+			Logger::debug( sprintf( 'Reply_Detector: note %d mentions Fresh Eyes, but its author cannot review post %d', $comment_id, $post_id ) );
 			return;
 		}
 

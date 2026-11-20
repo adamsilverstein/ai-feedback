@@ -161,4 +161,14 @@ class MentionsTest extends TestCase {
 			)
 		);
 	}
+
+	/**
+	 * A filtered handle with regex characters is matched literally.
+	 */
+	public function test_filtered_handle_with_regex_characters(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_mention_handles' => array( 'c++ bot' ) );
+
+		$this->assertTrue( Mentions::mentions_fresh_eyes( '@c++-bot help' ) );
+		$this->assertFalse( Mentions::mentions_fresh_eyes( '@ccc-bot help' ) );
+	}
 }
