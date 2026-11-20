@@ -182,6 +182,18 @@ class Editor_Text {
 	private const VOID = array( 'area', 'base', 'basefont', 'bgsound', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr' );
 
 	/**
+	 * Largest block HTML read, in bytes. A larger block reads as '', so no
+	 * edit is matched against it.
+	 */
+	public const MAX_BYTES = 100000;
+
+	/**
+	 * Most elements open at once. A block nested deeper reads as '', so no
+	 * edit is matched against it.
+	 */
+	public const MAX_DEPTH = 256;
+
+	/**
 	 * One token of HTML: a comment, markup a browser reads as a comment, a
 	 * tag, or text. A `<` that starts none of them is text.
 	 */
@@ -198,53 +210,71 @@ class Editor_Text {
 	 * The HTML API would read it the same way, but the unit tests run
 	 * without WordPress.
 	 *
+	 * Fails closed: a block over MAX_BYTES or MAX_DEPTH, or one the
+	 * tokenizer can't read within PCRE's limits, reads as '', so an edit is
+	 * never matched against text that might differ from the editor's.
+	 *
 	 * @param string $html Block HTML.
-	 * @return string Text.
+	 * @return string Text, or '' when the block can't be read.
 	 */
 	public static function read( string $html ): string {
+		if ( strlen( $html ) > self::MAX_BYTES ) {
+			Logger::debug( 'Editor text: block HTML too large to read' );
+			return '';
+		}
+
 		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
 		// Block delimiters mark blocks, not text. Their attributes never
 		// hold `--`, so the first `-->` ends one.
-		$html   = preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html ) ?? $html;
+		$html = preg_replace( '#<!--\s+/?wp:.*?-->#s', '', $html );
+		if ( null === $html ) {
+			Logger::debug( 'Editor text: could not read block HTML' );
+			return '';
+		}
+
 		$stack  = array( self::frame( '', null, false ) );
+		$open   = array();
+		$frames = array();
 		$offset = 0;
 		$length = strlen( $html );
 
 		while ( $offset < $length ) {
 			if ( 1 !== preg_match( self::TOKEN, $html, $token, 0, $offset ) ) {
 				// The pattern matches any input, so this is a PCRE limit.
-				// Keep the rest as plain text rather than dropping it.
-				Logger::debug( 'Editor text: could not tokenize block HTML, reading the rest as plain text' );
-				// phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags -- wp_strip_all_tags() uses PCRE too, which just failed.
-				$stack  = self::append( $stack, self::decode( strip_tags( substr( $html, $offset ) ) ) );
-				$offset = $length;
-				break;
+				Logger::debug( 'Editor text: could not read block HTML' );
+				return '';
 			}
 			$offset += strlen( $token[0] );
 
 			if ( isset( $token['text'] ) ) {
-				$stack = self::append( $stack, self::decode( $token['text'] ) );
+				self::append( $stack, self::decode( $token['text'] ) );
 				continue;
 			}
 
 			$tag = strtolower( $token['name'] ?? '' );
 			if ( '' === $tag ) {
 				// A comment, or markup a browser reads as one.
-				$stack = self::append( $stack, self::OBJECT );
+				self::append( $stack, self::OBJECT );
 				continue;
 			}
 
 			if ( 'br' === $tag ) {
 				// A browser reads `</br>` as `<br>` too.
-				$stack = self::append( $stack, "\n" );
+				self::append( $stack, "\n" );
 				continue;
 			}
 
 			if ( '' !== ( $token['close'] ?? '' ) ) {
-				$stack = self::close_to( $stack, $tag );
+				self::close_to( $stack, $open, $tag );
 				continue;
 			}
 
+			// Blocks repeat the same tags, so read each one once.
+			$key   = $tag . ' ' . ( $token['attributes'] ?? '' );
+			$frame = $frames[ $key ] ?? self::open( $tag, $token['attributes'] ?? '' );
+			if ( count( $frames ) < 100 ) {
+				$frames[ $key ] = $frame;
+			}
 			if ( in_array( $tag, self::RAW_TEXT, true ) ) {
 				// Text up to the closing tag, read as text, not markup.
 				$closer = preg_match( '#</' . $tag . '[\s/>]#i', $html, $match, PREG_OFFSET_CAPTURE, $offset ) ? (int) $match[0][1] : $length;
@@ -252,23 +282,35 @@ class Editor_Text {
 				$end    = strpos( $html, '>', $closer );
 				$offset = false === $end ? $length : $end + 1;
 				if ( 'script' === $tag ) {
-					$stack = self::append( $stack, self::OBJECT );
+					self::append( $stack, self::OBJECT );
 					continue;
 				}
-				$frame         = self::open( $tag, $token['attributes'] ?? '' );
 				$frame['text'] = self::decode( $raw, in_array( $tag, array( 'textarea', 'title' ), true ) );
-				$stack[]       = $frame;
-				$stack         = self::close_to( $stack, $tag );
+				self::close( $stack, $frame );
 				continue;
 			}
 
-			$stack[] = self::open( $tag, $token['attributes'] ?? '' );
 			if ( in_array( $tag, self::VOID, true ) ) {
-				$stack = self::close_to( $stack, $tag );
+				self::close( $stack, $frame );
+				continue;
+			}
+
+			if ( count( $stack ) > self::MAX_DEPTH ) {
+				Logger::debug( 'Editor text: block HTML nested too deeply to read' );
+				return '';
+			}
+			$stack[]      = $frame;
+			$open[ $tag ] = ( $open[ $tag ] ?? 0 ) + 1;
+		}
+
+		for ( $depth = count( $stack ); $depth > 1; --$depth ) {
+			$frame = array_pop( $stack );
+			if ( null !== $frame ) {
+				self::close( $stack, $frame );
 			}
 		}
 
-		return trim( self::close_from( $stack, 1 )[0]['text'] );
+		return trim( $stack[0]['text'] );
 	}
 
 	/**
@@ -384,42 +426,41 @@ class Editor_Text {
 	 * does.
 	 *
 	 * @param list<array{tag: string, object: bool, kept: bool|null, text: string}> $stack Open elements, the root first.
+	 * @param array<string, int>                                                    $open  How many elements of each tag are open.
 	 * @param string                                                                $tag   Lower case tag name.
-	 * @return list<array{tag: string, object: bool, kept: bool|null, text: string}> Open elements.
 	 */
-	private static function close_to( array $stack, string $tag ): array {
-		$at = count( $stack ) - 1;
-		while ( $at > 0 && $stack[ $at ]['tag'] !== $tag ) {
-			--$at;
+	private static function close_to( array &$stack, array &$open, string $tag ): void {
+		if ( empty( $open[ $tag ] ) ) {
+			return;
 		}
-		return 0 === $at ? $stack : self::close_from( $stack, $at );
+		for ( $depth = count( $stack ); $depth > 1; --$depth ) {
+			$frame = array_pop( $stack );
+			if ( null === $frame ) {
+				return;
+			}
+			--$open[ $frame['tag'] ];
+			self::close( $stack, $frame );
+			if ( $frame['tag'] === $tag ) {
+				return;
+			}
+		}
 	}
 
 	/**
-	 * Close the open elements from a depth up, adding each one's text to
-	 * its parent's.
+	 * Add a closed element's text to the innermost open element.
 	 *
 	 * @param list<array{tag: string, object: bool, kept: bool|null, text: string}> $stack Open elements, the root first.
-	 * @param int                                                                   $at    Depth of the first element to close, 1 or more.
-	 * @return list<array{tag: string, object: bool, kept: bool|null, text: string}> Open elements.
+	 * @param array{tag: string, object: bool, kept: bool|null, text: string}       $frame Closed element.
 	 */
-	private static function close_from( array $stack, int $at ): array {
-		for ( $index = count( $stack ) - 1; $index >= $at; --$index ) {
-			$frame = array_pop( $stack );
-			if ( null === $frame ) {
-				break;
-			}
-			$text = $frame['text'];
-			if ( $frame['object'] || ( '' === $text && true === $frame['kept'] ) ) {
-				$text = self::OBJECT;
-			}
-			if ( in_array( $frame['tag'], self::LINE_ENDS, true ) ) {
-				$text .= ' ';
-			}
-			$stack = self::append( $stack, $text );
+	private static function close( array &$stack, array $frame ): void {
+		$text = $frame['text'];
+		if ( $frame['object'] || ( '' === $text && true === $frame['kept'] ) ) {
+			$text = self::OBJECT;
 		}
-
-		return $stack;
+		if ( in_array( $frame['tag'], self::LINE_ENDS, true ) ) {
+			$text .= ' ';
+		}
+		self::append( $stack, $text );
 	}
 
 	/**
@@ -427,14 +468,12 @@ class Editor_Text {
 	 *
 	 * @param list<array{tag: string, object: bool, kept: bool|null, text: string}> $stack Open elements, the root first.
 	 * @param string                                                                $text  Text.
-	 * @return list<array{tag: string, object: bool, kept: bool|null, text: string}> Open elements.
 	 */
-	private static function append( array $stack, string $text ): array {
+	private static function append( array &$stack, string $text ): void {
 		$frame = array_pop( $stack );
 		if ( null !== $frame ) {
 			$frame['text'] .= $text;
 			$stack[]        = $frame;
 		}
-		return $stack;
 	}
 }

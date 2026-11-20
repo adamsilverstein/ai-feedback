@@ -48,10 +48,10 @@ class EditorTextTest extends TestCase {
 	}
 
 	/**
-	 * When PCRE gives up on the HTML, the rest is read as plain text, not
-	 * dropped.
+	 * When PCRE gives up on the HTML, the block reads as '', so no edit is
+	 * matched against text that might differ from the editor's.
 	 */
-	public function test_keeps_the_text_when_the_tokenizer_fails(): void {
+	public function test_fails_closed_when_the_tokenizer_fails(): void {
 		$jit       = ini_get( 'pcre.jit' );
 		$backtrack = ini_get( 'pcre.backtrack_limit' );
 		ini_set( 'pcre.jit', '0' );
@@ -63,6 +63,47 @@ class EditorTextTest extends TestCase {
 			ini_set( 'pcre.backtrack_limit', (string) $backtrack );
 		}
 
-		$this->assertSame( 'Revenue grew 40% last year.', $text );
+		$this->assertSame( '', $text );
+	}
+
+	/**
+	 * Data provider for blocks too large or too deep to read.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function unreadable_block_provider(): array {
+		return array(
+			'over the size limit'           => array( '<p>' . str_repeat( 'a', Editor_Text::MAX_BYTES ) . '</p>' ),
+			'nested past the depth limit'   => array( str_repeat( '<span>', 20000 ) . 'a' . str_repeat( '</span>', 20000 ) ),
+			'unclosed past the depth limit' => array( str_repeat( '<em>a', Editor_Text::MAX_DEPTH + 1 ) ),
+		);
+	}
+
+	/**
+	 * A block too large or nested too deeply reads as '' and returns
+	 * quickly.
+	 *
+	 * @dataProvider unreadable_block_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_fails_closed_on_an_unreadable_block( string $html ): void {
+		$start = microtime( true );
+		$text  = Editor_Text::read( $html );
+
+		$this->assertSame( '', $text );
+		$this->assertLessThan( 2.0, microtime( true ) - $start );
+	}
+
+	/**
+	 * A large block within the limits reads in linear time.
+	 */
+	public function test_reads_a_large_block_quickly(): void {
+		$html  = str_repeat( '<strong>a</strong></x>', 4000 ) . str_repeat( '<em>', Editor_Text::MAX_DEPTH - 1 ) . 'b';
+		$start = microtime( true );
+		$text  = Editor_Text::read( $html );
+
+		$this->assertSame( str_repeat( 'a', 4000 ) . 'b', $text );
+		$this->assertLessThan( 2.0, microtime( true ) - $start );
 	}
 }
