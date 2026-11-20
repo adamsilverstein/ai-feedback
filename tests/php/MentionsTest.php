@@ -134,7 +134,7 @@ class MentionsTest extends TestCase {
 		$reply = 'See https://example.com/real/ and https://made-up.example/study. Also www.made-up.example/paper and www.example.com/real';
 
 		$this->assertSame(
-			'See https://example.com/real/ and [link removed] Also [link removed] and www.example.com/real',
+			'See https://example.com/real/ and [link removed]. Also [link removed] and www.example.com/real',
 			Mentions::remove_unsourced_urls( $reply, 'Our docs live at https://example.com/real' )
 		);
 	}
@@ -268,5 +268,50 @@ class MentionsTest extends TestCase {
 	 */
 	public function test_selected_text_with_nested_marks( string $html, string $expected ): void {
 		$this->assertSame( $expected, Mentions::get_selected_text( $html, 300 ) );
+	}
+
+	/**
+	 * A word split across two stretches of the note is not broken up.
+	 */
+	public function test_selected_text_keeps_split_words_whole(): void {
+		$html = '<p><mark class="wp-note" data-id="300">un</mark><strong><mark class="wp-note" data-id="300">clear</mark></strong> and <mark class="wp-note" data-id="300">vague</mark></p>';
+
+		$this->assertSame( 'unclear vague', Mentions::get_selected_text( $html, 300 ) );
+	}
+
+	/**
+	 * An address with parentheses is compared whole, and a parenthesis
+	 * that closes the text around it stays.
+	 */
+	public function test_urls_with_parentheses(): void {
+		$sources = 'See https://example.com/Page_(one) for more.';
+
+		$this->assertSame(
+			'Compare https://example.com/Page_(one) with [link removed].',
+			Mentions::remove_unsourced_urls( 'Compare https://example.com/Page_(one) with https://example.com/Page_(invented).', $sources )
+		);
+		$this->assertSame(
+			'(see [link removed])',
+			Mentions::remove_unsourced_urls( '(see https://made-up.example/x)', $sources )
+		);
+	}
+
+	/**
+	 * The host is compared without case; the path keeps its case.
+	 */
+	public function test_url_path_case_matters(): void {
+		$sources = 'https://Example.com/Report';
+
+		$this->assertSame( 'https://EXAMPLE.com/Report', Mentions::remove_unsourced_urls( 'https://EXAMPLE.com/Report', $sources ) );
+		$this->assertSame( '[link removed]', Mentions::remove_unsourced_urls( 'https://example.com/report', $sources ) );
+		$this->assertTrue(
+			Mentions::edit_has_unsourced_url(
+				array(
+					'type'    => 'rewrite_block',
+					'content' => '<a href="https://example.com/report">x</a>',
+				),
+				$sources
+			)
+		);
 	}
 }

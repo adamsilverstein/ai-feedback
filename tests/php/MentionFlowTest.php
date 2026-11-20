@@ -281,11 +281,12 @@ class MentionFlowTest extends TestCase {
 	 * the text it is attached to in the editor.
 	 */
 	public function test_new_note_mention_is_answered_about_its_text(): void {
+		$before = time();
 		$this->insert_note( 300, '<p>@fresh-eyes simplify this</p>' );
 
 		$event = $GLOBALS['test_scheduled_events'][0] ?? array();
 		$this->assertSame( array( 300, 300, 42, '' ), $event['args'] ?? null );
-		$this->assertGreaterThanOrEqual( time() + Reply_Cron_Dispatcher::MENTION_DELAY - 1, $event['timestamp'] ?? 0, 'WP-Cron waits for the editor.' );
+		$this->assertGreaterThanOrEqual( $before + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? 0, 'WP-Cron waits for the editor.' );
 		$this->assertSame( 300, $this->threads()[300]['pending_reply_id'] ?? null );
 
 		$data = $this->process( 300 );
@@ -544,7 +545,7 @@ class MentionFlowTest extends TestCase {
 		$this->process( 300, 'planted-editor' );
 
 		$this->assertStringContainsString( 'planted.example', $this->service->prompts[0] ?? '', 'The block still reaches the AI.' );
-		$this->assertSame( 'The source is [link removed]', $this->notes->saved[900]['feedback'] ?? null );
+		$this->assertSame( 'The source is [link removed].', $this->notes->saved[900]['feedback'] ?? null );
 	}
 
 	/**
@@ -597,5 +598,22 @@ class MentionFlowTest extends TestCase {
 		$this->assertSame( 'complete', $this->process( 300 )['status'] );
 		$this->assertSame( array(), $GLOBALS['test_mail'] );
 		unset( $GLOBALS['test_mail'] );
+	}
+
+	/**
+	 * A mention in a reply to a reply is listed with its thread's root.
+	 */
+	public function test_nested_reply_mention_is_listed_under_the_root(): void {
+		$this->insert_note( 300, 'This sentence drags.' );
+		$this->insert_note( 301, 'Agreed.', 300, 'Bob' );
+		$this->insert_note( 302, '@fresh-eyes shorten it', 301, 'Jane' );
+
+		$threads = $this->threads();
+		$this->assertSame( array( 300 ), array_keys( $threads ) );
+		$this->assertSame( 302, $threads[300]['pending_reply_id'] );
+		$this->assertSame( array( 301, 302 ), array_column( $threads[300]['replies'], 'id' ) );
+
+		$this->process( 302 );
+		$this->assertSame( array( 301, 302, 900 ), array_column( $this->threads()[300]['replies'], 'id' ) );
 	}
 }

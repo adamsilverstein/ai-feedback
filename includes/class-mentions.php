@@ -46,7 +46,7 @@ class Mentions {
 	 * A web address in text: `http(s)://` or `www.` up to whitespace,
 	 * quotes, brackets or a backslash.
 	 */
-	private const URL_PATTERN = '#\b(?:https?://|www\.)[^\s"\'<>()\[\]\\\\]+#i';
+	private const URL_PATTERN = '#\b(?:https?://|www\.)[^\s"\'<>\[\]\\\\]+#i';
 
 	/**
 	 * Elements whose text is quoted, not written by the note's author.
@@ -198,16 +198,26 @@ class Mentions {
 		$stack  = array();
 		$inside = 0;
 		$text   = '';
+		// Text between two stretches of the note, so their words join as written.
+		$gap    = '';
 		$offset = 0;
 		foreach ( $tags as $tag ) {
+			$between = substr( $block_html, $offset, $tag[0][1] - $offset );
 			if ( $inside > 0 ) {
-				$text .= substr( $block_html, $offset, $tag[0][1] - $offset );
+				$text .= $between;
+			} else {
+				$gap .= $between;
 			}
 			$offset = $tag[0][1] + strlen( $tag[0][0] );
 
-			if ( 'mark' !== strtolower( $tag[2][0] ) ) {
-				// Other tags separate words, eg. a line break.
+			$name = strtolower( $tag[2][0] );
+			if ( 'br' === $name ) {
+				// A line break separates words; other tags, eg. bold, do not.
 				$text .= $inside > 0 ? ' ' : '';
+				$gap  .= ' ';
+				continue;
+			}
+			if ( 'mark' !== $name ) {
 				continue;
 			}
 
@@ -219,9 +229,10 @@ class Mentions {
 			}
 
 			$is_note = self::is_note_marker( $tag[3][0], $note_id );
-			if ( $is_note && 0 === $inside && '' !== $text ) {
-				// Another stretch of the same note.
-				$text .= ' ';
+			if ( $is_note && 0 === $inside ) {
+				// Another stretch of the same note, joined as the text reads.
+				$text .= '' !== $text && 1 === preg_match( '/\s|&nbsp;/u', $gap ) ? ' ' : '';
+				$gap   = '';
 			}
 			$stack[] = $is_note;
 			$inside += $is_note ? 1 : 0;
@@ -259,7 +270,7 @@ class Mentions {
 
 		$urls = array();
 		foreach ( $matches[0] as $url ) {
-			$urls[] = self::normalize_url( $url );
+			$urls[] = self::normalize_url( self::split_url( $url )[0] );
 		}
 		return array_values( array_unique( $urls ) );
 	}
@@ -280,10 +291,11 @@ class Mentions {
 		$cleaned = preg_replace_callback(
 			self::URL_PATTERN,
 			static function ( array $found ) use ( $known ): string {
-				if ( in_array( self::normalize_url( $found[0] ), $known, true ) ) {
+				list( $url, $rest ) = self::split_url( $found[0] );
+				if ( in_array( self::normalize_url( $url ), $known, true ) ) {
 					return $found[0];
 				}
-				return __( '[link removed]', 'fresh-eyes' );
+				return __( '[link removed]', 'fresh-eyes' ) . $rest;
 			},
 			$reply
 		);
@@ -360,7 +372,7 @@ class Mentions {
 		$decoded = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		// Browsers drop tabs and line breaks anywhere in a URL, and spaces and
 		// control characters around it.
-		$link = strtolower( (string) preg_replace( '/[\x00-\x20\x7f]+/', '', $decoded ) );
+		$link = (string) preg_replace( '/[\x00-\x20\x7f]+/', '', $decoded );
 		if ( str_contains( $link, '&' ) ) {
 			// An entity without its semicolon, which a browser may still decode.
 			return 'unreadable:' . $link;
@@ -368,7 +380,11 @@ class Mentions {
 		if ( str_starts_with( $link, '//' ) ) {
 			$link = 'https:' . $link;
 		}
-		return preg_match( '#^https?://#', $link ) ? self::normalize_url( $link ) : $link;
+		if ( preg_match( '#^https?://#i', $link ) ) {
+			return self::normalize_url( $link );
+		}
+		// Another scheme, such as mailto: or javascript:, is case-insensitive.
+		return (string) preg_replace_callback( '#^[a-z][a-z0-9+.-]*:#i', static fn ( array $scheme ): string => strtolower( $scheme[0] ), $link );
 	}
 
 	/**
@@ -406,7 +422,32 @@ class Mentions {
 	 * @return string
 	 */
 	private static function normalize_url( string $url ): string {
-		$url = (string) preg_replace( '#^https?://#i', '', strtolower( $url ) );
-		return rtrim( (string) preg_replace( '#^www\.#', '', $url ), '/.,;:!?' );
+		$url = (string) preg_replace( '#^https?://#i', '', $url );
+		// Only the host is case-insensitive; a path or query keeps its case.
+		$parts = preg_split( '#(?=[/?\#])#', $url, 2 );
+		$host  = strtolower( is_array( $parts ) ? $parts[0] : $url );
+		$path  = is_array( $parts ) ? ( $parts[1] ?? '' ) : '';
+		return rtrim( (string) preg_replace( '#^www\.#', '', $host ) . $path, '/.,;:!?' );
+	}
+
+	/**
+	 * Split a matched address from punctuation that ends the text around
+	 * it, such as the period or parenthesis after `(see https://example.com/x).`.
+	 * Parentheses that balance stay part of the address.
+	 *
+	 * @param string $url Matched address.
+	 * @return array{string, string} Address and the trailing text that is not part of it.
+	 */
+	private static function split_url( string $url ): array {
+		$rest = '';
+		while ( '' !== $url ) {
+			$last = substr( $url, -1 );
+			if ( ! str_contains( '.,;:!?', $last ) && ( ')' !== $last || substr_count( $url, '(' ) >= substr_count( $url, ')' ) ) ) {
+				break;
+			}
+			$rest = $last . $rest;
+			$url  = substr( $url, 0, -1 );
+		}
+		return array( $url, $rest );
 	}
 }
