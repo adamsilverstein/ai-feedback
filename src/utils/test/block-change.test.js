@@ -477,6 +477,31 @@ describe('heading and paragraph transforms', () => {
 		);
 	});
 
+	// The server keeps the break as a space; reviews from before dropped it.
+	it.each([
+		['new', 'Getting started now'],
+		['older', 'Getting startednow'],
+	])(
+		'is ready for a block with a line break, from a %s review',
+		(_l, text) => {
+			const paragraph = createBlock('core/paragraph', {
+				content: 'Getting started<br>now',
+				metadata: NOTE,
+			});
+			const { selectors } = setUp([paragraph]);
+			const change = {
+				type: 'transform',
+				to: 'core/heading',
+				level: 2,
+				text,
+			};
+
+			expect(
+				getBlockChangeState(selectors, change, paragraph.clientId).state
+			).toBe('ready');
+		}
+	);
+
 	it('is not offered when the editor does not offer the transform', () => {
 		const paragraph = createBlock('core/paragraph', { content: 'Title' });
 		const { selectors } = setUp([paragraph], {
