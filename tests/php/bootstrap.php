@@ -453,6 +453,10 @@ if ( ! function_exists( 'wp_delete_comment' ) ) {
 
 if ( ! function_exists( 'get_user_meta' ) ) {
 	function get_user_meta( $user_id, $key = '', $single = false ) {
+		// Like core, no key gives every key with its values as a list.
+		if ( '' === $key ) {
+			return array_map( static fn( $value ) => array( $value ), $GLOBALS['test_user_meta'][ $user_id ] ?? array() );
+		}
 		return $GLOBALS['test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : array() );
 	}
 }

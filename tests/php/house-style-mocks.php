@@ -37,8 +37,16 @@ if ( ! function_exists( 'get_blogs_of_user' ) ) {
  * `wp_` for the main site and `wp_{id}_` for the others.
  */
 class House_Style_Test_WPDB {
+	public $base_prefix = 'wp_';
+
 	public function get_blog_prefix( $blog_id = null ) {
 		$blog_id = $blog_id ?? ( $GLOBALS['test_blog_id'] ?? 1 );
 		return 1 === (int) $blog_id ? 'wp_' : 'wp_' . (int) $blog_id . '_';
+	}
+}
+
+if ( ! function_exists( 'get_blog_option' ) ) {
+	function get_blog_option( $id, $option, $default_value = false ) {
+		return 'blogname' === $option ? ( $GLOBALS['test_blog_names'][ $id ] ?? $default_value ) : $default_value;
 	}
 }

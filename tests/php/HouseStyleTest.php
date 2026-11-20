@@ -50,6 +50,7 @@ class HouseStyleTest extends TestCase {
 		unset(
 			$GLOBALS['test_blog_id'],
 			$GLOBALS['test_user_blogs'],
+			$GLOBALS['test_blog_names'],
 			$GLOBALS['test_options'],
 			$GLOBALS['test_user_meta'],
 			$GLOBALS['test_current_user_id'],
@@ -301,11 +302,9 @@ class HouseStyleTest extends TestCase {
 	 */
 	public function test_privacy_export_and_erase_cover_every_site(): void {
 		$GLOBALS['test_user_emails'] = array( 'jane@example.test' => self::USER_ID );
-		$GLOBALS['test_user_blogs']  = array(
-			self::USER_ID => array(
-				1 => (object) array( 'blogname' => 'Main' ),
-				2 => (object) array( 'blogname' => 'News' ),
-			),
+		$GLOBALS['test_blog_names']  = array(
+			1 => 'Main',
+			2 => 'News',
 		);
 		House_Style::add_rule( House_Style::SCOPE_USER, 'Use sentence case' );
 		$GLOBALS['test_blog_id'] = 2;
@@ -353,5 +352,35 @@ class HouseStyleTest extends TestCase {
 		$this->assertSame( $first, House_Style::add_rule( House_Style::SCOPE_USER, 'use the oxford comma;' ) );
 		$this->assertTrue( House_Style::list_has_rule( array( 'Use the Oxford comma' ), 'USE THE OXFORD COMMA!' ) );
 		$this->assertFalse( House_Style::list_has_rule( 'not a list', 'Use the Oxford comma' ) );
+	}
+
+	/**
+	 * Rules on a site the user has left, and rules saved under the key used
+	 * before rules were per site, are still exported and erased, since the
+	 * keys come from the user's own meta rather than their sites.
+	 */
+	public function test_privacy_tools_cover_former_sites_and_the_unprefixed_key(): void {
+		$GLOBALS['test_user_emails'] = array( 'jane@example.test' => self::USER_ID );
+		$GLOBALS['test_user_blogs']  = array( self::USER_ID => array( 1 => (object) array( 'blogname' => 'Main' ) ) );
+		$GLOBALS['test_blog_id']     = 3;
+		House_Style::add_rule( House_Style::SCOPE_USER, 'Rule on a site the user left' );
+		$GLOBALS['test_blog_id']                                                  = 1;
+		$GLOBALS['test_user_meta'][ self::USER_ID ][ House_Style::USER_META_KEY ] = array(
+			array(
+				'id'   => 'old1',
+				'text' => 'Rule from before per-site rules',
+			),
+		);
+		$GLOBALS['test_user_meta'][ self::USER_ID ]['wp_unrelated_key'] = 'kept';
+
+		$texts = array_map(
+			static fn ( array $item ): string => (string) end( $item['data'] )['value'],
+			House_Style::export_personal_data( 'jane@example.test' )['data']
+		);
+		sort( $texts );
+		$this->assertSame( array( 'Rule from before per-site rules', 'Rule on a site the user left' ), $texts );
+
+		$this->assertTrue( House_Style::erase_personal_data( 'jane@example.test' )['items_removed'] );
+		$this->assertSame( array( 'wp_unrelated_key' => 'kept' ), $GLOBALS['test_user_meta'][ self::USER_ID ] );
 	}
 }

@@ -418,13 +418,12 @@ class House_Style {
 		$user  = get_user_by( 'email', $email_address );
 		$items = array();
 		if ( $user ) {
-			foreach ( self::get_user_sites( (int) $user->ID ) as $site_id => $site_name ) {
-				$key = self::user_meta_key( $site_id );
+			foreach ( self::get_user_rule_keys( (int) $user->ID ) as $key => $site_name ) {
 				foreach ( self::normalize( get_user_meta( (int) $user->ID, $key, true ) ) as $rule ) {
 					$items[] = array(
 						'group_id'    => 'ai-feedback-house-style',
 						'group_label' => __( 'Fresh Eyes house style', 'fresh-eyes' ),
-						'item_id'     => 'ai-feedback-house-style-' . $site_id . '-' . $rule['id'],
+						'item_id'     => 'ai-feedback-house-style-' . $key . '-' . $rule['id'],
 						'data'        => array(
 							array(
 								'name'  => __( 'Site', 'fresh-eyes' ),
@@ -456,8 +455,7 @@ class House_Style {
 		$user    = get_user_by( 'email', $email_address );
 		$removed = false;
 		if ( $user ) {
-			foreach ( array_keys( self::get_user_sites( (int) $user->ID ) ) as $site_id ) {
-				$key = self::user_meta_key( $site_id );
+			foreach ( array_keys( self::get_user_rule_keys( (int) $user->ID ) ) as $key ) {
 				if ( array() !== self::normalize( get_user_meta( (int) $user->ID, $key, true ) ) ) {
 					$removed = true;
 				}
@@ -487,23 +485,46 @@ class House_Style {
 	}
 
 	/**
-	 * Sites a user may have personal rules on, for the privacy tools.
+	 * Every user meta key holding the user's personal rules, for the privacy
+	 * tools, with the site each belongs to.
+	 *
+	 * Found from the user's own meta rather than their site memberships, so
+	 * rules on a site they have left, or one that is archived or deleted,
+	 * are still exported and erased. Includes an unprefixed key, as saved
+	 * before rules were per site.
 	 *
 	 * @param  int $user_id User ID.
-	 * @return array<int, string> Site name by site ID; the current site when there is no list.
+	 * @return array<string, string> Site name by meta key; empty when the site is unknown.
 	 */
-	private static function get_user_sites( int $user_id ): array {
-		$sites = array();
-		if ( function_exists( 'get_blogs_of_user' ) ) {
-			foreach ( get_blogs_of_user( $user_id ) as $site_id => $site ) {
-				$name                    = isset( $site->blogname ) && is_string( $site->blogname ) ? $site->blogname : '';
-				$sites[ (int) $site_id ] = $name;
+	private static function get_user_rule_keys( int $user_id ): array {
+		global $wpdb;
+		$base    = is_object( $wpdb ) && isset( $wpdb->base_prefix ) && is_string( $wpdb->base_prefix ) ? $wpdb->base_prefix : '';
+		$pattern = '/^(?:' . preg_quote( $base, '/' ) . '(?:(\d+)_)?)?' . preg_quote( self::USER_META_KEY, '/' ) . '$/';
+
+		$keys = array();
+		$meta = get_user_meta( $user_id );
+		foreach ( array_keys( is_array( $meta ) ? $meta : array() ) as $key ) {
+			if ( ! is_string( $key ) || ! preg_match( $pattern, $key, $match ) ) {
+				continue;
 			}
+			$is_legacy    = self::USER_META_KEY === $key && '' !== $base;
+			$site_id      = isset( $match[1] ) && '' !== $match[1] ? (int) $match[1] : ( $is_legacy ? 0 : ( function_exists( 'get_main_site_id' ) ? get_main_site_id() : 1 ) );
+			$keys[ $key ] = $site_id > 0 ? self::site_name( $site_id ) : '';
 		}
-		if ( array() === $sites ) {
-			$sites[ get_current_blog_id() ] = get_bloginfo( 'name' );
-		}
-		return $sites;
+		return $keys;
+	}
+
+	/**
+	 * A site's name, for the export.
+	 *
+	 * @param  int $site_id Site ID.
+	 * @return string Name, or an empty string when it can't be found.
+	 */
+	private static function site_name( int $site_id ): string {
+		$name = function_exists( 'get_blog_option' )
+			? get_blog_option( $site_id, 'blogname' )
+			: ( get_current_blog_id() === $site_id ? get_bloginfo( 'name' ) : '' );
+		return is_string( $name ) ? $name : '';
 	}
 
 	/**
