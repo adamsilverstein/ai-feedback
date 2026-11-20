@@ -22,6 +22,15 @@ class Review_History {
 	const META_KEY = '_ai_feedback_history';
 
 	/**
+	 * Post meta key holding the notes still open after the latest review,
+	 * which the next review compares. Bookkeeping only, never sent to the
+	 * editor, so it is kept apart from the history and not registered.
+	 *
+	 * @var string
+	 */
+	const OPEN_NOTES_META_KEY = '_ai_feedback_open_notes';
+
+	/**
 	 * Maximum number of entries kept per post.
 	 *
 	 * @var int
@@ -161,24 +170,31 @@ class Review_History {
 				}
 			}
 
+			$open = self::get_open_notes( $post_id );
+
 			if ( null !== $existing ) {
-				$history[ $existing ] = self::merge_part( $history[ $existing ], $entry, $note_ids );
+				$history[ $existing ] = self::merge_part( $history[ $existing ], $entry );
+				$open_ids             = $open['review_id'] === $entry['review_id']
+					? Review_Progress::merge_ids( $open['note_ids'], $note_ids )
+					: Review_Progress::merge_ids( $note_ids );
 			} else {
 				$previous = end( $history );
+				$open_ids = Review_Progress::merge_ids( $note_ids );
 				if ( is_array( $previous ) ) {
-					$comparison             = Review_Progress::compare( $post_id, $previous );
-					$entry['progress']      = array(
+					$previous_id = is_string( $previous['review_id'] ?? null ) ? $previous['review_id'] : '';
+					// The open notes kept for the previous review, or, when they
+					// were never kept, the notes that review created.
+					$comparison        = Review_Progress::compare(
+						$post_id,
+						'' !== $previous_id && $open['review_id'] === $previous_id
+							? array( 'open_note_ids' => $open['note_ids'] )
+							: array( 'review_id' => $previous_id )
+					);
+					$entry['progress'] = array(
 						'addressed'  => $comparison['addressed'],
 						'still_open' => $comparison['still_open'],
 					);
-					$entry['open_note_ids'] = Review_Progress::merge_ids( $comparison['open_ids'], $note_ids );
-				} else {
-					$entry['open_note_ids'] = Review_Progress::merge_ids( $note_ids );
-				}
-
-				// Only the newest entry's open notes are ever compared.
-				foreach ( $history as $index => $stored ) {
-					unset( $history[ $index ]['open_note_ids'] );
+					$open_ids          = Review_Progress::merge_ids( $comparison['open_ids'], $note_ids );
 				}
 				$history[] = $entry;
 			}
@@ -186,21 +202,33 @@ class Review_History {
 
 			// update_post_meta() unslashes, which would strip backslashes from the summary.
 			update_post_meta( $post_id, self::META_KEY, wp_slash( $history ) );
+			update_post_meta(
+				$post_id,
+				self::OPEN_NOTES_META_KEY,
+				array(
+					'review_id' => $entry['review_id'],
+					'note_ids'  => $open_ids,
+				)
+			);
 		} catch ( \Throwable $e ) {
 			Logger::debug( sprintf( 'Could not record review history: %s', $e->getMessage() ) );
 		}
 	}
 
 	/**
-	 * An entry as the editor sees it, without the bookkeeping for the next comparison.
+	 * The notes still open after the latest review, kept for the next one.
 	 *
-	 * @param  array<mixed> $entry History entry.
-	 * @return array<mixed>
+	 * @param  int $post_id Post ID.
+	 * @return array{review_id: string, note_ids: list<int>}
 	 */
-	public static function for_response( array $entry ): array {
-		unset( $entry['open_note_ids'] );
+	public static function get_open_notes( int $post_id ): array {
+		$open = get_post_meta( $post_id, self::OPEN_NOTES_META_KEY, true );
+		$open = is_array( $open ) ? $open : array();
 
-		return $entry;
+		return array(
+			'review_id' => is_string( $open['review_id'] ?? null ) ? $open['review_id'] : '',
+			'note_ids'  => self::int_list( $open['note_ids'] ?? array() ),
+		);
 	}
 
 	/**
@@ -224,24 +252,22 @@ class Review_History {
 	 * The comparison with the previous review was made by the first part,
 	 * before this review created any notes, so it is kept.
 	 *
-	 * @param  array<mixed>         $stored   Entry recorded by the earlier parts.
-	 * @param  array<string, mixed> $part     Entry built from this part.
-	 * @param  int[]                $note_ids Notes this part created.
+	 * @param  array<mixed>         $stored Entry recorded by the earlier parts.
+	 * @param  array<string, mixed> $part   Entry built from this part.
 	 * @return array<mixed>
 	 */
-	private static function merge_part( array $stored, array $part, array $note_ids ): array {
+	private static function merge_part( array $stored, array $part ): array {
 		$stored_summary = is_array( $stored['summary'] ?? null ) ? $stored['summary'] : array();
 		$part_summary   = is_array( $part['summary'] ?? null ) ? $part['summary'] : array();
 
-		$stored['timestamp']     = $part['timestamp'];
-		$stored['note_count']    = ( is_int( $stored['note_count'] ?? null ) ? $stored['note_count'] : 0 ) + ( is_int( $part['note_count'] ?? null ) ? $part['note_count'] : 0 );
-		$stored['notes_failed']  = ! empty( $stored['notes_failed'] ) || ! empty( $part['notes_failed'] );
-		$stored['summary']       = array(
+		$stored['timestamp']    = $part['timestamp'];
+		$stored['note_count']   = ( is_int( $stored['note_count'] ?? null ) ? $stored['note_count'] : 0 ) + ( is_int( $part['note_count'] ?? null ) ? $part['note_count'] : 0 );
+		$stored['notes_failed'] = ! empty( $stored['notes_failed'] ) || ! empty( $part['notes_failed'] );
+		$stored['summary']      = array(
 			'by_severity' => self::add_counts( $stored_summary['by_severity'] ?? array(), $part_summary['by_severity'] ?? array() ),
 			'by_category' => self::add_counts( $stored_summary['by_category'] ?? array(), $part_summary['by_category'] ?? array() ),
 		);
-		$stored['strengths']     = self::sanitize_strengths( array_merge( is_array( $stored['strengths'] ?? null ) ? $stored['strengths'] : array(), is_array( $part['strengths'] ?? null ) ? $part['strengths'] : array() ) );
-		$stored['open_note_ids'] = Review_Progress::merge_ids( self::int_list( $stored['open_note_ids'] ?? array() ), $note_ids );
+		$stored['strengths']    = self::sanitize_strengths( array_merge( is_array( $stored['strengths'] ?? null ) ? $stored['strengths'] : array(), is_array( $part['strengths'] ?? null ) ? $part['strengths'] : array() ) );
 
 		// The last part's summary covers the whole document.
 		if ( is_string( $part['summary_text'] ?? null ) && '' !== $part['summary_text'] ) {

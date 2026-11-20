@@ -102,7 +102,7 @@ class History_Controller extends WP_REST_Controller {
 	 */
 	public function get_history( WP_REST_Request $request ): WP_REST_Response {
 		$post_id = $this->get_post_id( $request );
-		$history = array_map( array( Review_History::class, 'for_response' ), array_reverse( Review_History::get( $post_id ) ) );
+		$history = array_reverse( Review_History::get( $post_id ) );
 
 		return new WP_REST_Response(
 			array(
@@ -142,7 +142,6 @@ class History_Controller extends WP_REST_Controller {
 			)
 		);
 
-		$entry            = Review_History::for_response( $entry );
 		$entry['post_id'] = $post_id;
 		$entry['notes']   = $notes;
 

@@ -8,7 +8,6 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
-use AI_Feedback\History_Controller;
 use AI_Feedback\Notes_Manager;
 use AI_Feedback\Review_History;
 use AI_Feedback\Review_Progress;
@@ -286,35 +285,58 @@ class ReviewProgressTest extends TestCase {
 	}
 
 	/**
-	 * Only the newest entry keeps open note IDs, and the REST responses leave
-	 * them out.
+	 * Open note IDs are kept under their own meta key, never in the history,
+	 * so every stored entry still matches the entry schema.
 	 */
-	public function test_only_the_newest_entry_keeps_open_note_ids(): void {
+	public function test_open_notes_are_kept_apart_from_history(): void {
 		$first = $this->add_note( 'r1' );
 		Review_History::record( self::POST_ID, $this->review( 'r1', array( $first ) ) );
 		$second = $this->add_note( 'r2' );
 		Review_History::record( self::POST_ID, $this->review( 'r2', array( $second ) ) );
 
-		$history = Review_History::get( self::POST_ID );
-		$this->assertArrayNotHasKey( 'open_note_ids', $history[0] );
-		$this->assertSame( array( $first, $second ), $history[1]['open_note_ids'] );
+		$this->assertSame(
+			array(
+				'review_id' => 'r2',
+				'note_ids'  => array( $first, $second ),
+			),
+			Review_History::get_open_notes( self::POST_ID )
+		);
 
-		$controller = new History_Controller( new Notes_Manager() );
-		$request    = new \WP_REST_Request();
-		$request->set_param( 'post_id', self::POST_ID );
-		$data = $controller->get_history( $request )->get_data();
-		$this->assertIsArray( $data );
-		$this->assertIsArray( $data['history'] );
-		foreach ( $data['history'] as $entry ) {
-			$this->assertIsArray( $entry );
-			$this->assertArrayNotHasKey( 'open_note_ids', $entry );
+		$schema = Review_History::get_entry_schema();
+		$this->assertIsArray( $schema['properties'] );
+		$allowed = array_keys( $schema['properties'] );
+		foreach ( Review_History::get( self::POST_ID ) as $entry ) {
+			$this->assertSame( array(), array_diff( array_keys( $entry ), $allowed ) );
 		}
+	}
 
-		$request->set_param( 'review_id', 'r2' );
-		$review = $controller->get_history_review( $request );
-		$this->assertInstanceOf( \WP_REST_Response::class, $review );
-		$this->assertIsArray( $review->get_data() );
-		$this->assertArrayNotHasKey( 'open_note_ids', $review->get_data() );
+	/**
+	 * A previous review the open notes weren't kept for compares the notes it
+	 * created.
+	 */
+	public function test_open_notes_for_another_review_are_not_used(): void {
+		$first = $this->add_note( 'r1' );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( $first ) ) );
+		update_post_meta(
+			self::POST_ID,
+			Review_History::OPEN_NOTES_META_KEY,
+			array(
+				'review_id' => 'r0',
+				'note_ids'  => array( 999 ),
+			)
+		);
+
+		Review_History::record( self::POST_ID, $this->review( 'r2', array() ) );
+
+		$entry = Review_History::find( self::POST_ID, 'r2' );
+		$this->assertIsArray( $entry );
+		$this->assertSame(
+			array(
+				'addressed'  => 0,
+				'still_open' => 1,
+			),
+			$entry['progress']
+		);
 	}
 
 	/**
@@ -344,7 +366,7 @@ class ReviewProgressTest extends TestCase {
 		$entry = Review_History::find( self::POST_ID, 'r1' );
 		$this->assertIsArray( $entry );
 		$this->assertArrayNotHasKey( 'progress', $entry );
-		$this->assertSame( array( $first_a, $first_b, $first_c ), $entry['open_note_ids'] );
+		$this->assertSame( array( $first_a, $first_b, $first_c ), Review_History::get_open_notes( self::POST_ID )['note_ids'] );
 		$this->assertNull( Review_History::get_review_extras( self::POST_ID, 'r1' )['progress'] );
 
 		// Dismiss one, accept another's suggestion, delete nothing.
@@ -364,7 +386,7 @@ class ReviewProgressTest extends TestCase {
 			),
 			$entry['progress']
 		);
-		$this->assertSame( array( $first_c, $second ), $entry['open_note_ids'] );
+		$this->assertSame( array( $first_c, $second ), Review_History::get_open_notes( self::POST_ID )['note_ids'] );
 		$this->assertSame(
 			array(
 				'addressed'  => 2,
@@ -422,7 +444,6 @@ class ReviewProgressTest extends TestCase {
 		$this->assertIsArray( $entry['summary'] );
 		$this->assertIsArray( $entry['summary']['by_severity'] );
 		$this->assertIsArray( $entry['strengths'] );
-		$this->assertIsArray( $entry['open_note_ids'] );
 		$this->assertSame( 'r2', $entry['review_id'] );
 		$this->assertSame( 3, $entry['note_count'] );
 		$this->assertSame( 2, $entry['summary']['by_severity']['important'] );
@@ -435,8 +456,10 @@ class ReviewProgressTest extends TestCase {
 			$entry['progress']
 		);
 		$this->assertSame( array( 'One.', 'Two.', 'Three.' ), array_column( $entry['strengths'], 'text' ) );
-		$this->assertCount( 3, $entry['open_note_ids'] );
-		$this->assertContains( $part_two_note, $entry['open_note_ids'] );
+		$open = Review_History::get_open_notes( self::POST_ID );
+		$this->assertSame( 'r2', $open['review_id'] );
+		$this->assertCount( 3, $open['note_ids'] );
+		$this->assertContains( $part_two_note, $open['note_ids'] );
 	}
 
 	/**
