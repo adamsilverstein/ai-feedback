@@ -499,6 +499,11 @@ class Settings_Controller extends WP_REST_Controller {
 				'label'       => __( 'Design & Formatting', 'fresh-eyes' ),
 				'description' => __( 'Block usage and visual hierarchy', 'fresh-eyes' ),
 			),
+			array(
+				'id'          => 'grammar',
+				'label'       => __( 'Grammar & Spelling', 'fresh-eyes' ),
+				'description' => __( 'Typos, spelling and grammar, as one-click fixes', 'fresh-eyes' ),
+			),
 		);
 	}
 

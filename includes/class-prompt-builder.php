@@ -51,6 +51,8 @@ class Prompt_Builder {
 		);
 
 		$options = wp_parse_args( $options, $defaults );
+		$locale  = is_string( $options['locale'] ) ? $options['locale'] : '';
+		$areas   = is_array( $options['focus_areas'] ) ? $options['focus_areas'] : array();
 
 		// Build document structure.
 		$image_blocks    = array_values( array_filter( (array) ( $options['image_blocks'] ?? array() ), 'is_string' ) );
@@ -88,6 +90,7 @@ class Prompt_Builder {
 		$prompt           .= "FOCUS AREAS:\n" . $focus_instructions . "\n\n";
 		$prompt           .= "TARGET TONE:\n" . $tone_guidance;
 		$prompt           .= $language_instruction;
+		$prompt           .= $this->get_proofreading_instruction( $areas, $locale );
 		$prompt           .= $continuation_instructions . "\n\n";
 		$prompt           .= $this->get_block_type_instructions() . "\n\n";
 		$prompt           .= "INSTRUCTIONS:\n";
@@ -104,7 +107,7 @@ class Prompt_Builder {
 		$prompt           .= '  "feedback": [' . "\n";
 		$prompt           .= "    {\n";
 		$prompt           .= '      "block_id": "abc123-def456",' . "\n";
-		$prompt           .= '      "category": "content|tone|flow|design",' . "\n";
+		$prompt           .= '      "category": "' . implode( '|', Response_Parser::VALID_CATEGORIES ) . '",' . "\n";
 		$prompt           .= '      "severity": "suggestion|important|critical",' . "\n";
 		$prompt           .= '      "title": "Brief title (max 50 chars)",' . "\n";
 		$prompt           .= '      "feedback": "Detailed explanation of the issue and why it matters (max 200 chars)",' . "\n";
@@ -113,7 +116,7 @@ class Prompt_Builder {
 		$prompt           .= "    }\n";
 		$prompt           .= "  ]\n";
 		$prompt           .= "}\n\n";
-		$few_shot_examples = $this->get_few_shot_examples( $options['locale'] ?? 'en_US' );
+		$few_shot_examples = $this->get_few_shot_examples( '' === $locale ? 'en_US' : $locale, in_array( Response_Parser::GRAMMAR_CATEGORY, $areas, true ) );
 
 		// Only append examples if the base prompt is already under the character
 		// budget. 12000 chars ≈ 3000 tokens — conservative to avoid inflating cost
@@ -172,6 +175,67 @@ class Prompt_Builder {
 		}
 
 		return $instructions . "\n";
+	}
+
+	/**
+	 * Spelling variants named in the proofreading instruction, by locale.
+	 */
+	private const SPELLING_VARIANTS = array(
+		'en_US' => 'American English',
+		'en_GB' => 'British English',
+		'en_AU' => 'Australian English',
+		'en_CA' => 'Canadian English',
+		'en_NZ' => 'New Zealand English',
+		'en_ZA' => 'South African English',
+		'en_IE' => 'Irish English',
+		'pt_BR' => 'Brazilian Portuguese',
+		'pt_PT' => 'European Portuguese',
+		'es_ES' => 'Spanish as written in Spain',
+		'es_MX' => 'Mexican Spanish',
+		'fr_FR' => 'French as written in France',
+		'fr_CA' => 'Canadian French',
+		'de_DE' => 'German as written in Germany',
+		'de_CH' => 'Swiss German',
+	);
+
+	/**
+	 * Name the spelling variant reviews follow for a locale.
+	 *
+	 * @param  string $locale WordPress locale code, the review language or the site's.
+	 * @return string Variant, such as "British English (en_GB)".
+	 */
+	public static function get_spelling_variant( string $locale ): string {
+		if ( 1 !== preg_match( '/^[a-z]{2,3}(?:_[A-Za-z0-9]{2,8}){0,2}$/', $locale ) ) {
+			$locale = 'en_US';
+		}
+
+		$variant = self::SPELLING_VARIANTS[ $locale ] ?? '';
+		return '' === $variant ? sprintf( 'the %s locale', $locale ) : sprintf( '%s (%s)', $variant, $locale );
+	}
+
+	/**
+	 * Get the proofreading rules, when Grammar & Spelling is a focus area.
+	 *
+	 * @param  array<mixed> $focus_areas Selected focus areas.
+	 * @param  string       $locale      Review locale.
+	 * @return string Proofreading section, or an empty string.
+	 */
+	private function get_proofreading_instruction( array $focus_areas, string $locale ): string {
+		if ( ! in_array( Response_Parser::GRAMMAR_CATEGORY, $focus_areas, true ) ) {
+			return '';
+		}
+
+		$variant = self::get_spelling_variant( $locale );
+
+		$instruction  = "\n\n## PROOFREADING\n\n";
+		$instruction .= '- Report each spelling, typo or grammar error as its own item with "category": "grammar" and "severity": "suggestion", not under "content".' . "\n";
+		$instruction .= '- Every "grammar" item must have a "quick_fix" that corrects just that error; items without one are discarded. Keep "find" short: the word or phrase with the error, plus a neighboring word only if it would otherwise appear more than once in the block.' . "\n";
+		$instruction .= '- Two errors in one block are two items. Their "find" texts must not overlap.' . "\n";
+		$instruction .= '- Keep the title to the correction itself, for example "teh → the", and the feedback to one short sentence.' . "\n";
+		$instruction .= sprintf( '- Spelling and grammar follow %s. Do not flag a spelling that is correct there, even if another variant of the language spells it differently.', $variant ) . "\n";
+		$instruction .= '- Leave style, word choice and tone to the other focus areas; only correct what is wrong.';
+
+		return $instruction;
 	}
 
 	/**
@@ -423,6 +487,7 @@ class Prompt_Builder {
 			'tone'    => 'Tone & Voice - Assess consistency of voice, appropriateness for audience, and alignment with target tone. Flag jarring shifts in formality or inconsistent terminology.',
 			'flow'    => 'Flow & Structure - Analyze logical progression, transitions between ideas, paragraph structure, and overall organization. Identify awkward jumps or missing connections.',
 			'design'  => 'Design & Formatting - Review block usage, visual hierarchy, formatting choices, and readability. Suggest better block types or formatting improvements.',
+			'grammar' => 'Grammar & Spelling - Proofread for typos, misspellings, wrong words (its/it\'s, their/there), agreement errors and missing or doubled words. Each one is a single "grammar" item with a quick_fix.',
 		);
 
 		foreach ( $focus_areas as $area ) {
@@ -595,10 +660,11 @@ class Prompt_Builder {
 	 * Provides reference examples for each feedback category and severity
 	 * level so the AI produces consistently formatted, high-quality feedback.
 	 *
-	 * @param  string $locale WordPress locale code.
+	 * @param  string $locale          WordPress locale code.
+	 * @param  bool   $include_grammar Whether to include the proofreading example.
 	 * @return string Few-shot examples for the prompt.
 	 */
-	private function get_few_shot_examples( string $locale = 'en_US' ): string {
+	private function get_few_shot_examples( string $locale = 'en_US', bool $include_grammar = false ): string {
 		$language_note = '';
 		if ( 'en_US' !== $locale && 'en' !== substr( $locale, 0, 2 ) ) {
 			$language_note = 'Note: These examples are in English for format reference only. '
@@ -671,6 +737,7 @@ Design example (severity: suggestion):
   ]
 }
 
+GRAMMAR_EXAMPLE_PLACEHOLDER
 When content is well-written, return minimal or no feedback:
 {
   "summary": "Well-structured content with clear arguments and consistent tone.",
@@ -678,6 +745,33 @@ When content is well-written, return minimal or no feedback:
 }
 EOT;
 
+		$grammar_example = <<<'EOT'
+Grammar example (severity: suggestion):
+{
+  "summary": "Clear post with two typos in the opening.",
+  "feedback": [
+    {
+      "block_id": "example-5",
+      "category": "grammar",
+      "severity": "suggestion",
+      "title": "teh → the",
+      "feedback": "Typo.",
+      "quick_fix": { "find": "teh", "replace": "the" }
+    },
+    {
+      "block_id": "example-5",
+      "category": "grammar",
+      "severity": "suggestion",
+      "title": "it's → its",
+      "feedback": "The possessive has no apostrophe.",
+      "quick_fix": { "find": "it's lid", "replace": "its lid" }
+    }
+  ]
+}
+
+EOT;
+
+		$examples = str_replace( "GRAMMAR_EXAMPLE_PLACEHOLDER\n", $include_grammar ? $grammar_example : '', $examples );
 		$examples = $language_note . $examples;
 
 		/**
@@ -708,7 +802,7 @@ EOT;
 	 *     @type string $block_type        Optional. The block type (e.g. `core/paragraph`).
 	 *     @type bool   $block_can_rewrite Optional. Whether the AI may rewrite the whole block. Default false.
 	 *     @type string $original_feedback The original AI feedback text on this block.
-	 *     @type string $original_category Optional. Category of the original feedback (content|tone|flow|design).
+	 *     @type string $original_category Optional. Category of the original feedback (content|tone|flow|design|grammar).
 	 *     @type string $original_severity Optional. Severity of the original feedback (suggestion|important|critical).
 	 *     @type array  $thread            Prior replies in chronological order. Each entry:
 	 *                                     { string $author, string $content, bool $is_ai }.
