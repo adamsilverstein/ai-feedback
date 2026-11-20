@@ -172,6 +172,8 @@ class ResponseParserQuickFixTest extends TestCase {
 			'space over non-breaking space' => array( "Revenue grew\u{00A0}40%.", 'grew 40%', true ),
 			'non-breaking space in find'    => array( 'Revenue grew 40%.', "grew\u{00A0}40%", true ),
 			'space matching twice'          => array( "Revenue grew\u{00A0}40%, then grew 40%.", 'grew 40%', false ),
+			'find across a footnote'        => array( "Revenue growth\u{FFFC} was strong.", "growth\u{FFFC} was", false ),
+			'find beside a footnote'        => array( "Revenue growth\u{FFFC} was strong.", 'was strong', true ),
 		);
 	}
 
@@ -192,6 +194,19 @@ class ResponseParserQuickFixTest extends TestCase {
 		);
 
 		$this->assertSame( $kept ? $fix : null, $this->parser->validate_quick_fix( $fix, $content ) );
+	}
+
+	/**
+	 * A replacement holding U+FFFC would write an object character into the
+	 * text, so the fix is dropped.
+	 */
+	public function test_quick_fix_replacement_with_an_object_is_dropped(): void {
+		$fix = array(
+			'find'    => 'strong',
+			'replace' => "strong\u{FFFC}",
+		);
+
+		$this->assertNull( $this->parser->validate_quick_fix( $fix, "Revenue growth\u{FFFC} was strong." ) );
 	}
 
 	/**
