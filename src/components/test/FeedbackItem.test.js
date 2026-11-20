@@ -472,6 +472,24 @@ describe('FeedbackItem Make this change', () => {
 		);
 	});
 
+	it('replies in the thread of a secondary feedback item', async () => {
+		const saveEntityRecord = vi.fn();
+		renderItem({ id: 12, parent: 7 }, vi.fn(), { saveEntityRecord });
+
+		await act(async () => {
+			fireEvent.click(
+				screen.getByRole('button', { name: 'Make this change' })
+			);
+		});
+
+		expect(saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			expect.objectContaining({ parent: 7 }),
+			{ throwOnError: true }
+		);
+	});
+
 	it.each([
 		[
 			'the note has a quick fix',

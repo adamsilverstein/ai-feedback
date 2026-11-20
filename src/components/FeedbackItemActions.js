@@ -118,7 +118,8 @@ export default function FeedbackItemActions({
 				'comment',
 				{
 					post: postId,
-					parent: item.id,
+					// A secondary item is itself a reply; answer in its thread.
+					parent: item.parent || item.id,
 					type: 'note',
 					status: 'hold',
 					content: __('Please make this change.', 'fresh-eyes'),
