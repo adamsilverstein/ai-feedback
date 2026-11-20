@@ -39,9 +39,9 @@ beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/list')) {
 		registerCoreBlocks();
 	}
-	// The editor adds `metadata`, which holds a note's link, to every block
-	// through a hook. Packages here each bundle their own hooks, so it is
-	// added by hand.
+	// The editor adds `metadata`, which holds a note's link, and `anchor`
+	// to blocks through hooks. Packages here each bundle their own hooks, so
+	// they are added by hand.
 	for (const name of ['core/paragraph', 'core/heading', 'core/list']) {
 		const settings = getBlockType(name);
 		if (!settings.attributes.metadata) {
@@ -51,6 +51,7 @@ beforeAll(() => {
 				attributes: {
 					...settings.attributes,
 					metadata: { type: 'object' },
+					anchor: { type: 'string' },
 				},
 			});
 		}
@@ -215,6 +216,7 @@ describe('image alt text and caption', () => {
 			type: 'set_attributes',
 			attributes: { alt: 'Bar chart', caption: 'Before & <after>' },
 			from: { alt: '', caption: '' },
+			image: 'http://example.com/chart.png',
 		};
 
 		expect(
@@ -242,6 +244,7 @@ describe('image alt text and caption', () => {
 					type: 'set_attributes',
 					attributes: { alt: 'Bar chart' },
 					from: { alt: '' },
+					image: 'http://example.com/chart.png',
 				},
 				image.clientId
 			).state
@@ -358,7 +361,11 @@ describe('paragraph to list', () => {
 });
 
 describe('split', () => {
-	const change = { type: 'split', after: 'idea ends here.' };
+	const change = {
+		type: 'split',
+		after: 'idea ends here.',
+		next: 'The second idea goes on.',
+	};
 
 	it('splits after the sentence, keeping formatting on both halves', () => {
 		const paragraph = createBlock('core/paragraph', {
@@ -405,7 +412,12 @@ describe('heading and paragraph transforms', () => {
 			metadata: NOTE,
 		});
 		const { selectors, actions } = setUp([paragraph]);
-		const change = { type: 'transform', to: 'core/heading', level: 3 };
+		const change = {
+			type: 'transform',
+			to: 'core/heading',
+			level: 3,
+			text: 'Getting started',
+		};
 
 		const id = applyBlockChange(
 			selectors,
@@ -429,7 +441,11 @@ describe('heading and paragraph transforms', () => {
 			level: 2,
 		});
 		const { selectors, actions } = setUp([heading]);
-		const change = { type: 'transform', to: 'core/paragraph' };
+		const change = {
+			type: 'transform',
+			to: 'core/paragraph',
+			text: 'This is really body text.',
+		};
 
 		const id = applyBlockChange(
 			selectors,
@@ -454,9 +470,140 @@ describe('heading and paragraph transforms', () => {
 		expect(
 			getBlockChangeState(
 				selectors,
-				{ type: 'transform', to: 'core/heading', level: 2 },
+				{
+					type: 'transform',
+					to: 'core/heading',
+					level: 2,
+					text: 'Title',
+				},
 				paragraph.clientId
 			).state
 		).toBe('outdated');
+	});
+});
+
+describe('stale changes', () => {
+	it('never puts alt text written for one image on another', () => {
+		const image = createBlock('core/image', {
+			url: 'http://example.com/other.png',
+			alt: '',
+		});
+		const { selectors, actions } = setUp([image]);
+		const change = {
+			type: 'set_attributes',
+			attributes: { alt: 'Bar chart' },
+			from: { alt: '' },
+			image: 'http://example.com/chart.png',
+		};
+
+		expect(
+			getBlockChangeState(selectors, change, image.clientId).state
+		).toBe('outdated');
+		expect(
+			applyBlockChange(selectors, actions, change, image.clientId)
+		).toBeNull();
+		expect(selectors.getBlock(image.clientId).attributes.alt).toBe('');
+	});
+
+	it('does not read a list of the other type as applied', () => {
+		const list = createBlock('core/list', { ordered: false }, [
+			createBlock('core/list-item', { content: 'Node' }),
+			createBlock('core/list-item', { content: 'npm' }),
+		]);
+		const { selectors } = setUp([list]);
+		const change = {
+			type: 'transform',
+			to: 'core/list',
+			items: ['Node', 'npm'],
+			ordered: true,
+		};
+
+		expect(
+			getBlockChangeState(selectors, change, list.clientId).state
+		).toBe('outdated');
+		expect(
+			getBlockChangeState(
+				selectors,
+				{ ...change, ordered: false },
+				list.clientId
+			).state
+		).toBe('applied');
+	});
+
+	it('does not turn an edited paragraph into a heading', () => {
+		const paragraph = createBlock('core/paragraph', {
+			content:
+				'Setup, and a lot more text the author added after the review.',
+		});
+		const { selectors } = setUp([paragraph]);
+
+		expect(
+			getBlockChangeState(
+				selectors,
+				{
+					type: 'transform',
+					to: 'core/heading',
+					level: 2,
+					text: 'Setup',
+				},
+				paragraph.clientId
+			).state
+		).toBe('outdated');
+	});
+
+	it('does not count an unrelated next paragraph as a split', () => {
+		const first = createBlock('core/paragraph', {
+			content: 'First sentence.',
+		});
+		const references = createBlock('core/paragraph', {
+			content: 'References.',
+		});
+		const { selectors } = setUp([first, references]);
+		const change = {
+			type: 'split',
+			after: 'First sentence.',
+			next: 'Second sentence.',
+		};
+
+		expect(
+			getBlockChangeState(selectors, change, first.clientId).state
+		).toBe('outdated');
+	});
+});
+
+describe('anchors', () => {
+	const change = {
+		type: 'transform',
+		to: 'core/list',
+		items: ['Node', 'npm'],
+		ordered: false,
+	};
+
+	it('keeps the anchor on the introduction', () => {
+		const paragraph = createBlock('core/paragraph', {
+			content: 'You need Node and npm.',
+			anchor: 'requirements',
+		});
+		const { selectors, actions } = setUp([paragraph]);
+
+		applyBlockChange(selectors, actions, change, paragraph.clientId);
+
+		const [lead, list] = selectors.getBlocks();
+		expect(lead.attributes.anchor).toBe('requirements');
+		expect(list.attributes.anchor).toBeUndefined();
+	});
+
+	it('keeps the anchor on the list when there is no introduction', () => {
+		const paragraph = createBlock('core/paragraph', {
+			content: 'Node and npm',
+			anchor: 'requirements',
+		});
+		const { selectors, actions } = setUp([paragraph]);
+
+		applyBlockChange(selectors, actions, change, paragraph.clientId);
+
+		const [list] = selectors.getBlocks();
+		expect(list.name).toBe('core/list');
+		expect(list.attributes.anchor).toBe('requirements');
 	});
 });

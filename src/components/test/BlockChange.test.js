@@ -47,13 +47,19 @@ const LEVEL = {
 /**
  * Render a note's formatting fix against a post with one heading.
  *
- * @param {Object}  options         Options.
- * @param {number}  options.level   The heading's level.
- * @param {boolean} options.actions Render FeedbackItemActions instead.
- * @param {Object}  options.extra   Extra note fields.
+ * @param {Object}                                                 options             Options.
+ * @param {number}                                                 options.level       The heading's level.
+ * @param {boolean}                                                options.actions     Render FeedbackItemActions instead.
+ * @param {Object}                                                 options.extra       Extra note fields.
+ * @param {(id: number, resolved: boolean) => (Promise|undefined)} options.resolveWith What each resolve request waits on.
  * @return {Object} Registry, heading and spies.
  */
-function renderChange({ level = 4, actions = false, extra = {} } = {}) {
+function renderChange({
+	level = 4,
+	actions = false,
+	extra = {},
+	resolveWith = () => undefined,
+} = {}) {
 	const spies = {
 		setNoteResolved: vi.fn(),
 		setFixApplied: vi.fn(),
@@ -64,14 +70,16 @@ function renderChange({ level = 4, actions = false, extra = {} } = {}) {
 	registry.register(blockEditorStore);
 	registry.register(noticesStore);
 	registry.registerStore('core/editor', {
-		reducer: (state = {}) => state,
+		reducer: (state = {}, action) =>
+			action.type === 'EDIT_POST' ? { ...state, ...action.edits } : state,
 		actions: {
 			undo: () => {
 				spies.undo();
 				return { type: 'NOOP' };
 			},
+			editPost: (edits) => ({ type: 'EDIT_POST', edits }),
 		},
-		selectors: {},
+		selectors: { getPostEdits: (state) => state },
 	});
 	registry.registerStore('ai-feedback/store', {
 		reducer: (state = {}, action) =>
@@ -81,7 +89,10 @@ function renderChange({ level = 4, actions = false, extra = {} } = {}) {
 		actions: {
 			setNoteResolved: (...args) => {
 				spies.setNoteResolved(...args);
-				return { type: 'NOOP' };
+				// Resolves when the test says the request finished.
+				return Promise.resolve(resolveWith(...args)).then(() => ({
+					type: 'NOOP',
+				}));
 			},
 			setFixApplied: (id, applied) => {
 				spies.setFixApplied(id, applied);
@@ -172,5 +183,56 @@ describe('BlockChange', () => {
 		});
 
 		expect(screen.queryByRole('button', { name: 'Apply fix' })).toBeNull();
+	});
+
+	it('refuses Undo once the title changed after the fix', async () => {
+		const { registry, heading, spies } = renderChange();
+
+		act(() => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+		act(() => {
+			registry.dispatch('core/editor').editPost({ title: 'New title' });
+		});
+		const [notice] = registry.select(noticesStore).getNotices();
+		await act(() => notice.actions[0].onClick());
+
+		expect(spies.undo).not.toHaveBeenCalled();
+		expect(
+			registry.select(blockEditorStore).getBlock(heading.clientId)
+				.attributes.level
+		).toBe(3);
+		expect(spies.setNoteResolved).not.toHaveBeenCalledWith(7, false);
+	});
+
+	it('reopens the note only after resolving it finished', async () => {
+		let finish;
+		const pending = new Promise((resolve) => {
+			finish = resolve;
+		});
+		const { registry, spies } = renderChange({
+			resolveWith: (id, resolved) => (resolved ? pending : undefined),
+		});
+
+		act(() => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+		const [notice] = registry.select(noticesStore).getNotices();
+		let undone;
+		act(() => {
+			undone = notice.actions[0].onClick();
+		});
+
+		expect(spies.undo).toHaveBeenCalled();
+		expect(spies.setNoteResolved).not.toHaveBeenCalledWith(7, false);
+
+		await act(async () => {
+			finish();
+			await undone;
+		});
+		expect(spies.setNoteResolved.mock.calls).toEqual([
+			[7, true],
+			[7, false],
+		]);
 	});
 });

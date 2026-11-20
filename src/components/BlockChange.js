@@ -26,6 +26,34 @@ import {
 import { navigateToBlock } from '../utils/navigate-to-block';
 
 /**
+ * The post's unsaved edits other than its blocks, eg. its title.
+ *
+ * @param {Object} registry Data registry.
+ * @return {Object} Edits by post field.
+ */
+function getOtherPostEdits(registry) {
+	const edits = registry.select('core/editor').getPostEdits?.() || {};
+
+	const { blocks, content, selection, ...rest } = edits;
+	return rest;
+}
+
+/**
+ * Whether two sets of post edits hold the same values.
+ *
+ * @param {Object} a Edits.
+ * @param {Object} b Edits.
+ * @return {boolean} True when nothing changed between them.
+ */
+function isSameEdits(a, b) {
+	const keys = Object.keys(a);
+	return (
+		keys.length === Object.keys(b).length &&
+		keys.every((key) => a[key] === b[key])
+	);
+}
+
+/**
  * Formatting fix with Preview and Apply.
  *
  * Applying it resolves the note, like a quick fix.
@@ -60,16 +88,18 @@ export default function BlockChange({ item, isSuperseded = false }) {
 		useDispatch(noticesStore);
 
 	const canApply = state === 'ready';
+	// The preview, and its highlight, only show while the fix can be applied.
+	const isPreviewShown = isPreviewOpen && canApply && !isSuperseded;
 
 	// Highlight the block while the preview is open.
 	useEffect(() => {
-		if (!isPreviewOpen || !canApply || !clientId) {
+		if (!isPreviewShown || !clientId) {
 			return undefined;
 		}
 		const { toggleBlockHighlight } = blockEditorActions;
 		toggleBlockHighlight?.(clientId, true);
 		return () => toggleBlockHighlight?.(clientId, false);
-	}, [isPreviewOpen, canApply, clientId, blockEditorActions]);
+	}, [isPreviewShown, clientId, blockEditorActions]);
 
 	const summary = (
 		<p className="ai-feedback-quick-fix-summary">
@@ -138,10 +168,13 @@ export default function BlockChange({ item, isSuperseded = false }) {
 			);
 			return;
 		}
-		// Any later edit gives the editor a new blocks tree.
+		// Any later edit gives the editor a new blocks tree, or changes the
+		// post's other edits, such as its title.
 		const appliedBlocks = registry.select(blockEditorStore).getBlocks();
+		const appliedEdits = getOtherPostEdits(registry);
 		setFixApplied(item.id, true);
-		setResolved(true);
+		// Undo waits for this, so the note ends up as open as the block.
+		const resolving = setResolved(true);
 
 		createSuccessNotice(__('Change applied.', 'fresh-eyes'), {
 			type: 'snackbar',
@@ -149,11 +182,15 @@ export default function BlockChange({ item, isSuperseded = false }) {
 			actions: [
 				{
 					label: __('Undo', 'fresh-eyes'),
-					onClick: () => {
+					onClick: async () => {
 						// Undo only while the change is still the last one.
 						if (
 							registry.select(blockEditorStore).getBlocks() !==
-							appliedBlocks
+								appliedBlocks ||
+							!isSameEdits(
+								getOtherPostEdits(registry),
+								appliedEdits
+							)
 						) {
 							createWarningNotice(
 								__(
@@ -166,6 +203,7 @@ export default function BlockChange({ item, isSuperseded = false }) {
 						}
 						registry.dispatch('core/editor').undo();
 						setFixApplied(item.id, false);
+						await resolving;
 						setResolved(false);
 					},
 				},
@@ -181,9 +219,7 @@ export default function BlockChange({ item, isSuperseded = false }) {
 	};
 
 	const preview =
-		isPreviewOpen && canApply && block
-			? getBlockChangePreview(block, change)
-			: null;
+		isPreviewShown && block ? getBlockChangePreview(block, change) : null;
 
 	return (
 		<div className="ai-feedback-quick-fix ai-feedback-block-change">

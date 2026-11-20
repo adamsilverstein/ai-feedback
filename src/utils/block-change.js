@@ -9,7 +9,12 @@
  * - `{ type: 'transform', to: 'core/list', items, ordered }` turns a
  *   paragraph of separated items into a list; `to` may also be
  *   `core/heading` (with `level`) or, from a heading, `core/paragraph`.
- * - `{ type: 'split', after }` splits a paragraph after a sentence.
+ * - `{ type: 'split', after, next }` splits a paragraph after a sentence;
+ *   `next` is the start of the text after it.
+ *
+ * Alt text and captions keep the reviewed image's URL as `image`, and
+ * heading and paragraph transforms the reviewed `text`, so a change to the
+ * block reads as outdated.
  *
  * Each is checked again here against the live blocks, at render time and
  * again inside applyBlockChange(), and applied as one undo step. Text is
@@ -79,12 +84,16 @@ export function isBlockChange(change) {
 		);
 	}
 	if (change.type === 'transform') {
-		return (
-			typeof change.to === 'string' &&
-			(change.to !== 'core/list' || Array.isArray(change.items))
-		);
+		return change.to === 'core/list'
+			? Array.isArray(change.items)
+			: typeof change.to === 'string' && typeof change.text === 'string';
 	}
-	return typeof change.after === 'string' && change.after !== '';
+	return (
+		typeof change.after === 'string' &&
+		change.after !== '' &&
+		typeof change.next === 'string' &&
+		change.next !== ''
+	);
 }
 
 /**
@@ -281,7 +290,12 @@ export function getBlockChangeState(selectors, change, clientId) {
 	if (change.type === 'set_attributes') {
 		const keys = Object.keys(change.attributes);
 		const allowed = SETTABLE_ATTRIBUTES[block.name] || [];
-		if (!keys.every((key) => allowed.includes(key))) {
+		if (
+			!keys.every((key) => allowed.includes(key)) ||
+			// Alt text or a caption written for another image.
+			(change.image !== undefined &&
+				block.attributes?.url !== change.image)
+		) {
 			return { state: 'outdated' };
 		}
 		if (
@@ -304,15 +318,20 @@ export function getBlockChangeState(selectors, change, clientId) {
 		if (block.name === change.to) {
 			const isThere =
 				change.to === 'core/list'
-					? getListItems(block).join('\n') === change.items.join('\n')
-					: change.to !== 'core/heading' ||
-						(block.attributes?.level ?? 2) === change.level;
+					? getListItems(block).join('\n') ===
+							change.items.join('\n') &&
+						!!block.attributes?.ordered === !!change.ordered
+					: getBlockText(block) === change.text &&
+						(change.to !== 'core/heading' ||
+							(block.attributes?.level ?? 2) === change.level);
 			return { state: isThere ? 'applied' : 'outdated' };
 		}
 		const isReady =
 			(TRANSFORMS[block.name] || []).includes(change.to) &&
 			canTransform(selectors, clientId, change.to) &&
-			(change.to !== 'core/list' || !!getListSplit(block, change.items));
+			(change.to === 'core/list'
+				? !!getListSplit(block, change.items)
+				: getBlockText(block) === change.text);
 		return { state: isReady ? 'ready' : 'outdated' };
 	}
 
@@ -321,10 +340,14 @@ export function getBlockChangeState(selectors, change, clientId) {
 		if (findSplit(text, change.after) !== -1) {
 			return { state: 'ready' };
 		}
+		// Applied when this block ends the sentence and the next one starts
+		// with the text that followed it.
 		const next = getNextBlock(selectors, clientId);
 		return {
 			state:
-				text.endsWith(change.after) && next?.name === 'core/paragraph'
+				text.endsWith(change.after) &&
+				next?.name === 'core/paragraph' &&
+				getBlockText(next).startsWith(change.next)
 					? 'applied'
 					: 'outdated',
 		};
@@ -480,15 +503,26 @@ export function buildReplacementBlocks(block, change) {
 			if (!split) {
 				return null;
 			}
+			// Links to the paragraph's anchor go to its introduction, or the list.
+			const anchor = block.attributes?.anchor;
 			const list = createBlock(
 				'core/list',
-				withMetadata({ ordered: !!change.ordered }),
+				withMetadata({
+					ordered: !!change.ordered,
+					...(anchor && !split.lead ? { anchor } : {}),
+				}),
 				split.items.map((content) =>
 					createBlock('core/list-item', { content })
 				)
 			);
 			return split.lead
-				? [createBlock('core/paragraph', { content: split.lead }), list]
+				? [
+						createBlock('core/paragraph', {
+							content: split.lead,
+							...(anchor ? { anchor } : {}),
+						}),
+						list,
+					]
 				: [list];
 		}
 
