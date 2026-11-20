@@ -415,6 +415,30 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * A review note's structural edit counts as the first revision, like a
+	 * quick fix, and a structural reply edit is returned as its edit.
+	 */
+	public function test_threads_count_block_action_as_first_revision(): void {
+		$this->seed_thread( 'complete' );
+		$move = array(
+			'type'            => 'move_block',
+			'position'        => 'before',
+			'target_block_id' => '',
+			'target_name'     => 'core/heading',
+			'target_text'     => 'Intro',
+		);
+
+		$GLOBALS['test_comment_meta'][300][ \AI_Feedback\Notes_Manager::BLOCK_ACTION_META_KEY ] = '{"type":"remove_block"}';
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY ]   = (string) json_encode( $move );
+
+		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$replies = ( (array) $data['threads'] )[300]['replies'];
+
+		$this->assertSame( array( null, 2, null ), array_column( $replies, 'revision' ) );
+		$this->assertSame( array( null, $move, null ), array_column( $replies, 'edit' ) );
+	}
+
+	/**
 	 * The newest user reply awaiting an AI response is exposed for polling.
 	 */
 	public function test_threads_expose_pending_reply_id(): void {
