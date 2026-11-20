@@ -751,7 +751,8 @@ EOT;
 		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
 			return sprintf(
 				'rewrite the block as "%s"',
-				self::truncate( wp_strip_all_tags( self::to_string( $edit['content'] ?? '' ) ), self::REPLY_BLOCK_CONTENT_LIMIT )
+				// The whole rewrite the parser accepted, so a detail at its end can be kept.
+				self::truncate( wp_strip_all_tags( self::to_string( $edit['content'] ?? '' ) ), Response_Parser::MAX_REWRITE_LENGTH )
 			);
 		}
 

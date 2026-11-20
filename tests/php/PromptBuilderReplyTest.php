@@ -311,4 +311,26 @@ class PromptBuilderReplyTest extends TestCase {
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
 		$this->assertStringNotContainsString( 'return a new edit that replaces it', $prompt );
 	}
+
+	/**
+	 * A pending rewrite is sent whole, up to the length the parser accepts,
+	 * so a detail at its end can be kept.
+	 */
+	public function test_reply_prompt_keeps_whole_pending_rewrite(): void {
+		$rewrite = str_repeat( 'Revenue grew. ', 200 ) . 'Source: annual report.';
+		$prompt  = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => $rewrite,
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Keep the source.',
+			)
+		);
+
+		$this->assertGreaterThan( \AI_Feedback\Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT, strlen( $rewrite ) );
+		$this->assertStringContainsString( 'Source: annual report."', $prompt );
+	}
 }
