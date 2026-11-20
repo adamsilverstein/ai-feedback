@@ -47,8 +47,11 @@ class Review_History {
 	/**
 	 * Register the history meta for all post types.
 	 *
-	 * Exposed in the REST API for the `edit` context only, and read-only:
-	 * entries are written by the server when a review completes.
+	 * Read-only: entries are written by the server when a review completes.
+	 * Not shown in the post's REST meta, where the editor would send the
+	 * value it loaded back with every save that changes any meta, and the
+	 * save would fail on this field's auth callback. The editor reads the
+	 * history through the plugin's own route, GET /history/post/{id}.
 	 */
 	public static function register_meta(): void {
 		register_post_meta(
@@ -60,18 +63,13 @@ class Review_History {
 				'default'       => array(),
 				'description'   => __( 'Recent Fresh Eyes reviews for this post.', 'fresh-eyes' ),
 				'auth_callback' => '__return_false',
-				'show_in_rest'  => array(
-					'schema' => array(
-						'context' => array( 'edit' ),
-						'items'   => self::get_entry_schema(),
-					),
-				),
+				'show_in_rest'  => false,
 			)
 		);
 	}
 
 	/**
-	 * JSON schema for a single history entry.
+	 * JSON schema for a single history entry, as the history route returns it.
 	 *
 	 * @return array<string, mixed>
 	 */

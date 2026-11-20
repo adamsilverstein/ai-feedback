@@ -715,7 +715,7 @@ Both routes answer `403 rest_forbidden` for a review ID with no notes, the same 
 
 ### GET /history/post/{post_id}
 
-Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. `timestamp` is ISO 8601 in UTC; older entries use a MySQL datetime in site time with no offset. Requires `edit_post` on the post.
+Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta, which is not exposed in the post's REST `meta` field; this route is the way to read it. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. `timestamp` is ISO 8601 in UTC; older entries use a MySQL datetime in site time with no offset. Requires `edit_post` on the post.
 
 #### Response
 

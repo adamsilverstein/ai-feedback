@@ -192,14 +192,15 @@ class ReviewHistoryTest extends TestCase {
 	}
 
 	/**
-	 * Meta is registered read-only and edit-context only.
+	 * Meta is registered read-only and kept out of the post's REST meta, so
+	 * the editor never sends it back with a save.
 	 */
 	public function test_register_meta_is_protected(): void {
 		Review_History::register_meta();
 
 		$args = $GLOBALS['test_registered_post_meta'][ Review_History::META_KEY ];
 		$this->assertSame( '__return_false', $args['auth_callback'] );
-		$this->assertSame( array( 'edit' ), $args['show_in_rest']['schema']['context'] );
+		$this->assertFalse( $args['show_in_rest'] );
 	}
 
 	/**
