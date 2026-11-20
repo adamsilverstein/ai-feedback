@@ -128,7 +128,9 @@ class Notes_Manager {
 			'comment_parent'   => $parent_id,
 			'user_id'          => 0, // System-generated (AI).
 			'comment_author'   => Plugin::get_ai_feedback_author(),
-			'comment_meta'     => $note_meta,
+			// add_comment_meta() unslashes each value, which would strip the
+			// backslashes from JSON escapes such as \" and \u00e9.
+			'comment_meta'     => wp_slash( $note_meta ),
 		);
 
 		// Insert comment as note.
