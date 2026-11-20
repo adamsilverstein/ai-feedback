@@ -640,6 +640,10 @@ class Response_Parser {
 		$type = $edit['type'] ?? null;
 
 		if ( 'replace_text' === $type ) {
+			// A missing replacement is not a deletion; only an empty string is.
+			if ( ! is_string( $edit['replace'] ?? null ) ) {
+				return null;
+			}
 			$fix = $this->validate_quick_fix( $edit, $block_content );
 			return null === $fix ? null : array( 'type' => 'replace_text' ) + $fix;
 		}

@@ -116,6 +116,19 @@ class ResponseParserReplyTest extends TestCase {
 					'replace' => 'Sales',
 				),
 			),
+			'missing replace'            => array(
+				array(
+					'type' => 'replace_text',
+					'find' => 'last year',
+				),
+			),
+			'null replace'               => array(
+				array(
+					'type'    => 'replace_text',
+					'find'    => 'last year',
+					'replace' => null,
+				),
+			),
 			'find not in block'          => array(
 				array(
 					'type'    => 'replace_text',
@@ -237,6 +250,28 @@ class ResponseParserReplyTest extends TestCase {
 				array(
 					'type'    => 'rewrite_block',
 					'content' => "  $content ",
+				),
+				self::BLOCK,
+				true
+			)
+		);
+	}
+
+	/**
+	 * An explicit empty replacement is a deletion.
+	 */
+	public function test_empty_replace_is_a_deletion(): void {
+		$this->assertSame(
+			array(
+				'type'    => 'replace_text',
+				'find'    => ' last year',
+				'replace' => '',
+			),
+			$this->parser->validate_reply_edit(
+				array(
+					'type'    => 'replace_text',
+					'find'    => ' last year',
+					'replace' => '',
 				),
 				self::BLOCK,
 				true
