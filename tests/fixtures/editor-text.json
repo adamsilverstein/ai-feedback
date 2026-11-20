@@ -1,0 +1,211 @@
+{
+	"_comment": "Block HTML and the text the editor's rich text reads from it (create( { html } ).text). Reply_Service::editor_text() and extractEditorText() must agree with it; the PHP side also trims the outer ends.",
+	"cases": [
+		{
+			"name": "plain break",
+			"html": "a<br>b",
+			"text": "a\nb"
+		},
+		{
+			"name": "self-closing break",
+			"html": "a<br/>b",
+			"text": "a\nb"
+		},
+		{
+			"name": "spaced self-closing break",
+			"html": "a<br />b",
+			"text": "a\nb"
+		},
+		{
+			"name": "upper case break",
+			"html": "a<BR>b",
+			"text": "a\nb"
+		},
+		{
+			"name": "break with attributes",
+			"html": "a<br class=\"x\">b",
+			"text": "a\nb"
+		},
+		{
+			"name": "two breaks",
+			"html": "a<br><br>b",
+			"text": "a\n\nb"
+		},
+		{
+			"name": "break inside bold",
+			"html": "<strong>a<br>b</strong>",
+			"text": "a\nb"
+		},
+		{
+			"name": "spaces around a break",
+			"html": "a <br> b",
+			"text": "a \n b"
+		},
+		{
+			"name": "break then source newline",
+			"html": "a<br />\nb",
+			"text": "a\n\nb"
+		},
+		{
+			"name": "break then source newline in a paragraph",
+			"html": "<p>Revenue grew 40%<br />\nlast year.</p>",
+			"text": "Revenue grew 40%\n\nlast year."
+		},
+		{
+			"name": "source newline",
+			"html": "a\nb",
+			"text": "a\nb"
+		},
+		{
+			"name": "source CRLF",
+			"html": "a\r\nb",
+			"text": "a\nb"
+		},
+		{
+			"name": "source CR",
+			"html": "a\rb",
+			"text": "a\nb"
+		},
+		{
+			"name": "encoded newline",
+			"html": "a&#10;b",
+			"text": "a\nb"
+		},
+		{
+			"name": "tab",
+			"html": "a\tb",
+			"text": "a\tb"
+		},
+		{
+			"name": "non-breaking space",
+			"html": "a&nbsp;b",
+			"text": "a\u00a0b"
+		},
+		{
+			"name": "hex non-breaking space",
+			"html": "a&#xA0;b",
+			"text": "a\u00a0b"
+		},
+		{
+			"name": "two typed spaces",
+			"html": "end.&nbsp; Next",
+			"text": "end.\u00a0 Next"
+		},
+		{
+			"name": "space then non-breaking space",
+			"html": "end. &nbsp;Next",
+			"text": "end. \u00a0Next"
+		},
+		{
+			"name": "two plain spaces",
+			"html": "a  b",
+			"text": "a  b"
+		},
+		{
+			"name": "narrow no-break space",
+			"html": "Prix\u202f: 5 euros.",
+			"text": "Prix\u202f: 5 euros."
+		},
+		{
+			"name": "thin space",
+			"html": "a\u2009b",
+			"text": "a\u2009b"
+		},
+		{
+			"name": "ideographic space",
+			"html": "a\u3000b",
+			"text": "a\u3000b"
+		},
+		{
+			"name": "non-breaking space before a break",
+			"html": "a&nbsp;<br>b",
+			"text": "a\u00a0\nb"
+		},
+		{
+			"name": "leading break",
+			"html": "<br>a",
+			"text": "\na"
+		},
+		{
+			"name": "trailing break",
+			"html": "a<br>",
+			"text": "a\n"
+		},
+		{
+			"name": "inline image",
+			"html": "a<img src=\"x.png\" alt=\"\">b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "entities",
+			"html": "Tom &amp; Jerry &quot;hi&quot; &#8211; it&#039;s",
+			"text": "Tom & Jerry \"hi\" \u2013 it's"
+		},
+		{
+			"name": "escaped markup",
+			"html": "a&lt;div&gt;b",
+			"text": "a<div>b"
+		},
+		{
+			"name": "apostrophe entity",
+			"html": "a&apos;b",
+			"text": "a'b"
+		},
+		{
+			"name": "note marker",
+			"html": "<mark class=\"wp-note\" data-id=\"3\">a</mark> b",
+			"text": "a b"
+		},
+		{
+			"name": "link",
+			"html": "<a href=\"https://x.example\">link</a> text",
+			"text": "link text"
+		},
+		{
+			"name": "inline tags",
+			"html": "a<span style=\"x\">b</span>c<sup>2</sup>",
+			"text": "abc2"
+		},
+		{
+			"name": "byte order mark",
+			"html": "a\ufeffb",
+			"text": "ab"
+		},
+		{
+			"name": "zero width space",
+			"html": "a\u200bb",
+			"text": "a\u200bb"
+		},
+		{
+			"name": "code with spaces",
+			"html": "<code>x  y</code>",
+			"text": "x  y"
+		},
+		{
+			"name": "paragraph wrapper",
+			"html": "<p class=\"has-text-align-center\">a <strong>b</strong></p>",
+			"text": "a b"
+		}
+	],
+	"_comment_blocks": "Blocks with inner blocks: the editor matches an edit against the block's own rich text, `content`, never the inner blocks. The server reads it from the innerContent strings around the inner blocks (before, inner, after); the review reads the `content` attribute.",
+	"blocks": [
+		{
+			"name": "list item with a nested list",
+			"block": "core/list-item",
+			"before": "<li>Revenue grew 40%<br>last year.",
+			"inner": "<ul class=\"wp-block-list\"><li>Nested item</li></ul>",
+			"after": "</li>",
+			"content": "Revenue grew 40%<br>last year.",
+			"text": "Revenue grew 40%\nlast year."
+		},
+		{
+			"name": "list item with a nested list and two spaces",
+			"block": "core/list-item",
+			"before": "<li>Two.&nbsp; Spaces",
+			"inner": "<ul class=\"wp-block-list\"><li>Nested item</li></ul>",
+			"after": "</li>",
+			"content": "Two.&nbsp; Spaces",
+			"text": "Two.\u00a0 Spaces"
+		}
+	]
+}
