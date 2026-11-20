@@ -25,6 +25,7 @@ import {
 	toHtml,
 } from './quick-fix';
 import { isReplyEdit } from './is-reply-edit';
+import { readSource, readValue, toSourceHTML } from './source-newlines';
 
 export { isReplyEdit };
 
@@ -403,11 +404,11 @@ export function getRewriteRuns(content, edit) {
 		return null;
 	}
 
-	const before = create({ html: toHtml(content) });
+	const { value: before, marker } = readSource(toHtml(content));
 	const after = create({ html: edit.content });
 
-	return diffValues(before, after).map((run) => {
-		const old = toHTMLString({ value: slice(before, run.from, run.to) });
+	return diffValues(readValue(before, marker), after).map((run) => {
+		const old = toSourceHTML(slice(before, run.from, run.to), marker);
 		if (run.type === 'equal') {
 			return { type: 'equal', html: old };
 		}

@@ -94,7 +94,11 @@ A note can carry a `block_change`: a one-click formatting fix that never adds, d
 
 `Block_Change::validate()` drops any that fail validation and keeps the note: every attribute must be on its block type's allow-list and differ from the current value; a list's items must appear in the paragraph in order with only separators (commas, semicolons, a final "and" or "or") between them, and text before the first item stays as an introduction unless it ends in a comma or semicolon (which would mean items were left out); a split must fall after sentence-ending punctuation that appears once, with text after it. A review gets one change per block, shared with `block_action`, which wins on the same item; either replaces the `quick_fix` of every item on that block, once grouping has kept it. Groups of similar notes have none, and only a thread's root note keeps one. `Block_Change::decode()` checks the allow-lists again when the meta is read.
 
-Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model has the `vision` capability in the model list, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone. Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
+Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone.
+
+Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since core would otherwise run the review on another model that takes images, or refuse it. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
+
+Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
 
 The editor shows each one on its note with a one-line description, such as "Change to a level 3 heading", "Turn into a list" or "Split the paragraph after “…”", with Preview (before and after) and Apply fix. Everything is checked again against the live block: a change whose block changed since the review (another level, image, text or list type) reads as outdated, a transform is only offered when the editor offers it (`getBlockTransformItems()`), and a list split that would drop an inline object is not offered. Text is sliced from the block's rich text, so links and formatting stay, and the note's link (`metadata`) moves to the new list, heading or first half of a split. Apply is one undo step and is only marked applied if the block now reads as the change leaves it. A paragraph's anchor moves to the list's introduction, or the list. The introduction keeps the paragraph's styling, and the list gets what core's own transforms carry over (class name, font size and colors, where the list supports them). A split's second half keeps the paragraph's styling but not its drop cap. Formatting fixes stay with Preview and Apply when Gutenberg's Suggestion Mode is on. A formatting fix is also the thread's first suggested edit: the reply prompt gets it as the pending edit until the saved post shows it, the first reply edit after it is revision 2, and the note gets quick replies ("Try another" and "Why?").
 
@@ -308,7 +312,9 @@ A thread a person started is listed once a note in it mentions Fresh Eyes. It is
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
-`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
+`proposal` is a house style rule an AI reply offers to remember, as `{ "text": "Headings use sentence case", "status": "" }`, or null. `status` is `saved` or `dismissed` once the current user acts on it. Each user decides for themselves, since a personal rule one user saves does not apply to others, and dismissing never undoes a save. See [house style](#get-house-style).
+
+`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is counted from the thread's order each time the thread is read, not stored, so two edits saved at the same moment still number one after the other (a `feedback_revision` comment meta stored by earlier versions is ignored). The Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
 Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
 
@@ -418,14 +424,14 @@ X-WP-Nonce: {nonce}
       "id": "claude-sonnet-5-5",
       "name": "Claude Sonnet 5.5",
       "provider": "anthropic",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 200000
     },
     {
       "id": "claude-opus-4",
       "name": "Claude Opus 4",
       "provider": "anthropic",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 200000
     },
     {
@@ -436,10 +442,10 @@ X-WP-Nonce: {nonce}
       "max_tokens": 128000
     },
     {
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
       "provider": "google",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 1000000
     }
   ],
@@ -722,6 +728,46 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
 ### GET /history/post/{post_id}/review/{review_id}
 
 Returns one history entry plus the notes that review created, as `notes`. Notes deleted since the review ran are omitted. Returns `404` when the review is not in the post's history. Requires `edit_post` on the post.
+
+### GET /house-style
+
+House style rules: short plain text style preferences that every review and reply follows. Reviews flag writing that breaks a rule and leave alone what a rule allows. Site rules apply to everyone and are stored in the `ai_feedback_house_style` option; personal rules apply to one user's reviews and replies and are stored in that user's site-prefixed `ai_feedback_personal_house_style` meta. Requires `edit_posts`.
+
+```json
+{
+  "site": [ { "id": "6f1c...", "text": "Use the Oxford comma" } ],
+  "user": [ { "id": "9a2b...", "text": "Headings use sentence case" } ],
+  "can_manage_site": false,
+  "max_rules": 20,
+  "max_length": 150
+}
+```
+
+Rules are sanitized to single-line plain text (tags, line breaks and control and zero-width characters removed, except a zero-width joiner between two emoji), at most `max_length` characters and `max_rules` per list, and checked again when read. In prompts they sit in a `HOUSE STYLE` section, quoted one per line and framed as preferences rather than instructions, ahead of the output format. Personal rules are part of the core personal data export and eraser tools. Both kinds belong to one site: a house style belongs to a publication, so on multisite a user's personal rules are stored under a site-prefixed meta key (`{table prefix}ai_feedback_personal_house_style`, as `update_user_option()` stores per-site options) and a rule saved on one site is neither listed nor used on another. This differs from the plugin's other personal preferences (model, tone, focus areas and language), which follow the user across the network. The privacy exporter and eraser find a user's rules from their own user meta, so rules on every site are covered, including sites the user has left and any unprefixed key.
+
+### POST /house-style
+
+Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and closing punctuation) returns that rule with `200`. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
+
+```json
+{ "text": "Headings use sentence case", "scope": "user", "note_id": 790 }
+```
+
+`note_id` is optional: the AI reply that proposed the rule, which is then marked `saved`. It requires `edit_post` on that reply's post.
+
+### PUT /house-style/{id}, DELETE /house-style/{id}
+
+Change a rule's `text`, or remove it. Pass the rule's `scope` (`user` by default; `site` requires `manage_options`). Returns the lists, or `404` when the rule is gone.
+
+### POST /house-style/proposals/{note_id}/dismiss
+
+Record that the author doesn't want to keep a rule an AI reply proposed, so the thread stops offering it. Requires `edit_post` on the reply's post.
+
+### How replies propose a rule
+
+The reply prompt lists the rules and lets the AI add `"remember": "short rule"` to its JSON when the author states a standing preference, such as "we always write WordPress with a capital P". The rule is sanitized like a saved one and stored in the reply's `feedback_house_rule` comment meta, unless the author's reviews already follow it. Nothing is saved as a rule until the author clicks **Remember**, after editing the text if they like.
+
+---
 
 ### GET /analytics
 
@@ -1028,6 +1074,17 @@ add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
 } );
 ```
 
+#### `ai_feedback_house_style_rules`
+
+Change the house style rules added to a user's review and reply prompts, for example to load them from elsewhere. Returned rules are sanitized and capped like saved ones.
+
+```php
+add_filter( 'ai_feedback_house_style_rules', function( array $rules, int $user_id ): array {
+    $rules[] = 'Write WordPress with a capital P';
+    return $rules;
+}, 10, 2 );
+```
+
 #### `ai_feedback_max_review_images`
 
 How many images a review request may show a vision model so it can propose alt text. Default 4; return 0 to never send images.
@@ -1036,6 +1093,16 @@ How many images a review request may show a vision model so it can propose alt t
 add_filter( 'ai_feedback_max_review_images', function(): int {
     return 0;
 } );
+```
+
+#### `ai_feedback_model_supports_vision`
+
+Whether a model is sent images so it can propose alt text. Gets the answer from core's model metadata or the model list, the model ID, and `core` or `catalog` for where the answer came from. Only `true` turns images on.
+
+```php
+add_filter( 'ai_feedback_model_supports_vision', function( bool $supports, string $model_id ): bool {
+    return 'my-text-only-model' === $model_id ? false : $supports;
+}, 10, 2 );
 ```
 
 #### `ai_feedback_use_structural_suggestions`
@@ -1161,6 +1228,14 @@ add_filter( 'ai_feedback_mention_handles', function( array $handles ): array {
     $handles[] = 'editor bot';
     return $handles;
 } );
+```
+
+#### `ai_feedback_create_mention_user` (filter)
+
+Filters whether to create the hidden [Fresh Eyes user](#the-fresh-eyes-user) the Notes `@` completer offers. Default `true`. Return `false` to go without it: the account is not created, and one that already exists is removed, with its stored ID, at the next activation or admin page load. Typing `@fresh-eyes` still asks Fresh Eyes; only picking it from the `@` menu goes away. Returning `true` again creates a new account at the next admin page load.
+
+```php
+add_filter( 'ai_feedback_create_mention_user', '__return_false' );
 ```
 
 #### `ai_feedback_reply_received`
@@ -1315,12 +1390,24 @@ X-RateLimit-Reset: 1701874200
 
 Typing `@fresh-eyes` in a note asks Fresh Eyes about the text or blocks the note is on, in a thread a person started. In a thread Fresh Eyes started, every reply is answered, as before.
 
-- **Who is answered:** a note whose own text mentions `@fresh-eyes` (also `@FreshEyes`, `@fresh_eyes` or `@Fresh Eyes`), whether it starts a thread or replies in one, when its author could run a review of the post (`edit_posts` and `edit_post`). Only the note's text is read, at most 5,000 characters: classes, IDs and attributes never count, and a mention inside `blockquote`, `q`, `code` or `pre` is quoted, not asked. Notes by Fresh Eyes never trigger an answer, and a note is only looked at when it is inserted, so editing it does not ask again.
+- **Who is answered:** a note whose own text mentions `@fresh-eyes` (also `@FreshEyes`, `@fresh_eyes` or `@Fresh Eyes`), or that holds the Notes `@` completer's chip for the [Fresh Eyes user](#the-fresh-eyes-user) (`<span class="wp-note-mention user-N">`, whatever name it shows), whether it starts a thread or replies in one, when its author could run a review of the post (`edit_posts` and `edit_post`). Only the note's text is read, at most 5,000 characters: classes, IDs and attributes never count, and a mention inside `blockquote`, `q`, `code` or `pre` is quoted, not asked. Notes by Fresh Eyes never trigger an answer, and a note is only looked at when it is inserted, so editing it does not ask again.
 - **What the AI sees:** the note's block (the first one, for a note shared by several blocks), the text the note is anchored to when it was added to a text selection (Gutenberg's `<mark class="wp-note" data-id="N">` marker), up to five blocks on each side, and the thread. Other people's notes are context only, and the prompt says to ignore instructions in them.
-- **Changes:** a request for a change gets one of the usual reply edits, which the editor offers as a Gutenberg suggestion with Suggestion Mode on, or with Preview and Apply in the sidebar's **Ask Fresh Eyes** panel. Nothing is applied on its own. With a selection, the prompt asks for a `replace_text` edit scoped to it, and the server drops one whose `find` text is outside the selection, with a short note in the answer.
+- **Changes:** a request for a change gets one of the usual reply edits, which the editor offers as a Gutenberg suggestion with Suggestion Mode on, or with Preview and Apply in the sidebar's **Ask Fresh Eyes** panel. Nothing is applied on its own. With a selection, the prompt asks for a `replace_text` edit scoped to it, and the server drops one whose `find` text is outside the selection, or a structural edit (`remove_block`, `move_block`, `insert_block`), with a short note in the answer.
 - **Sources:** answers are written without web search. A request to research or link to sources is declined, and any `http(s)://` or `www.` address in the answer that the saved post, the thread and the request do not already hold (content only in the editor does not count) is replaced with "[link removed]"; an edit that would add one is dropped, with a short note in the answer saying so. Links in an edit's markup are read the way a browser would (entities decoded, whitespace and control characters dropped, `//host` links resolved), across every link-bearing attribute (`href`, `src`, `cite` and so on). Bare domains such as `example.com/study` are not recognized as addresses.
 - **Limits:** each answer counts against the hourly review limit of the person who asked, and is refunded when the AI request fails. Answers are counted as "Questions answered" in usage analytics.
 - **Timing:** the author's editor answers a mention right away through [`POST /replies/{id}/process`](#post-repliesidprocess), sending its unsaved content, which is only used when the saved post does not link the note yet. Other people's editors leave it alone. WP-Cron answers it after 60 seconds if no editor did, from the saved post.
-- **Notifications:** the typed handle is plain text, not a mention chip, so WordPress sends no mention email for it, and Fresh Eyes' answer is saved without going through the REST API, so it sends none either.
+- **Notifications:** WordPress emails a mentioned user only when the account has an email address and can edit the note. The Fresh Eyes user has neither, so picking it from the completer sends no email, and a typed handle is plain text that sends none either. Fresh Eyes' answer is saved without going through the REST API, so it sends none.
 
-Fresh Eyes is not a WordPress user, so the Notes `@` completer (WordPress 7.1+) does not suggest it as you type.
+### The Fresh Eyes user
+
+The Notes `@` completer (WordPress 7.1+) lists site users, so the plugin creates a hidden user named Fresh Eyes for it to offer. Typing `@fr` in a note lists it; picking it saves a `<span class="wp-note-mention user-N">@Fresh Eyes</span>` chip, which asks Fresh Eyes like the typed handle.
+
+- **Created** on activation, and on the first admin page load after an update, unless the [`ai_feedback_create_mention_user`](#ai_feedback_create_mention_user-filter) filter returns `false`, which also removes an existing account. Its ID is kept in the `ai_feedback_user_id` network option (a site option on single sites) and the account carries the `ai_feedback_user` user meta. The ID is only trusted while that account still carries the meta, and the login is never used to find it: when `fresh-eyes` is taken, the plugin picks `fresh-eyes-2` and so on, and leaves the other account alone. If the account is deleted while the plugin is active, it is created again, with a new ID; chips for the old ID are in notes that were already answered, since a note is only read when it is added. Creation runs under a lock (in the main site's options on multisite), and an account carrying the meta is adopted rather than made twice. When creation can't run, the next try waits five minutes.
+- **Inert:** no role or capabilities, no email address, and a random 64-character password nobody is given. It cannot log in (`authenticate`), never becomes the current user, whatever authenticated the request (`determine_current_user`), and gets no application passwords or password resets. Nobody can edit, delete, promote or remove it (`map_meta_cap`), and a role, capability, super admin grant or email address given to it through code or WP-CLI is taken back. Anything it picked up while the plugin was inactive is taken back at the next activation or update check. AI notes are still saved with `user_id` 0, not as this user.
+- **Code that sets the current user directly:** `wp_set_current_user( N )`, as some single sign-on or "switch to user" tools call, does not go through `determine_current_user`, so it can make the account the current user. It then has no role or capabilities, not even `read`, so it can't edit or publish anything, or ask Fresh Eyes (`edit_posts`). A note written over REST in that state would be saved under its name. Such tools should leave this account out of their user pickers; it is already missing from every user list.
+- **A look-alike account:** anyone who can create users can name another account "Fresh Eyes", and the completer would list both. Picking the look-alike still asks Fresh Eyes, since its chip reads `@Fresh Eyes` and the typed handle matches, but WordPress also emails that account about the mention like any other user.
+- **Hidden:** every `WP_User_Query` leaves it out (`pre_user_query`), which covers the Users screen, author dropdowns, `wp_list_authors()`, sitemaps, WP-CLI's `wp user list` and `/wp/v2/users`. The Users screen counts leave it out (`pre_count_users`). `/wp/v2/users/<id>` and its application password routes answer 404, and its author archive, also reached through `?author=<id>`, is a 404.
+- **Revealed** only to the Notes completer's search. The completer asks `GET /wp/v2/users?context=view&search=<typed text>` (plus `_locale=user`) on each keystroke. The user is listed when a request has exactly those parameters, comes from someone with `edit_posts`, and the typed text, at least two characters, starts its display name, its login or a mention handle, ignoring case and hyphens, underscores or spaces between words: `fr`, `fresh-e`, `Fresh Ey` and `FreshEy` do, `f` and `eyes` do not. It is listed for people without `list_users` too, who otherwise only see users with published posts. The block editor's own `@` completer, in paragraphs and other blocks, sends the same request, so the editor script removes the user from that completer's list. Any other plugin that sends this exact request with a matching search also sees the user.
+- **Not hidden:** the total from `get_user_count()`, which counts every account, for example on the network admin dashboard.
+- **Multisite:** one user for the whole network, kept in a network option. Not tested on a multisite install yet. It belongs to the site where it was created; the completer's search lists it on every site.
+- **Removed** on uninstall, with its options. It authors nothing, so nothing is reassigned. On deactivation it stays, as a no-role account the Users screen shows again, with no email address and a password nobody has, so the IDs in existing chips still point to it.

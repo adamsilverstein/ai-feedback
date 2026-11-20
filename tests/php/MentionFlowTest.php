@@ -334,7 +334,7 @@ class MentionFlowTest extends TestCase {
 			),
 			$this->notes->saved[900]['reply_edit'] ?? null
 		);
-		$this->assertSame( 1, $this->notes->saved[900]['revision'] ?? null );
+		$this->assertSame( 1, $this->threads()[300]['replies'][0]['revision'] ?? null );
 		$this->assertSame( 'the sentence', $this->threads()[300]['replies'][0]['edit']['replace'] ?? null );
 	}
 
@@ -585,6 +585,110 @@ class MentionFlowTest extends TestCase {
 			'Tightened the intro. (The suggested change was left out because it went beyond the selected text.)',
 			$this->notes->saved[900]['feedback'] ?? null
 		);
+	}
+
+	/**
+	 * Data provider for edits around a line break in or beside the selection.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function line_break_selection_provider(): array {
+		$across = '<p>Revenue <mark class="wp-note" data-id="300">grew 40%<br>last year</mark>.</p>';
+		$before = '<p>Revenue grew <mark class="wp-note" data-id="300">40%</mark><br>last year.</p>';
+		return array(
+			'find holding a break inside the selection' => array( $across, "40%\nlast year", true ),
+			'find on one line of the selection'         => array( $across, 'last year', true ),
+			'find across the break with a space'        => array( $across, '40% last year', false ),
+			'find past the break out of the selection'  => array( $before, "40%\nlast", false ),
+		);
+	}
+
+	/**
+	 * A selection that spans a line break holds an edit across it, as long
+	 * as the edit's find copies the break.
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	#[\PHPUnit\Framework\Attributes\DataProvider( 'line_break_selection_provider' )]
+	public function test_edit_across_a_line_break_in_the_selection( string $html, string $find, bool $kept ): void {
+		$GLOBALS['test_parsed_blocks'] = array(
+			self::EDITOR_CONTENT => array(
+				array(
+					'blockName'    => 'core/paragraph',
+					'attrs'        => array( 'metadata' => array( 'noteId' => 300 ) ),
+					'innerBlocks'  => array(),
+					'innerHTML'    => $html,
+					'innerContent' => array( $html ),
+				),
+			),
+		);
+		$this->service->response = (string) wp_json_encode(
+			array(
+				'reply' => 'Changed it.',
+				'edit'  => array(
+					'type'    => 'replace_text',
+					'find'    => $find,
+					'replace' => 'changed',
+				),
+			)
+		);
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->process( 300 );
+
+		$edit = $this->notes->saved[900]['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
+	 * Structural changes a mention on selected text can come back with.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function structural_edits(): array {
+		return array(
+			'remove' => array( '{"type": "remove_block"}' ),
+			'insert' => array( '{"type": "insert_block", "position": "after", "block": {"name": "core/paragraph", "content": "More."}}' ),
+		);
+	}
+
+	/**
+	 * A structural change is beyond a note on selected text: it is dropped,
+	 * and the answer says so.
+	 *
+	 * @dataProvider structural_edits
+	 *
+	 * @param string $edit Edit JSON.
+	 */
+	public function test_structural_change_to_a_selection_is_dropped( string $edit ): void {
+		$this->service->response = '{"reply": "Cut it.", "edit": ' . $edit . '}';
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->process( 300 );
+
+		$this->assertArrayNotHasKey( 'reply_edit', $this->notes->saved[900] ?? array() );
+		$this->assertSame(
+			'Cut it. (The suggested change was left out because it went beyond the selected text.)',
+			$this->notes->saved[900]['feedback'] ?? null
+		);
+	}
+
+	/**
+	 * A note on a whole block may still get a structural change.
+	 */
+	public function test_structural_change_to_a_whole_block_is_kept(): void {
+		$html = '<p>Intro the very long sentence ends here.</p>';
+		$GLOBALS['test_parsed_blocks'][ self::EDITOR_CONTENT ][0]['innerHTML']    = $html;
+		$GLOBALS['test_parsed_blocks'][ self::EDITOR_CONTENT ][0]['innerContent'] = array( $html );
+		$this->service->response = '{"reply": "Cut it.", "edit": {"type": "remove_block"}}';
+		$this->insert_note( 300, '@fresh-eyes should this go?' );
+
+		$this->process( 300 );
+
+		$this->assertSame( array( 'type' => 'remove_block' ), $this->notes->saved[900]['reply_edit'] ?? null );
+		$this->assertSame( 'Cut it.', $this->notes->saved[900]['feedback'] ?? null );
 	}
 
 	/**

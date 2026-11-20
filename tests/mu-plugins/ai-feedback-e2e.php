@@ -19,6 +19,16 @@ if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type
 	return;
 }
 
+// Lets a test treat pending suggestions as old enough to clean up.
+if ( isset( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) && is_string( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) ) {
+	$ai_feedback_e2e_cleanup_delay = absint( $_COOKIE['ai_feedback_e2e_cleanup_delay'] );
+	add_filter(
+		'ai_feedback_suggestion_cleanup_delay',
+		static fn (): int => $ai_feedback_e2e_cleanup_delay
+	);
+	unset( $ai_feedback_e2e_cleanup_delay );
+}
+
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', true );
 }
@@ -103,10 +113,25 @@ add_filter(
 		if (
 			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $user_reply )
 			|| ! preg_match( '/make (?:this|that) change/i', $user_reply[1] )
-			|| ! preg_match( '/^Block content: (.*)$/m', $prompt, $block )
+			|| ! preg_match( '/^Block content: (.*?)\n\n/ms', $prompt, $block )
 			|| ! str_contains( $block[1], 'last year' )
 		) {
 			return $reply;
+		}
+
+		// Asked to change both lines of a block split by a line break, the
+		// edit's find runs across the break, copying it as a newline.
+		if ( str_contains( $user_reply[1], 'both lines' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: both lines now read "in 2025".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => "40%\nlast year",
+						'replace' => "40%\nin 2025",
+					),
+				)
+			);
 		}
 
 		return (string) wp_json_encode(
@@ -361,6 +386,37 @@ add_filter(
 	2
 );
 
+// A review of a paragraph split by a line break fixes a typo with a find
+// that runs across the break, copied as a newline. It only does when the
+// newline reaches the review intact.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		foreach ( $blocks as $block ) {
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( "Revenue grew 40%\nlast yaer." !== $content ) {
+				continue;
+			}
+			$response['feedback'] = array(
+				array(
+					'block_id'  => $block['clientId'] ?? '',
+					'category'  => 'grammar',
+					'severity'  => 'suggestion',
+					'title'     => 'yaer → year',
+					'feedback'  => 'Spelling.',
+					'quick_fix' => array(
+						'find'    => "40%\nlast yaer",
+						'replace' => "40%\nlast year",
+					),
+				),
+			);
+		}
+		return $response;
+	},
+	10,
+	2
+);
+
 // A note that mentions Fresh Eyes and asks to simplify gets an edit that
 // shortens the text the note is on, and names that text so tests can tell
 // the selection reached the AI. Asking for sources gets an answer with a
@@ -422,4 +478,52 @@ add_filter(
 	},
 	40,
 	2
+);
+
+// A reply that mentions sentence case states a standing preference, so the
+// mock reply offers to remember it as a house style rule.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/sentence case/i', $asked[1] )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply'    => 'Got it, sentence case it is.',
+				'edit'     => null,
+				'remember' => 'Headings use sentence case, except product names such as WordPress and Gutenberg, which keep their own capital letters',
+			)
+		);
+	},
+	40,
+	2
+);
+
+// A review whose prompt carries the sentence case house style rule flags the
+// first block for breaking it, so tests can see a saved rule reach the
+// next review.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks, string $prompt = '' ): array {
+		$block = $blocks[0] ?? null;
+		if ( ! str_contains( $prompt, "HOUSE STYLE:\n" ) || ! preg_match( '/^- "Headings use sentence case\b/mi', $prompt ) || ! is_array( $block ) ) {
+			return $response;
+		}
+
+		$response['feedback'][] = array(
+			'block_id' => $block['clientId'] ?? '',
+			'category' => 'tone',
+			'severity' => 'suggestion',
+			'title'    => 'Follow the house style',
+			'feedback' => 'House style: headings use sentence case.',
+		);
+		return $response;
+	},
+	30,
+	3
 );

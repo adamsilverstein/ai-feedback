@@ -26,6 +26,7 @@
 	},
 	"files": [
 		"fresh-eyes.php",
+		"uninstall.php",
 		"includes/",
 		"build/",
 		"assets/",
@@ -47,6 +48,7 @@
 		"@wordpress/edit-post": "~9.1.0",
 		"@wordpress/editor": "~16.1.0",
 		"@wordpress/element": "~10.1.0",
+		"@wordpress/hooks": "~5.1.0",
 		"@wordpress/i18n": "~7.1.0",
 		"@wordpress/icons": "~20.0.0",
 		"@wordpress/keyboard-shortcuts": "~6.1.0",
@@ -85,11 +87,15 @@
 		"test:php": "composer run test",
 		"test:e2e": "npx playwright test --config=playwright.config.js",
 		"test:e2e:debug": "npx playwright test --config=playwright.config.js --debug",
+		"test:e2e:suggestion-mode": "npx playwright test --config=playwright.suggestion-mode.config.js",
 		"test:visual": "playwright test --config=tests/visual/playwright.config.js",
 		"test:all": "npm run lint:js && npm run lint:css && npm run test:unit && npm run test:e2e",
 		"env:start": "wp-env start",
 		"env:stop": "wp-env stop",
 		"env:clean": "wp-env clean",
+		"env:suggestion-mode:build": "bin/build-suggestion-mode-gutenberg.sh",
+		"env:suggestion-mode:start": "bin/build-suggestion-mode-gutenberg.sh && wp-env start --config=.wp-env.suggestion-mode.json",
+		"env:suggestion-mode:stop": "wp-env stop --config=.wp-env.suggestion-mode.json",
 		"plugin-zip": "wp-scripts plugin-zip"
 	},
 	"overrides": {

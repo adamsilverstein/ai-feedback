@@ -4,12 +4,17 @@
  * When Gutenberg's Suggestion Mode is available the same fixes become
  * suggestions instead (see suggestions.js).
  */
+import { create, insert, RichTextData } from '@wordpress/rich-text';
+
+/**
+ * Internal dependencies
+ */
 import {
-	create,
-	insert,
-	RichTextData,
-	toHTMLString,
-} from '@wordpress/rich-text';
+	markReplacement,
+	readSource,
+	readValue,
+	toContent,
+} from './source-newlines';
 
 /**
  * Find the block's main rich text attribute.
@@ -56,10 +61,21 @@ function escapeRegExp(text) {
 }
 
 /**
+ * Replace non-breaking spaces with plain ones.
+ *
+ * @param {string} text Text.
+ * @return {string} Text with plain spaces.
+ */
+function withPlainSpaces(text) {
+	return text.replace(/\u00a0/g, ' ');
+}
+
+/**
  * Find every match of a quick fix's text.
  *
  * Text that starts or ends with a letter or digit only matches at a word
- * boundary there, the same rule the server uses (Response_Parser).
+ * boundary there, the same rule the server uses (Response_Parser). A space
+ * matches a non-breaking one, which the server reads as a space.
  *
  * @param {string} text Plain text to search.
  * @param {string} find Text to find.
@@ -70,7 +86,7 @@ export function findMatches(text, find) {
 		return [];
 	}
 
-	let pattern = escapeRegExp(find);
+	let pattern = escapeRegExp(find).replace(/[ \u00a0]/g, '[ \\u00a0]');
 	if (/^[\p{L}\p{N}]/u.test(find)) {
 		pattern = '(?<![\\p{L}\\p{N}])' + pattern;
 	}
@@ -104,7 +120,8 @@ export function isReplacementAt(text, fix, start) {
 		const from = start - at;
 		if (
 			from >= 0 &&
-			text.slice(from, from + fix.replace.length) === fix.replace
+			withPlainSpaces(text.slice(from, from + fix.replace.length)) ===
+				withPlainSpaces(fix.replace)
 		) {
 			return true;
 		}
@@ -154,8 +171,8 @@ export function findUniqueOffset(value, fix) {
  * @return {string|RichTextData|null} New attribute value, or null if the fix no longer applies.
  */
 export function applyFixToContent(content, fix) {
-	const value = create({ html: toHtml(content) });
-	const start = findUniqueOffset(value, fix);
+	const { value, marker } = readSource(toHtml(content), [fix?.replace]);
+	const start = findUniqueOffset(readValue(value, marker), fix);
 
 	if (start === -1) {
 		return null;
@@ -163,19 +180,20 @@ export function applyFixToContent(content, fix) {
 
 	// Carry over the formatting of the replaced text's first character, so a
 	// fix inside bold or a link stays bold or linked.
+	const end = start + fix.find.length;
 	const length = fix.replace.length;
 	const replacement = {
-		text: fix.replace,
+		text: markReplacement(
+			value.text.slice(start, end),
+			fix.replace,
+			marker
+		),
 		formats: Array.from({ length }, () => value.formats[start]),
 		// Sparse, like the arrays rich text builds: core-data reads every
 		// entry that exists when it orders footnotes.
 		replacements: new Array(length),
 	};
-	const updated = insert(value, replacement, start, start + fix.find.length);
-
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	return toContent(content, insert(value, replacement, start, end), marker);
 }
 
 /**

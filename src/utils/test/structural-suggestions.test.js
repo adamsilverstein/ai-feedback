@@ -249,6 +249,18 @@ describe('suggestBlockAction', () => {
 			0
 		);
 		expect(mocks.order['']).toEqual(['open', 'intro', 'bg', 'rep']);
+		// Gutenberg's Reject reads the origin from the stored operation.
+		const [record] = mocks.saveEntityRecord.mock.calls[0].slice(2);
+		expect(JSON.parse(record.meta._wp_suggestion).operations).toEqual([
+			{
+				type: 'block-move',
+				clientId: 'open',
+				blockName: 'core/paragraph',
+				fromParentClientId: null,
+				fromIndex: 2,
+				fromAnchorClientId: 'bg',
+			},
+		]);
 		expect(mocks.blocks.open.attributes.metadata.suggestion).toEqual({
 			type: 'pending-move',
 			commentId: 13,
@@ -257,6 +269,30 @@ describe('suggestBlockAction', () => {
 			fromIndex: 2,
 			fromAnchorClientId: 'bg',
 		});
+	});
+
+	it('records the parent of a move inside a container', async () => {
+		mocks.order = {
+			'': ['group'],
+			group: ['intro', 'bg', 'open', 'rep'],
+		};
+		mocks.blocks.group = paragraph('group', '');
+
+		expect(await suggestBlockAction(moveNote)).toBe(true);
+
+		expect(mocks.order.group).toEqual(['open', 'intro', 'bg', 'rep']);
+		const [record] = mocks.saveEntityRecord.mock.calls[0].slice(2);
+		const origin = {
+			fromParentClientId: 'group',
+			fromIndex: 2,
+			fromAnchorClientId: 'bg',
+		};
+		expect(JSON.parse(record.meta._wp_suggestion).operations[0]).toEqual(
+			expect.objectContaining(origin)
+		);
+		expect(mocks.blocks.open.attributes.metadata.suggestion).toEqual(
+			expect.objectContaining(origin)
+		);
 	});
 
 	it('turns the note back into a plain note when the server drops the payload', async () => {

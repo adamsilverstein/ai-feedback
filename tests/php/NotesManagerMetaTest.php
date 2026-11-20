@@ -113,19 +113,16 @@ class NotesManagerMetaTest extends TestCase {
 	}
 
 	/**
-	 * An AI reply's edit revision is stored, and nothing is stored without one.
+	 * A revision number is not stored: it is counted when the thread is read.
 	 */
-	public function test_stores_revision(): void {
+	public function test_does_not_store_revision(): void {
 		$meta = $this->build_note_meta(
 			array(
 				'feedback' => 'Done.',
 				'revision' => 2,
 			)
 		);
-		$this->assertSame( 2, $meta[ Notes_Manager::REVISION_META_KEY ] );
-
-		$meta = $this->build_note_meta( array( 'feedback' => 'Done.' ) );
-		$this->assertArrayNotHasKey( Notes_Manager::REVISION_META_KEY, $meta );
+		$this->assertArrayNotHasKey( 'feedback_revision', $meta );
 	}
 
 	/**

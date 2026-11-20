@@ -188,10 +188,16 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 ### Ask Fresh Eyes in a Note
 
 1. Select text or blocks and add a note, or reply in any note thread
-2. Type `@fresh-eyes` and a request, for example "@fresh-eyes simplify this" or "@fresh-eyes adjust the tone"
+2. Type `@fr` and pick **Fresh Eyes** from the menu, or type `@fresh-eyes` in full, then a request, for example "@fresh-eyes simplify this" or "@fresh-eyes adjust the tone"
 3. Fresh Eyes answers in the thread. A change it suggests is offered for you to accept, in the **Ask Fresh Eyes** panel or as a suggestion with Suggestion Mode on
 
-Fresh Eyes can't search the web, so it declines requests to research or link to sources. The name doesn't autocomplete in the Notes `@` menu, since Fresh Eyes isn't a site user; type it out.
+Fresh Eyes can't search the web, so it declines requests to research or link to sources. To show up in the Notes `@` menu, the plugin adds a hidden Fresh Eyes user that can't log in, has no role or email and stays out of user lists; see [The Fresh Eyes user](docs/API.md#the-fresh-eyes-user).
+
+### House Style
+
+When you tell the AI how you always write, for example "we use sentence case for headings here", its reply offers **Remember this for future reviews** with the preference as a short rule. Edit it if you like, then click **Remember**; nothing is saved until you do. Later reviews flag writing that breaks a rule and stop flagging what a rule allows.
+
+Manage rules under **House style** in Review Settings. Rules marked **Just me** apply to your own reviews; administrators can also add rules for **Everyone on this site**.
 
 ### Usage Analytics
 

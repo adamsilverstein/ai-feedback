@@ -342,6 +342,22 @@ class ResponseParserGrammarTest extends TestCase {
 	}
 
 	/**
+	 * A fix matched over a non-breaking space, two bytes for the find's one
+	 * space, still leaves the next fix where it was.
+	 */
+	public function test_fix_over_a_non_breaking_space_keeps_the_next_fix(): void {
+		$feedback = $this->parse(
+			array(
+				self::grammar( 'b1', 'x y', 'X Y' ),
+				self::grammar( 'b1', 'z', 'Z' ),
+			),
+			array( 'b1' => "x\u{00A0}y z" )
+		);
+
+		$this->assertSame( array( 'x y>X Y', 'z>Z' ), self::fixes( $feedback ) );
+	}
+
+	/**
 	 * Each block keeps at most MAX_FIXES_PER_BLOCK fixes.
 	 */
 	public function test_fixes_per_block_are_capped(): void {

@@ -439,7 +439,7 @@ class Reply_Service {
 		$model              = self::preference_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL, $user_id );
 
 		if ( ! $is_mention ) {
-			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, false );
+			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $prompt, $system_instruction, $model, false );
 		}
 
 		// A mention starts a new request, so it counts against the review limit.
@@ -450,7 +450,7 @@ class Reply_Service {
 
 		$result = null;
 		try {
-			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, true );
+			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $prompt, $system_instruction, $model, true );
 		} finally {
 			// No answer was saved by this request, so give the slot back.
 			if ( ! is_int( $result ) || $result <= 0 ) {
@@ -487,21 +487,20 @@ class Reply_Service {
 	 * @param int                  $post_id            Post ID.
 	 * @param string               $block_id           Block ID from the root note.
 	 * @param array<string, mixed> $context            Reply context.
-	 * @param array<mixed>         $edits              Edits proposed in the thread, oldest first.
 	 * @param string               $prompt             Prompt.
 	 * @param string               $system_instruction System instruction.
 	 * @param string               $model              Model preference.
 	 * @param bool                 $is_mention         Whether the reply asks Fresh Eyes through a mention.
 	 * @return int|WP_Error New AI reply comment ID, or error.
 	 */
-	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, array $edits, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
+	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI call failed: ' . $ai_text->get_error_message() );
 			return $ai_text;
 		}
 
-		$block_content = is_string( $context['block_content'] ?? null ) ? $context['block_content'] : '';
+		$block_content = is_string( $context['block_text'] ?? null ) ? $context['block_text'] : '';
 		$targets       = is_array( $context['block_targets'] ?? null ) ? $context['block_targets'] : array();
 		$parsed        = $this->response_parser->parse_reply( $ai_text, $block_content, ! empty( $context['block_can_rewrite'] ), $targets );
 		if ( null === $parsed && ! $this->response_parser->is_readable_reply( $ai_text ) ) {
@@ -526,11 +525,14 @@ class Reply_Service {
 			'feedback' => $parsed['reply'],
 			'block_id' => $block_id,
 		);
+		// Offer to remember a stated preference unless the author's reviews
+		// already follow it.
+		$house_rule = $this->response_parser->parse_reply_rule( $ai_text );
+		if ( null !== $house_rule && ! House_Style::list_has_rule( $context['house_style'] ?? array(), $house_rule ) ) {
+			$feedback_item['house_rule'] = $house_rule;
+		}
 		if ( null !== $parsed['edit'] ) {
 			$feedback_item['reply_edit'] = $parsed['edit'];
-			// A new edit supersedes the thread's earlier ones; the editor
-			// takes their markers out and keeps only this one pending.
-			$feedback_item['revision'] = count( $edits ) + 1;
 		}
 		$review_data = array(
 			'review_id' => 'reply-' . $comment_id,
@@ -598,7 +600,8 @@ class Reply_Service {
 	}
 
 	/**
-	 * Drop a text change outside the text the note is anchored to.
+	 * Drop a text change outside the text the note is anchored to, and any
+	 * structural change (remove, move or insert a block) to it.
 	 *
 	 * The prompt asks for changes scoped to the selection; this holds the
 	 * AI to it. A note on a whole block has no selection and is left alone.
@@ -610,15 +613,22 @@ class Reply_Service {
 	 */
 	private static function keep_edit_in_selection( array $parsed, array $context, int $parent_id ): array {
 		$edit = $parsed['edit'];
-		if ( null === $edit || 'replace_text' !== ( $edit['type'] ?? null ) || ! is_string( $edit['find'] ?? null ) ) {
+		if ( null === $edit ) {
+			return $parsed;
+		}
+		$is_text = 'replace_text' === ( $edit['type'] ?? null ) && is_string( $edit['find'] ?? null );
+		if ( ! $is_text && ! Response_Parser::is_block_action( $edit ) ) {
 			return $parsed;
 		}
 
 		$block_html = is_string( $context['block_html'] ?? null ) ? $context['block_html'] : '';
 		// The whole selection, not the prompt's shortened copy.
 		$selection = Mentions::get_selected_text( $block_html, $parent_id, PHP_INT_MAX );
-		$find      = trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) );
-		if ( '' === $selection || ( '' !== $find && str_contains( $selection, $find ) ) ) {
+		if ( '' === $selection ) {
+			return $parsed;
+		}
+		$find = $is_text ? trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) ) : '';
+		if ( '' !== $find && str_contains( $selection, $find ) ) {
 			return $parsed;
 		}
 
@@ -717,9 +727,21 @@ class Reply_Service {
 
 		// The text as it reads without any pending suggestion, which is how
 		// the editor leaves it once a new edit supersedes that suggestion.
-		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
-		$block_content = null !== $block ? self::html_text( $block_html ) : '';
-		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
+		$block_html = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
+		// What an edit's `find` is matched against: the block's own text as
+		// the editor holds it, without its inner blocks, like a list item's
+		// text without its nested list.
+		$block_text    = null !== $block ? self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) : '';
+		$block_content = '';
+		if ( null !== $block ) {
+			// The prompt reads a block with inner blocks, or an image block,
+			// whose <img> is the block, the collapsed way, which is easier to
+			// follow.
+			$block_content = empty( $block['innerBlocks'] ) && 'core/image' !== $block_type
+				? $block_text
+				: self::html_text( $block_html );
+		}
+		$nearby = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
 			'is_mention'        => $is_mention,
@@ -728,6 +750,7 @@ class Reply_Service {
 			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
 			'block_html'        => $block_html,
 			'block_content'     => $block_content,
+			'block_text'        => $block_text,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
 			// A rewrite replaces the whole block from the plain text the AI
@@ -744,10 +767,11 @@ class Reply_Service {
 			'thread'            => $thread,
 			'nearby_blocks'     => $nearby,
 			'block_targets'     => self::get_block_targets( $nearby ),
-			'pending_edit'      => $this->find_pending_edit( $edits, $block_content, $located ),
+			'pending_edit'      => $this->find_pending_edit( $edits, $block_text, $located ),
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
+			'house_style'       => House_Style::get_prompt_rules( $user_id ),
 			'persona'           => self::meta_string( $parent_id, Personas::META_KEY ),
 		);
 	}
@@ -1229,6 +1253,34 @@ class Reply_Service {
 	}
 
 	/**
+	 * Get block HTML's plain text as the editor's rich text reads it.
+	 *
+	 * An edit's `find` is matched against this text here and against
+	 * `create( { html } ).text` in the editor, so they must agree: a line
+	 * break is "\n", an inline image is U+FFFC, entities are decoded and
+	 * whitespace is kept as written. The outer ends are trimmed. Shares its
+	 * cases with extractEditorText() in src/utils/block-utils.js through
+	 * tests/fixtures/editor-text.json.
+	 *
+	 * Table cells and list items, which the editor never matches across,
+	 * end with a space so their text doesn't run together in the prompt.
+	 * A rich text block's own closing tag ends the text, so it is trimmed.
+	 *
+	 * @param string $html Block HTML.
+	 * @return string Block text.
+	 */
+	public static function editor_text( string $html ): string {
+		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
+		// Comments are block delimiters here, not text.
+		$html = (string) preg_replace( '#<!--.*?-->#s', '', $html );
+		$html = (string) preg_replace( '#<br\b[^>]*>#i', "\n", $html );
+		$html = (string) preg_replace( '#</(?:p|li|td|th|h[1-6]|div|figcaption|blockquote|pre)\b[^>]*>#i', '$0 ', $html );
+		$html = (string) preg_replace( '#<img\b[^>]*>#i', "\u{FFFC}", $html );
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return trim( str_replace( "\u{FEFF}", '', $text ) );
+	}
+
+	/**
 	 * Rebuild a parsed block's HTML, including its inner blocks.
 	 *
 	 * `innerContent` holds HTML strings with a null placeholder where each
@@ -1258,6 +1310,17 @@ class Reply_Service {
 		}
 
 		return $html;
+	}
+
+	/**
+	 * Get a parsed block's own HTML, without its inner blocks.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return string Block HTML.
+	 */
+	private static function get_own_html( array $block ): string {
+		$inner_content = is_array( $block['innerContent'] ?? null ) ? $block['innerContent'] : array();
+		return implode( '', array_filter( $inner_content, 'is_string' ) );
 	}
 
 	/**

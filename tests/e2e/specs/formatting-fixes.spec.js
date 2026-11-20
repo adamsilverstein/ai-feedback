@@ -142,6 +142,57 @@ test.describe('Formatting fixes', () => {
 		await expect.poll(() => outline(editor)).toEqual(original);
 	});
 
+	test('a split keeps newlines in the HTML as newlines, after a reload too', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Formatting fixes with newlines',
+			content: CONTENT.replace(
+				'The first idea ends here. The second idea starts here and goes on.',
+				'The first idea ends here.\nThe second idea\nstarts here and goes on.'
+			),
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(5);
+		await aiFeedback.openSidebar();
+		await aiFeedback.runReview();
+
+		const splitItem = page.locator('.ai-feedback-item', {
+			hasText: 'Split this paragraph',
+		});
+		await splitItem.getByRole('button', { name: 'Apply fix' }).click();
+		await expect
+			.poll(() => editor.getBlocks().then((b) => b.length))
+			.toBe(6);
+
+		const second = editor.canvas.locator('p.wp-block-paragraph', {
+			hasText: 'The second idea',
+		});
+		for (const pass of ['applied', 'reloaded']) {
+			if (pass === 'reloaded') {
+				await editor.saveDraft();
+				await page.reload();
+			}
+			await expect
+				.poll(() => outline(editor).then((all) => all.slice(3, 5)))
+				.toEqual([
+					'core/paragraph: The first idea ends here.',
+					'core/paragraph: The second idea\nstarts here and goes on.',
+				]);
+			await expect(second).toHaveText(
+				'The second idea starts here and goes on.'
+			);
+			await expect(second.locator('br')).toHaveCount(0);
+		}
+	});
+
 	test('a fix whose block changed shows as outdated', async ({
 		page,
 		editor,

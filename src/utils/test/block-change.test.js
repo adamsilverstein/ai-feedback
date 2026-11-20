@@ -13,6 +13,7 @@ import {
 	createBlock,
 	getBlockType,
 	getBlockTypes,
+	parse,
 	registerBlockType,
 	store as blocksStore,
 	unregisterBlockType,
@@ -422,6 +423,126 @@ describe('split', () => {
 	});
 });
 
+/**
+ * A paragraph loaded from post content, as the editor reads it.
+ *
+ * @param {string} html Paragraph text, as HTML.
+ * @return {Object} Block.
+ */
+function loadParagraph(html) {
+	return parse(
+		`<!-- wp:paragraph --><p>${html}</p><!-- /wp:paragraph -->`
+	)[0];
+}
+
+/**
+ * A block's content as saved, and as the editor shows it.
+ *
+ * @param {Object} block Block.
+ * @return {[string, string]} HTML and text.
+ */
+function contentOf(block) {
+	return [String(block.attributes.content), block.attributes.content.text];
+}
+
+describe('splits of a paragraph with newlines in its HTML', () => {
+	const split = {
+		type: 'split',
+		after: 'idea ends here.',
+		next: 'The second idea goes on.',
+		next_length: 24,
+	};
+	const list = {
+		type: 'transform',
+		to: 'core/list',
+		items: ['Node', 'npm', 'Docker Compose', 'Git'],
+		ordered: false,
+	};
+
+	/**
+	 * Apply a change to one loaded paragraph.
+	 *
+	 * @param {string} html   Paragraph text, as HTML.
+	 * @param {Object} change Change.
+	 * @return {Object[]} Blocks after the change.
+	 */
+	function apply(html, change) {
+		const paragraph = loadParagraph(html);
+		const { selectors, actions } = setUp([paragraph]);
+		expect(
+			applyBlockChange(selectors, actions, change, paragraph.clientId)
+		).not.toBeNull();
+		return selectors.getBlocks();
+	}
+
+	it('keeps a newline in each half of a split as a newline', () => {
+		const [first, second] = apply(
+			'The first idea\nends here.\nThe second\nidea goes on.',
+			split
+		);
+		expect(contentOf(first)).toEqual([
+			'The first idea\nends here.',
+			'The first idea ends here.',
+		]);
+		expect(contentOf(second)).toEqual([
+			'The second\nidea goes on.',
+			'The second idea goes on.',
+		]);
+	});
+
+	it('keeps a line break in each half of a split on its own side', () => {
+		const [first, second] = apply(
+			'The first idea<br>ends here. The second<br>idea goes on.',
+			split
+		);
+		expect(String(first.attributes.content)).toBe(
+			'The first idea<br>ends here.'
+		);
+		expect(String(second.attributes.content)).toBe(
+			'The second<br>idea goes on.'
+		);
+	});
+
+	it('keeps a newline in the introduction and items of a list', () => {
+		const [lead, result] = apply(
+			'You\nneed Node,\nnpm, Docker\nCompose and Git.',
+			list
+		);
+		expect(contentOf(lead)).toEqual(['You\nneed', 'You need']);
+		expect(result.innerBlocks.map(contentOf)).toEqual([
+			['Node', 'Node'],
+			['npm', 'npm'],
+			['Docker\nCompose', 'Docker Compose'],
+			['Git', 'Git'],
+		]);
+	});
+
+	it('keeps a line break in the introduction and items of a list', () => {
+		const [lead, result] = apply(
+			'You<br>need Node, npm, Docker<br>Compose and Git.',
+			list
+		);
+		expect(String(lead.attributes.content)).toBe('You<br>need');
+		expect(
+			result.innerBlocks.map((item) => String(item.attributes.content))
+		).toEqual(['Node', 'npm', 'Docker<br>Compose', 'Git']);
+	});
+
+	it('previews the halves as text', () => {
+		expect(
+			getBlockChangePreview(
+				loadParagraph(
+					'The first idea\nends here. The second\nidea goes on.'
+				),
+				split
+			).after
+		).toEqual([
+			'Paragraph: The first idea ends here.',
+			'Paragraph: The second idea goes on.',
+		]);
+	});
+});
+
 describe('heading and paragraph transforms', () => {
 	it('turns a paragraph into a heading at the proposed level', () => {
 		const paragraph = createBlock('core/paragraph', {
@@ -476,6 +597,31 @@ describe('heading and paragraph transforms', () => {
 			'applied'
 		);
 	});
+
+	// The server keeps the break as a space; reviews from before dropped it.
+	it.each([
+		['new', 'Getting started now'],
+		['older', 'Getting startednow'],
+	])(
+		'is ready for a block with a line break, from a %s review',
+		(_l, text) => {
+			const paragraph = createBlock('core/paragraph', {
+				content: 'Getting started<br>now',
+				metadata: NOTE,
+			});
+			const { selectors } = setUp([paragraph]);
+			const change = {
+				type: 'transform',
+				to: 'core/heading',
+				level: 2,
+				text,
+			};
+
+			expect(
+				getBlockChangeState(selectors, change, paragraph.clientId).state
+			).toBe('ready');
+		}
+	);
 
 	it('is not offered when the editor does not offer the transform', () => {
 		const paragraph = createBlock('core/paragraph', { content: 'Title' });

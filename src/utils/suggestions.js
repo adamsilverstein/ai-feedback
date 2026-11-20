@@ -17,14 +17,17 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import {
-	concat,
-	create,
-	RichTextData,
-	slice,
-	toHTMLString,
-} from '@wordpress/rich-text';
+import { concat, create, RichTextData, slice } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
+import {
+	fromSourceHTML,
+	markReplacement,
+	markSource,
+	readSource,
+	readValue,
+	toContent,
+	toSourceHTML,
+} from './source-newlines';
 import { getRewriteRuns } from './reply-edit';
 import { resolveBlockClientId } from './navigate-to-block';
 import { isBlockAction } from './is-reply-edit';
@@ -125,8 +128,8 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 		return null;
 	}
 
-	const value = create({ html: toHtml(content) });
-	const start = findUniqueOffset(value, fix);
+	const { value, marker } = readSource(toHtml(content), [fix.replace]);
+	const start = findUniqueOffset(readValue(value, marker), fix);
 	if (start === -1) {
 		return null;
 	}
@@ -135,27 +138,30 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 	let markup = '';
 	if (fix.replace) {
 		const length = fix.replace.length;
-		const added = toHTMLString({
-			value: {
-				text: fix.replace,
+		const added = toSourceHTML(
+			{
+				text: markReplacement(
+					value.text.slice(start, end),
+					fix.replace,
+					marker
+				),
 				formats: Array.from({ length }, () => value.formats[start]),
 				replacements: new Array(length),
 			},
-		});
+			marker
+		);
 		markup += `${openMarker('add', id, authorId)}${added}</mark>`;
 	}
-	const removed = toHTMLString({ value: slice(value, start, end) });
+	const removed = toSourceHTML(slice(value, start, end), marker);
 	markup += `${openMarker('del', id, authorId)}${removed}</mark>`;
 
 	const updated = concat(
 		slice(value, 0, start),
-		create({ html: markup }),
+		(marker && markSource(markup, marker)) || create({ html: markup }),
 		slice(value, end, value.text.length)
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	return toContent(content, updated, marker);
 }
 
 /**
@@ -200,11 +206,9 @@ export function buildRewriteSuggestionContent(
 			return added + removed;
 		})
 		.join('');
-	const updated = create({ html: markup });
 
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	const { value, marker } = readSource(markup);
+	return toContent(content, value, marker);
 }
 
 /**
@@ -525,6 +529,25 @@ function canSuggestNow(selectors, action, clientId) {
 }
 
 /**
+ * Where a block is before it moves, in the fields Gutenberg's `block-move`
+ * operation and `pending-move` marker use.
+ *
+ * @param {Object} selectors Block editor selectors.
+ * @param {string} clientId  Client id of the block.
+ * @return {{fromParentClientId: (string|null), fromIndex: number, fromAnchorClientId: (string|null)}} Its origin.
+ */
+function getMoveOrigin(selectors, clientId) {
+	const fromParentClientId = selectors.getBlockRootClientId(clientId);
+	const fromIndex = selectors.getBlockIndex(clientId);
+	const fromOrder = selectors.getBlockOrder(fromParentClientId ?? '');
+	return {
+		fromParentClientId: fromParentClientId || null,
+		fromIndex,
+		fromAnchorClientId: fromOrder[fromIndex - 1] ?? null,
+	};
+}
+
+/**
  * Turns a review note's remove or move into a Gutenberg structural
  * suggestion. Moves between parent blocks stay with Preview and Apply.
  *
@@ -565,7 +588,13 @@ export async function suggestBlockAction(note) {
 	const operation =
 		action.type === 'remove_block'
 			? { type: 'block-remove', clientId, blockName: block.name }
-			: { type: 'block-move', clientId, blockName: block.name };
+			: {
+					type: 'block-move',
+					clientId,
+					blockName: block.name,
+					// Gutenberg's Reject puts the block back from these.
+					...getMoveOrigin(selectors, clientId),
+				};
 	const saved = await saveNoteMeta(note.id, {
 		_wp_suggestion: JSON.stringify(
 			buildStructuralPayload(block.name, operation)
@@ -594,14 +623,7 @@ export async function suggestBlockAction(note) {
 
 	if (action.type === 'move_block') {
 		const { targetId } = getBlockActionState(current, action, clientId);
-		const fromParentClientId = current.getBlockRootClientId(clientId);
-		const fromIndex = current.getBlockIndex(clientId);
-		const fromOrder = current.getBlockOrder(fromParentClientId ?? '');
-		Object.assign(marker, {
-			fromParentClientId: fromParentClientId || null,
-			fromIndex,
-			fromAnchorClientId: fromOrder[fromIndex - 1] ?? null,
-		});
+		Object.assign(marker, getMoveOrigin(current, clientId));
 
 		const { fromRootClientId, toRootClientId, index } = getMovePosition(
 			current,
@@ -741,9 +763,7 @@ export function removeSuggestionMarkers(content, id) {
 		}
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(create({ html: body.innerHTML }))
-		: body.innerHTML;
+	return fromSourceHTML(content, body.innerHTML);
 }
 
 /**
@@ -773,9 +793,7 @@ export function acceptSuggestionMarkers(content, id) {
 		}
 	);
 
-	return content instanceof RichTextData
-		? new RichTextData(create({ html: body.innerHTML }))
-		: body.innerHTML;
+	return fromSourceHTML(content, body.innerHTML);
 }
 
 /**

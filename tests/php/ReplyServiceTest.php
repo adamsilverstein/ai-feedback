@@ -578,7 +578,8 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year.', $service->captured_prompt );
+		// A newline in the source stays, as the editor reads it.
+		$this->assertStringContainsString( "Block content: Revenue grew 40%\n last year.", $service->captured_prompt );
 		$this->assertStringNotContainsString( 'Block content: Unrelated intro.', $service->captured_prompt );
 		// Other blocks are listed as nearby blocks, for structural edits.
 		$this->assertStringContainsString( '- [b1] core/paragraph: Unrelated intro.', $service->captured_prompt );
@@ -649,11 +650,13 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( "Block content: Tom & Jerry said \"hi\" \u{2013} it's 5 pm.\n", $service->captured_prompt );
+		// Non-breaking spaces stay, as the editor keeps them.
+		$this->assertStringContainsString( "Block content: Tom & Jerry\u{00A0}said \"hi\" \u{2013} it's 5\u{00A0}\u{00A0}pm.\n", $service->captured_prompt );
 	}
 
 	/**
-	 * Line breaks and table cells don't run their text together.
+	 * Table cells don't run their text together, and a line break stays a
+	 * line break.
 	 */
 	public function test_block_content_keeps_breaks_between_cells_and_lines(): void {
 		$this->seed_parent_and_reply();
@@ -664,7 +667,7 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( "Block content: 10 20 First Second\n", $service->captured_prompt );
+		$this->assertStringContainsString( "Block content: 10 20 First\nSecond\n", $service->captured_prompt );
 	}
 
 	/**
@@ -802,6 +805,227 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
 		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * Data provider for the ways a line break is written in block HTML.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function line_break_provider(): array {
+		return array(
+			'br'             => array( '<p>Revenue grew 40%<br>last year.</p>' ),
+			'self-closing'   => array( '<p>Revenue grew 40%<br/>last year.</p>' ),
+			'spaced closing' => array( '<p>Revenue grew 40%<br />last year.</p>' ),
+		);
+	}
+
+	/**
+	 * The editor reads a line break as a newline, so a `find` that runs
+	 * across one with a space never matches there and is dropped.
+	 *
+	 * @dataProvider line_break_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_text_edit_spanning_a_line_break_is_dropped( string $html ): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "40% last year", "replace": "40% in 2025"}}', $html );
+
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A `find` that keeps the line break as a newline matches the editor's
+	 * text, and is kept.
+	 *
+	 * @dataProvider line_break_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_text_edit_with_the_line_break_is_kept( string $html ): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "40%\nlast year", "replace": "40%\nin 2025"}}', $html );
+
+		$this->assertSame(
+			array(
+				'type'    => 'replace_text',
+				'find'    => "40%\nlast year",
+				'replace' => "40%\nin 2025",
+			),
+			$notes->last_reply['feedback_item']['reply_edit']
+		);
+	}
+
+	/**
+	 * Data provider for block whitespace the editor keeps as written.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function editor_whitespace_provider(): array {
+		return array(
+			'break then source newline, as the prompt showed it before' => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n last year", false ),
+			'break then source newline, as the editor reads it' => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n\nlast year", true ),
+			'two typed spaces, read as one'              => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew. Last', false ),
+			'two typed spaces, as the editor reads them' => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew.  Last', true ),
+			'narrow no-break space read as a space'      => array( "<p>Prix\u{202F}: 5 euros.</p>", 'Prix : 5', false ),
+			'narrow no-break space kept'                 => array( "<p>Prix\u{202F}: 5 euros.</p>", "Prix\u{202F}: 5", true ),
+		);
+	}
+
+	/**
+	 * An edit is kept only when its `find` matches the block text the way
+	 * the editor reads it, so it is never stored and then outdated.
+	 *
+	 * @dataProvider editor_whitespace_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	public function test_text_edit_matches_editor_whitespace( string $html, string $find, bool $kept ): void {
+		$notes = $this->reply_with(
+			(string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			),
+			$html
+		);
+
+		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
+	 * Data provider for the block text cases shared with the editor.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function editor_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['cases'] ?? null ) ? $fixture['cases'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['html'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['html'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * The server reads block text as the editor does (extractEditorText()
+	 * in src/utils/block-utils.js runs the same cases), with the outer ends
+	 * trimmed.
+	 *
+	 * @dataProvider editor_text_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $text Text the editor reads.
+	 */
+	public function test_editor_text_matches_the_editor( string $html, string $text ): void {
+		$this->assertSame( trim( $text ), Reply_Service::editor_text( $html ) );
+	}
+
+	/**
+	 * Data provider for the shared blocks with inner blocks.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: string, 3: string, 4: string}>
+	 */
+	public static function own_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['blocks'] ?? null ) ? $fixture['blocks'] : array() as $case ) {
+			if ( ! is_array( $case ) ) {
+				continue;
+			}
+			$fields = array();
+			foreach ( array( 'name', 'block', 'before', 'inner', 'after', 'text' ) as $key ) {
+				$fields[ $key ] = is_string( $case[ $key ] ?? null ) ? $case[ $key ] : '';
+			}
+			$cases[ $fields['name'] ] = array( $fields['block'], $fields['before'], $fields['inner'], $fields['after'], $fields['text'] );
+		}
+		return $cases;
+	}
+
+	/**
+	 * An edit on a block with inner blocks, like a list item with a nested
+	 * list, is matched against the block's own text as the editor reads it,
+	 * without the inner blocks.
+	 *
+	 * @dataProvider own_text_provider
+	 *
+	 * @param string $name   Block name.
+	 * @param string $before HTML before the inner blocks.
+	 * @param string $inner  Inner blocks' HTML.
+	 * @param string $after  HTML after the inner blocks.
+	 * @param string $text   The block's own text, as the editor reads it.
+	 */
+	public function test_text_edit_matches_own_text_of_a_block_with_inner_blocks( string $name, string $before, string $inner, string $after, string $text ): void {
+		$finds = array(
+			$text                                         => true,
+			(string) preg_replace( '/\s+/u', ' ', $text ) => false,
+			'Nested item'                                 => false,
+		);
+		foreach ( $finds as $find => $kept ) {
+			$find = (string) $find;
+			$this->seed_parent_and_reply();
+			$this->seed_post_blocks(
+				array(
+					array(
+						'blockName'    => $name,
+						'attrs'        => array( 'metadata' => array( 'noteId' => 100 ) ),
+						'innerBlocks'  => array( self::leaf_block( 'core/list', $inner ) ),
+						'innerHTML'    => $before . $after,
+						'innerContent' => array( $before, null, $after ),
+					),
+				)
+			);
+
+			$notes                    = new Reply_Service_Fake_Notes_Manager();
+			$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+			$service->canned_response = (string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			);
+			$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+			$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+			$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null, $find );
+		}
+	}
+
+	/**
+	 * A `find` on one side of a line break is kept.
+	 */
+	public function test_text_edit_beside_a_line_break_is_kept(): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}', '<p>Revenue grew 40%<br>last year.</p>' );
+
+		$this->assertSame( 'last year', $notes->last_reply['feedback_item']['reply_edit']['find'] );
+	}
+
+	/**
+	 * The prompt shows a line break as a newline, so the AI can copy text
+	 * from one line.
+	 */
+	public function test_prompt_shows_line_break_as_newline(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% <br>last year.</p>', 100 ) ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% \nlast year.\n", $service->captured_prompt );
 	}
 
 	/**
@@ -1127,40 +1351,12 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
-	 * A new edit is numbered after the thread's earlier ones, counting the
-	 * review's quick fix.
+	 * An edit is saved without a revision number: the thread's order gives
+	 * it when the thread is read.
 	 */
-	public function test_new_edit_is_numbered_after_earlier_edits(): void {
-		$this->seed_parent_and_reply();
-		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2025"}';
-		$this->seed_ai_edit_reply(
-			500,
-			array(
-				'type'    => 'replace_text',
-				'find'    => 'last year',
-				'replace' => 'in fiscal 2025',
-			)
-		);
-		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% last year.</p>', 100 ) ) );
-
-		$notes                    = new Reply_Service_Fake_Notes_Manager();
-		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
-		$service->canned_response = '{"reply": "Shorter.", "edit": {"type": "replace_text", "find": "last year", "replace": "2025"}}';
-		$service->handle_reply( 999, 100, 42, 'abc-123' );
-
-		$this->assertSame( 3, $notes->last_reply['feedback_item']['revision'] );
-	}
-
-	/**
-	 * The first edit in a thread without a quick fix is revision 1, and a
-	 * reply without an edit has no revision.
-	 */
-	public function test_first_edit_is_revision_one(): void {
-		$with_edit = $this->reply_with( '{"reply": "Done.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
-		$this->assertSame( 1, $with_edit->last_reply['feedback_item']['revision'] );
-
-		$without_edit = $this->reply_with( '{"reply": "It is the growth figure.", "edit": null}' );
-		$this->assertArrayNotHasKey( 'revision', $without_edit->last_reply['feedback_item'] );
+	public function test_edit_is_saved_without_revision(): void {
+		$notes = $this->reply_with( '{"reply": "Done.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
+		$this->assertArrayNotHasKey( 'revision', $notes->last_reply['feedback_item'] );
 	}
 
 	/**
@@ -1310,7 +1506,6 @@ class ReplyServiceTest extends TestCase {
 			),
 			$item['reply_edit']
 		);
-		$this->assertSame( 1, $item['revision'] );
 	}
 
 	/**
@@ -1329,7 +1524,6 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nmove this block before the core/paragraph block that starts \"Before 1.\"", $service->captured_prompt );
 		$this->assertSame( array( 'type' => 'remove_block' ), $notes->last_reply['feedback_item']['reply_edit'] );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**
@@ -1340,7 +1534,7 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_parent_and_reply();
 		$GLOBALS['test_comment_meta'][100]['block_name']                           = 'core/heading';
 		$GLOBALS['test_comment_meta'][100][ Notes_Manager::BLOCK_CHANGE_META_KEY ] = '{"type":"set_attributes","attributes":{"level":3},"from":{"level":4}}';
-		$heading                  = self::leaf_block( 'core/heading', '<h4 class="wp-block-heading">Setup</h4>', 100 );
+		$heading                   = self::leaf_block( 'core/heading', '<h4 class="wp-block-heading">Setup</h4>', 100 );
 		$heading['attrs']['level'] = 4;
 		$this->seed_post_blocks( array( $heading ) );
 
@@ -1350,7 +1544,6 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nchange this heading to level 3", $service->captured_prompt );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**
@@ -1370,7 +1563,6 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**
@@ -1452,5 +1644,48 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_ai_edit_reply( 500, $heading( 2 ) );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
+	}
+
+	/**
+	 * A reply that proposes a house style rule saves it with the reply.
+	 */
+	public function test_reply_saves_proposed_house_rule(): void {
+		$notes = $this->reply_with( '{"reply": "Got it, sentence case it is.", "edit": null, "remember": "Headings use <b>sentence case</b>"}' );
+
+		$this->assertSame( 'Headings use sentence case', $notes->last_reply['feedback_item']['house_rule'] );
+	}
+
+	/**
+	 * A proposed rule the author's reviews already follow is not offered again.
+	 */
+	public function test_reply_skips_rule_that_already_exists(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Headings use sentence case',
+			),
+		);
+
+		$notes = $this->reply_with( '{"reply": "Got it.", "edit": null, "remember": "headings use sentence case."}' );
+
+		$this->assertArrayNotHasKey( 'house_rule', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * The reply prompt carries the house style rules.
+	 */
+	public function test_reply_prompt_includes_house_style(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Write WordPress with a capital P',
+			),
+		);
+		$this->seed_parent_and_reply();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( '- "Write WordPress with a capital P"', $service->captured_prompt );
 	}
 }

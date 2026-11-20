@@ -206,6 +206,7 @@ class Review_Service {
 
 		// Build prompt with existing feedback context if available.
 		$options['image_blocks'] = $attached;
+		$options['house_style']  = House_Style::get_prompt_rules( get_current_user_id() );
 		$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
 		$system_instruction      = $this->prompt_builder->get_system_instruction( $is_continuation );
 
@@ -213,7 +214,7 @@ class Review_Service {
 
 		// Check if using mock mode.
 		if ( $is_mock ) {
-			$ai_response = $this->get_mock_response( is_array( $blocks ) ? $blocks : array(), $options['persona'] );
+			$ai_response = $this->get_mock_response( is_array( $blocks ) ? $blocks : array(), $options['persona'], $prompt );
 			Logger::debug( 'Using mock response mode' );
 		} else {
 			// Call AI with retry logic.
@@ -378,15 +379,44 @@ class Review_Service {
 	/**
 	 * Images to show the model so it can propose alt text, when it can see.
 	 *
+	 * Images are only sent to a model that reads them: given an image, core
+	 * would otherwise switch to another model that does, or refuse the prompt.
+	 * The model is only asked about once there are images to send, since the
+	 * answer can need a request to the provider for its model list. That
+	 * request uses the WordPress HTTP timeout (`http_request_timeout`, 5
+	 * seconds by default), as core's `wp_ai_client_default_request_timeout`
+	 * only applies to prompt requests.
+	 *
 	 * @param  array<mixed> $blocks Blocks being reviewed.
 	 * @param  string       $model  Model ID.
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
-		if ( ! ( new Settings_Controller() )->model_has_capability( $model, 'vision' ) ) {
+		$images = $this->collect_review_images( $blocks );
+		if ( array() === $images || ! $this->model_supports_vision( $model ) ) {
 			return array();
 		}
+		return $images;
+	}
+
+	/**
+	 * Images from the blocks that could be sent, see Review_Images.
+	 *
+	 * @param  array<mixed> $blocks Blocks being reviewed.
+	 * @return list<array{block_id: string, mime: string, data: string}> Images.
+	 */
+	protected function collect_review_images( array $blocks ): array {
 		return ( new Review_Images() )->collect( $blocks );
+	}
+
+	/**
+	 * Whether a model reads images, see Model_Capabilities.
+	 *
+	 * @param  string $model Model ID.
+	 * @return bool
+	 */
+	protected function model_supports_vision( string $model ): bool {
+		return ( new Model_Capabilities() )->supports_vision( $model );
 	}
 
 	/**
@@ -691,9 +721,10 @@ class Review_Service {
 	 *
 	 * @param  array<mixed> $blocks  Document blocks with clientId, name, content.
 	 * @param  string       $persona Persona ID the review runs as.
+	 * @param  string       $prompt  Review prompt, for filters that answer from it.
 	 * @return string Mock JSON response.
 	 */
-	private function get_mock_response( array $blocks, string $persona = Personas::DEFAULT_PERSONA ): string {
+	private function get_mock_response( array $blocks, string $persona = Personas::DEFAULT_PERSONA, string $prompt = '' ): string {
 		$feedback = array();
 
 		// Generate mock feedback for first 3 blocks.
@@ -743,8 +774,9 @@ class Review_Service {
 		 *
 		 * @param array<string, mixed> $response Mock response, with `summary` and `feedback`.
 		 * @param array<mixed>         $blocks   Blocks being reviewed.
+		 * @param string               $prompt   Review prompt.
 		 */
-		$response = apply_filters( 'ai_feedback_mock_review', $response, $blocks );
+		$response = apply_filters( 'ai_feedback_mock_review', $response, $blocks, $prompt );
 
 		return (string) wp_json_encode( $response );
 	}
