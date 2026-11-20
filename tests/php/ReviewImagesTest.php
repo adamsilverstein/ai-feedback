@@ -757,7 +757,7 @@ class ReviewImagesTest extends TestCase {
 	public function test_refusal_is_remembered(): void {
 		list( $service, , $result ) = $this->review(
 			'gpt-4o',
-			array( new WP_Error( 'prompt_client_error', 'Unsupported Media Type', array( 'status' => 415 ) ), self::alt_response() )
+			array( new WP_Error( 'prompt_invalid_argument', 'No models found that support text_generation for this prompt.', array( 'status' => 400 ) ), self::alt_response() )
 		);
 		$this->assertCount( 2, $service->sent );
 		$this->assertSame( array( 'refused' ), array_column( $result['images_skipped'], 'reason' ) );
@@ -812,8 +812,8 @@ class ReviewImagesTest extends TestCase {
 
 	/**
 	 * A 413 or 415 is not retried: one failed call, then one text call.
-	 * A 415 is remembered; a 413 is not, as the next review's images may be
-	 * smaller.
+	 * Neither is remembered, as either can be about one file, so the next
+	 * review sends its images again.
 	 */
 	public function test_413_and_415_not_retried(): void {
 		list( $service ) = $this->review(
@@ -830,7 +830,10 @@ class ReviewImagesTest extends TestCase {
 			array( new WP_Error( 'prompt_client_error', 'Unsupported Media Type', array( 'status' => 415 ) ), self::alt_response() )
 		);
 		$this->assertCount( 2, $service->sent );
-		$this->assertTrue( Image_Refusals::is_refused( 'openai', 'gpt-4o' ) );
+		$this->assertFalse( Image_Refusals::is_refused( 'openai', 'gpt-4o' ) );
+
+		list( $service ) = $this->review( 'gpt-4o', array( self::alt_response() ) );
+		$this->assertSame( array( 'img' ), array_column( $service->sent[0], 'block_id' ) );
 	}
 
 	/**

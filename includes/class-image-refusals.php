@@ -86,19 +86,16 @@ class Image_Refusals {
 	 * Whether a failed request with images means the model doesn't take
 	 * images at all, so later reviews, by any user, shouldn't send them.
 	 *
-	 * The memory is site-wide, so only errors that can't come from one
-	 * author's image count. Only called once the same review without images
-	 * succeeded, so an outage or auth failure never gets here. Remembered:
+	 * The memory is site-wide, so only an error that can't come from one
+	 * author's image counts: core finding no configured model for the
+	 * prompt (`prompt_invalid_argument`, "No models found ..."). Only called
+	 * once the same review without images succeeded, so with the text alone
+	 * working this means the model's metadata takes no images.
 	 *
-	 * - core finding no configured model for the prompt
-	 *   (`prompt_invalid_argument`, "No models found ..."), which with the
-	 *   text alone working means the model's metadata takes no images;
-	 * - a 415, the provider refusing image input.
-	 *
-	 * Never remembered: any 400 or 422, even one naming images, since it can
-	 * be about one image (corrupt, too large, an unsupported format, too
-	 * many), a 413, and every other error. Those cost only that review's
-	 * proposals.
+	 * Never remembered: a 400, 415 or 422, even one naming images, since at
+	 * some providers each can be about one file (corrupt, too large, an
+	 * unsupported format, too many); a 413; and every other error. Those
+	 * cost only that review's proposals.
 	 *
 	 * @param  WP_Error $error Error from the request with images.
 	 * @return bool
@@ -106,10 +103,8 @@ class Image_Refusals {
 	public static function is_lasting_refusal( WP_Error $error ): bool {
 		$code    = (string) $error->get_error_code();
 		$message = (string) $error->get_error_message();
-		$data    = $error->get_error_data();
-		$status  = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
 
-		$lasting = ( 'prompt_invalid_argument' === $code && str_starts_with( $message, 'No models found' ) ) || 415 === $status;
+		$lasting = 'prompt_invalid_argument' === $code && str_starts_with( $message, 'No models found' );
 
 		/**
 		 * Filters whether a refused request with images is remembered, so

@@ -114,7 +114,7 @@ class ImageRefusalsTest extends TestCase {
 		$error = static fn ( string $code, string $message, int $status ): WP_Error => new WP_Error( $code, $message, array( 'status' => $status ) );
 		return array(
 			'core finds no model for the images' => array( new WP_Error( 'prompt_invalid_argument', 'No models found that support text_generation for this prompt.', array( 'status' => 400 ) ), true ),
-			'415 media type'                     => array( $error( 'prompt_client_error', 'Unsupported Media Type', 415 ), true ),
+			'415 media type'                     => array( $error( 'prompt_client_error', 'Unsupported Media Type', 415 ), false ),
 			'400 naming images'                  => array( $error( 'prompt_client_error', 'This model does not support image input.', 400 ), false ),
 			'400 naming image_url'               => array( $error( 'prompt_client_error', 'Invalid content type. image_url is only supported by certain models.', 400 ), false ),
 			'422 naming modalities'              => array( $error( 'prompt_client_error', 'Input modality not supported.', 422 ), false ),
@@ -154,6 +154,6 @@ class ImageRefusalsTest extends TestCase {
 	 */
 	public function test_remember_filter(): void {
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_remember_image_refusal' => 'yes' );
-		$this->assertFalse( Image_Refusals::is_lasting_refusal( new WP_Error( 'x', 'Unsupported Media Type', array( 'status' => 415 ) ) ) );
+		$this->assertFalse( Image_Refusals::is_lasting_refusal( new WP_Error( 'prompt_invalid_argument', 'No models found that support text_generation for this prompt.', array( 'status' => 400 ) ) ) );
 	}
 }
