@@ -81,7 +81,9 @@ class PromptBuilderPersonaTest extends TestCase {
 
 	/**
 	 * A default review sends exactly the prompts it sent before reader
-	 * personas, from fixtures built on e10091b with the same inputs.
+	 * personas, from fixtures built on e10091b with the same inputs. The
+	 * reply prompt has since gained the REMEMBERING PREFERENCES instruction
+	 * from house style (#285), so reply.txt was rebuilt with it.
 	 */
 	public function test_default_prompts_match_before_personas(): void {
 		/** @var array{blocks: list<array<string, mixed>>, options: array<string, mixed>, existing_feedback: list<array<string, mixed>>, reply_context: array<string, mixed>} $in */

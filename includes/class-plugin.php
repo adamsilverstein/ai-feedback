@@ -137,6 +137,8 @@ class Plugin {
 		add_action( 'deleted_user', array( Analytics::class, 'on_deleted_user' ) );
 		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
+		add_filter( 'wp_privacy_personal_data_exporters', array( House_Style::class, 'register_exporter' ) );
+		add_filter( 'wp_privacy_personal_data_erasers', array( House_Style::class, 'register_eraser' ) );
 		Analytics_Page::init();
 		add_action( 'enqueue_block_editor_assets', array( $this, 'enqueue_editor_assets' ) );
 
@@ -182,6 +184,8 @@ class Plugin {
 
 		$this->reply_status_controller = new Reply_Status_Controller( $this->reply_service );
 		$this->reply_status_controller->register_routes();
+
+		( new House_Style_Controller() )->register_routes();
 	}
 
 	/**
