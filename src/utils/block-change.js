@@ -33,7 +33,7 @@ import {
 } from '@wordpress/blocks';
 import { create, slice, toHTMLString } from '@wordpress/rich-text';
 import { toHtml } from './quick-fix';
-import { excerpt, getBlockText } from './block-action';
+import { excerpt, getBlockText, getBlockTexts } from './block-action';
 
 /**
  * Formatting fix types.
@@ -340,7 +340,7 @@ export function getBlockChangeState(selectors, change, clientId) {
 					? getListItems(block).join('\n') ===
 							change.items.join('\n') &&
 						!!block.attributes?.ordered === !!change.ordered
-					: getBlockText(block) === change.text &&
+					: getBlockTexts(block).includes(change.text) &&
 						(change.to !== 'core/heading' ||
 							(block.attributes?.level ?? 2) === change.level);
 			return { state: isThere ? 'applied' : 'outdated' };
@@ -350,7 +350,7 @@ export function getBlockChangeState(selectors, change, clientId) {
 			canTransform(selectors, clientId, change.to) &&
 			(change.to === 'core/list'
 				? !!getListSplit(block, change.items)
-				: getBlockText(block) === change.text);
+				: getBlockTexts(block).includes(change.text));
 		return { state: isReady ? 'ready' : 'outdated' };
 	}
 

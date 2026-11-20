@@ -139,4 +139,37 @@ test.describe('Proofreading', () => {
 		await expect.poll(() => texts(editor)).toEqual(afterAccept);
 		await expect(group).toContainText('1 proofreading fix');
 	});
+
+	test('a fix across a line break applies and keeps the break', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Proofreading a line break',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40%<br>last yaer.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		// The review keeps the break as a newline, so the mock finds the typo.
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		expect(review.note_ids).toHaveLength(1);
+
+		const group = page.locator('.ai-feedback-proofreading');
+		await expect(group).toContainText('1 proofreading fix');
+		await group.getByRole('button', { name: 'Accept all' }).click();
+
+		await expect
+			.poll(() => texts(editor))
+			.toEqual(['Revenue grew 40%<br>last year.']);
+	});
 });

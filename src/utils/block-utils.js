@@ -6,6 +6,7 @@ import {
 	getSaveContent,
 	getSaveElement,
 } from '@wordpress/blocks';
+import { create } from '@wordpress/rich-text';
 import { debugLog } from './debug';
 
 /**
@@ -22,6 +23,49 @@ export function extractTextContent(innerHTML) {
 	const temp = document.createElement('div');
 	temp.innerHTML = innerHTML;
 	return temp.textContent || temp.innerText || '';
+}
+
+/**
+ * Extract a block's text as the editor's rich text reads it.
+ *
+ * A quick fix's `find` is matched against this text on the server and
+ * against `create( { html } ).text` in the editor, so a line break is "\n",
+ * whitespace is kept as written and an inline image is U+FFFC. Comments
+ * are block delimiters here, not text, so they are dropped. Shares its
+ * cases with Reply_Service::editor_text() through
+ * tests/fixtures/editor-text.json.
+ *
+ * @param {string} innerHTML The block's HTML.
+ * @return {string} Plain text content.
+ */
+export function extractEditorText(innerHTML) {
+	if (!innerHTML) {
+		return '';
+	}
+	return create({ html: innerHTML.replace(/<!--[\s\S]*?-->/g, '') }).text;
+}
+
+/**
+ * Text of a block a review's quick fixes are matched against.
+ *
+ * A block with inner blocks and its own rich text, like a list item with
+ * a nested list, is edited in its `content` alone, so that is its text.
+ *
+ * @param {Object} block      Block.
+ * @param {string} rawContent The block's own HTML, without its inner blocks.
+ * @return {string} Text.
+ */
+function getReviewText(block, rawContent) {
+	const own = block.attributes?.content;
+	if (block.innerBlocks?.length && own !== undefined && own !== null) {
+		return extractEditorText(
+			typeof own === 'string' ? own : own.toHTMLString()
+		);
+	}
+	// An image block's <img> is the block, not an inline image in its text.
+	return block.name === 'core/image'
+		? extractTextContent(rawContent)
+		: extractEditorText(rawContent);
 }
 
 /**
@@ -84,7 +128,7 @@ export function getFormattingAttributes(block) {
  * @param {Object} block Block from the editor.
  * @return {string} Block HTML.
  */
-function getOwnHTML(block) {
+export function getBlockOwnHTML(block) {
 	// The Custom HTML block keeps its markup in `innerContent`, which is
 	// updated as it is edited, and saves nothing. Its string fragments are
 	// its own markup, the `null` ones mark inner blocks.
@@ -136,7 +180,8 @@ export function extractBlockData(blocks, parent = '') {
 	const result = [];
 
 	for (const block of blocks) {
-		const content = extractTextContent(getOwnHTML(block));
+		const rawContent = getBlockOwnHTML(block);
+		const content = getReviewText(block, rawContent);
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
@@ -147,10 +192,12 @@ export function extractBlockData(blocks, parent = '') {
 				clientId: block.clientId,
 				name: block.name,
 				content: content.trim(),
-				// A captionless image is told apart by its URL.
+				// A captionless image is told apart by its URL. Anchors hash
+				// the text read without line breaks, as for notes saved before.
 				anchor: getBlockAnchor(
 					block.name,
-					content.trim() || (isImage ? attributes.url : '')
+					extractTextContent(rawContent).trim() ||
+						(isImage ? attributes.url : '')
 				),
 				...(parent ? { parent } : {}),
 				...(attributes ? { attributes } : {}),
@@ -188,7 +235,7 @@ export function hasTextContent(blocks) {
 			return false;
 		}
 		if (!hasTextCache.has(block)) {
-			const text = extractTextContent(getOwnHTML(block));
+			const text = extractTextContent(getBlockOwnHTML(block));
 			hasTextCache.set(
 				block,
 				text.trim().length > 0 ||

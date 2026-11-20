@@ -28,10 +28,16 @@ import { registerCoreBlocks } from '@wordpress/block-library';
  */
 import {
 	extractBlockData,
+	extractEditorText,
 	extractTextContent,
 	getBlockAnchor,
+	getBlockOwnHTML,
 	hasTextContent,
 } from '../block-utils';
+
+// Shared with ReplyServiceTest, where the server reads a block's own text
+// from its `innerContent` strings with Reply_Service::editor_text().
+const EDITOR_TEXT = require('../../../tests/fixtures/editor-text.json');
 
 beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/paragraph')) {
@@ -291,4 +297,51 @@ describe('Custom HTML and blocks that save nothing', () => {
 			unregisterBlockType('test/saves-nothing');
 		}
 	});
+});
+
+// The editor's notion of a block's own text, from its save output without
+// inner blocks, must match the server's, from its `innerContent` strings.
+describe('a block’s own text, shared with the server', () => {
+	it.each(EDITOR_TEXT.blocks.map((item) => [item.name, item]))(
+		'reads the own text of a %s as the server does, loaded and edited',
+		(_name, item) => {
+			const registry = loadEditor(
+				parse(
+					`<!-- wp:list --><ul><!-- wp:${item.block.replace(
+						'core/',
+						''
+					)} -->${item.before}<!-- wp:list -->${item.inner}<!-- /wp:list -->${item.after}<!-- /wp:${item.block.replace(
+						'core/',
+						''
+					)} --></ul><!-- /wp:list -->`
+				)
+			);
+			const ownText = () => {
+				const [list] = registry.select(blockEditorStore).getBlocks();
+				const [block] = list.innerBlocks;
+				expect(block.name).toBe(item.block);
+				expect(block.innerBlocks).toHaveLength(1);
+				const sent = extractBlockData([list]).find(
+					({ clientId }) => clientId === block.clientId
+				);
+				return [
+					extractEditorText(getBlockOwnHTML(block)).trim(),
+					sent.content,
+				];
+			};
+
+			expect(ownText()).toEqual([item.text.trim(), item.text.trim()]);
+
+			const [list] = registry.select(blockEditorStore).getBlocks();
+			registry
+				.dispatch(blockEditorStore)
+				.updateBlockAttributes(list.innerBlocks[0].clientId, {
+					content: 'Edited<br>own text.',
+				});
+			expect(ownText()).toEqual([
+				'Edited\nown text.',
+				'Edited\nown text.',
+			]);
+		}
+	);
 });

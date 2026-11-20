@@ -137,6 +137,18 @@ describe('buildSuggestionContent', () => {
 		);
 	});
 
+	it('keeps a line break inside the markers', () => {
+		expect(
+			buildSuggestionContent(
+				'Revenue grew 40%<br>last year.',
+				{ find: '40%\nlast year', replace: '40%\nin 2025' },
+				{ id: 7 }
+			)
+		).toBe(
+			'Revenue grew <mark class="wp-suggestion-add" data-suggestion-id="7" data-suggestion-type="add">40%<br>in 2025</mark><mark class="wp-suggestion-del" data-suggestion-id="7" data-suggestion-type="del">40%<br>last year</mark>.'
+		);
+	});
+
 	it('only marks a deletion when the replacement is empty', () => {
 		expect(
 			buildSuggestionContent(
