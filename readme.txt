@@ -2,7 +2,7 @@
 Contributors: adamsilverstein
 Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
-Tested up to: 7.1
+Tested up to: 7.2
 Requires PHP: 8.1
 Stable tag: 1.0.3
 License: GPLv2 or later
