@@ -116,7 +116,7 @@ class Image_Refusals {
 		} elseif ( in_array( $status, array( 400, 422 ), true ) ) {
 			$text = $code . ' ' . $message;
 			// An image too large, or too many, may pass in a later review.
-			$lasting = 1 === preg_match( '/\b(?:image|vision|modalit|media[ _]type|mime)/i', $text )
+			$lasting = 1 === preg_match( '/(?<![a-z])(?:image|vision|modalit|media[ _]type|mime)/i', $text )
 				&& 1 !== preg_match( '/\b(?:too (?:large|big|many)|exceed|limit|maximum)/i', $text );
 		} else {
 			$lasting = false;
@@ -145,7 +145,9 @@ class Image_Refusals {
 	}
 
 	/**
-	 * Clear refusals when a user picks another model.
+	 * Clear refusals when a user picks another model. Every refusal is
+	 * cleared, not only that user's model: the worst case is one more
+	 * failed call.
 	 *
 	 * @param int|array<int> $meta_id   Meta ID, or IDs when deleted.
 	 * @param int            $object_id User ID.

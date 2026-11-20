@@ -119,6 +119,7 @@ class ImageRefusalsTest extends TestCase {
 			'400 naming image_url'               => array( $error( 'prompt_client_error', 'Invalid content type. image_url is only supported by certain models.', 400 ), true ),
 			'422 naming modalities'              => array( $error( 'prompt_client_error', 'Input modality not supported.', 422 ), true ),
 			'400 naming the media type'          => array( $error( 'prompt_client_error', 'Image does not match the provided media type.', 400 ), true ),
+			'400 with an underscored code'       => array( $error( 'invalid_input_image', 'Bad request.', 400 ), true ),
 			'400 image too large'                => array( $error( 'prompt_client_error', 'image exceeds 5 MB maximum', 400 ), false ),
 			'400 too many images'                => array( $error( 'prompt_client_error', 'Too many images in the request.', 400 ), false ),
 			'422 image count limit'              => array( $error( 'prompt_client_error', 'Image count over the limit.', 422 ), false ),
