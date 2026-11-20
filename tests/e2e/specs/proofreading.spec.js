@@ -172,4 +172,41 @@ test.describe('Proofreading', () => {
 			.poll(() => texts(editor))
 			.toEqual(['Revenue grew 40%<br>last year.']);
 	});
+
+	test('a fix in a paragraph with a newline in its HTML adds no line break', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Proofreading a source newline',
+			content:
+				'<!-- wp:paragraph --><p>Revenue grew 40%\nlast yaer.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		// The review reads the newline as the editor's rich text does, so
+		// the mock's fix spans it.
+		const response = await aiFeedback.runReview();
+		const review = await response.json();
+		expect(review.note_ids).toHaveLength(1);
+
+		const group = page.locator('.ai-feedback-proofreading');
+		await expect(group).toContainText('1 proofreading fix');
+		await group.getByRole('button', { name: 'Accept all' }).click();
+
+		await expect
+			.poll(() => texts(editor))
+			.toEqual(['Revenue grew 40%\nlast year.']);
+		const paragraph = editor.canvas.locator('p.wp-block-paragraph');
+		await expect(paragraph).toHaveText('Revenue grew 40% last year.');
+		await expect(paragraph.locator('br')).toHaveCount(0);
+	});
 });
