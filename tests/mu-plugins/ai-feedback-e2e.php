@@ -61,3 +61,32 @@ add_action(
 		);
 	}
 );
+
+// Mock replies return an edit when asked to make the change, so tests can
+// cover the reply to edit flow. Everything else gets the prose mock reply.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $user_reply )
+			|| ! preg_match( '/make (?:this|that) change/i', $user_reply[1] )
+			|| ! preg_match( '/^Block content: (.*)$/m', $prompt, $block )
+			|| ! str_contains( $block[1], 'last year' )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply' => 'Done: "last year" now reads "in 2025".',
+				'edit'  => array(
+					'type'    => 'replace_text',
+					'find'    => 'last year',
+					'replace' => 'in 2025',
+				),
+			)
+		);
+	},
+	10,
+	2
+);
