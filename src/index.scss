@@ -1070,3 +1070,79 @@ $ai-feedback-reply-error: #cc1818;
 	gap: 2px;
 	margin: 0 0 4px;
 }
+
+/* What's working: strengths from the review. */
+.ai-feedback-strengths {
+	margin: 0 0 16px;
+
+	.ai-feedback-strengths-heading {
+		margin: 0 0 8px;
+	}
+}
+
+.ai-feedback-strengths-list,
+.ai-feedback-history-strengths {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	.ai-feedback-strength {
+		display: flex;
+		gap: 8px;
+		margin: 0 0 6px;
+	}
+}
+
+.ai-feedback-strength-icon {
+	flex: none;
+	color: #1e7e34;
+	font-weight: 600;
+}
+
+.ai-feedback-strengths .ai-feedback-strength-text.components-button {
+	height: auto;
+	padding: 0;
+	text-align: left;
+	white-space: normal;
+}
+
+/* Progress through the review's feedback, and what changed since the last one. */
+.ai-feedback-comparison,
+.ai-feedback-history-progress {
+	margin: 4px 0 12px;
+	color: $ai-feedback-text-muted;
+	font-size: 13px;
+}
+
+.ai-feedback-progress-row {
+	margin: 16px 0 8px;
+
+	.ai-feedback-progress-text {
+		margin: 0 0 6px;
+		font-size: 13px;
+		font-weight: 600;
+	}
+
+	.ai-feedback-progress-bar {
+		width: 100%;
+	}
+}
+
+.ai-feedback-done {
+	margin: 8px 0 0;
+	padding: 12px;
+	background: #d4edda;
+	border-left: 3px solid #28a745;
+	border-radius: 4px;
+
+	.ai-feedback-done-text {
+		margin: 0 0 8px;
+	}
+
+	.ai-feedback-done-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+}
