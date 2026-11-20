@@ -115,4 +115,33 @@ class NotesManagerMetaStorageTest extends TestCase {
 		$this->assertSame( $action, Notes_Manager::decode_block_action( get_comment_meta( $root, Notes_Manager::BLOCK_ACTION_META_KEY, true ) ) );
 		$this->assertSame( '', get_comment_meta( $child, Notes_Manager::BLOCK_ACTION_META_KEY, true ) );
 	}
+
+	/**
+	 * When several items share a block, the one with a structural edit leads
+	 * the thread, so the edit is kept even when it was not listed first.
+	 */
+	public function test_item_with_block_action_becomes_the_root(): void {
+		$item = static fn ( string $title, array $extra = array() ): array => array(
+			'block_id' => 'block-1',
+			'category' => 'content',
+			'severity' => 'critical',
+			'title'    => $title,
+			'feedback' => 'Feedback.',
+		) + $extra;
+
+		$result = ( new Notes_Manager() )->create_notes_from_feedback(
+			array(
+				$item( 'Text only' ),
+				$item( 'Cut it', array( 'block_action' => array( 'type' => 'remove_block' ) ) ),
+			),
+			10
+		);
+
+		$this->assertIsArray( $result );
+		list( $root, $child ) = $result['note_ids'];
+		$this->assertSame( $root, $result['block_mapping']['block-1'] );
+		$this->assertSame( array( 'type' => 'remove_block' ), Notes_Manager::decode_block_action( get_comment_meta( $root, Notes_Manager::BLOCK_ACTION_META_KEY, true ) ) );
+		$this->assertSame( 'Cut it', get_comment_meta( $root, 'feedback_title', true ) );
+		$this->assertSame( 'Text only', get_comment_meta( $child, 'feedback_title', true ) );
+	}
 }

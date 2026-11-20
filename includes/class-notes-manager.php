@@ -79,6 +79,16 @@ class Notes_Manager {
 			$grouped_feedback[ $block_id ][] = $item;
 		}
 
+		// Only a thread's root note keeps a structural edit, so the item
+		// carrying one leads its block's thread.
+		foreach ( $grouped_feedback as $block_id => $items ) {
+			usort(
+				$items,
+				static fn ( mixed $a, mixed $b ): int => (int) self::has_block_action( $b ) <=> (int) self::has_block_action( $a )
+			);
+			$grouped_feedback[ $block_id ] = $items;
+		}
+
 		foreach ( $grouped_feedback as $block_id => $items ) {
 			$parent_id = 0;
 			foreach ( $items as $index => $item ) {
@@ -118,6 +128,16 @@ class Notes_Manager {
 			'note_ids'      => $note_ids,
 			'block_mapping' => $block_mapping,
 		);
+	}
+
+	/**
+	 * Whether a feedback item carries a structural edit.
+	 *
+	 * @param  mixed $item Feedback item.
+	 * @return bool
+	 */
+	private static function has_block_action( mixed $item ): bool {
+		return is_array( $item ) && ! empty( $item['block_action'] ) && is_array( $item['block_action'] );
 	}
 
 	/**
