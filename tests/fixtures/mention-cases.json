@@ -41,7 +41,9 @@
 			"<span data-class=\"wp-note-mention user-41\">@Editorial Bot</span>",
 			"<blockquote><span class=\"wp-note-mention user-41\">@Editorial Bot</span> simplify</blockquote> No thanks.",
 			"<code>&lt;span class=\"wp-note-mention user-41\"&gt;</code>",
-			"<a class=\"wp-note-mention user-41\">@Editorial Bot</a>"
+			"<a class=\"wp-note-mention user-41\">@Editorial Bot</a>",
+			"<span title=\"class='wp-note-mention user-41'\">Please wait</span>",
+			"<span class=\"other\" class=\"wp-note-mention user-41\">@Editorial Bot</span>"
 		]
 	}
 }

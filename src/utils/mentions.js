@@ -105,10 +105,20 @@ export function hasUserChip(content) {
 		/<span\b((?:[^>"']|"[^"]*"|'[^']*')*)>/gi
 	);
 	for (const [, attributes] of tags) {
-		const match = attributes.match(
-			/(?:^|[\s/"'])class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
-		);
-		const tokens = (match?.[1] ?? match?.[2] ?? match?.[3] ?? '')
+		// Each quoted value is consumed whole, so a name inside another
+		// attribute's value is not read as an attribute. A browser uses the
+		// first class attribute.
+		const classAttribute = [
+			...attributes.matchAll(
+				/([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
+			),
+		].find(([, name]) => name.toLowerCase() === 'class');
+		const tokens = (
+			classAttribute?.[2] ??
+			classAttribute?.[3] ??
+			classAttribute?.[4] ??
+			''
+		)
 			.trim()
 			.split(/\s+/);
 		if (

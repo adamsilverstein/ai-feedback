@@ -189,12 +189,16 @@ class Mentions {
 		}
 
 		foreach ( $tags[1] as $attributes ) {
-			if ( ! preg_match( '#(?:^|[\s/"\'])class\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i', $attributes, $class ) ) {
-				continue;
-			}
-			$tokens = preg_split( '/\s+/', trim( $class[1] . ( $class[2] ?? '' ) . ( $class[3] ?? '' ) ) );
-			if ( is_array( $tokens ) && in_array( 'wp-note-mention', $tokens, true ) && in_array( 'user-' . $user_id, $tokens, true ) ) {
-				return true;
+			foreach ( self::parse_attributes( $attributes ) as list( $name, $value ) ) {
+				if ( 'class' !== $name ) {
+					continue;
+				}
+				// A browser uses the first class attribute.
+				$tokens = preg_split( '/\s+/', trim( $value ) );
+				if ( is_array( $tokens ) && in_array( 'wp-note-mention', $tokens, true ) && in_array( 'user-' . $user_id, $tokens, true ) ) {
+					return true;
+				}
+				break;
 			}
 		}
 		return false;
@@ -387,15 +391,12 @@ class Mentions {
 
 		$targets = array();
 		preg_match_all( '#<[a-zA-Z][a-zA-Z0-9:-]*((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>#', $html, $tags );
+		$link_names = explode( '|', self::LINK_ATTRIBUTES );
 		foreach ( $tags[1] as $attributes ) {
-			preg_match_all(
-				'#(?:^|[\s/"\'])(' . self::LINK_ATTRIBUTES . ')\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))#i',
-				$attributes,
-				$found,
-				PREG_SET_ORDER
-			);
-			foreach ( $found as $attribute ) {
-				$raw    = ( $attribute[2] ?? '' ) . ( $attribute[3] ?? '' ) . ( $attribute[4] ?? '' );
+			foreach ( self::parse_attributes( $attributes ) as list( $name, $raw ) ) {
+				if ( ! in_array( $name, $link_names, true ) ) {
+					continue;
+				}
 				$target = self::normalize_link( $raw );
 				if ( '' !== $target && ! str_starts_with( $target, '#' ) ) {
 					$targets[] = $target;
@@ -404,6 +405,26 @@ class Mentions {
 		}
 
 		return array_values( array_unique( $targets ) );
+	}
+
+	/**
+	 * Split a tag's attributes into names and values, left to right.
+	 *
+	 * Each quoted value is consumed whole, so a name inside another
+	 * attribute's value, as in `title="class='x'"`, is not an attribute,
+	 * while one right after a closing quote, as in `title="x"href="y"`, is.
+	 *
+	 * @param string $attributes Everything between a tag's name and its `>`.
+	 * @return list<array{string, string}> Lowercase names and raw values, in order.
+	 */
+	private static function parse_attributes( string $attributes ): array {
+		preg_match_all( '#([^\s"\'>/=]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?#', $attributes, $found, PREG_SET_ORDER );
+
+		$pairs = array();
+		foreach ( $found as $attribute ) {
+			$pairs[] = array( strtolower( $attribute[1] ), ( $attribute[2] ?? '' ) . ( $attribute[3] ?? '' ) . ( $attribute[4] ?? '' ) );
+		}
+		return $pairs;
 	}
 
 	/**

@@ -287,6 +287,20 @@ class MentionsTest extends TestCase {
 	}
 
 	/**
+	 * A link named inside another attribute's value is not a source.
+	 */
+	public function test_link_inside_another_attribute_is_not_a_source(): void {
+		$edit = array(
+			'type'    => 'rewrite_block',
+			'content' => '<a href="/new">go</a>',
+		);
+
+		$this->assertTrue( Mentions::edit_has_unsourced_url( $edit, "<span title='href=\"/new\"'>text</span>" ) );
+		$this->assertSame( array(), Mentions::find_link_attributes( "<span title='href=\"/new\"'>text</span>" ) );
+		$this->assertFalse( Mentions::edit_has_unsourced_url( $edit, '<p><a href="/new">go</a></p>' ) );
+	}
+
+	/**
 	 * A link from the sources may be written another way, and a link to a
 	 * spot on the page is not a source at all.
 	 */
