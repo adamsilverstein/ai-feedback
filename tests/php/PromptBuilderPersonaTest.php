@@ -70,6 +70,41 @@ class PromptBuilderPersonaTest extends TestCase {
 	}
 
 	/**
+	 * Read a prompt fixture built before reader personas existed.
+	 *
+	 * @param  string $name Fixture file name.
+	 * @return string Prompt text.
+	 */
+	private static function fixture( string $name ): string {
+		return (string) file_get_contents( __DIR__ . '/fixtures/default-prompts/' . $name );
+	}
+
+	/**
+	 * A default review sends exactly the prompts it sent before reader
+	 * personas, from fixtures built on e10091b with the same inputs.
+	 */
+	public function test_default_prompts_match_before_personas(): void {
+		/** @var array{blocks: list<array<string, mixed>>, options: array<string, mixed>, existing_feedback: list<array<string, mixed>>, reply_context: array<string, mixed>} $in */
+		$in      = require __DIR__ . '/fixtures/default-prompt-inputs.php';
+		$builder = new Prompt_Builder();
+		$default = array(
+			'persona'  => 'copy_editor',
+			'audience' => '',
+		);
+
+		foreach ( array( $in['options'], $in['options'] + $default ) as $options ) {
+			$this->assertSame( self::fixture( 'review.txt' ), $builder->build_review_prompt( $in['blocks'], $options ) );
+			$this->assertSame( self::fixture( 'review-continuation.txt' ), $builder->build_review_prompt( $in['blocks'], $options, $in['existing_feedback'] ) );
+		}
+
+		$this->assertSame( self::fixture( 'reply.txt' ), $builder->build_reply_prompt( $in['reply_context'] ) );
+		$this->assertSame( self::fixture( 'reply.txt' ), $builder->build_reply_prompt( $in['reply_context'] + array( 'persona' => 'copy_editor' ) ) );
+		$this->assertSame( self::fixture( 'system.txt' ), $builder->get_system_instruction( false ) );
+		$this->assertSame( self::fixture( 'system-continuation.txt' ), $builder->get_system_instruction( true ) );
+		$this->assertSame( self::fixture( 'reply-system.txt' ), $builder->get_reply_system_instruction() );
+	}
+
+	/**
 	 * An unknown persona, such as one a filter removed, reviews as the default.
 	 */
 	public function test_unknown_persona_reviews_as_default(): void {
