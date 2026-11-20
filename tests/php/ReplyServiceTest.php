@@ -1086,4 +1086,47 @@ class ReplyServiceTest extends TestCase {
 		$without_edit = $this->reply_with( '{"reply": "It is the growth figure.", "edit": null}' );
 		$this->assertArrayNotHasKey( 'revision', $without_edit->last_reply['feedback_item'] );
 	}
+
+	/**
+	 * Data provider for strip_suggestion_markers().
+	 *
+	 * @return array<string, array{string, string}>
+	 */
+	public static function suggestion_marker_provider(): array {
+		return array(
+			'add and del'              => array(
+				'<p>A <mark class="wp-suggestion-add" data-suggestion-id="5">b</mark><mark class="wp-suggestion-del" data-suggestion-id="5">c</mark> d</p>',
+				'<p>A c d</p>',
+			),
+			'format inside a deletion' => array(
+				'<p>A <mark class="wp-suggestion-del" data-suggestion-id="5">b <mark class="wp-suggestion-format" data-suggestion-id="6"><strong>c</strong></mark> e</mark> f</p>',
+				'<p>A b <strong>c</strong> e f</p>',
+			),
+			'single quoted class'      => array(
+				"<p>A <mark class='wp-suggestion-add'>b</mark>c</p>",
+				'<p>A c</p>',
+			),
+			'highlight is kept'        => array(
+				'<p>A <mark class="wp-suggestion-del"><mark class="has-inline-color">b</mark></mark><mark class="wp-suggestion-add">x</mark> <mark style="color:red">c</mark></p>',
+				'<p>A <mark class="has-inline-color">b</mark> <mark style="color:red">c</mark></p>',
+			),
+			'no markers'               => array(
+				'<p>A <mark>b</mark></p>',
+				'<p>A <mark>b</mark></p>',
+			),
+		);
+	}
+
+	/**
+	 * Suggestion markers are taken out as a rejection would, nested or not.
+	 *
+	 * @dataProvider suggestion_marker_provider
+	 *
+	 * @param string $html     Block HTML.
+	 * @param string $expected HTML without suggestion markers.
+	 */
+	public function test_strip_suggestion_markers( string $html, string $expected ): void {
+		$method = new \ReflectionMethod( Reply_Service::class, 'strip_suggestion_markers' );
+		$this->assertSame( $expected, $method->invoke( null, $html ) );
+	}
 }

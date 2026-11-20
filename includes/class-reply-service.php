@@ -610,6 +610,10 @@ class Reply_Service {
 	 * as it reads with the suggestions rejected: added runs are dropped and
 	 * deleted or reformatted runs keep their text.
 	 *
+	 * Marks are handled innermost first, so a format run inside a deleted run
+	 * unwraps cleanly. Other marks, such as highlights, are set aside while
+	 * the marks around them are handled, then put back.
+	 *
 	 * @param string $html Block HTML.
 	 * @return string HTML without suggestion markers.
 	 */
@@ -618,11 +622,34 @@ class Reply_Service {
 			return $html;
 		}
 
-		return (string) preg_replace_callback(
-			'#<mark\b[^>]*\bclass="[^"]*\bwp-suggestion-(add|del|format)\b[^"]*"[^>]*>(.*?)</mark>#s',
-			static fn ( array $matches ): string => 'add' === $matches[1] ? '' : $matches[2],
-			$html
-		);
+		$kept    = array();
+		$pattern = '#<mark\b([^>]*)>((?:(?!<mark\b).)*?)</mark>#si';
+		do {
+			$html = (string) preg_replace_callback(
+				$pattern,
+				static function ( array $matches ) use ( &$kept ): string {
+					if ( preg_match( '#\bclass\s*=\s*(["\'])[^"\']*\bwp-suggestion-(add|del|format)\b#i', $matches[1], $type ) ) {
+						return 'add' === $type[2] ? '' : $matches[2];
+					}
+					$kept[] = $matches[0];
+					return "\x00" . ( count( $kept ) - 1 ) . "\x00";
+				},
+				$html,
+				-1,
+				$count
+			);
+		} while ( $count > 0 );
+
+		// Put back the other marks, which may hold one another.
+		while ( preg_match( '#\x00(\d+)\x00#', $html ) ) {
+			$html = (string) preg_replace_callback(
+				'#\x00(\d+)\x00#',
+				static fn ( array $matches ): string => $kept[ (int) $matches[1] ] ?? '',
+				$html
+			);
+		}
+
+		return $html;
 	}
 
 	/**
