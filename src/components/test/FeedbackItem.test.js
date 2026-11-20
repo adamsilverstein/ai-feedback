@@ -644,6 +644,25 @@ describe('FeedbackItem reply edits', () => {
 		).not.toBeInTheDocument();
 	});
 
+	it('shows an edit already in the block as applied after a reload', () => {
+		renderItem({}, vi.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: { content: 'Revenue grew 40% in 2025.' },
+				},
+			},
+			thread: replyWith(textEdit),
+		});
+
+		expect(
+			screen.getByText('The block already has this change.')
+		).toBeInTheDocument();
+		expect(
+			screen.queryByText(/This change is outdated/)
+		).not.toBeInTheDocument();
+	});
+
 	it('defers to Gutenberg once the reply edit is a suggestion', () => {
 		renderItem({}, vi.fn(), {
 			blocks,

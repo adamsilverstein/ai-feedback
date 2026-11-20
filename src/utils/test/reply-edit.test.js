@@ -17,6 +17,7 @@ import {
 	diffValues,
 	getEditPreview,
 	getRewriteRuns,
+	isEditApplied,
 	isEditCurrent,
 	isReplyEdit,
 	MAX_DIFF_CELLS,
@@ -93,6 +94,33 @@ describe('rewrites of formatted blocks', () => {
 		expect(applyEditToContent(linked, TEXT_EDIT)).toBe(
 			'Revenue grew 40% <a href="https://example.com">in 2025</a>.'
 		);
+	});
+});
+
+describe('isEditApplied', () => {
+	it('recognizes a text edit already in the block', () => {
+		expect(isEditApplied('Revenue grew 40% in 2025.', TEXT_EDIT)).toBe(
+			true
+		);
+		expect(isEditApplied(CONTENT, TEXT_EDIT)).toBe(false);
+		// Both texts present: neither clearly applied nor clearly not.
+		expect(
+			isEditApplied('Last year, last year and in 2025.', TEXT_EDIT)
+		).toBe(false);
+		expect(isEditApplied('Something else.', TEXT_EDIT)).toBe(false);
+	});
+
+	it('cannot tell a deletion was applied', () => {
+		expect(
+			isEditApplied('Revenue grew.', { find: 'a lot', replace: '' })
+		).toBe(false);
+	});
+
+	it('recognizes a rewrite already in the block', () => {
+		expect(
+			isEditApplied('Revenue grew <em>sharply</em> last year.', REWRITE)
+		).toBe(true);
+		expect(isEditApplied(CONTENT, REWRITE)).toBe(false);
 	});
 });
 

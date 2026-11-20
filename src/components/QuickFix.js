@@ -18,6 +18,7 @@ import { getRichTextAttributeKey } from '../utils/quick-fix';
 import {
 	applyEditToContent,
 	describeEdit,
+	isEditApplied,
 	describeFix,
 	getEditPreview,
 } from '../utils/reply-edit';
@@ -153,13 +154,19 @@ export default function QuickFix({ item, edit, noteId }) {
 		return null;
 	}
 
-	// A reply stays in the thread after its edit is applied.
-	if (isReplyEdit && isApplied) {
+	// A reply stays in the thread after its edit is applied. The applied
+	// flag only lasts the session; after a reload the text tells.
+	if (isReplyEdit && (isApplied || isEditApplied(content, fix))) {
 		return (
 			<div className="ai-feedback-quick-fix">
 				{summary}
 				<p className="ai-feedback-quick-fix-applied description">
-					{__('You applied this change.', 'fresh-eyes')}
+					{isApplied
+						? __('You applied this change.', 'fresh-eyes')
+						: __(
+								'The block already has this change.',
+								'fresh-eyes'
+							)}
 				</p>
 			</div>
 		);

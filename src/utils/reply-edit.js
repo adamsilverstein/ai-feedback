@@ -18,6 +18,7 @@ import {
 } from '@wordpress/rich-text';
 import {
 	applyFixToContent,
+	findMatches,
 	findUniqueOffset,
 	getFixPreview,
 	toHtml,
@@ -62,6 +63,32 @@ export function isEditCurrent(content, edit) {
 		);
 	}
 	return findUniqueOffset(value, edit) !== -1;
+}
+
+/**
+ * Whether the block already reads as an edit would leave it.
+ *
+ * Applied state is only kept for the session, so after a reload this tells
+ * an edit the author applied from one that went out of date. A deletion
+ * can't be told apart, so it reads as not applied.
+ *
+ * @param {string|RichTextData} content Current attribute value.
+ * @param {Object}              edit    Edit or quick fix.
+ * @return {boolean} True when the block holds the edit's result.
+ */
+export function isEditApplied(content, edit) {
+	const value = create({ html: toHtml(content) });
+	if (edit?.type === 'rewrite_block') {
+		const after = create({ html: edit.content });
+		return normalizeText(value.text) === normalizeText(after.text);
+	}
+	if (!edit?.replace) {
+		return false;
+	}
+	return (
+		findMatches(value.text, edit.find).length === 0 &&
+		findMatches(value.text, edit.replace).length === 1
+	);
 }
 
 /**
