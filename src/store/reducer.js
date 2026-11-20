@@ -13,12 +13,15 @@ export const initialState = {
 		defaultFocusAreas: ['content', 'tone', 'flow'],
 		defaultTone: 'professional',
 		feedbackLocale: 'auto',
+		defaultPersona: 'copy_editor',
+		reviewAudience: '',
 		chunkSize: 20,
 	},
 	availableModels: [],
 	availableFocusAreas: [],
 	availableTones: [],
 	availableLocales: [],
+	availablePersonas: [],
 	isReviewing: false,
 	reviewStage: null,
 	unavailableRetries: 0,
@@ -191,6 +194,9 @@ export default function reducer(state = initialState, action) {
 					defaultFocusAreas: action.settings.default_focus_areas,
 					defaultTone: action.settings.default_tone,
 					feedbackLocale: action.settings.feedback_locale || 'auto',
+					defaultPersona:
+						action.settings.default_persona || 'copy_editor',
+					reviewAudience: action.settings.review_audience || '',
 					chunkSize: action.settings.chunk_size || 20,
 				},
 				availableModels: action.settings.available_models || [],
@@ -198,6 +204,7 @@ export default function reducer(state = initialState, action) {
 					action.settings.available_focus_areas || [],
 				availableTones: action.settings.available_tones || [],
 				availableLocales: action.settings.available_locales || [],
+				availablePersonas: action.settings.available_personas || [],
 				isLoadingSettings: false,
 			};
 
