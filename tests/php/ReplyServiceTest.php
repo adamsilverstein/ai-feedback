@@ -85,7 +85,8 @@ class ReplyServiceTest extends TestCase {
 			$GLOBALS['test_post_content'],
 			$GLOBALS['test_parsed_blocks'],
 			$GLOBALS['test_parse_blocks_calls'],
-			$GLOBALS['test_missing_posts']
+			$GLOBALS['test_missing_posts'],
+			$GLOBALS['test_block_types']
 		);
 		parent::tearDown();
 	}
@@ -1076,6 +1077,64 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "Block content: Revenue grew 40% \nlast year.\n", $service->captured_prompt );
+	}
+
+	/**
+	 * Seed a list item with a nested list and a line break.
+	 */
+	private function seed_list_item_with_nested_list(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array(
+				array(
+					'blockName'    => 'core/list-item',
+					'attrs'        => array( 'metadata' => array( 'noteId' => 100 ) ),
+					'innerBlocks'  => array( self::leaf_block( 'core/list', '<ul class="wp-block-list"><li>Nested item</li></ul>' ) ),
+					'innerHTML'    => '<li>Revenue grew 40%<br>last year.</li>',
+					'innerContent' => array( '<li>Revenue grew 40%<br>last year.', null, '</li>' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * For a block whose own rich text an edit applies to, like a list item
+	 * with a nested list, the prompt shows that text as the editor reads
+	 * it, with the nested blocks as context.
+	 */
+	public function test_prompt_shows_own_text_of_a_list_item_with_a_nested_list(): void {
+		$GLOBALS['test_block_types'] = array(
+			'core/list-item' => array(
+				'content' => array(
+					'type'     => 'rich-text',
+					'source'   => 'rich-text',
+					'selector' => 'li',
+				),
+			),
+		);
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString(
+			"Block content: Revenue grew 40%\nlast year.\nBlocks inside it (context only; an edit changes the block content above, not these): Nested item\n\n",
+			$service->captured_prompt
+		);
+	}
+
+	/**
+	 * A block with inner blocks whose type keeps no rich text `content`, like
+	 * a quote, keeps the collapsed reading of all its text.
+	 */
+	public function test_prompt_keeps_the_full_text_of_a_block_without_own_rich_text(): void {
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% last year. Nested item\n\n", $service->captured_prompt );
+		$this->assertStringNotContainsString( 'Blocks inside it', $service->captured_prompt );
 	}
 
 	/**

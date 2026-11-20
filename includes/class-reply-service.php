@@ -719,7 +719,19 @@ class Reply_Service {
 		// text without its nested list.
 		$block_text    = null !== $block ? self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) : '';
 		$block_content = '';
-		if ( null !== $block ) {
+		$inner_text    = '';
+		$inner_blocks  = null !== $block && is_array( $block['innerBlocks'] ?? null ) ? $block['innerBlocks'] : array();
+		if ( array() !== $inner_blocks && self::has_rich_text_content( $block_type ) ) {
+			// An edit applies to the block's own text, like a list item's
+			// text without its nested list, so the prompt shows that, with
+			// the inner blocks as context.
+			$block_content = $block_text;
+			$inner_html    = '';
+			foreach ( $inner_blocks as $inner ) {
+				$inner_html .= is_array( $inner ) ? ' ' . self::get_block_html( $inner ) : '';
+			}
+			$inner_text = self::html_text( self::strip_suggestion_markers( $inner_html ) );
+		} elseif ( null !== $block ) {
 			// The prompt reads a block with inner blocks, or an image block,
 			// whose <img> is the block, the collapsed way, which is easier to
 			// follow.
@@ -736,6 +748,7 @@ class Reply_Service {
 			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
 			'block_html'        => $block_html,
 			'block_content'     => $block_content,
+			'inner_blocks_text' => $inner_text,
 			'block_text'        => $block_text,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
@@ -1114,6 +1127,28 @@ class Reply_Service {
 
 	/**
 	 * Whether a block type keeps its text in a rich text `content` attribute,
+	 * which the editor applies a text edit to.
+	 *
+	 * Matches getRichTextAttributeKey() in src/utils/quick-fix.js.
+	 *
+	 * @param string $block_name Block name.
+	 * @return bool
+	 */
+	private static function has_rich_text_content( string $block_name ): bool {
+		if ( '' === $block_name || ! class_exists( 'WP_Block_Type_Registry' ) ) {
+			return false;
+		}
+
+		$block_type = \WP_Block_Type_Registry::get_instance()->get_registered( $block_name );
+		$attribute  = null !== $block_type && is_array( $block_type->attributes ) ? ( $block_type->attributes['content'] ?? null ) : null;
+		return is_array( $attribute ) && (
+			'rich-text' === ( $attribute['type'] ?? null )
+			|| in_array( $attribute['source'] ?? null, array( 'rich-text', 'html' ), true )
+		);
+	}
+
+	/**
+	 * Whether a block type keeps its text in a rich text `content` attribute,
 	 * which a `rewrite_block` edit replaces.
 	 *
 	 * Matches getRichTextAttributeKey() in src/utils/quick-fix.js.
@@ -1122,16 +1157,7 @@ class Reply_Service {
 	 * @return bool
 	 */
 	private static function supports_rewrite( string $block_name ): bool {
-		$supported = false;
-
-		if ( '' !== $block_name && class_exists( 'WP_Block_Type_Registry' ) ) {
-			$block_type = \WP_Block_Type_Registry::get_instance()->get_registered( $block_name );
-			$attribute  = null !== $block_type && is_array( $block_type->attributes ) ? ( $block_type->attributes['content'] ?? null ) : null;
-			$supported  = is_array( $attribute ) && (
-				'rich-text' === ( $attribute['type'] ?? null )
-				|| in_array( $attribute['source'] ?? null, array( 'rich-text', 'html' ), true )
-			);
-		}
+		$supported = self::has_rich_text_content( $block_name );
 
 		/**
 		 * Filters whether an AI reply may rewrite a whole block of this type.
