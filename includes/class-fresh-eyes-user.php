@@ -45,6 +45,11 @@ class Fresh_Eyes_User {
 	public const CHECKED_OPTION = 'ai_feedback_user_checked';
 
 	/**
+	 * Transient set after creating the user did not work, to wait before trying again.
+	 */
+	private const RETRY_TRANSIENT = 'ai_feedback_user_retry';
+
+	/**
 	 * Option used as the lock while the user is created.
 	 */
 	private const LOCK_OPTION = 'ai_feedback_user_lock';
@@ -75,6 +80,13 @@ class Fresh_Eyes_User {
 	 * is a different screen and never lists the user.
 	 */
 	private const REVEAL_PARAMS = array( 'context', 'search', '_locale', 'rest_route' );
+
+	/**
+	 * Secret the reveal flag must carry, so only flag_reveal() can set it.
+	 *
+	 * @var string|null
+	 */
+	private static ?string $reveal_token = null;
 
 	/**
 	 * Cached user ID.
@@ -156,12 +168,15 @@ class Fresh_Eyes_User {
 	 * Create the user on upgrade, once per plugin version and site.
 	 */
 	public static function maybe_ensure(): void {
-		if ( AI_FEEDBACK_VERSION === get_option( self::CHECKED_OPTION ) ) {
+		if ( AI_FEEDBACK_VERSION === get_option( self::CHECKED_OPTION ) || false !== get_transient( self::RETRY_TRANSIENT ) ) {
 			return;
 		}
 		if ( self::ensure() > 0 ) {
 			update_option( self::CHECKED_OPTION, AI_FEEDBACK_VERSION );
+			return;
 		}
+		// Another request holds the lock, or creating failed: try again in a few minutes, not on every page.
+		set_transient( self::RETRY_TRANSIENT, 1, 5 * MINUTE_IN_SECONDS );
 	}
 
 	/**
@@ -240,7 +255,7 @@ class Fresh_Eyes_User {
 		}
 
 		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
-			$insert = $db->prepare( "INSERT IGNORE INTO %i ( `option_name`, `option_value`, `autoload` ) VALUES (%s, %s, 'off') /* LOCK */", $db->options, self::LOCK_OPTION, (string) time() );
+			$insert = $db->prepare( "INSERT IGNORE INTO %i ( `option_name`, `option_value`, `autoload` ) VALUES (%s, %s, 'off') /* LOCK */", self::lock_table( $db ), self::LOCK_OPTION, (string) time() );
 			if ( null === $insert ) {
 				return false;
 			}
@@ -251,7 +266,7 @@ class Fresh_Eyes_User {
 			}
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Read the lock without a stale option cache.
-			$locked_at = $db->get_var( $db->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $db->options, self::LOCK_OPTION ) );
+			$locked_at = $db->get_var( $db->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', self::lock_table( $db ), self::LOCK_OPTION ) );
 			if ( ! is_numeric( $locked_at ) || (int) $locked_at > time() - self::LOCK_TTL ) {
 				return false;
 			}
@@ -259,7 +274,7 @@ class Fresh_Eyes_User {
 			// Delete only the stale lock seen, so two requests taking it over can't both win.
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
 			$db->delete(
-				$db->options,
+				self::lock_table( $db ),
 				array(
 					'option_name'  => self::LOCK_OPTION,
 					'option_value' => $locked_at,
@@ -271,13 +286,24 @@ class Fresh_Eyes_User {
 	}
 
 	/**
+	 * The table the creation lock lives in: the main site's options on
+	 * multisite, since the user is shared by the network.
+	 *
+	 * @param \wpdb $db Database.
+	 * @return string Table name.
+	 */
+	private static function lock_table( \wpdb $db ): string {
+		return is_multisite() ? $db->base_prefix . 'options' : $db->options;
+	}
+
+	/**
 	 * Release the creation lock.
 	 */
 	private static function release_lock(): void {
 		$db = self::db();
 		if ( null !== $db ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Paired with the INSERT IGNORE lock.
-			$db->delete( $db->options, array( 'option_name' => self::LOCK_OPTION ) );
+			$db->delete( self::lock_table( $db ), array( 'option_name' => self::LOCK_OPTION ) );
 		}
 	}
 
@@ -371,6 +397,18 @@ class Fresh_Eyes_User {
 		delete_network_option( null, self::OPTION );
 		delete_option( self::CHECKED_OPTION );
 		delete_option( self::LOCK_OPTION );
+		delete_transient( self::RETRY_TRANSIENT );
+		if ( is_multisite() ) {
+			foreach ( get_sites(
+				array(
+					'fields' => 'ids',
+					'number' => 0,
+				)
+			) as $site_id ) {
+				delete_blog_option( (int) $site_id, self::CHECKED_OPTION );
+				delete_blog_option( (int) $site_id, self::LOCK_OPTION );
+			}
+		}
 		self::$id = null;
 
 		if ( ! self::is_ours( $id ) ) {
@@ -413,7 +451,8 @@ class Fresh_Eyes_User {
 		}
 		$column = $db->users . '.ID';
 
-		if ( empty( $query->query_vars[ self::REVEAL_VAR ] ) ) {
+		$flag = $query->query_vars[ self::REVEAL_VAR ] ?? null;
+		if ( ! is_string( $flag ) || ! hash_equals( self::reveal_token(), $flag ) ) {
 			$query->query_where = $where . " AND {$column} <> {$id}";
 			return;
 		}
@@ -443,9 +482,22 @@ class Fresh_Eyes_User {
 	public static function flag_reveal( array $args, WP_REST_Request $request ): array {
 		unset( $args[ self::REVEAL_VAR ] );
 		if ( self::is_reveal_request( $request ) ) {
-			$args[ self::REVEAL_VAR ] = true;
+			$args[ self::REVEAL_VAR ] = self::reveal_token();
 		}
 		return $args;
+	}
+
+	/**
+	 * Get this request's reveal secret, so other code that builds a
+	 * WP_User_Query cannot set the reveal flag.
+	 *
+	 * @return string
+	 */
+	private static function reveal_token(): string {
+		if ( null === self::$reveal_token ) {
+			self::$reveal_token = bin2hex( random_bytes( 16 ) );
+		}
+		return self::$reveal_token;
 	}
 
 	/**

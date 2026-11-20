@@ -194,6 +194,23 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertCount( 2, $GLOBALS['test_inserted_users'] );
 	}
 
+	public function test_upgrade_waits_a_while_after_creation_did_not_work(): void {
+		$GLOBALS['test_options']['ai_feedback_user_lock'] = (string) time();
+
+		Fresh_Eyes_User::maybe_ensure();
+		$this->assertSame( 1, $GLOBALS['test_transients']['ai_feedback_user_retry'] ?? null );
+		$this->assertArrayNotHasKey( Fresh_Eyes_User::CHECKED_OPTION, $GLOBALS['test_options'] );
+
+		// The lock is gone, but the next page load waits for the retry time.
+		unset( $GLOBALS['test_options']['ai_feedback_user_lock'] );
+		Fresh_Eyes_User::maybe_ensure();
+		$this->assertSame( array(), $GLOBALS['test_inserted_users'] );
+
+		unset( $GLOBALS['test_transients']['ai_feedback_user_retry'] );
+		Fresh_Eyes_User::maybe_ensure();
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+	}
+
 	public function test_a_deleted_user_is_recreated(): void {
 		$id = $this->create_user();
 		unset( $GLOBALS['test_user_objects'][ $id ] );
@@ -238,7 +255,7 @@ class FreshEyesUserTest extends TestCase {
 
 		$query->query_fields = 'SQL_CALC_FOUND_ROWS wp_users.*';
 		$query->query_where  = "WHERE 1=1 AND wp_users.ID IN ( SELECT DISTINCT post_author FROM wp_posts WHERE post_status = 'publish' ) AND (user_login LIKE '%fr%')";
-		$query->query_vars   = array( Fresh_Eyes_User::REVEAL_VAR => true );
+		$query->query_vars   = Fresh_Eyes_User::flag_reveal( array(), $this->users_request( array( 'search' => 'fr' ) ) );
 
 		Fresh_Eyes_User::filter_user_query( $query );
 
@@ -249,10 +266,24 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertSame( 'DISTINCT SQL_CALC_FOUND_ROWS wp_users.*', $query->query_fields );
 
 		// Already distinct, eg. for a meta query with OR.
+		$query->query_vars   = Fresh_Eyes_User::flag_reveal( array(), $this->users_request( array( 'search' => 'fr' ) ) );
 		$query->query_fields = 'DISTINCT wp_users.ID';
 		$query->query_where  = 'WHERE 1=1';
 		Fresh_Eyes_User::filter_user_query( $query );
 		$this->assertSame( 'DISTINCT wp_users.ID', $query->query_fields );
+	}
+
+	public function test_other_code_cannot_set_the_reveal_flag(): void {
+		$id = $this->create_user();
+
+		foreach ( array( true, 1, '1', 'guess' ) as $flag ) {
+			$query             = new \WP_User_Query();
+			$query->query_vars = array( Fresh_Eyes_User::REVEAL_VAR => $flag );
+
+			Fresh_Eyes_User::filter_user_query( $query );
+
+			$this->assertSame( "WHERE 1=1 AND wp_users.ID <> {$id}", $query->query_where, var_export( $flag, true ) );
+		}
 	}
 
 	/**
@@ -285,7 +316,8 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertTrue( Fresh_Eyes_User::is_reveal_request( $this->users_request( $params ) ) );
 
 		$args = Fresh_Eyes_User::flag_reveal( array( 'number' => 10 ), $this->users_request( $params ) );
-		$this->assertTrue( $args[ Fresh_Eyes_User::REVEAL_VAR ] );
+		$this->assertIsString( $args[ Fresh_Eyes_User::REVEAL_VAR ] );
+		$this->assertSame( 32, strlen( $args[ Fresh_Eyes_User::REVEAL_VAR ] ) );
 	}
 
 	/**

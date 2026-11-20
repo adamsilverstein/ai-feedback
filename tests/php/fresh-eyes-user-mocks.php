@@ -57,6 +57,7 @@ if ( ! class_exists( 'WP_Query' ) ) {
  */
 function ai_feedback_test_reset_users(): void {
 	$GLOBALS['test_options']           = array();
+	$GLOBALS['test_transients']        = array();
 	$GLOBALS['test_user_objects']      = array();
 	$GLOBALS['test_user_meta']         = array();
 	$GLOBALS['test_logins']            = array();
