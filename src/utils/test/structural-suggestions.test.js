@@ -286,6 +286,26 @@ describe('suggestBlockAction', () => {
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
+	it('leaves a move into another parent block to Preview and Apply', async () => {
+		mocks.blocks.group = { ...paragraph('group', ''), name: 'core/group' };
+		mocks.blocks.inner = paragraph('inner', 'Inside.');
+		mocks.order[''].push('group');
+		mocks.order.group = ['inner'];
+
+		expect(
+			await suggestBlockAction({
+				...moveNote,
+				block_action: {
+					...moveNote.block_action,
+					target_block_id: 'inner',
+					target_text: 'Inside.',
+				},
+			})
+		).toBe(false);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.moveBlocksToPosition).not.toHaveBeenCalled();
+	});
+
 	it('skips a move whose target is gone', async () => {
 		delete mocks.blocks.intro;
 		mocks.order[''] = ['bg', 'open', 'rep'];

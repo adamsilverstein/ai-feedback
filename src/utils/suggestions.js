@@ -447,8 +447,42 @@ export function buildStructuralPayload(blockName, operation) {
 }
 
 /**
+ * Whether a structural edit can become a suggestion with the blocks as they
+ * are: it is ready to apply, and a move stays within its parent block.
+ *
+ * Reject puts a moved block back by its old neighbor or index. Client ids
+ * change on reload, so a move between parents could only be put back into
+ * the wrong parent; those stay with Preview and Apply.
+ *
+ * @param {Object} selectors Block editor selectors.
+ * @param {Object} action    Structural edit.
+ * @param {string} clientId  Client id of the note's block.
+ * @return {boolean} True when it can be suggested.
+ */
+function canSuggestNow(selectors, action, clientId) {
+	const { state, targetId } = getBlockActionState(
+		selectors,
+		action,
+		clientId
+	);
+	if (state !== 'ready') {
+		return false;
+	}
+	if (action.type !== 'move_block') {
+		return true;
+	}
+	const { fromRootClientId, toRootClientId } = getMovePosition(
+		selectors,
+		action,
+		clientId,
+		targetId
+	);
+	return fromRootClientId === toRootClientId;
+}
+
+/**
  * Turns a review note's remove or move into a Gutenberg structural
- * suggestion.
+ * suggestion. Moves between parent blocks stay with Preview and Apply.
  *
  * Like Gutenberg's own capture, the change is made and tagged: a removal
  * keeps the block and marks it `pending-remove`, and a move puts the block
@@ -468,7 +502,7 @@ export async function suggestBlockAction(note) {
 	if (
 		!block ||
 		block.attributes?.metadata?.suggestion ||
-		getBlockActionState(selectors, action, clientId).state !== 'ready'
+		!canSuggestNow(selectors, action, clientId)
 	) {
 		return false;
 	}
@@ -486,10 +520,9 @@ export async function suggestBlockAction(note) {
 
 	// The blocks may have changed while the request ran.
 	const current = dataSelect(blockEditorStore);
-	const { state, targetId } = getBlockActionState(current, action, clientId);
 	if (
 		!saved?.meta?._wp_suggestion ||
-		state !== 'ready' ||
+		!canSuggestNow(current, action, clientId) ||
 		current.getBlock(clientId)?.attributes?.metadata?.suggestion
 	) {
 		await removeSuggestion(note.id);
@@ -505,6 +538,7 @@ export async function suggestBlockAction(note) {
 	};
 
 	if (action.type === 'move_block') {
+		const { targetId } = getBlockActionState(current, action, clientId);
 		const fromParentClientId = current.getBlockRootClientId(clientId);
 		const fromIndex = current.getBlockIndex(clientId);
 		const fromOrder = current.getBlockOrder(fromParentClientId ?? '');
