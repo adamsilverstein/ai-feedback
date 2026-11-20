@@ -211,16 +211,14 @@ class Review_History {
 	 */
 	public static function build_persona_fields( array $review ): array {
 		$persona = $review['persona'] ?? null;
-		if ( ! is_string( $persona ) || 1 !== preg_match( '/^[a-z0-9_-]{1,40}$/', $persona ) || Personas::DEFAULT_PERSONA === $persona ) {
+		// A persona a filter has since removed is left out, as its notes lose their badge.
+		if ( ! is_string( $persona ) || ! Personas::is_custom( $persona ) ) {
 			return array();
 		}
 
-		// Kept as stored, so the summary still names a persona a filter later removed.
-		$label = is_string( $review['persona_label'] ?? null ) ? sanitize_text_field( $review['persona_label'] ) : '';
-
 		return array(
 			'persona'          => $persona,
-			'persona_label'    => '' === $label ? Personas::get_label( $persona ) : $label,
+			'persona_label'    => Personas::get_label( $persona ),
 			'persona_takeaway' => Personas::sanitize_takeaway( $review['persona_takeaway'] ?? '' ),
 		);
 	}
