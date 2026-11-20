@@ -942,6 +942,7 @@ class ReplyServiceTest extends TestCase {
 		$parts = preg_split( '#(<!-- /?wp:[a-z0-9/-]+ -->)#', $markup, -1, PREG_SPLIT_DELIM_CAPTURE );
 		$root  = array(
 			'innerBlocks'  => array(),
+			'innerHTML'    => '',
 			'innerContent' => array(),
 		);
 		$stack = array( $root );
@@ -956,22 +957,30 @@ class ReplyServiceTest extends TestCase {
 					'innerContent' => array(),
 				);
 			} elseif ( str_starts_with( $part, '<!-- /wp:' ) ) {
-				$block                       = array_pop( $stack );
-				$parent                      = array_pop( $stack );
-				$parent['innerBlocks'][]     = $block;
-				$parent['innerContent'][]    = null;
-				$stack[]                     = $parent;
+				$block                    = array_pop( $stack );
+				$parent                   = array_pop( $stack );
+				$parent['innerBlocks'][]  = $block;
+				$parent['innerContent'][] = null;
+				$stack[]                  = $parent;
 			} elseif ( '' !== $part ) {
 				$block                   = array_pop( $stack );
 				$block['innerContent'][] = $part;
-				if ( isset( $block['innerHTML'] ) && is_string( $block['innerHTML'] ) ) {
-					$block['innerHTML'] .= $part;
-				}
-				$stack[] = $block;
+				$block['innerHTML']      = ( $block['innerHTML'] ?? '' ) . $part;
+				$stack[]                 = $block;
 			}
 		}
-		$blocks = $stack[0]['innerBlocks'];
-		return array_values( is_array( $blocks ) ? $blocks : array() );
+		return $stack[0]['innerBlocks'];
+	}
+
+	/**
+	 * The edit a reply saved, if any.
+	 *
+	 * @param Reply_Service_Fake_Notes_Manager $notes Notes manager the reply went to.
+	 * @return mixed Saved edit, or null.
+	 */
+	private static function saved_edit( Reply_Service_Fake_Notes_Manager $notes ): mixed {
+		$item = $notes->last_reply['feedback_item'] ?? null;
+		return is_array( $item ) ? ( $item['reply_edit'] ?? null ) : null;
 	}
 
 	/**
@@ -1033,7 +1042,7 @@ class ReplyServiceTest extends TestCase {
 		$service->canned_response = '{"reply": "Moved it.", "edit": {"type": "move_block", "target_block_id": "b1", "position": "after"}}';
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$edit = self::saved_edit( $notes );
 		$this->assertIsArray( $edit );
 		$this->assertSame( 'core/quote', $edit['target_name'] );
 		$this->assertSame( 'Ada Lovelace', $edit['target_text'] );
@@ -1054,7 +1063,7 @@ class ReplyServiceTest extends TestCase {
 		$service->canned_response = '{"reply": "Moved it.", "edit": {"type": "move_block", "target_block_id": "b1", "position": "after"}}';
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertNull( $notes->last_reply['feedback_item']['reply_edit'] ?? null );
+		$this->assertNull( self::saved_edit( $notes ) );
 	}
 
 	/**
