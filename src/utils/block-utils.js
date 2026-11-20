@@ -2,6 +2,7 @@
  * Utility functions for block content extraction.
  */
 import { getBlockType, getSaveContent } from '@wordpress/blocks';
+import { debugLog } from './debug';
 
 /**
  * Extract text content from a block's innerHTML.
@@ -86,7 +87,11 @@ function getOwnHTML(block) {
 	}
 	try {
 		return getSaveContent(block.name, block.attributes ?? {}, []);
-	} catch {
+	} catch (error) {
+		debugLog(
+			`Could not save ${block.name}, using its loaded markup.`,
+			error
+		);
 		return saved;
 	}
 }
@@ -140,6 +145,8 @@ export function extractBlockData(blocks, parent = '') {
  *
  * The editor replaces a block's object, and its parents', only when it
  * changes, so typing in one block re-reads just that block and its parents.
+ * Block types register before editing starts, so a result read before a
+ * type was registered is not expected to go stale.
  */
 const hasTextCache = new WeakMap();
 

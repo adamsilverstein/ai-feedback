@@ -125,6 +125,18 @@ describe('extractBlockData on editor blocks', () => {
 		expect(hasTextContent(parsed)).toBe(true);
 		expect(hasTextContent([created])).toBe(true);
 	});
+
+	it('gives a dynamic block no text of its own, as before', () => {
+		const [block] = loadEditor(
+			parse('<!-- wp:latest-posts {"postsToShow":3} /-->')
+		)
+			.select(blockEditorStore)
+			.getBlocks();
+
+		expect(block.originalContent).toBe('');
+		expect(extractBlockData([block])).toEqual([]);
+		expect(hasTextContent([block])).toBe(false);
+	});
 });
 
 describe('anchors of loaded blocks', () => {
