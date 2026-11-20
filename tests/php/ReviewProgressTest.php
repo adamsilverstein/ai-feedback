@@ -8,6 +8,7 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\History_Controller;
 use AI_Feedback\Notes_Manager;
 use AI_Feedback\Review_History;
 use AI_Feedback\Review_Progress;
@@ -180,6 +181,140 @@ class ReviewProgressTest extends TestCase {
 			),
 			$result
 		);
+	}
+
+	/**
+	 * The server counts each shared case the way the editor does.
+	 *
+	 * @dataProvider data_shared_cases
+	 *
+	 * @param array<string, mixed> $meta          Note meta.
+	 * @param string               $status        Note status, or `deleted`.
+	 * @param string|null          $parent_status Thread status when the note is a reply.
+	 * @param string               $expected      `addressed`, `open` or `excluded`.
+	 */
+	public function test_shared_addressed_cases( array $meta, string $status, ?string $parent_status, string $expected ): void {
+		$parent = 0;
+		if ( null !== $parent_status ) {
+			$parent = $this->add_note( 'r1' );
+			$this->note( $parent )->comment_approved = 'approved' === $parent_status ? '1' : '0';
+		}
+
+		$id = $this->add_note( 'r1', $parent, $meta );
+		if ( 'deleted' === $status ) {
+			wp_delete_comment( $id, true );
+		} else {
+			$this->note( $id )->comment_approved = match ( $status ) {
+				'approved' => '1',
+				'hold'     => '0',
+				'spam'     => 'spam',
+				default    => 'trash',
+			};
+		}
+
+		$result = Review_Progress::compare( self::POST_ID, array( 'open_note_ids' => array( $id ) ) );
+
+		$this->assertSame(
+			array(
+				'addressed'  => 'addressed' === $expected ? 1 : 0,
+				'still_open' => 'open' === $expected ? 1 : 0,
+			),
+			array(
+				'addressed'  => $result['addressed'],
+				'still_open' => $result['still_open'],
+			)
+		);
+	}
+
+	/**
+	 * Cases from tests/fixtures/addressed-cases.json, shared with progress.test.js.
+	 *
+	 * @return array<string, array{0: array<string, mixed>, 1: string, 2: string|null, 3: string}>
+	 */
+	public static function data_shared_cases(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/addressed-cases.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['cases'] ?? null ) ? $fixture['cases'] : array() as $case ) {
+			if ( ! is_array( $case ) || ! is_string( $case['name'] ?? null ) ) {
+				continue;
+			}
+			$meta = array();
+			foreach ( is_array( $case['meta'] ?? null ) ? $case['meta'] : array() as $key => $value ) {
+				$meta[ (string) $key ] = $value;
+			}
+			$cases[ $case['name'] ] = array(
+				$meta,
+				is_string( $case['status'] ?? null ) ? $case['status'] : 'hold',
+				is_string( $case['parent_status'] ?? null ) ? $case['parent_status'] : null,
+				is_string( $case['expected'] ?? null ) ? $case['expected'] : '',
+			);
+		}
+
+		return $cases;
+	}
+
+	/**
+	 * A trashed note is left out but still followed, so restoring it from the
+	 * trash counts it again at the next review.
+	 */
+	public function test_trashed_note_counts_again_once_restored(): void {
+		$open    = $this->add_note( 'r1' );
+		$trashed = $this->add_note( 'r1' );
+		$this->note( $trashed )->comment_approved = 'trash';
+
+		$first = Review_Progress::compare( self::POST_ID, array( 'open_note_ids' => array( $open, $trashed ) ) );
+		$this->assertSame( 1, $first['still_open'] );
+		$this->assertSame( array( $open, $trashed ), $first['open_ids'] );
+
+		$this->note( $trashed )->comment_approved = '0';
+
+		$second = Review_Progress::compare( self::POST_ID, array( 'open_note_ids' => $first['open_ids'] ) );
+		$this->assertSame( 2, $second['still_open'] );
+	}
+
+	/**
+	 * Open note IDs are capped, keeping the newest.
+	 */
+	public function test_open_note_ids_are_capped(): void {
+		$ids = range( 1, Review_Progress::MAX_OPEN_NOTES + 100 );
+
+		$merged = Review_Progress::merge_ids( array_slice( $ids, 0, 300 ), array_slice( $ids, 300 ), array( 1, 600 ) );
+
+		$this->assertCount( Review_Progress::MAX_OPEN_NOTES, $merged );
+		$this->assertSame( 101, $merged[0] );
+		$this->assertSame( Review_Progress::MAX_OPEN_NOTES + 100, $merged[ Review_Progress::MAX_OPEN_NOTES - 1 ] );
+	}
+
+	/**
+	 * Only the newest entry keeps open note IDs, and the REST responses leave
+	 * them out.
+	 */
+	public function test_only_the_newest_entry_keeps_open_note_ids(): void {
+		$first = $this->add_note( 'r1' );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( $first ) ) );
+		$second = $this->add_note( 'r2' );
+		Review_History::record( self::POST_ID, $this->review( 'r2', array( $second ) ) );
+
+		$history = Review_History::get( self::POST_ID );
+		$this->assertArrayNotHasKey( 'open_note_ids', $history[0] );
+		$this->assertSame( array( $first, $second ), $history[1]['open_note_ids'] );
+
+		$controller = new History_Controller( new Notes_Manager() );
+		$request    = new \WP_REST_Request();
+		$request->set_param( 'post_id', self::POST_ID );
+		$data = $controller->get_history( $request )->get_data();
+		$this->assertIsArray( $data );
+		$this->assertIsArray( $data['history'] );
+		foreach ( $data['history'] as $entry ) {
+			$this->assertIsArray( $entry );
+			$this->assertArrayNotHasKey( 'open_note_ids', $entry );
+		}
+
+		$request->set_param( 'review_id', 'r2' );
+		$review = $controller->get_history_review( $request );
+		$this->assertInstanceOf( \WP_REST_Response::class, $review );
+		$this->assertIsArray( $review->get_data() );
+		$this->assertArrayNotHasKey( 'open_note_ids', $review->get_data() );
 	}
 
 	/**

@@ -3,8 +3,10 @@
  *
  * A note counts as addressed when it was dismissed (or its quick fix applied)
  * in the sidebar, its suggested edit was accepted or rejected, or its thread
- * was resolved in the Notes panel. A deleted note is left out entirely.
- * Review_Progress applies the same rules on the server.
+ * was resolved in the Notes panel. A deleted, trashed or spam note is left
+ * out entirely: core never loads those into the editor. Review_Progress
+ * applies the same rules on the server, and tests/fixtures/addressed-cases.json
+ * holds the cases both are tested against.
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getRecordSuggestionStatus } from '../hooks/useSuggestionStatus';

@@ -15,9 +15,10 @@ namespace AI_Feedback;
  *
  * A note counts as addressed when it was dismissed (or its quick fix
  * applied) in the sidebar, its suggested edit was accepted or rejected, or
- * its thread was resolved in the Notes panel. A note that was deleted is
- * not counted at all. src/utils/progress.js applies the same rules in the
- * editor.
+ * its thread was resolved in the Notes panel. A note that was deleted,
+ * trashed or marked as spam is not counted at all. src/utils/progress.js
+ * applies the same rules in the editor, and tests/fixtures/addressed-cases.json
+ * holds the cases both are tested against.
  */
 class Review_Progress {
 
@@ -58,6 +59,16 @@ class Review_Progress {
 		$thread = $parent > 0 ? get_comment( $parent ) : $note;
 
 		return $thread instanceof \WP_Comment && '1' === (string) $thread->comment_approved;
+	}
+
+	/**
+	 * Whether a note is in the trash or marked as spam.
+	 *
+	 * @param  \WP_Comment $note Note.
+	 * @return bool
+	 */
+	public static function is_trashed( \WP_Comment $note ): bool {
+		return in_array( (string) $note->comment_approved, array( 'trash', 'spam' ), true );
 	}
 
 	/**
@@ -123,8 +134,9 @@ class Review_Progress {
 			_prime_comment_caches( $note_ids );
 		}
 
-		$addressed = 0;
-		$open_ids  = array();
+		$addressed  = 0;
+		$still_open = 0;
+		$open_ids   = array();
 		foreach ( $note_ids as $note_id ) {
 			$note = get_comment( $note_id );
 			// Deleted notes, and IDs that are not notes on this post, don't count.
@@ -132,16 +144,25 @@ class Review_Progress {
 				continue;
 			}
 
+			// The Notes panel deletes a note by trashing it. Like the editor,
+			// which never loads trashed or spam notes, leave it out of the
+			// counts, but keep comparing it in case it comes back.
+			if ( self::is_trashed( $note ) ) {
+				$open_ids[] = (int) $note->comment_ID;
+				continue;
+			}
+
 			if ( self::is_addressed( $note ) ) {
 				++$addressed;
 			} else {
+				++$still_open;
 				$open_ids[] = (int) $note->comment_ID;
 			}
 		}
 
 		return array(
 			'addressed'  => $addressed,
-			'still_open' => count( $open_ids ),
+			'still_open' => $still_open,
 			'open_ids'   => $open_ids,
 		);
 	}

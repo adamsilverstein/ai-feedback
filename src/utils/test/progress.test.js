@@ -15,6 +15,11 @@ import {
 
 vi.mock('@wordpress/editor', () => ({ store: 'core/editor' }));
 
+// Shared with tests/php/ReviewProgressTest.php, so the server and the
+// editor count the same notes.
+const ADDRESSED_CASES =
+	require('../../../tests/fixtures/addressed-cases.json').cases;
+
 /**
  * A core-data note record.
  *
@@ -168,4 +173,35 @@ describe('describeComparison', () => {
 			'Since the last review: 0 addressed, 0 new, 2 still open'
 		);
 	});
+});
+
+describe('shared addressed cases', () => {
+	// Core leaves trashed and spam notes out of the records the editor loads.
+	const isLoaded = (status) => !['trash', 'spam', 'deleted'].includes(status);
+
+	it.each(ADDRESSED_CASES.map((item) => [item.name, item]))(
+		'%s',
+		(_, { status, parent_status: parentStatus, meta, expected }) => {
+			const records = [];
+			let parent = 0;
+			if (parentStatus) {
+				parent = 1;
+				records.push(record(1, { status: parentStatus }));
+			}
+			const note = {
+				id: 2,
+				parent,
+				status: 'deleted' === status ? 'hold' : status,
+				is_resolved: !!meta.ai_feedback_resolved,
+			};
+			if (isLoaded(status)) {
+				records.push(record(2, { parent, status, meta }));
+			}
+
+			expect(getFeedbackProgress([note], records)).toEqual({
+				addressed: expected === 'addressed' ? 1 : 0,
+				total: expected === 'excluded' ? 0 : 1,
+			});
+		}
+	);
 });
