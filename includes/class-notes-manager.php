@@ -22,13 +22,6 @@ class Notes_Manager {
 	public const REPLY_EDIT_META_KEY = 'feedback_reply_edit';
 
 	/**
-	 * Comment meta key holding which revision of its thread's suggested edit
-	 * an AI reply's edit is: 1 for the first edit in the thread, counting the
-	 * review's quick fix, and 2 or more for a revised one.
-	 */
-	public const REVISION_META_KEY = 'feedback_revision';
-
-	/**
 	 * Comment meta key holding a review note's structural edit, as JSON:
 	 * removing its block, moving it, or inserting a block next to it.
 	 */
@@ -297,7 +290,7 @@ class Notes_Manager {
 			array(
 				'category' => self::first_meta( $meta, 'feedback_category' ),
 				'severity' => self::first_meta( $meta, 'feedback_severity' ),
-				'revision' => self::first_meta( $meta, self::REVISION_META_KEY ),
+				'revision' => null === self::decode_reply_edit( self::first_meta( $meta, self::REPLY_EDIT_META_KEY ) ) ? 0 : self::reply_edit_revision( $comment ),
 				'persona'  => self::first_meta( $meta, Personas::META_KEY ),
 			)
 		);
@@ -323,6 +316,60 @@ class Notes_Manager {
 		}
 
 		return $text . "\n\n" . $badges;
+	}
+
+	/**
+	 * Which revision of its thread's suggested edit an AI reply's edit is.
+	 *
+	 * Counted from the thread's order each time, not stored, so two edits
+	 * saved at the same moment still get consecutive numbers. Matches the
+	 * count in Reply_Status_Controller::get_threads().
+	 *
+	 * @param  \WP_Comment $comment AI reply with an edit.
+	 * @return int Revision from 1, or 0 outside a thread.
+	 */
+	private static function reply_edit_revision( \WP_Comment $comment ): int {
+		$parent_id = (int) $comment->comment_parent;
+		if ( $parent_id <= 0 ) {
+			return 0;
+		}
+
+		$revision = self::has_review_edit( $parent_id ) ? 1 : 0;
+		$replies  = get_comments(
+			array(
+				'parent'  => $parent_id,
+				'post_id' => (int) $comment->comment_post_ID,
+				'type'    => 'note',
+				'status'  => 'all',
+				'orderby' => array(
+					'comment_date' => 'ASC',
+					'comment_ID'   => 'ASC',
+				),
+			)
+		);
+		foreach ( $replies as $reply ) {
+			$reply_id = (int) $reply->comment_ID;
+			if ( get_comment_meta( $reply_id, 'ai_feedback', true ) && null !== self::decode_reply_edit( get_comment_meta( $reply_id, self::REPLY_EDIT_META_KEY, true ) ) ) {
+				++$revision;
+			}
+			if ( (int) $comment->comment_ID === $reply_id ) {
+				return $revision;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Whether a review note carries a quick fix, structural edit or
+	 * formatting fix, which is the first revision of its thread's edit.
+	 *
+	 * @param  int $note_id Note ID.
+	 * @return bool
+	 */
+	public static function has_review_edit( int $note_id ): bool {
+		return null !== ( new self() )->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) )
+			|| null !== self::decode_block_action( get_comment_meta( $note_id, self::BLOCK_ACTION_META_KEY, true ) )
+			|| null !== Block_Change::decode( get_comment_meta( $note_id, self::BLOCK_CHANGE_META_KEY, true ) );
 	}
 
 	/**
@@ -458,10 +505,6 @@ class Notes_Manager {
 
 		if ( ! empty( $feedback_item['house_rule'] ) && is_string( $feedback_item['house_rule'] ) ) {
 			$meta[ House_Style::PROPOSAL_META_KEY ] = House_Style::sanitize_rule( $feedback_item['house_rule'] );
-		}
-
-		if ( isset( $feedback_item['revision'] ) && is_int( $feedback_item['revision'] ) && $feedback_item['revision'] > 0 ) {
-			$meta[ self::REVISION_META_KEY ] = $feedback_item['revision'];
 		}
 
 		// Add block ID (clientId) if available.

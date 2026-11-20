@@ -376,8 +376,9 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
-	 * AI replies with an edit carry their stored revision, and edits saved
-	 * without one are numbered in order after the review's quick fix.
+	 * AI replies with an edit are numbered in order after the review's quick
+	 * fix. A number stored by an earlier version is ignored, so two edits
+	 * that were saved with the same number read one after the other.
 	 */
 	public function test_threads_number_edit_revisions(): void {
 		$this->seed_thread( 'complete' );
@@ -405,13 +406,13 @@ class ReplyStatusControllerTest extends TestCase {
 		$GLOBALS['test_comment_meta'][304] = array(
 			'ai_feedback'                                  => '1',
 			\AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY => $edit,
-			\AI_Feedback\Notes_Manager::REVISION_META_KEY   => '5',
+			'feedback_revision'                            => '2',
 		);
 
 		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
 		$replies = ( (array) $data['threads'] )[300]['replies'];
 
-		$this->assertSame( array( null, 2, null, 5 ), array_column( $replies, 'revision' ) );
+		$this->assertSame( array( null, 2, null, 3 ), array_column( $replies, 'revision' ) );
 	}
 
 	/**

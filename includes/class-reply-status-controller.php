@@ -247,12 +247,10 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			$edit     = $is_ai ? Notes_Manager::decode_reply_edit( get_comment_meta( $id, Notes_Manager::REPLY_EDIT_META_KEY, true ) ) : null;
 			$revision = null;
 			if ( null !== $edit ) {
-				// Edits saved before revisions were stored are counted in
-				// order, with the review's quick fix as the first.
-				$revisions[ $parent_id ] = ( $revisions[ $parent_id ] ?? ( self::has_quick_fix( $parent_id ) ? 1 : 0 ) ) + 1;
-
-				$stored   = get_comment_meta( $id, Notes_Manager::REVISION_META_KEY, true );
-				$revision = is_numeric( $stored ) && (int) $stored > 0 ? (int) $stored : $revisions[ $parent_id ];
+				// Counted in order, with the review's edit as the first, so
+				// edits saved at the same moment still number one by one.
+				$revisions[ $parent_id ] = ( $revisions[ $parent_id ] ?? ( Notes_Manager::has_review_edit( $parent_id ) ? 1 : 0 ) ) + 1;
+				$revision                = $revisions[ $parent_id ];
 			}
 
 			$threads[ $parent_id ]['replies'][] = array(
@@ -313,19 +311,6 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			$note_id = $parent;
 		}
 		return $note_id;
-	}
-
-	/**
-	 * Whether a note carries a review quick fix, structural edit or
-	 * formatting fix, which is the first revision of its thread's edit.
-	 *
-	 * @param int $note_id Note ID.
-	 * @return bool
-	 */
-	private static function has_quick_fix( int $note_id ): bool {
-		return null !== ( new Notes_Manager() )->decode_quick_fix( get_comment_meta( $note_id, 'feedback_quick_fix', true ) )
-			|| null !== Notes_Manager::decode_block_action( get_comment_meta( $note_id, Notes_Manager::BLOCK_ACTION_META_KEY, true ) )
-			|| null !== Block_Change::decode( get_comment_meta( $note_id, Notes_Manager::BLOCK_CHANGE_META_KEY, true ) );
 	}
 
 	/**

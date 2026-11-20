@@ -439,7 +439,7 @@ class Reply_Service {
 		$model              = self::preference_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL, $user_id );
 
 		if ( ! $is_mention ) {
-			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, false );
+			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $prompt, $system_instruction, $model, false );
 		}
 
 		// A mention starts a new request, so it counts against the review limit.
@@ -450,7 +450,7 @@ class Reply_Service {
 
 		$result = null;
 		try {
-			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, true );
+			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $prompt, $system_instruction, $model, true );
 		} finally {
 			// No answer was saved by this request, so give the slot back.
 			if ( ! is_int( $result ) || $result <= 0 ) {
@@ -487,14 +487,13 @@ class Reply_Service {
 	 * @param int                  $post_id            Post ID.
 	 * @param string               $block_id           Block ID from the root note.
 	 * @param array<string, mixed> $context            Reply context.
-	 * @param array<mixed>         $edits              Edits proposed in the thread, oldest first.
 	 * @param string               $prompt             Prompt.
 	 * @param string               $system_instruction System instruction.
 	 * @param string               $model              Model preference.
 	 * @param bool                 $is_mention         Whether the reply asks Fresh Eyes through a mention.
 	 * @return int|WP_Error New AI reply comment ID, or error.
 	 */
-	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, array $edits, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
+	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI call failed: ' . $ai_text->get_error_message() );
@@ -534,9 +533,6 @@ class Reply_Service {
 		}
 		if ( null !== $parsed['edit'] ) {
 			$feedback_item['reply_edit'] = $parsed['edit'];
-			// A new edit supersedes the thread's earlier ones; the editor
-			// takes their markers out and keeps only this one pending.
-			$feedback_item['revision'] = count( $edits ) + 1;
 		}
 		$review_data = array(
 			'review_id' => 'reply-' . $comment_id,
