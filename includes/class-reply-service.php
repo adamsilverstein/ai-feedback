@@ -401,7 +401,8 @@ class Reply_Service {
 			update_comment_meta(
 				$comment_id,
 				Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY,
-				mb_substr( sanitize_text_field( $result->get_error_message() ), 0, 300 )
+				// update_comment_meta() unslashes, which would strip backslashes.
+				wp_slash( mb_substr( sanitize_text_field( $result->get_error_message() ), 0, 300 ) )
 			);
 			return;
 		}

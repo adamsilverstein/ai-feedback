@@ -16,6 +16,7 @@ require_once dirname( __DIR__, 2 ) . '/includes/class-reply-cron-dispatcher.php'
 require_once dirname( __DIR__, 2 ) . '/includes/class-reply-service.php';
 require_once __DIR__ . '/reply-service-mocks.php';
 require_once __DIR__ . '/reply-cron-mocks.php';
+require_once __DIR__ . '/fixtures/backslash-text.php';
 
 /**
  * Subclass that captures the prompt and returns a canned AI reply.
@@ -57,6 +58,8 @@ class Reply_Service_Fake_Notes_Manager extends Notes_Manager {
  * Reply_Service test cases.
  */
 class ReplyServiceTest extends TestCase {
+
+	use Backslash_Text_Provider;
 
 	/**
 	 * Reset the fake-WP state before each test.
@@ -493,6 +496,41 @@ class ReplyServiceTest extends TestCase {
 		);
 		$this->assertStringNotContainsString(
 			'Provider exploded',
+			$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ]
+		);
+	}
+
+	/**
+	 * A provider error stored on the reply keeps its backslashes, since
+	 * update_comment_meta() unslashes the value.
+	 *
+	 * @dataProvider backslash_text_provider
+	 *
+	 * @param string $text Error message.
+	 */
+	public function test_failed_reply_error_keeps_backslashes( string $text ): void {
+		$this->seed_parent_and_reply();
+
+		$service = new class( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() ) extends Reply_Service {
+			/**
+			 * Error message the provider returns.
+			 *
+			 * @var string
+			 */
+			public string $message = '';
+
+			protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
+				return new \WP_Error( 'provider_error', $this->message );
+			}
+		};
+		$service->message = $text;
+
+		$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::STATUS_META_KEY ] = 'pending';
+
+		$service->on_reply_received( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame(
+			$text,
 			$GLOBALS['test_comment_meta'][999][ \AI_Feedback\Reply_Cron_Dispatcher::REPLY_ERROR_META_KEY ]
 		);
 	}

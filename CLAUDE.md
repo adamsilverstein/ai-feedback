@@ -142,6 +142,7 @@ Edit `class-prompt-builder.php`. Consider:
 - Escape all output (`esc_html`, `esc_attr`)
 - Capability checks on endpoints (`current_user_can`)
 - Validate AI responses against expected schema
+- `wp_slash()` text passed to `wp_insert_comment()`, `update_comment_meta()`, `update_post_meta()` and the like - they unslash it and would strip backslashes
 
 ## Debugging
 
