@@ -289,8 +289,8 @@ export function undoAcceptAll(registry, plan) {
 		([clientId, attributes]) =>
 			Object.entries(attributes).every(
 				([key, value]) =>
-					String(selectors.getBlock(clientId)?.attributes[key]) ===
-					String(value)
+					toHtml(selectors.getBlock(clientId)?.attributes[key]) ===
+					toHtml(value)
 			)
 	);
 	if (!unchanged) {

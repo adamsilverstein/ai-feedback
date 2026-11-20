@@ -570,7 +570,9 @@ class Response_Parser {
 		// A proofreading item is a text fix and nothing else, and always a
 		// suggestion: a typo is never a critical problem.
 		if ( self::GRAMMAR_CATEGORY === $validated['category'] ) {
-			if ( ! isset( $validated['quick_fix'] ) ) {
+			// A missing replacement is a malformed fix here, not a deletion.
+			$fix = $item['quick_fix'] ?? null;
+			if ( ! isset( $validated['quick_fix'] ) || ! is_array( $fix ) || ! is_string( $fix['replace'] ?? null ) ) {
 				Logger::debug( 'Grammar item without a usable quick fix, skipping' );
 				return null;
 			}
@@ -983,15 +985,17 @@ class Response_Parser {
 	}
 
 	/**
-	 * Keep only the quick fixes on each block that can be applied together,
-	 * and one by one in any order, without one changing where another applies.
+	 * Keep only the quick fixes on each block that can be applied together
+	 * without one changing where another applies.
 	 *
 	 * Fixes are kept in review order. A later fix loses its quick fix when its
-	 * text overlaps a kept fix's text, when applying a kept fix (or all of
-	 * them) moves its text, or makes it missing or ambiguous, or the other
-	 * way round, and once a block has MAX_FIXES_PER_BLOCK fixes. Accept all
-	 * in the editor replaces each fix's text where it was found
-	 * (src/utils/proofreading.js).
+	 * text overlaps a kept fix's text, when applying any one kept fix, or all
+	 * of them, moves its text or makes it missing or ambiguous, or the other
+	 * way round, and once a block has MAX_FIXES_PER_BLOCK fixes. Other
+	 * subsets are not checked, as their number grows exponentially: applying
+	 * some fixes one at a time can still leave another ambiguous, and the
+	 * editor then shows it as outdated rather than applying it. Accept all
+	 * locates every fix before replacing any (src/utils/proofreading.js).
 	 *
 	 * @param  array<int, array<string, mixed>> $items      Feedback items.
 	 * @param  array<mixed>                     $block_info Map of block IDs to their info, with `content`.
@@ -1008,8 +1012,10 @@ class Response_Parser {
 
 			$info    = $block_info[ $block_id ] ?? null;
 			$content = is_array( $info ) && is_string( $info['content'] ?? null ) ? $info['content'] : '';
-			$start   = self::find_unique_offset( $fix['find'], $content );
-			$others  = $kept[ $block_id ] ?? array();
+			// Byte offsets, compared only with each other; the editor works
+			// in UTF-16 units on its own copy of the text.
+			$start  = self::find_unique_offset( $fix['find'], $content );
+			$others = $kept[ $block_id ] ?? array();
 
 			$candidate = null === $start ? null : array(
 				'find'    => $fix['find'],

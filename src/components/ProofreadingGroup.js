@@ -183,12 +183,50 @@ export default function ProofreadingGroup({
 		}
 	};
 
+	/**
+	 * Save suggestion statuses, offering a retry for any that fail.
+	 *
+	 * @param {number[]} noteIds Suggestion (note) ids.
+	 * @param {string}   status  Status to save.
+	 * @return {Promise<void>}
+	 */
+	const saveStatuses = async (noteIds, status) => {
+		if (noteIds.length === 0) {
+			return;
+		}
+		const failed = await saveSuggestionStatuses(noteIds, status);
+		if (failed.length > 0) {
+			createWarningNotice(
+				__(
+					'Some suggested edits could not be updated in their notes.',
+					'fresh-eyes'
+				),
+				{
+					type: 'snackbar',
+					id: 'ai-feedback-proofreading-status-failed',
+					actions: [
+						{
+							label: __('Retry', 'fresh-eyes'),
+							onClick: () => saveStatuses(failed, status),
+						},
+					],
+				}
+			);
+		}
+	};
+
 	const handleAcceptAll = async () => {
 		setIsBusy(true);
 		try {
 			const plan = acceptAllFixes(registry, openItems, statuses);
 			const done = [...plan.applied, ...plan.accepted];
 			done.forEach((id) => setFixApplied(id, true));
+
+			// Undo waits on these, so its writes never land before them.
+			plan.saving = Promise.all([
+				setResolved(plan.applied, true),
+				saveStatuses(plan.accepted, 'applied-unsaved'),
+			]);
 
 			createSuccessNotice(
 				describeAcceptAll(done.length, plan.skipped.length),
@@ -207,13 +245,7 @@ export default function ProofreadingGroup({
 				}
 			);
 
-			const saves = [setResolved(plan.applied, true)];
-			if (plan.accepted.length > 0) {
-				saves.push(
-					saveSuggestionStatuses(plan.accepted, 'applied-unsaved')
-				);
-			}
-			await Promise.all(saves);
+			await plan.saving;
 		} finally {
 			setIsBusy(false);
 		}
@@ -233,11 +265,11 @@ export default function ProofreadingGroup({
 		[...plan.applied, ...plan.accepted].forEach((id) =>
 			setFixApplied(id, false)
 		);
-		const saves = [setResolved(plan.applied, false)];
-		if (plan.accepted.length > 0) {
-			saves.push(saveSuggestionStatuses(plan.accepted, 'pending'));
-		}
-		await Promise.all(saves);
+		await plan.saving;
+		await Promise.all([
+			setResolved(plan.applied, false),
+			saveStatuses(plan.accepted, 'pending'),
+		]);
 	};
 
 	const ids = new Set(items.map((item) => item.id));

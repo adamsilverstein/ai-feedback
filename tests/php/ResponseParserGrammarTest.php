@@ -152,6 +152,15 @@ class ResponseParserGrammarTest extends TestCase {
 				$no_fix,
 				// Not in the block.
 				self::grammar( 'b1', 'recieve', 'receive' ),
+				// A missing replacement is not a deletion.
+				array(
+					'block_id'  => 'b1',
+					'category'  => 'grammar',
+					'severity'  => 'suggestion',
+					'title'     => 'Spelling',
+					'feedback'  => 'Typo.',
+					'quick_fix' => array( 'find' => 'sat' ),
+				),
 				// Markup is never a valid fix.
 				self::grammar( 'b1', '<b>cat</b>', 'cat' ),
 				array(

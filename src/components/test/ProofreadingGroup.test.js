@@ -66,7 +66,7 @@ function renderGroup(paragraphs, makeItems) {
 	);
 	registry.dispatch(blockEditorStore).resetBlocks(blocks);
 
-	const calls = { resolved: [], applied: [] };
+	const calls = { resolved: [], applied: [], gate: null };
 	registry.registerStore('ai-feedback/store', {
 		reducer: (state = { applied: {} }, action) =>
 			action.type === 'SET_FIX_APPLIED'
@@ -85,10 +85,14 @@ function renderGroup(paragraphs, makeItems) {
 				calls.applied.push([noteId, isApplied]);
 				return { type: 'SET_FIX_APPLIED', noteId, isApplied };
 			},
-			setNoteResolved: (noteId, isResolved) => {
-				calls.resolved.push([noteId, isResolved]);
-				return { type: 'NOOP' };
-			},
+			setNoteResolved:
+				(noteId, isResolved) =>
+				async ({ dispatch }) => {
+					calls.resolved.push(['start', noteId, isResolved]);
+					await calls.gate?.[String(isResolved)];
+					calls.resolved.push(['end', noteId, isResolved]);
+					dispatch({ type: 'NOOP' });
+				},
 		},
 	});
 	registry.registerStore('core/editor', {
@@ -183,7 +187,12 @@ describe('ProofreadingGroup', () => {
 			'The <strong>cat</strong> ate a lot.'
 		);
 		expect(text(registry, blocks[1])).toBe('You receive it.');
-		expect(calls.resolved.sort()).toEqual([
+		expect(
+			calls.resolved
+				.filter(([step]) => step === 'end')
+				.map(([, id, resolved]) => [id, resolved])
+				.sort()
+		).toEqual([
 			[1, true],
 			[2, true],
 			[3, true],
@@ -200,10 +209,41 @@ describe('ProofreadingGroup', () => {
 			'Teh <strong>cat</strong> ate alot.'
 		);
 		expect(text(registry, blocks[1])).toBe('You recieve it.');
-		expect(calls.resolved.filter(([, resolved]) => !resolved)).toHaveLength(
-			3
-		);
+		expect(
+			calls.resolved.filter(
+				([step, , resolved]) => step === 'end' && !resolved
+			)
+		).toHaveLength(3);
 		expect(screen.getByText('4 proofreading fixes')).toBeInTheDocument();
+	});
+
+	it('waits for the notes to resolve before Undo reopens them', async () => {
+		let release;
+		const { registry, blocks, calls } = renderGroup(['Teh cat.'], (b) => [
+			note(1, b[0].clientId, 'Teh', 'The'),
+		]);
+		calls.gate = { true: new Promise((resolve) => (release = resolve)) };
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'Accept all' }));
+		});
+		const [notice] = registry.select(noticesStore).getNotices();
+		await act(async () => {
+			notice.actions[0].onClick();
+		});
+		// The text is back, but the note is not reopened while resolving runs.
+		expect(text(registry, blocks[0])).toBe('Teh cat.');
+		expect(calls.resolved).toEqual([['start', 1, true]]);
+
+		await act(async () => {
+			release();
+		});
+		expect(calls.resolved).toEqual([
+			['start', 1, true],
+			['end', 1, true],
+			['start', 1, false],
+			['end', 1, false],
+		]);
 	});
 
 	it('disables Accept all once nothing is left', () => {
