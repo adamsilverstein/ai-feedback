@@ -15,8 +15,32 @@
 
 declare( strict_types=1 );
 
+// The Suggestion Mode environment (.wp-env.suggestion-mode.json) turns on
+// Gutenberg's experiment for every request, not only the tests' own.
+if ( defined( 'AI_FEEDBACK_E2E_SUGGESTION_MODE' ) && AI_FEEDBACK_E2E_SUGGESTION_MODE && 'local' === wp_get_environment_type() ) {
+	$ai_feedback_e2e_suggestion_mode = static function ( mixed $experiments ): array {
+		$experiments = is_array( $experiments ) ? $experiments : array();
+
+		$experiments['gutenberg-suggestion-mode'] = 1;
+		return $experiments;
+	};
+	add_filter( 'option_gutenberg-experiments', $ai_feedback_e2e_suggestion_mode );
+	add_filter( 'default_option_gutenberg-experiments', $ai_feedback_e2e_suggestion_mode );
+	unset( $ai_feedback_e2e_suggestion_mode );
+}
+
 if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type() ) {
 	return;
+}
+
+// Lets a test treat pending suggestions as old enough to clean up.
+if ( isset( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) ) {
+	$ai_feedback_e2e_cleanup_delay = absint( $_COOKIE['ai_feedback_e2e_cleanup_delay'] );
+	add_filter(
+		'ai_feedback_suggestion_cleanup_delay',
+		static fn (): int => $ai_feedback_e2e_cleanup_delay
+	);
+	unset( $ai_feedback_e2e_cleanup_delay );
 }
 
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {

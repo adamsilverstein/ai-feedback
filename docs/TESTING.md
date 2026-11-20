@@ -1215,6 +1215,58 @@ test.describe( 'Settings', () => {
 } );
 ```
 
+### Suggestion Mode E2E Tests
+
+Stock wp-env has no Suggestion Mode, so the main suite only covers Preview and Apply. A second suite in `tests/e2e/suggestion-mode/specs` runs the Suggestion Mode paths against a Gutenberg build with the experiment on: reply edits accepted, rejected and revised, structural moves and removals accepted and rejected, Accept all with pending proofreading suggestions, and orphaned suggestion cleanup.
+
+```
+tests/e2e/suggestion-mode/
+├── gutenberg.json   # The pinned Gutenberg commit
+├── utils.js         # Notes sidebar Accept/Reject and suggestion meta helpers
+└── specs/
+```
+
+It runs on its own wp-env instance (`.wp-env.suggestion-mode.json`, port 8892, no tests site) with its own Playwright config (`playwright.suggestion-mode.config.js`). The main suite and stock wp-env are untouched. The e2e mu-plugin turns the `gutenberg-suggestion-mode` experiment on when the config defines `AI_FEEDBACK_E2E_SUGGESTION_MODE`.
+
+```mermaid
+flowchart LR
+    pin[gutenberg.json sha] --> build[bin/build-suggestion-mode-gutenberg.sh]
+    build --> cache[.cache/suggestion-mode/gutenberg]
+    cache --> env[wp-env --config=.wp-env.suggestion-mode.json]
+    env --> pw[playwright.suggestion-mode.config.js]
+```
+
+Run it locally:
+
+```bash
+# Builds Gutenberg at the pinned commit into .cache/suggestion-mode/gutenberg
+# the first time (uses Gutenberg's own .nvmrc through nvm, takes a while),
+# then starts the environment on http://localhost:8892.
+npm run env:suggestion-mode:start
+
+npm run test:e2e:suggestion-mode
+
+npm run env:suggestion-mode:stop
+```
+
+To run it on other ports, export `WP_ENV_PORT` before both the start and test commands; the Playwright config reads it.
+
+#### Which Gutenberg it runs
+
+The pin lives in one place, `tests/e2e/suggestion-mode/gutenberg.json`: a commit of [Gutenberg PR #78994](https://github.com/WordPress/gutenberg/pull/78994), the combined Suggestion Mode branch the Playground blueprint uses. It holds the whole stack the plugin relies on, including structural suggestions from [#80429](https://github.com/WordPress/gutenberg/pull/80429). A fixed commit keeps the suite stable; it moves only when someone bumps it.
+
+To bump it, set `sha` to the new head and run the suite:
+
+```bash
+gh pr view 78994 --repo WordPress/gutenberg --json headRefOid --jq .headRefOid
+```
+
+CI caches the build by commit, so the first run after a bump builds Gutenberg again (about 15 minutes) and later runs reuse it. Locally the build script rebuilds when the commit in `.cache/suggestion-mode/gutenberg/.built-sha` differs.
+
+#### In CI
+
+The `E2E Tests (Suggestion Mode)` workflow runs on the same changes as the main e2e workflow. It has `continue-on-error: true`, since it tracks unmerged Gutenberg work: a failure shows on the pull request but does not fail the run. Specs that fail because of a known plugin or upstream problem are marked `test.fixme` with a comment pointing at it.
+
 ## Visual Regression Tests
 
 ### Setup

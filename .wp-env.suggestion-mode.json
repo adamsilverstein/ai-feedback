@@ -1,0 +1,19 @@
+{
+	"core": "WordPress/WordPress#master",
+	"phpVersion": "8.2",
+	"plugins": ["./.cache/suggestion-mode/gutenberg", "."],
+	"themes": ["WordPress/twentytwentyfour"],
+	"port": 8892,
+	"testsEnvironment": false,
+	"config": {
+		"WP_DEBUG": true,
+		"WP_DEBUG_LOG": true,
+		"WP_DEBUG_DISPLAY": false,
+		"SCRIPT_DEBUG": true,
+		"WP_ENVIRONMENT_TYPE": "local",
+		"AI_FEEDBACK_E2E_SUGGESTION_MODE": true
+	},
+	"mappings": {
+		"wp-content/mu-plugins": "./tests/mu-plugins"
+	}
+}
