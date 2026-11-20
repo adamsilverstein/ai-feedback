@@ -14,8 +14,8 @@ import { store as blocksStore } from '@wordpress/blocks';
 import { insert, RichTextData } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
 import {
-	createFromSource,
 	markReplacement,
+	readSource,
 	readValue,
 	toContent,
 } from './source-newlines';
@@ -205,8 +205,13 @@ export function isRecordedSuggestion(noteId) {
  * @return {{content: (string|RichTextData|null), applied: number[], skipped: number[]}} New value (null when nothing applied) and the indexes of the fixes applied and skipped.
  */
 export function applyFixesToContent(content, fixes) {
-	let value = createFromSource(toHtml(content));
-	const read = readValue(value);
+	const source = readSource(
+		toHtml(content),
+		(fixes || []).map((fix) => fix?.replace ?? '')
+	);
+	const { marker } = source;
+	let value = source.value;
+	const read = readValue(value, marker);
 	const skipped = [];
 	const located = [];
 
@@ -250,7 +255,8 @@ export function applyFixesToContent(content, fixes) {
 			{
 				text: markReplacement(
 					value.text.slice(start, end),
-					fix.replace
+					fix.replace,
+					marker
 				),
 				formats: Array.from({ length }, () => value.formats[start]),
 				// Sparse, like the arrays rich text builds.
@@ -262,7 +268,7 @@ export function applyFixesToContent(content, fixes) {
 	}
 
 	return {
-		content: toContent(content, value),
+		content: toContent(content, value, marker),
 		applied: kept.map((entry) => entry.index).sort((a, b) => a - b),
 		skipped: skipped.sort((a, b) => a - b),
 	};

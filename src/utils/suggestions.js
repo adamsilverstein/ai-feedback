@@ -17,12 +17,13 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { concat, RichTextData, slice } from '@wordpress/rich-text';
+import { concat, create, RichTextData, slice } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
 import {
-	createFromSource,
 	fromSourceHTML,
 	markReplacement,
+	markSource,
+	readSource,
 	readValue,
 	toContent,
 	toSourceHTML,
@@ -126,8 +127,8 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 		return null;
 	}
 
-	const value = createFromSource(toHtml(content));
-	const start = findUniqueOffset(readValue(value), fix);
+	const { value, marker } = readSource(toHtml(content), [fix.replace]);
+	const start = findUniqueOffset(readValue(value, marker), fix);
 	if (start === -1) {
 		return null;
 	}
@@ -136,23 +137,30 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 	let markup = '';
 	if (fix.replace) {
 		const length = fix.replace.length;
-		const added = toSourceHTML({
-			text: markReplacement(value.text.slice(start, end), fix.replace),
-			formats: Array.from({ length }, () => value.formats[start]),
-			replacements: new Array(length),
-		});
+		const added = toSourceHTML(
+			{
+				text: markReplacement(
+					value.text.slice(start, end),
+					fix.replace,
+					marker
+				),
+				formats: Array.from({ length }, () => value.formats[start]),
+				replacements: new Array(length),
+			},
+			marker
+		);
 		markup += `${openMarker('add', id, authorId)}${added}</mark>`;
 	}
-	const removed = toSourceHTML(slice(value, start, end));
+	const removed = toSourceHTML(slice(value, start, end), marker);
 	markup += `${openMarker('del', id, authorId)}${removed}</mark>`;
 
 	const updated = concat(
 		slice(value, 0, start),
-		createFromSource(markup),
+		(marker && markSource(markup, marker)) || create({ html: markup }),
 		slice(value, end, value.text.length)
 	);
 
-	return toContent(content, updated);
+	return toContent(content, updated, marker);
 }
 
 /**
@@ -198,7 +206,8 @@ export function buildRewriteSuggestionContent(
 		})
 		.join('');
 
-	return toContent(content, createFromSource(markup));
+	const { value, marker } = readSource(markup);
+	return toContent(content, value, marker);
 }
 
 /**

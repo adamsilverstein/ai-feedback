@@ -10,8 +10,8 @@ import { create, insert, RichTextData } from '@wordpress/rich-text';
  * Internal dependencies
  */
 import {
-	createFromSource,
 	markReplacement,
+	readSource,
 	readValue,
 	toContent,
 } from './source-newlines';
@@ -171,8 +171,8 @@ export function findUniqueOffset(value, fix) {
  * @return {string|RichTextData|null} New attribute value, or null if the fix no longer applies.
  */
 export function applyFixToContent(content, fix) {
-	const value = createFromSource(toHtml(content));
-	const start = findUniqueOffset(readValue(value), fix);
+	const { value, marker } = readSource(toHtml(content), [fix?.replace]);
+	const start = findUniqueOffset(readValue(value, marker), fix);
 
 	if (start === -1) {
 		return null;
@@ -183,13 +183,17 @@ export function applyFixToContent(content, fix) {
 	const end = start + fix.find.length;
 	const length = fix.replace.length;
 	const replacement = {
-		text: markReplacement(value.text.slice(start, end), fix.replace),
+		text: markReplacement(
+			value.text.slice(start, end),
+			fix.replace,
+			marker
+		),
 		formats: Array.from({ length }, () => value.formats[start]),
 		// Sparse, like the arrays rich text builds: core-data reads every
 		// entry that exists when it orders footnotes.
 		replacements: new Array(length),
 	};
-	return toContent(content, insert(value, replacement, start, end));
+	return toContent(content, insert(value, replacement, start, end), marker);
 }
 
 /**

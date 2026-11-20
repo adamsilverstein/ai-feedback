@@ -88,14 +88,26 @@ describe.each([
 });
 
 describe('a fix whose text spans a newline in the HTML', () => {
-	it('keeps the newline where the replacement keeps it', () => {
-		expect(
-			applyFixToContent(SOURCE, {
-				find: 'grew\nlast year in order to',
-				replace: 'grew\nlast year to',
-			})
-		).toBe('Revenue grew\nlast year to grow.');
-	});
+	const SPANNING = {
+		find: 'grew\nlast year in order to',
+		replace: 'grew\nlast year to',
+	};
+
+	it.each([
+		['Apply', (content) => applyFixToContent(content, SPANNING)],
+		[
+			'Accept all',
+			(content) => applyFixesToContent(content, [SPANNING]).content,
+		],
+	])(
+		'keeps the newline where the replacement keeps it, with %s',
+		(label, apply) => {
+			expect(apply(SOURCE)).toBe('Revenue grew\nlast year to grow.');
+			expect(apply(parse(SOURCE)).toHTMLString()).toBe(
+				'Revenue grew\nlast year to grow.'
+			);
+		}
+	);
 
 	it('writes a newline the fix adds as a line break', () => {
 		expect(
@@ -175,5 +187,59 @@ describe('Suggestion Mode on a block with a newline in its HTML', () => {
 		});
 		expect(result).not.toContain('<br');
 		expect(result).toContain('Revenue grew\nlast year ');
+	});
+});
+
+describe('private use characters in the content', () => {
+	const GLYPH = '';
+
+	it('keeps one in a block without a source newline', () => {
+		expect(
+			applyFixToContent(`Call ${GLYPH} us in order to win.`, FIX)
+		).toBe(`Call ${GLYPH} us to win.`);
+	});
+
+	it('keeps one beside a source newline', () => {
+		const html = `Call ${GLYPH} us\nin order to win.`;
+		expect(applyFixToContent(html, FIX)).toBe(`Call ${GLYPH} us\nto win.`);
+		expect(applyFixesToContent(html, [FIX]).content).toBe(
+			`Call ${GLYPH} us\nto win.`
+		);
+		expect(applyFixToContent(parse(html), FIX).toHTMLString()).toBe(
+			`Call ${GLYPH} us\nto win.`
+		);
+	});
+
+	it('keeps one the replacement brings in', () => {
+		const fix = { find: 'in order to', replace: `${GLYPH} to` };
+		expect(applyFixToContent(SOURCE, fix)).toBe(
+			`Revenue grew\nlast year ${GLYPH} to grow.`
+		);
+		expect(applyFixesToContent(SOURCE, [fix]).content).toBe(
+			`Revenue grew\nlast year ${GLYPH} to grow.`
+		);
+		const suggested = buildSuggestionContent(SOURCE, fix, { id: 7 });
+		expect(suggested).toContain(`${GLYPH} to`);
+		expect(suggested).toContain('Revenue grew\nlast');
+		expect(suggested).not.toContain('<br');
+	});
+
+	it('keeps one in a suggestion and after accepting it', () => {
+		const html = `Call ${GLYPH} us\nin order to win.`;
+		const suggested = buildSuggestionContent(parse(html), FIX, { id: 7 });
+		expect(suggested.toHTMLString()).toContain(`Call ${GLYPH} us\n`);
+		expect(acceptSuggestionMarkers(suggested, 7).toHTMLString()).toBe(
+			`Call ${GLYPH} us\nto win.`
+		);
+	});
+
+	it('works as before when every private use character is taken', () => {
+		let glyphs = '';
+		for (let code = 0xe000; code <= 0xf8ff; code++) {
+			glyphs += String.fromCharCode(code);
+		}
+		expect(
+			applyFixToContent(`${glyphs} grew\nlast year in order to win.`, FIX)
+		).toBe(`${glyphs} grew<br>last year to win.`);
 	});
 });
