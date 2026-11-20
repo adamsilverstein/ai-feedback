@@ -300,6 +300,8 @@ A thread a person started is listed once a note in it mentions Fresh Eyes. It is
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
+`proposal` is a house style rule an AI reply offers to remember, as `{ "text": "Headings use sentence case", "status": "" }`, or null. `status` is `saved` or `dismissed` once the author acts on it. See [house style](#get-house-style).
+
 `revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
 Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
@@ -705,6 +707,46 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
 
 Returns one history entry plus the notes that review created, as `notes`. Notes deleted since the review ran are omitted. Returns `404` when the review is not in the post's history. Requires `edit_post` on the post.
 
+### GET /house-style
+
+House style rules: short plain text style preferences that every review and reply follows. Reviews flag writing that breaks a rule and leave alone what a rule allows. Site rules apply to everyone and are stored in the `ai_feedback_house_style` option; personal rules apply to one user's reviews and replies and are stored in that user's `ai_feedback_personal_house_style` meta. Requires `edit_posts`.
+
+```json
+{
+  "site": [ { "id": "6f1c...", "text": "Use the Oxford comma" } ],
+  "user": [ { "id": "9a2b...", "text": "Headings use sentence case" } ],
+  "can_manage_site": false,
+  "max_rules": 20,
+  "max_length": 150
+}
+```
+
+Rules are sanitized to single-line plain text (tags, line breaks and control characters removed), at most `max_length` characters and `max_rules` per list, and checked again when read. In prompts they sit in a `HOUSE STYLE` section, quoted one per line and framed as preferences rather than instructions, ahead of the output format. Personal rules are part of the core personal data export and eraser tools.
+
+### POST /house-style
+
+Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and a closing full stop) returns that rule. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
+
+```json
+{ "text": "Headings use sentence case", "scope": "user", "note_id": 790 }
+```
+
+`note_id` is optional: the AI reply that proposed the rule, which is then marked `saved`. It requires `edit_post` on that reply's post.
+
+### PUT /house-style/{id}, DELETE /house-style/{id}
+
+Change a rule's `text`, or remove it. Pass the rule's `scope` (`user` by default; `site` requires `manage_options`). Returns the lists, or `404` when the rule is gone.
+
+### POST /house-style/proposals/{note_id}/dismiss
+
+Record that the author doesn't want to keep a rule an AI reply proposed, so the thread stops offering it. Requires `edit_post` on the reply's post.
+
+### How replies propose a rule
+
+The reply prompt lists the rules and lets the AI add `"remember": "short rule"` to its JSON when the author states a standing preference, such as "we always write WordPress with a capital P". The rule is sanitized like a saved one and stored in the reply's `feedback_house_rule` comment meta, unless the author's reviews already follow it. Nothing is saved as a rule until the author clicks **Remember**, after editing the text if they like.
+
+---
+
 ### GET /analytics
 
 Usage summary for the Settings > AI Feedback Analytics page. Requires `manage_options`.
@@ -989,6 +1031,17 @@ Choose which block types a structural edit may insert. By default `core/paragrap
 add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
     return array_diff( $blocks, array( 'core/list' ) );
 } );
+```
+
+#### `ai_feedback_house_style_rules`
+
+Change the house style rules added to a user's review and reply prompts, for example to load them from elsewhere. Returned rules are sanitized and capped like saved ones.
+
+```php
+add_filter( 'ai_feedback_house_style_rules', function( array $rules, int $user_id ): array {
+    $rules[] = 'Write WordPress with a capital P';
+    return $rules;
+}, 10, 2 );
 ```
 
 #### `ai_feedback_max_review_images`

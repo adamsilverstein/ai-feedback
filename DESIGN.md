@@ -458,11 +458,13 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 | `ai_feedback_default_model` | string | `'claude-sonnet-5-5'` | Default AI model to use |
 | `ai_feedback_default_focus` | array | `['content', 'tone', 'flow']` | Default focus areas |
 | `ai_feedback_default_tone` | string | `'professional'` | Default target tone |
+| `ai_feedback_house_style` | array | `[]` | Site house style rules, `{ id, text }` each |
 
 #### User Meta (Per-User Settings)
 
 | Meta Key | Type | Description |
 |----------|------|-------------|
+| `ai_feedback_personal_house_style` | array | User's own house style rules, `{ id, text }` each |
 | `ai_feedback_model_preference` | string | User's preferred model |
 | `ai_feedback_dismissed_tips` | array | Onboarding tips user has dismissed |
 

@@ -191,6 +191,12 @@ When the AI proposes a simple wording change, such as fixing a typo or cutting f
 
 Fresh Eyes can't search the web, so it declines requests to research or link to sources. The name doesn't autocomplete in the Notes `@` menu, since Fresh Eyes isn't a site user; type it out.
 
+### House Style
+
+When you tell the AI how you always write, for example "we use sentence case for headings here", its reply offers **Remember this for future reviews** with the preference as a short rule. Edit it if you like, then click **Remember**; nothing is saved until you do. Later reviews flag writing that breaks a rule and stop flagging what a rule allows.
+
+Manage rules under **House style** in Review Settings. Rules marked **Just me** apply to your own reviews; administrators can also add rules for **Everyone on this site**.
+
 ### Usage Analytics
 
 **Settings → AI Feedback Analytics** shows how many reviews were run, by which model and user, and how the feedback breaks down by severity and category.
