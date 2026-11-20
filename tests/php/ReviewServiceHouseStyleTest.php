@@ -77,7 +77,7 @@ class ReviewServiceHouseStyleTest extends TestCase {
 		);
 		$GLOBALS['test_user_meta']       = array(
 			7 => array(
-				House_Style::USER_META_KEY => array(
+				House_Style::user_meta_key() => array(
 					array(
 						'id'   => 'u1',
 						'text' => 'Headings use sentence case',
@@ -85,7 +85,7 @@ class ReviewServiceHouseStyleTest extends TestCase {
 				),
 			),
 			8 => array(
-				House_Style::USER_META_KEY => array(
+				House_Style::user_meta_key() => array(
 					array(
 						'id'   => 'u2',
 						'text' => 'Someone else rule',

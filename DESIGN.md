@@ -464,7 +464,7 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 
 | Meta Key | Type | Description |
 |----------|------|-------------|
-| `ai_feedback_personal_house_style` | array | User's own house style rules, `{ id, text }` each |
+| `{prefix}ai_feedback_personal_house_style` | array | User's own house style rules on one site, `{ id, text }` each. Site-prefixed like `update_user_option()` |
 | `ai_feedback_model_preference` | string | User's preferred model |
 | `ai_feedback_dismissed_tips` | array | Onboarding tips user has dismissed |
 

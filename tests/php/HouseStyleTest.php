@@ -26,7 +26,17 @@ class HouseStyleTest extends TestCase {
 	/**
 	 * Reset stored options, user meta and the acting user.
 	 */
+	/**
+	 * The wpdb in place before the test.
+	 *
+	 * @var mixed
+	 */
+	private mixed $previous_wpdb = null;
+
 	protected function setUp(): void {
+		$this->previous_wpdb             = $GLOBALS['wpdb'] ?? null;
+		$GLOBALS['wpdb']                 = new \House_Style_Test_WPDB();
+		$GLOBALS['test_blog_id']         = 1;
 		$GLOBALS['test_options']         = array();
 		$GLOBALS['test_user_meta']       = array();
 		$GLOBALS['test_current_user_id'] = self::USER_ID;
@@ -36,7 +46,10 @@ class HouseStyleTest extends TestCase {
 	 * Clean up globals.
 	 */
 	protected function tearDown(): void {
+		$GLOBALS['wpdb'] = $this->previous_wpdb;
 		unset(
+			$GLOBALS['test_blog_id'],
+			$GLOBALS['test_user_blogs'],
 			$GLOBALS['test_options'],
 			$GLOBALS['test_user_meta'],
 			$GLOBALS['test_current_user_id'],
@@ -265,18 +278,53 @@ class HouseStyleTest extends TestCase {
 	}
 
 	/**
-	 * A user's personal rules can be exported and erased.
+	 * Personal rules belong to the site they were saved on: on another site
+	 * of the network they are neither listed nor sent with prompts.
 	 */
-	public function test_privacy_export_and_erase(): void {
-		$GLOBALS['test_user_emails'] = array( 'jane@example.test' => self::USER_ID );
+	public function test_personal_rules_are_per_site(): void {
 		House_Style::add_rule( House_Style::SCOPE_USER, 'Use sentence case' );
+		$this->assertArrayHasKey( 'wp_ai_feedback_personal_house_style', $GLOBALS['test_user_meta'][ self::USER_ID ] );
+
+		$GLOBALS['test_blog_id'] = 2;
+		$this->assertSame( array(), House_Style::get_rules( House_Style::SCOPE_USER ) );
+		$this->assertSame( array(), House_Style::get_prompt_rules( self::USER_ID ) );
+		House_Style::add_rule( House_Style::SCOPE_USER, 'Spell out numbers under ten' );
+		$this->assertSame( array( 'Spell out numbers under ten' ), House_Style::get_prompt_rules( self::USER_ID ) );
+
+		$GLOBALS['test_blog_id'] = 1;
+		$this->assertSame( array( 'Use sentence case' ), House_Style::get_prompt_rules( self::USER_ID ) );
+	}
+
+	/**
+	 * The privacy tools export and erase a user's personal rules on every
+	 * site they belong to.
+	 */
+	public function test_privacy_export_and_erase_cover_every_site(): void {
+		$GLOBALS['test_user_emails'] = array( 'jane@example.test' => self::USER_ID );
+		$GLOBALS['test_user_blogs']  = array(
+			self::USER_ID => array(
+				1 => (object) array( 'blogname' => 'Main' ),
+				2 => (object) array( 'blogname' => 'News' ),
+			),
+		);
+		House_Style::add_rule( House_Style::SCOPE_USER, 'Use sentence case' );
+		$GLOBALS['test_blog_id'] = 2;
+		House_Style::add_rule( House_Style::SCOPE_USER, 'Spell out numbers under ten' );
+		$GLOBALS['test_blog_id'] = 1;
 
 		$export = House_Style::export_personal_data( 'jane@example.test' );
-		$this->assertCount( 1, $export['data'] );
-		$this->assertSame( 'Use sentence case', $export['data'][0]['data'][0]['value'] );
+		$this->assertSame(
+			array(
+				array( 'Main', 'Use sentence case' ),
+				array( 'News', 'Spell out numbers under ten' ),
+			),
+			array_map( static fn ( array $item ): array => array_column( $item['data'], 'value' ), $export['data'] )
+		);
 
 		$erased = House_Style::erase_personal_data( 'jane@example.test' );
 		$this->assertTrue( $erased['items_removed'] );
+		$this->assertSame( array(), House_Style::get_rules( House_Style::SCOPE_USER ) );
+		$GLOBALS['test_blog_id'] = 2;
 		$this->assertSame( array(), House_Style::get_rules( House_Style::SCOPE_USER ) );
 
 		$this->assertFalse( House_Style::erase_personal_data( 'jane@example.test' )['items_removed'] );

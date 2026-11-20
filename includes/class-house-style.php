@@ -13,9 +13,11 @@ use WP_Error;
  * Stores the short style rules that reviews and replies follow.
  *
  * Site rules live in an option and apply to everyone. Personal rules live
- * in the user's preferences and apply to that user's reviews and replies.
- * On multisite, site rules are per site and personal rules follow the user
- * across the network, like the other User_Preferences.
+ * in user meta and apply to that user's reviews and replies. Both belong to
+ * one site: on multisite, personal rules are kept under a site-prefixed meta
+ * key (as `update_user_option()` does), since a house style belongs to a
+ * publication. That differs from the other User_Preferences, which follow
+ * the user across the network.
  * Rules are user-written text that ends up in prompts, so they are stored
  * as single-line plain text, capped in count and length, and checked again
  * whenever they are read.
@@ -28,7 +30,8 @@ class House_Style {
 	public const SITE_OPTION = 'ai_feedback_house_style';
 
 	/**
-	 * User preference holding a user's personal rules.
+	 * User meta holding a user's personal rules, after the site's table
+	 * prefix. See user_meta_key().
 	 */
 	public const USER_META_KEY = 'ai_feedback_personal_house_style';
 
@@ -124,7 +127,7 @@ class House_Style {
 			$stored = get_option( self::SITE_OPTION, array() );
 		} else {
 			$user_id = $user_id > 0 ? $user_id : get_current_user_id();
-			$stored  = $user_id > 0 ? get_user_meta( $user_id, self::USER_META_KEY, true ) : array();
+			$stored  = $user_id > 0 ? get_user_meta( $user_id, self::user_meta_key(), true ) : array();
 		}
 
 		return self::normalize( $stored );
@@ -415,18 +418,25 @@ class House_Style {
 		$user  = get_user_by( 'email', $email_address );
 		$items = array();
 		if ( $user ) {
-			foreach ( self::get_rules( self::SCOPE_USER, (int) $user->ID ) as $rule ) {
-				$items[] = array(
-					'group_id'    => 'ai-feedback-house-style',
-					'group_label' => __( 'Fresh Eyes house style', 'fresh-eyes' ),
-					'item_id'     => 'ai-feedback-house-style-' . $rule['id'],
-					'data'        => array(
-						array(
-							'name'  => __( 'Rule', 'fresh-eyes' ),
-							'value' => $rule['text'],
+			foreach ( self::get_user_sites( (int) $user->ID ) as $site_id => $site_name ) {
+				$key = self::user_meta_key( $site_id );
+				foreach ( self::normalize( get_user_meta( (int) $user->ID, $key, true ) ) as $rule ) {
+					$items[] = array(
+						'group_id'    => 'ai-feedback-house-style',
+						'group_label' => __( 'Fresh Eyes house style', 'fresh-eyes' ),
+						'item_id'     => 'ai-feedback-house-style-' . $site_id . '-' . $rule['id'],
+						'data'        => array(
+							array(
+								'name'  => __( 'Site', 'fresh-eyes' ),
+								'value' => $site_name,
+							),
+							array(
+								'name'  => __( 'Rule', 'fresh-eyes' ),
+								'value' => $rule['text'],
+							),
 						),
-					),
-				);
+					);
+				}
 			}
 		}
 
@@ -444,9 +454,15 @@ class House_Style {
 	 */
 	public static function erase_personal_data( string $email_address ): array {
 		$user    = get_user_by( 'email', $email_address );
-		$removed = $user && array() !== self::get_rules( self::SCOPE_USER, (int) $user->ID );
-		if ( $removed ) {
-			delete_user_meta( (int) $user->ID, self::USER_META_KEY );
+		$removed = false;
+		if ( $user ) {
+			foreach ( array_keys( self::get_user_sites( (int) $user->ID ) ) as $site_id ) {
+				$key = self::user_meta_key( $site_id );
+				if ( array() !== self::normalize( get_user_meta( (int) $user->ID, $key, true ) ) ) {
+					$removed = true;
+				}
+				delete_user_meta( (int) $user->ID, $key );
+			}
 		}
 
 		return array(
@@ -455,6 +471,39 @@ class House_Style {
 			'messages'       => array(),
 			'done'           => true,
 		);
+	}
+
+	/**
+	 * User meta key of personal rules on a site: the site's table prefix,
+	 * then USER_META_KEY, as `update_user_option()` stores per-site options.
+	 *
+	 * @param  int|null $site_id Site ID. Defaults to the current site.
+	 * @return string Meta key.
+	 */
+	public static function user_meta_key( ?int $site_id = null ): string {
+		global $wpdb;
+		$prefix = is_object( $wpdb ) && method_exists( $wpdb, 'get_blog_prefix' ) ? $wpdb->get_blog_prefix( $site_id ) : '';
+		return ( is_string( $prefix ) ? $prefix : '' ) . self::USER_META_KEY;
+	}
+
+	/**
+	 * Sites a user may have personal rules on, for the privacy tools.
+	 *
+	 * @param  int $user_id User ID.
+	 * @return array<int, string> Site name by site ID; the current site when there is no list.
+	 */
+	private static function get_user_sites( int $user_id ): array {
+		$sites = array();
+		if ( function_exists( 'get_blogs_of_user' ) ) {
+			foreach ( get_blogs_of_user( $user_id ) as $site_id => $site ) {
+				$name                    = isset( $site->blogname ) && is_string( $site->blogname ) ? $site->blogname : '';
+				$sites[ (int) $site_id ] = $name;
+			}
+		}
+		if ( array() === $sites ) {
+			$sites[ get_current_blog_id() ] = get_bloginfo( 'name' );
+		}
+		return $sites;
 	}
 
 	/**
@@ -533,7 +582,7 @@ class House_Style {
 			return;
 		}
 		// update_user_meta() unslashes, which would drop backslashes from rules.
-		User_Preferences::set( self::USER_META_KEY, wp_slash( $rules ) );
+		update_user_meta( get_current_user_id(), self::user_meta_key(), wp_slash( $rules ) );
 	}
 
 	/**
