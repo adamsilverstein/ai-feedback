@@ -38,9 +38,26 @@ class Personas {
 	public const MAX_TAKEAWAY_LENGTH = 200;
 
 	/**
+	 * Maximum length of a persona's label, shown on badges and in the prompt.
+	 */
+	public const MAX_LABEL_LENGTH = 60;
+
+	/**
+	 * Maximum length of a persona's description, shown under its option.
+	 */
+	public const MAX_DESCRIPTION_LENGTH = 200;
+
+	/**
 	 * Maximum length of a persona's prompt guidance.
 	 */
-	private const MAX_GUIDANCE_LENGTH = 1000;
+	public const MAX_GUIDANCE_LENGTH = 1000;
+
+	/**
+	 * Personas for this request, once `init` has run.
+	 *
+	 * @var array<string, array{label: string, description: string, guidance: string}>|null
+	 */
+	private static ?array $cache = null;
 
 	/**
 	 * Get every persona, keyed by ID.
@@ -48,6 +65,10 @@ class Personas {
 	 * @return array<string, array{label: string, description: string, guidance: string}> Personas.
 	 */
 	public static function get_all(): array {
+		if ( null !== self::$cache ) {
+			return self::$cache;
+		}
+
 		$built_in = array(
 			self::DEFAULT_PERSONA => array(
 				'label'       => __( 'Copy editor', 'fresh-eyes' ),
@@ -76,8 +97,10 @@ class Personas {
 		 *
 		 * Keys are persona IDs: lowercase letters, numbers, `_` and `-`, at
 		 * most 40 characters. `guidance` is added to the review prompt and
-		 * describes who the reader is and what they notice. The copy editor
-		 * is always available and adds nothing to the prompt.
+		 * describes who the reader is and what they notice. Labels are cut
+		 * to 60 characters, descriptions to 200 and guidance to 1000. The
+		 * copy editor is always available and adds nothing to the prompt.
+		 * The result is cached for the request once `init` has run.
 		 *
 		 * @param array<string, array{label: string, description?: string, guidance: string}> $personas Personas keyed by ID.
 		 */
@@ -88,7 +111,22 @@ class Personas {
 		$default['guidance'] = '';
 		unset( $personas[ self::DEFAULT_PERSONA ] );
 
-		return array( self::DEFAULT_PERSONA => $default ) + $personas;
+		$all = array( self::DEFAULT_PERSONA => $default ) + $personas;
+
+		// Filters added before `init` are all in place by then, so the
+		// result can be kept for the rest of the request.
+		if ( did_action( 'init' ) ) {
+			self::$cache = $all;
+		}
+
+		return $all;
+	}
+
+	/**
+	 * Forget the cached personas, for example after adding a filter late.
+	 */
+	public static function flush_cache(): void {
+		self::$cache = null;
 	}
 
 	/**
@@ -120,7 +158,7 @@ class Personas {
 			return null;
 		}
 
-		$label = is_string( $persona['label'] ?? null ) ? sanitize_text_field( $persona['label'] ) : '';
+		$label = is_string( $persona['label'] ?? null ) ? trim( mb_substr( sanitize_text_field( $persona['label'] ), 0, self::MAX_LABEL_LENGTH ) ) : '';
 		if ( '' === $label ) {
 			return null;
 		}
@@ -130,7 +168,7 @@ class Personas {
 
 		return array(
 			'label'       => $label,
-			'description' => $description,
+			'description' => mb_substr( $description, 0, self::MAX_DESCRIPTION_LENGTH ),
 			'guidance'    => mb_substr( $guidance, 0, self::MAX_GUIDANCE_LENGTH ),
 		);
 	}

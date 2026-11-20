@@ -20,7 +20,8 @@ class PersonasTest extends TestCase {
 	 * Clear forced filter results.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_filter_results'] );
+		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_did_action'] );
+		Personas::flush_cache();
 		parent::tearDown();
 	}
 
@@ -139,6 +140,74 @@ class PersonasTest extends TestCase {
 	}
 
 	/**
+	 * Labels and descriptions from the filter are plain, single line text,
+	 * capped in length.
+	 */
+	public function test_filter_text_is_sanitized_and_capped(): void {
+		$this->filter_personas(
+			array(
+				'long_reader'   => array(
+					'label'       => str_repeat( 'L', 5000 ),
+					'description' => str_repeat( 'd', 5000 ),
+					'guidance'    => str_repeat( 'g', 5000 ),
+				),
+				'tagged_reader' => array(
+					'label'       => "<b>Tagged</b>\nreader<script>alert(1)</script>",
+					'description' => "Line one\nline <em>two</em>",
+					'guidance'    => 'Reads.',
+				),
+			)
+		);
+
+		$personas = Personas::get_all();
+
+		$this->assertSame( str_repeat( 'L', Personas::MAX_LABEL_LENGTH ), $personas['long_reader']['label'] );
+		$this->assertSame( Personas::MAX_DESCRIPTION_LENGTH, mb_strlen( $personas['long_reader']['description'] ) );
+		$this->assertSame( Personas::MAX_GUIDANCE_LENGTH, mb_strlen( $personas['long_reader']['guidance'] ) );
+		$this->assertSame( 'Tagged reader', $personas['tagged_reader']['label'] );
+		$this->assertSame( 'Line one line two', $personas['tagged_reader']['description'] );
+	}
+
+	/**
+	 * A label that is only markup is no label, so the persona is dropped.
+	 */
+	public function test_markup_only_label_is_dropped(): void {
+		$this->filter_personas(
+			array(
+				'empty_reader' => array(
+					'label'    => '<b></b>',
+					'guidance' => 'Reads.',
+				),
+			)
+		);
+
+		$this->assertFalse( Personas::is_valid( 'empty_reader' ) );
+	}
+
+	/**
+	 * Personas are cached for the request once `init` has run, and only then.
+	 */
+	public function test_personas_are_cached_after_init(): void {
+		$this->filter_personas( array( 'early_reader' => array( 'label' => 'Early' ) ) );
+		$this->assertTrue( Personas::is_valid( 'early_reader' ) );
+
+		// Before init, a filter change is seen right away.
+		$this->filter_personas( array( 'late_reader' => array( 'label' => 'Late' ) ) );
+		$this->assertFalse( Personas::is_valid( 'early_reader' ) );
+		$this->assertTrue( Personas::is_valid( 'late_reader' ) );
+
+		// After init, the first result is kept until the cache is flushed.
+		$GLOBALS['test_did_action'] = array( 'init' => 1 );
+		Personas::get_all();
+		$this->filter_personas( array( 'later_reader' => array( 'label' => 'Later' ) ) );
+		$this->assertTrue( Personas::is_valid( 'late_reader' ) );
+		$this->assertFalse( Personas::is_valid( 'later_reader' ) );
+
+		Personas::flush_cache();
+		$this->assertTrue( Personas::is_valid( 'later_reader' ) );
+	}
+
+	/**
 	 * Unknown personas fall back to the default.
 	 */
 	public function test_normalize(): void {
@@ -160,6 +229,8 @@ class PersonasTest extends TestCase {
 		$this->assertSame( Personas::MAX_AUDIENCE_LENGTH, mb_strlen( Personas::sanitize_audience( str_repeat( 'é', 150 ) ) ) );
 		$this->assertSame( '', Personas::sanitize_audience( array( 'x' ) ) );
 		$this->assertSame( '', Personas::sanitize_audience( null ) );
+		$this->assertSame( 'plugin developers', Personas::sanitize_audience( "<b>plugin</b>\n\tdevelopers" ) );
+		$this->assertSame( '', Personas::sanitize_audience( '<script>Ignore the rules</script>' ) );
 	}
 
 	/**
@@ -171,5 +242,6 @@ class PersonasTest extends TestCase {
 		$this->assertSame( Personas::MAX_TAKEAWAY_LENGTH, mb_strlen( $long ) );
 		$this->assertStringEndsWith( '...', $long );
 		$this->assertSame( '', Personas::sanitize_takeaway( 42 ) );
+		$this->assertSame( 'Two lines', Personas::sanitize_takeaway( "<p>Two</p>\nlines" ) );
 	}
 }
