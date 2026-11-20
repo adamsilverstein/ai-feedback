@@ -344,7 +344,7 @@ class House_Style {
 		}
 
 		$statuses[ $user_id ] = $status;
-		update_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, $statuses );
+		update_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, wp_slash( $statuses ) );
 	}
 
 	/**

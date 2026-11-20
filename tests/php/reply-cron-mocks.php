@@ -50,7 +50,8 @@ namespace {
 			if ( '' !== $prev_value && ( $GLOBALS['test_comment_meta'][ $comment_id ][ $key ] ?? null ) != $prev_value ) {
 				return false;
 			}
-			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = $value;
+			// Like core's update_metadata(), which unslashes the value.
+			$GLOBALS['test_comment_meta'][ $comment_id ][ $key ] = wp_unslash( $value );
 			return true;
 		}
 	}

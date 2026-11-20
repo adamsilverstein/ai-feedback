@@ -446,7 +446,7 @@ if ( ! function_exists( 'get_user_meta' ) ) {
 
 if ( ! function_exists( 'update_user_meta' ) ) {
 	function update_user_meta( $user_id, $key, $value ) {
-		// Like core, which unslashes the value before saving it.
+		// Like core's update_metadata(), which unslashes the value.
 		$GLOBALS['test_user_meta'][ $user_id ][ $key ] = wp_unslash( $value );
 		return true;
 	}
@@ -618,7 +618,8 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 
 if ( ! function_exists( 'update_post_meta' ) ) {
 	function update_post_meta( $post_id, $key, $value ) {
-		$GLOBALS['test_post_meta'][ $post_id ][ $key ] = $value;
+		// Like core's update_metadata(), which unslashes the value.
+		$GLOBALS['test_post_meta'][ $post_id ][ $key ] = wp_unslash( $value );
 		return true;
 	}
 }

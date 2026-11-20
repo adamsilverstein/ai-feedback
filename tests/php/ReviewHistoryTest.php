@@ -12,6 +12,8 @@ use AI_Feedback\Review_History;
 use AI_Feedback\History_Controller;
 use AI_Feedback\Notes_Manager;
 
+require_once __DIR__ . '/fixtures/backslash-text.php';
+
 /**
  * Notes manager stub that returns canned notes.
  */
@@ -39,6 +41,8 @@ class StubNotesManager extends Notes_Manager {
  * Review history tests.
  */
 class ReviewHistoryTest extends TestCase {
+
+	use Backslash_Text_Provider;
 
 	/**
 	 * Reset global fixtures.
@@ -311,5 +315,22 @@ class ReviewHistoryTest extends TestCase {
 		$request->set_param( 'post_id', 42 );
 
 		$this->assertTrue( ( new History_Controller( new StubNotesManager() ) )->get_history_permissions_check( $request ) );
+	}
+
+	/**
+	 * The stored AI summary keeps its backslashes, since update_post_meta()
+	 * unslashes the value.
+	 *
+	 * @dataProvider backslash_text_provider
+	 *
+	 * @param string $text Summary text.
+	 */
+	public function test_summary_text_keeps_backslashes( string $text ): void {
+		$review                 = $this->review( 'aaa-1' );
+		$review['summary_text'] = $text;
+
+		Review_History::record( 42, $review );
+
+		$this->assertSame( $text, Review_History::get_summary_text( 42, 'aaa-1' ) );
 	}
 }

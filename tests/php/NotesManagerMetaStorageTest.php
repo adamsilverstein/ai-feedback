@@ -10,6 +10,8 @@ namespace AI_Feedback\Tests;
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Notes_Manager;
 
+require_once __DIR__ . '/fixtures/backslash-text.php';
+
 /**
  * Round trips of the JSON stored in note meta.
  *
@@ -17,6 +19,8 @@ use AI_Feedback\Notes_Manager;
  * through add_comment_meta().
  */
 class NotesManagerMetaStorageTest extends TestCase {
+
+	use Backslash_Text_Provider;
 
 	/**
 	 * Load the fake comment API and reset it.
@@ -187,5 +191,51 @@ class NotesManagerMetaStorageTest extends TestCase {
 
 		$fields = new \ReflectionMethod( Notes_Manager::class, 'get_feedback_fields' );
 		$this->assertSame( $change, $fields->invoke( new Notes_Manager(), $root )['block_change'] );
+	}
+
+	/**
+	 * Review note text keeps its backslashes, since wp_insert_comment()
+	 * unslashes the comment content.
+	 *
+	 * @dataProvider backslash_text_provider
+	 *
+	 * @param string $text Note text.
+	 */
+	public function test_review_note_text_keeps_backslashes( string $text ): void {
+		$result = ( new Notes_Manager() )->create_notes_from_feedback(
+			array(
+				array(
+					'block_id' => 'block-1',
+					'category' => 'content',
+					'severity' => 'suggestion',
+					'feedback' => $text,
+				),
+			),
+			10
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( $text, get_comment( $result['note_ids'][0] )->comment_content );
+	}
+
+	/**
+	 * AI reply text keeps its backslashes.
+	 *
+	 * @dataProvider backslash_text_provider
+	 *
+	 * @param string $text Reply text.
+	 */
+	public function test_reply_text_keeps_backslashes( string $text ): void {
+		$note_id = ( new Notes_Manager() )->add_reply_to_thread(
+			array(
+				'feedback' => $text,
+				'block_id' => 'block-1',
+			),
+			10,
+			5
+		);
+
+		$this->assertIsInt( $note_id );
+		$this->assertSame( $text, get_comment( $note_id )->comment_content );
 	}
 }
