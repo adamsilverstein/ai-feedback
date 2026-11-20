@@ -5,6 +5,7 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect } from '@wordpress/element';
 import FeedbackList from './FeedbackList';
 import ModelName from './ModelName';
+import { describeSkippedImages } from '../utils/skipped-images';
 
 /**
  * Labels for the feedback categories, built at render time so translations apply.
@@ -62,6 +63,7 @@ export default function ReviewSummary({ review }) {
 		persona_label: personaLabel,
 	} = review;
 	const personaTakeaway = personaLabel ? review.persona_takeaway : '';
+	const skippedImageLines = describeSkippedImages(review.images_skipped);
 
 	const hasNotes = notes && notes.length > 0;
 	const mappedBlockCount = blockMapping
@@ -98,6 +100,15 @@ export default function ReviewSummary({ review }) {
 					)}
 				</p>
 			)}
+
+			{skippedImageLines.map((line) => (
+				<p
+					key={line}
+					className="ai-feedback-review-status ai-feedback-images-skipped description"
+				>
+					{line}
+				</p>
+			))}
 
 			{/* AI-generated summary text */}
 			{(summaryText || personaTakeaway) && (

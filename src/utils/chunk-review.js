@@ -69,6 +69,10 @@ export function mergeChunkResponses(responses) {
 				...(response.block_mapping || {}),
 			},
 			note_count: acc.note_count + (response.note_count || 0),
+			images_skipped: [
+				...acc.images_skipped,
+				...(response.images_skipped || []),
+			],
 			summary: {
 				total_notes:
 					acc.summary.total_notes +
@@ -91,6 +95,7 @@ export function mergeChunkResponses(responses) {
 			note_ids: [],
 			block_mapping: {},
 			note_count: 0,
+			images_skipped: [],
 			summary: {
 				total_notes: 0,
 				by_category: {},
