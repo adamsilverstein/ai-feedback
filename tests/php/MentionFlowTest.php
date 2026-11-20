@@ -365,7 +365,10 @@ class MentionFlowTest extends TestCase {
 
 		$this->process( 300 );
 
-		$this->assertSame( 'A study at [link removed] backs this.', $this->notes->saved[900]['feedback'] ?? null );
+		$this->assertSame(
+			'A study at [link removed] backs this. (The suggested change was left out because it added a link Fresh Eyes could not check.)',
+			$this->notes->saved[900]['feedback'] ?? null
+		);
 		$this->assertArrayNotHasKey( 'reply_edit', $this->notes->saved[900] ?? array() );
 	}
 
@@ -392,6 +395,18 @@ class MentionFlowTest extends TestCase {
 		$this->process( 300 );
 
 		$this->assertCount( 1, $GLOBALS['test_user_meta'][7]['ai_feedback_reviews'] ?? array() );
+	}
+
+	/**
+	 * A slot is given back when no answer is saved, here an empty AI reply.
+	 */
+	public function test_failed_answer_gives_the_slot_back(): void {
+		$this->service->response = '{"reply": "", "edit": null}';
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->assertSame( 'failed', $this->process( 300 )['status'] );
+		$this->assertSame( array(), $GLOBALS['test_user_meta'][7]['ai_feedback_reviews'] ?? array() );
+		$this->assertSame( array(), self::mention_actions() );
 	}
 
 	/**

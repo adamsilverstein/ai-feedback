@@ -38,6 +38,12 @@ class Mentions {
 	public const META_KEY = 'ai_feedback_mention';
 
 	/**
+	 * A web address: `http(s)://` or `www.` up to whitespace, quotes,
+	 * brackets or a backslash.
+	 */
+	private const URL_PATTERN = '#\b(?:https?://|www\.)[^\s"\'<>()\[\]\\\\]+#i';
+
+	/**
 	 * Elements whose text is quoted, not written by the note's author.
 	 */
 	private const QUOTED_TAGS = 'blockquote|q|code|pre';
@@ -193,7 +199,7 @@ class Mentions {
 	 * @return list<string> Addresses, lowercased and without a trailing slash or punctuation.
 	 */
 	public static function find_urls( string $text ): array {
-		if ( ! preg_match_all( '#\bhttps?://[^\s"\'<>()\[\]\\\\]+#i', $text, $matches ) ) {
+		if ( ! preg_match_all( self::URL_PATTERN, $text, $matches ) ) {
 			return array();
 		}
 
@@ -218,7 +224,7 @@ class Mentions {
 		$known = self::find_urls( $sources );
 
 		$cleaned = preg_replace_callback(
-			'#\bhttps?://[^\s"\'<>()\[\]\\\\]+#i',
+			self::URL_PATTERN,
 			static function ( array $found ) use ( $known ): string {
 				if ( in_array( self::normalize_url( $found[0] ), $known, true ) ) {
 					return $found[0];
@@ -252,6 +258,7 @@ class Mentions {
 	 * @return string
 	 */
 	private static function normalize_url( string $url ): string {
-		return rtrim( strtolower( $url ), '/.,;:!?' );
+		$url = (string) preg_replace( '#^https?://#i', '', strtolower( $url ) );
+		return rtrim( (string) preg_replace( '#^www\.#', '', $url ), '/.,;:!?' );
 	}
 }

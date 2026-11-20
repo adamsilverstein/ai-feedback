@@ -230,6 +230,7 @@ class Plugin {
 				'connectorsUrl'         => admin_url( 'options-general.php?page=connectors' ),
 				'suggestions'           => Suggestions::is_available(),
 				'structuralSuggestions' => Suggestions::is_structural_available(),
+				'mentionHandles'        => Mentions::get_handles(),
 				'priorityThresholds'    => array(
 					'high'   => Response_Parser::PRIORITY_HIGH_THRESHOLD,
 					'medium' => Response_Parser::PRIORITY_MEDIUM_THRESHOLD,

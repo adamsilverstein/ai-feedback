@@ -24,23 +24,23 @@ class MentionsTest extends TestCase {
 	}
 
 	/**
+	 * Read the cases shared with the editor's tests in src/utils/test/mentions.test.js.
+	 *
+	 * @param string $key `mentions` or `others`.
+	 * @return array<int, array{string}>
+	 */
+	private static function shared_cases( string $key ): array {
+		$cases = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/mention-cases.json' ), true );
+		return array_map( static fn ( string $content ): array => array( $content ), $cases[ $key ] );
+	}
+
+	/**
 	 * Notes that mention Fresh Eyes.
 	 *
-	 * @return array<string, array{string}>
+	 * @return array<int, array{string}>
 	 */
 	public static function mentioning_notes(): array {
-		return array(
-			'handle'               => array( '@fresh-eyes simplify this' ),
-			'camel case'           => array( '@FreshEyes adjust the tone' ),
-			'name with a space'    => array( 'Can @Fresh Eyes help here?' ),
-			'underscore'           => array( '@fresh_eyes, shorten this.' ),
-			'end of note'          => array( 'Thoughts, @fresh-eyes?' ),
-			'in a paragraph'       => array( '<p>Hey <strong>@fresh-eyes</strong> simplify</p>' ),
-			'mention chip'         => array( '<span class="wp-note-mention user-9">@Fresh Eyes</span> simplify' ),
-			'encoded at sign'      => array( '&#64;fresh-eyes simplify' ),
-			'after a line break'   => array( "First line\n@fresh-eyes second" ),
-			'after an open paren'  => array( 'Simplify (@fresh-eyes)' ),
-		);
+		return self::shared_cases( 'mentions' );
 	}
 
 	/**
@@ -57,25 +57,10 @@ class MentionsTest extends TestCase {
 	/**
 	 * Notes that do not mention Fresh Eyes.
 	 *
-	 * @return array<string, array{string}>
+	 * @return array<int, array{string}>
 	 */
 	public static function other_notes(): array {
-		return array(
-			'no mention'              => array( 'Simplify this paragraph.' ),
-			'name without at sign'    => array( 'Fresh Eyes said this was fine.' ),
-			'email address'           => array( 'Write to editor@fresh-eyes.example' ),
-			'domain'                  => array( 'See @fresh-eyes.com for details' ),
-			'longer name'             => array( '@fresh-eyesight is a different user' ),
-			'other user'              => array( '@jane can you look?' ),
-			'quoted'                  => array( '<blockquote>@fresh-eyes simplify this</blockquote> I disagree.' ),
-			'inline quote'            => array( 'She wrote <q>@fresh-eyes rewrite</q> earlier.' ),
-			'code'                    => array( 'Type <code>@fresh-eyes</code> to ask.' ),
-			'nested quote'            => array( '<blockquote><p><q>x</q> @fresh-eyes</p></blockquote>' ),
-			'unclosed quote'          => array( 'Earlier: <blockquote>@fresh-eyes do it' ),
-			'class does not count'    => array( '<span class="wp-note-mention fresh-eyes user-0" data-fresh-eyes="1">@jane</span>' ),
-			'attribute does not count' => array( '<a href="https://example.com/@fresh-eyes">link</a>' ),
-			'empty'                   => array( '' ),
-		);
+		return self::shared_cases( 'others' );
 	}
 
 	/**
@@ -146,10 +131,10 @@ class MentionsTest extends TestCase {
 	 * Made-up addresses are removed from an answer; ones from the sources stay.
 	 */
 	public function test_removes_unsourced_urls(): void {
-		$reply = 'See https://example.com/real/ and https://made-up.example/study.';
+		$reply = 'See https://example.com/real/ and https://made-up.example/study. Also www.made-up.example/paper and www.example.com/real';
 
 		$this->assertSame(
-			'See https://example.com/real/ and [link removed]',
+			'See https://example.com/real/ and [link removed] Also [link removed] and www.example.com/real',
 			Mentions::remove_unsourced_urls( $reply, 'Our docs live at https://example.com/real' )
 		);
 	}

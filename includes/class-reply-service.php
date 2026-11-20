@@ -422,20 +422,66 @@ class Reply_Service {
 		$system_instruction = $this->prompt_builder->get_reply_system_instruction();
 		$model              = self::preference_string( 'ai_feedback_default_model', AI_FEEDBACK_DEFAULT_MODEL, $user_id );
 
-		if ( $is_mention ) {
-			// A mention starts a new request, so it counts against the review limit.
-			$allowed = $this->get_review_service()->check_rate_limit( $user_id );
-			if ( is_wp_error( $allowed ) ) {
-				return $allowed;
+		if ( ! $is_mention ) {
+			return $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, false );
+		}
+
+		// A mention starts a new request, so it counts against the review limit.
+		$allowed = $this->get_review_service()->check_rate_limit( $user_id );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
+		$result = null;
+		try {
+			$result = $this->answer( $comment_id, $parent_id, $post_id, $block_id, $context, $edits, $prompt, $system_instruction, $model, true );
+		} finally {
+			// No answer was saved by this request, so give the slot back.
+			if ( ! is_int( $result ) || $result <= 0 ) {
+				$this->get_review_service()->refund_rate_limit( $user_id );
 			}
 		}
 
+		if ( is_int( $result ) && $result > 0 ) {
+			/**
+			 * Fires after Fresh Eyes answers a note that mentions it.
+			 *
+			 * @param int                  $post_id Post ID.
+			 * @param array<string, mixed> $answer  `user_id` who asked, `model`, and the answer's `note_id`.
+			 */
+			do_action(
+				'ai_feedback_after_mention',
+				$post_id,
+				array(
+					'user_id' => $user_id,
+					'model'   => $model,
+					'note_id' => $result,
+				)
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Call the AI for a reply and save its answer in the thread.
+	 *
+	 * @param int                  $comment_id         Reply comment ID.
+	 * @param int                  $parent_id          Root note ID.
+	 * @param int                  $post_id            Post ID.
+	 * @param string               $block_id           Block ID from the root note.
+	 * @param array<string, mixed> $context            Reply context.
+	 * @param array<mixed>         $edits              Edits proposed in the thread, oldest first.
+	 * @param string               $prompt             Prompt.
+	 * @param string               $system_instruction System instruction.
+	 * @param string               $model              Model preference.
+	 * @param bool                 $is_mention         Whether the reply asks Fresh Eyes through a mention.
+	 * @return int|WP_Error New AI reply comment ID, or error.
+	 */
+	private function answer( int $comment_id, int $parent_id, int $post_id, string $block_id, array $context, array $edits, string $prompt, string $system_instruction, string $model, bool $is_mention ): int|WP_Error {
 		$ai_text = $this->call_ai( $prompt, $system_instruction, $model );
 		if ( is_wp_error( $ai_text ) ) {
 			Logger::debug( 'Reply_Service: AI call failed: ' . $ai_text->get_error_message() );
-			if ( $is_mention ) {
-				$this->get_review_service()->refund_rate_limit( $user_id );
-			}
 			return $ai_text;
 		}
 
@@ -476,27 +522,7 @@ class Reply_Service {
 			'timestamp' => current_time( 'c', true ),
 		);
 
-		$note_id = $this->notes_manager->add_reply_to_thread( $feedback_item, $post_id, $parent_id, $review_data );
-
-		if ( $is_mention && ! is_wp_error( $note_id ) && $note_id > 0 ) {
-			/**
-			 * Fires after Fresh Eyes answers a note that mentions it.
-			 *
-			 * @param int                  $post_id Post ID.
-			 * @param array<string, mixed> $answer  `user_id` who asked, `model`, and the answer's `note_id`.
-			 */
-			do_action(
-				'ai_feedback_after_mention',
-				$post_id,
-				array(
-					'user_id' => $user_id,
-					'model'   => $model,
-					'note_id' => $note_id,
-				)
-			);
-		}
-
-		return $note_id;
+		return $this->notes_manager->add_reply_to_thread( $feedback_item, $post_id, $parent_id, $review_data );
 	}
 
 	/**
@@ -544,7 +570,8 @@ class Reply_Service {
 		$parsed['reply'] = Mentions::remove_unsourced_urls( $parsed['reply'], $sources );
 		if ( null !== $parsed['edit'] && Mentions::edit_has_unsourced_url( $parsed['edit'], $sources ) ) {
 			Logger::debug( 'Reply_Service: dropped an edit that adds a link the AI was not given.' );
-			$parsed['edit'] = null;
+			$parsed['edit']   = null;
+			$parsed['reply'] .= ' ' . __( '(The suggested change was left out because it added a link Fresh Eyes could not check.)', 'fresh-eyes' );
 		}
 		return $parsed;
 	}

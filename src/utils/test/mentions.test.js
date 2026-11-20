@@ -9,36 +9,29 @@ import {
 	mentionsFreshEyes,
 } from '../mentions';
 
+// Shared with tests/php/MentionsTest.php, so both sides agree.
+const CASES = require('../../../tests/fixtures/mention-cases.json');
+
 describe('mentionsFreshEyes', () => {
-	it.each([
-		'@fresh-eyes simplify this',
-		'@FreshEyes adjust the tone',
-		'Can @Fresh Eyes help here?',
-		'@fresh_eyes, shorten this.',
-		'<p>Hey <strong>@fresh-eyes</strong> simplify</p>',
-		'<span class="wp-note-mention user-9">@Fresh Eyes</span> simplify',
-		'&#64;fresh-eyes simplify',
-		'Simplify (@fresh-eyes)',
-	])('finds a mention in %s', (content) => {
+	it.each(CASES.mentions)('finds a mention in %s', (content) => {
 		expect(mentionsFreshEyes(content)).toBe(true);
 	});
 
-	it.each([
-		'Simplify this paragraph.',
-		'Fresh Eyes said this was fine.',
-		'Write to editor@fresh-eyes.example',
-		'See @fresh-eyes.com for details',
-		'@fresh-eyesight is a different user',
-		'<blockquote>@fresh-eyes simplify this</blockquote> I disagree.',
-		'She wrote <q>@fresh-eyes rewrite</q> earlier.',
-		'Type <code>@fresh-eyes</code> to ask.',
-		'Earlier: <blockquote>@fresh-eyes do it',
-		'<span class="wp-note-mention fresh-eyes">@jane</span>',
-		'<a href="https://example.com/@fresh-eyes">link</a>',
-		'',
-		undefined,
-	])('finds no mention in %s', (content) => {
-		expect(mentionsFreshEyes(content)).toBe(false);
+	it.each([...CASES.others, undefined])(
+		'finds no mention in %s',
+		(content) => {
+			expect(mentionsFreshEyes(content)).toBe(false);
+		}
+	);
+
+	it('matches handles the server adds through its filter', () => {
+		window.aiFeedbackData = { mentionHandles: ['ojos frescos'] };
+		try {
+			expect(mentionsFreshEyes('@ojos-frescos simplifica')).toBe(true);
+			expect(mentionsFreshEyes('@fresh-eyes simplify')).toBe(false);
+		} finally {
+			delete window.aiFeedbackData;
+		}
 	});
 
 	it('only scans the start of a long note', () => {

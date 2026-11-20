@@ -24,10 +24,13 @@ const QUOTED_TAGS = 'blockquote|q|code|pre';
  * @return {RegExp} Pattern.
  */
 function getMentionPattern() {
-	const names = [
-		'fresh eyes',
-		__('Fresh Eyes', 'fresh-eyes').toLowerCase(),
-	].map((handle) =>
+	// The server's list, which a filter can change; the defaults otherwise.
+	const localized = window.aiFeedbackData?.mentionHandles;
+	const handles =
+		Array.isArray(localized) && localized.length
+			? localized.filter((handle) => typeof handle === 'string')
+			: ['fresh eyes', __('Fresh Eyes', 'fresh-eyes').toLowerCase()];
+	const names = handles.map((handle) =>
 		handle
 			.trim()
 			.split(/[\s_-]+/u)
