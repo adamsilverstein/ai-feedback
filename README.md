@@ -205,6 +205,23 @@ Manage rules under **House style** in Review Settings. Rules marked **Just me** 
 
 ![The AI Feedback Analytics screen](docs/images/analytics.png)
 
+### Uninstalling
+
+Deactivating the plugin keeps everything. Deleting it removes its settings and personal data and keeps your notes:
+
+| Removed | Kept |
+|---------|------|
+| Review settings, site and per-user | Notes (comments of type `note`) |
+| House style rules, site and personal, on every site | The notes' meta: feedback details, suggested edits, personas, mentions, house style proposals, reply status |
+| Review history (`_ai_feedback_history` post meta) | |
+| Usage analytics and rate limit records | |
+| The plugin's editor preferences (tips, welcome guide) | |
+| Cached model lists, chunked review sessions and locks | |
+| Scheduled AI replies | |
+| The hidden Fresh Eyes user, unless it somehow owns posts | |
+
+On multisite every site is cleaned, a batch of sites at a time, then the network-wide data once. The full list of keys lives in `includes/class-uninstaller.php`, and a test fails when the plugin stores a key that isn't on it.
+
 ## Development
 
 ### Project Structure
