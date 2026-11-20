@@ -42,10 +42,14 @@ export function getBlockAnchor(name, content) {
 /**
  * Recursively extract blocks with their clientIds and content.
  *
- * @param {Array} blocks Array of blocks from the editor.
+ * Inner blocks carry their parent's client ID, so the server can tell a
+ * block from the blocks inside it.
+ *
+ * @param {Array}  blocks   Array of blocks from the editor.
+ * @param {string} [parent] Client ID of the blocks' parent, '' at the top level.
  * @return {Array} Simplified block data for API.
  */
-export function extractBlockData(blocks) {
+export function extractBlockData(blocks, parent = '') {
 	const result = [];
 
 	for (const block of blocks) {
@@ -62,12 +66,13 @@ export function extractBlockData(blocks) {
 				name: block.name,
 				content: content.trim(),
 				anchor: getBlockAnchor(block.name, content.trim()),
+				...(parent ? { parent } : {}),
 			});
 		}
 
 		// Recursively process inner blocks
 		if (block.innerBlocks && block.innerBlocks.length > 0) {
-			result.push(...extractBlockData(block.innerBlocks));
+			result.push(...extractBlockData(block.innerBlocks, block.clientId));
 		}
 	}
 

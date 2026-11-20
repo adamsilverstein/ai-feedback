@@ -674,4 +674,70 @@ class ResponseParserBlockActionTest extends TestCase {
 		$this->assertTrue( Response_Parser::matches_target_text( ' Step  1 ', 'Step 1' ) );
 		$this->assertTrue( Response_Parser::matches_target_text( $long . 'here.', mb_substr( trim( $long ), 0, Response_Parser::MAX_TARGET_TEXT_LENGTH ) ) );
 	}
+
+	/**
+	 * A block can't move next to one of its own inner blocks, at any depth,
+	 * and a parent loop in crafted input ends.
+	 */
+	public function test_move_into_own_inner_block_is_dropped(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'group',
+				'name'     => 'core/group',
+				'content'  => 'First inside. Deep inside.',
+			),
+			array(
+				'clientId' => 'columns',
+				'name'     => 'core/columns',
+				'content'  => 'Deep inside.',
+				'parent'   => 'group',
+			),
+			array(
+				'clientId' => 'deep',
+				'name'     => 'core/paragraph',
+				'content'  => 'Deep inside.',
+				'parent'   => 'columns',
+			),
+			array(
+				'clientId' => 'loop-a',
+				'name'     => 'core/paragraph',
+				'content'  => 'A.',
+				'parent'   => 'loop-b',
+			),
+			array(
+				'clientId' => 'loop-b',
+				'name'     => 'core/paragraph',
+				'content'  => 'B.',
+				'parent'   => 'loop-a',
+			),
+		);
+		$parse  = function ( string $block_id, string $target ) use ( $blocks ): mixed {
+			$result = $this->parser->parse_feedback(
+				(string) json_encode(
+					array(
+						'feedback' => array(
+							self::item(
+								$block_id,
+								array(
+									'type'            => 'move',
+									'target_block_id' => $target,
+									'position'        => 'after',
+								)
+							),
+						),
+					)
+				),
+				$blocks
+			);
+			$this->assertIsArray( $result );
+			return $result['feedback'][0]['block_action'] ?? null;
+		};
+
+		$this->assertNull( $parse( 'group', 'deep' ) );
+		$this->assertNull( $parse( 'group', 'columns' ) );
+		// Out of its group, next to the group, is fine.
+		$this->assertIsArray( $parse( 'deep', 'group' ) );
+		$this->assertIsArray( $parse( 'loop-a', 'group' ) );
+		$this->assertIsArray( $parse( 'group', 'loop-a' ) );
+	}
 }

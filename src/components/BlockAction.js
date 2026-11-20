@@ -245,13 +245,7 @@ export default function BlockAction({
 	const handleApply = () => {
 		setIsPreviewOpen(false);
 		if (
-			!applyBlockAction(
-				selectors,
-				blockEditorActions,
-				action,
-				clientId,
-				targetId
-			)
+			!applyBlockAction(selectors, blockEditorActions, action, clientId)
 		) {
 			return;
 		}

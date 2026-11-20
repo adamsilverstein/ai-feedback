@@ -336,7 +336,7 @@ class Review_Controller extends WP_REST_Controller {
 			'blocks'             => array(
 				'required'    => true,
 				'type'        => 'array',
-				'description' => __( 'Array of blocks with clientId, name, and content.', 'fresh-eyes' ),
+				'description' => __( 'Array of blocks with clientId, name, and content, and the parent block clientId for inner blocks.', 'fresh-eyes' ),
 				'items'       => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -358,6 +358,10 @@ class Review_Controller extends WP_REST_Controller {
 						'anchor'   => array(
 							'type'    => 'string',
 							'pattern' => '^[a-z0-9]{1,32}$',
+						),
+						'parent'   => array(
+							'type'   => 'string',
+							'format' => 'text-field',
 						),
 					),
 				),

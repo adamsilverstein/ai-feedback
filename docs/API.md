@@ -27,7 +27,7 @@ X-WP-Nonce: {nonce}
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `post_id` | integer | Yes | The post ID to review |
-| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content` and an optional `anchor` |
+| `blocks` | array | Yes | Blocks to review. Each item has `clientId`, `name`, `content`, an optional `anchor`, and for an inner block its parent's `clientId` as `parent` |
 | `model` | string | No | AI model to use (default: site default) |
 | `focus_areas` | array | No | Areas to focus on: `content`, `tone`, `flow`, `design` |
 | `target_tone` | string | No | Target tone: `professional`, `casual`, `academic`, `friendly` |
@@ -72,7 +72,7 @@ A note can carry a `block_action`: a change to the document's structure the auth
 | `move_block` | `position`, `target_block_id`, `target_name`, `target_text` | Move the note's block `before` or `after` another reviewed block. The target is kept by client ID, block name and the first 80 characters of its text, so the editor can find it again after a reload |
 | `insert_block` | `position`, `block` | Add a block `before` or `after` the note's block. `block` is `{ "name": "core/paragraph", "content" }`, `{ "name": "core/heading", "content", "level" }` (2-6) or `{ "name": "core/list", "items", "ordered" }` (up to 20 items) |
 
-The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_id", "position" }` and `{ "type": "insert", "position", "block" }`. `Response_Parser` drops any that fail validation and keeps the note: the target must be one of the blocks in the same request (so a chunked review only moves within its part), a block can't move next to itself or to where it already is, a review gets at most one per block, inserted blocks must be on the allow-list (`ai_feedback_insertable_blocks`), and inserted text may only hold inline formatting and goes through `wp_kses()`. Groups of similar notes have none.
+The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_id", "position" }` and `{ "type": "insert", "position", "block" }`. `Response_Parser` drops any that fail validation and keeps the note: the target must be one of the blocks in the same request (so a chunked review only moves within its part), a block can't move next to itself, next to one of its own inner blocks (found through `parent`), or to where it already is, a review gets at most one per block, inserted blocks must be on the allow-list (`ai_feedback_insertable_blocks`), and inserted text may only hold inline formatting and goes through `wp_kses()`. Groups of similar notes have none.
 
 The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”". With Gutenberg's Suggestion Mode on, a review note's removal or move becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). Inserts, and structural edits from replies, stay with Preview and Apply in the sidebar. Apply is a single undo step. An edit whose block or move target is gone shows as outdated.
 

@@ -312,7 +312,12 @@ export function getBlockActionState(selectors, action, clientId) {
 	const offset = action.position === 'before' ? -1 : 1;
 	if (action.type === 'move_block') {
 		const targetId = findMoveTarget(selectors, action, clientId);
-		if (!targetId) {
+		// A block can't move next to one of its own inner blocks: the block
+		// editor would put it inside itself and never return.
+		if (
+			!targetId ||
+			(selectors.getBlockParents?.(targetId) ?? []).includes(clientId)
+		) {
 			return { state: 'outdated', targetId: null };
 		}
 		// Moved before a block, the block's next neighbor is the target.
@@ -384,16 +389,18 @@ export function buildInsertedBlock(spec) {
  * @param {Object} actions   Block editor actions.
  * @param {Object} action    Structural edit.
  * @param {string} clientId  Client ID of the note's block.
- * @param {string} targetId  A move's target, from getBlockActionState().
  * @return {boolean} Whether the blocks now read as the edit leaves them.
  */
-export function applyBlockAction(
-	selectors,
-	actions,
-	action,
-	clientId,
-	targetId
-) {
+export function applyBlockAction(selectors, actions, action, clientId) {
+	// Only an edit that is ready right now, whoever calls this.
+	const { state: before, targetId } = getBlockActionState(
+		selectors,
+		action,
+		clientId
+	);
+	if (before !== 'ready') {
+		return false;
+	}
 	let run = null;
 	if (action.type === 'remove_block') {
 		run = () => actions.removeBlocks([clientId], false);

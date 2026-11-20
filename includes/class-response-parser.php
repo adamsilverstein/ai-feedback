@@ -199,6 +199,7 @@ class Response_Parser {
 					'name'    => $block['name'] ?? '',
 					'index'   => $index,
 					'content' => is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '',
+					'parent'  => is_array( $block ) && is_string( $block['parent'] ?? null ) ? $block['parent'] : '',
 					'anchor'  => $this->get_block_anchor( $block ),
 				);
 				Logger::debug(
@@ -544,7 +545,7 @@ class Response_Parser {
 	 * which in a chunked review are only the blocks of that chunk.
 	 *
 	 * @param  array<mixed> $block_info Map of block IDs to their info.
-	 * @return array<string, array{client_id: string, name: string, text: string, index: int}> Targets keyed by block ID.
+	 * @return array<string, array{client_id: string, name: string, text: string, index: int, parent: string}> Targets keyed by block ID.
 	 */
 	private static function get_review_targets( array $block_info ): array {
 		$targets = array();
@@ -557,6 +558,7 @@ class Response_Parser {
 				'name'      => is_string( $info['name'] ?? null ) ? $info['name'] : '',
 				'text'      => is_string( $info['content'] ?? null ) ? $info['content'] : '',
 				'index'     => is_int( $info['index'] ?? null ) ? $info['index'] : 0,
+				'parent'    => is_string( $info['parent'] ?? null ) ? $info['parent'] : '',
 			);
 		}
 		return $targets;
@@ -621,6 +623,11 @@ class Response_Parser {
 			$target = $targets[ $target_id ];
 			$self   = $targets[ $block_id ];
 
+			// A block can't move next to one of its own inner blocks.
+			if ( self::is_inside( $target_id, $block_id, $targets ) ) {
+				return null;
+			}
+
 			// Moving a block before the block after it, or after the block
 			// before it, leaves it where it is. Indexes count the reviewed
 			// blocks in document order, nested ones included, so across
@@ -651,6 +658,34 @@ class Response_Parser {
 			'position' => $position,
 			'block'    => $block,
 		);
+	}
+
+	/**
+	 * Whether a block sits inside another, following `parent` through the
+	 * targets. Each block is visited at most once, so a parent loop in
+	 * crafted input ends.
+	 *
+	 * @param  string       $block_id    Block to start from.
+	 * @param  string       $ancestor_id Possible ancestor.
+	 * @param  array<mixed> $targets     Targets keyed by block ID, each with an optional `parent`.
+	 * @return bool
+	 */
+	private static function is_inside( string $block_id, string $ancestor_id, array $targets ): bool {
+		$seen    = array();
+		$current = $block_id;
+		while ( ! isset( $seen[ $current ] ) ) {
+			$seen[ $current ] = true;
+			$entry            = $targets[ $current ] ?? null;
+			$parent           = is_array( $entry ) && is_string( $entry['parent'] ?? null ) ? $entry['parent'] : '';
+			if ( '' === $parent ) {
+				return false;
+			}
+			if ( $parent === $ancestor_id ) {
+				return true;
+			}
+			$current = $parent;
+		}
+		return false;
 	}
 
 	/**

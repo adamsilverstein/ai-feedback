@@ -517,7 +517,12 @@ describe('applyBlockAction', () => {
 	it('does nothing for a move without a target or a block it cannot build', () => {
 		const actions = editorActions();
 		expect(
-			applyBlockAction(doc(), actions, move('h', 'before'), 'open', null)
+			applyBlockAction(
+				doc(),
+				actions,
+				move('gone', 'before', { target_text: 'Gone' }),
+				'open'
+			)
 		).toBe(false);
 		expect(
 			applyBlockAction(
