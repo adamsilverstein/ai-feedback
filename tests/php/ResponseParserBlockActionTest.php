@@ -740,4 +740,74 @@ class ResponseParserBlockActionTest extends TestCase {
 		$this->assertIsArray( $parse( 'loop-a', 'group' ) );
 		$this->assertIsArray( $parse( 'group', 'loop-a' ) );
 	}
+
+	/**
+	 * Moving an inner block out next to its own parent is a real move, even
+	 * though the two sit next to each other in document order.
+	 */
+	public function test_move_out_of_parent_is_kept(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'group',
+				'name'     => 'core/group',
+				'content'  => 'Inside.',
+			),
+			array(
+				'clientId' => 'inner',
+				'name'     => 'core/paragraph',
+				'content'  => 'Inside.',
+				'parent'   => 'group',
+			),
+		);
+		$result = $this->parser->parse_feedback(
+			(string) json_encode(
+				array(
+					'feedback' => array(
+						self::item(
+							'inner',
+							array(
+								'type'            => 'move',
+								'target_block_id' => 'group',
+								'position'        => 'after',
+							)
+						),
+					),
+				)
+			),
+			$blocks
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'group', $result['feedback'][0]['block_action']['target_block_id'] );
+	}
+
+	/**
+	 * Text that looks like a tag is kept in a move target, as the editor
+	 * compares block text literally.
+	 */
+	public function test_move_target_keeps_literal_text(): void {
+		$blocks               = self::blocks();
+		$blocks[1]['content'] = 'Use <label> here.';
+
+		$result = $this->parser->parse_feedback(
+			(string) json_encode(
+				array(
+					'feedback' => array(
+						self::item(
+							'opening',
+							array(
+								'type'            => 'move',
+								'target_block_id' => 'background',
+								'position'        => 'before',
+							)
+						),
+					),
+				)
+			),
+			$blocks
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'Use <label> here.', $result['feedback'][0]['block_action']['target_text'] );
+	}
 }

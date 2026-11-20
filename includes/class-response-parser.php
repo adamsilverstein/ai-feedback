@@ -628,13 +628,14 @@ class Response_Parser {
 				return null;
 			}
 
-			// Moving a block before the block after it, or after the block
-			// before it, leaves it where it is. Indexes count the reviewed
-			// blocks in document order, nested ones included, so across
-			// parents this can drop a real move; the editor checks the
-			// actual siblings before applying anything.
-			$offset = self::int_value( $target['index'] ?? null ) - self::int_value( $self['index'] ?? null );
-			if ( ( 'before' === $position && 1 === $offset ) || ( 'after' === $position && -1 === $offset ) ) {
+			// Moving a block before the sibling after it, or after the
+			// sibling before it, leaves it where it is. Indexes count the
+			// reviewed blocks in document order, nested ones included, so
+			// only blocks with the same parent are compared; the editor
+			// checks the actual siblings before applying anything.
+			$offset      = self::int_value( $target['index'] ?? null ) - self::int_value( $self['index'] ?? null );
+			$same_parent = ( $target['parent'] ?? '' ) === ( $self['parent'] ?? '' );
+			if ( $same_parent && ( ( 'before' === $position && 1 === $offset ) || ( 'after' === $position && -1 === $offset ) ) ) {
 				return null;
 			}
 
@@ -766,7 +767,9 @@ class Response_Parser {
 	 * @return string Whitespace-collapsed text, at most MAX_TARGET_TEXT_LENGTH characters.
 	 */
 	private static function excerpt( string $text ): string {
-		return mb_substr( self::normalize_text( wp_strip_all_tags( $text ) ), 0, self::MAX_TARGET_TEXT_LENGTH );
+		// Block text is plain text, so text that looks like a tag is kept:
+		// the editor compares it literally.
+		return mb_substr( self::normalize_text( $text ), 0, self::MAX_TARGET_TEXT_LENGTH );
 	}
 
 	/**
