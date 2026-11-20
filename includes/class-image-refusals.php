@@ -93,8 +93,8 @@ class Image_Refusals {
 	 *   (`prompt_invalid_argument`, "No models found ..."), which with the
 	 *   text alone working means none takes its images;
 	 * - a 415, the provider refusing the media type;
-	 * - a 400 or 422 whose code or message names images, vision, modalities,
-	 *   media types or MIME types.
+	 * - a 400 or 422 whose code or message names images (`image_url` too),
+	 *   vision, modalities, media types or MIME types.
 	 *
 	 * Not remembered: a 413 (that request was too large, the next may not
 	 * be), any other 400 or 422, and every other error.
@@ -113,7 +113,7 @@ class Image_Refusals {
 		} elseif ( 415 === $status ) {
 			$lasting = true;
 		} elseif ( in_array( $status, array( 400, 422 ), true ) ) {
-			$lasting = 1 === preg_match( '/\b(?:images?|vision|modalit(?:y|ies)|media[ _]type|mime)\b/i', $code . ' ' . $message );
+			$lasting = 1 === preg_match( '/\b(?:image|vision|modalit|media[ _]type|mime)/i', $code . ' ' . $message );
 		} else {
 			$lasting = false;
 		}
