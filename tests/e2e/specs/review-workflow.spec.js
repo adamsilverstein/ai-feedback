@@ -121,6 +121,43 @@ test.describe('Review Workflow', () => {
 		);
 	});
 
+	test('reviews a loaded block as edited, before it is saved', async ({
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		// Loaded from the database, so the block is parsed from saved markup.
+		const post = await requestUtils.createPost({
+			title: 'Edited before review',
+			content:
+				'<!-- wp:paragraph --><p>Text as loaded.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+
+		const [{ clientId }] = await editor.getBlocks({ full: true });
+		await editor.canvas
+			.getByRole('document', { name: 'Block: Paragraph' })
+			.fill('Text as edited.');
+		await expect
+			.poll(() =>
+				editor.getBlocks().then(([block]) => block.attributes.content)
+			)
+			.toBe('Text as edited.');
+
+		await aiFeedback.openSidebar();
+		const response = await aiFeedback.runReview();
+		const { blocks } = response.request().postDataJSON();
+
+		expect(blocks).toEqual([
+			expect.objectContaining({ clientId, content: 'Text as edited.' }),
+		]);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,
