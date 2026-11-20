@@ -12,7 +12,8 @@ const blocks = [];
 
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 vi.mock('@wordpress/blocks', () => ({ serialize: () => '' }));
-vi.mock('@wordpress/data', () => ({
+vi.mock('@wordpress/data', async (importOriginal) => ({
+	...(await importOriginal()),
 	select: () => ({
 		getBlock: (id) => blocks.find((block) => block.clientId === id),
 		getBlocks: () => blocks,
