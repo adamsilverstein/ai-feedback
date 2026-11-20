@@ -198,8 +198,16 @@ class Review_Images {
 		 * @param list<string> $types    MIME types. Default JPEG, PNG and WebP.
 		 * @param string       $provider Provider ID, or '' when the model isn't in the model list.
 		 */
-		$types = apply_filters( 'ai_feedback_review_image_types', self::DEFAULT_PROVIDER_TYPES, $provider );
-		return array_values( array_intersect( self::MIME_TYPES, is_array( $types ) ? $types : array() ) );
+		$filtered = apply_filters( 'ai_feedback_review_image_types', self::DEFAULT_PROVIDER_TYPES, $provider );
+
+		/**
+		 * Types after the filter, which can return anything; only the four
+		 * types are ever sent.
+		 *
+		 * @var mixed $types
+		 */
+		$types = $filtered;
+		return array_values( array_intersect( self::MIME_TYPES, is_array( $types ) ? array_filter( $types, 'is_string' ) : array() ) );
 	}
 
 	/**
@@ -224,17 +232,17 @@ class Review_Images {
 	 * Find a local file for an attachment the block shows.
 	 *
 	 * The type and dimensions are read from the file's contents, not its
-	 * name, so a mislabeled file is sent as what it is, or left out.
+	 * name, so a mislabeled file is sent as what it is, or left out. Returns
+	 * a SKIP_* reason when the image exists but the provider would refuse
+	 * every file of it, and null when the image is never sent.
 	 *
-	 * @param  int          $attachment_id Attachment ID from the block.
-	 * @param  string       $url           Image URL from the block.
-	 * @param  list<string> $types         Image types the provider takes.
-	 * @param  int          $max_side      Longest side the provider takes, in pixels.
-	 * @return array{path: string, mime: string}|string|null File path and real type; a SKIP_* reason when
-	 *                                                      the image exists but the provider would refuse every
-	 *                                                      file of it; null when it is never sent.
+	 * @param  int      $attachment_id Attachment ID from the block.
+	 * @param  string   $url           Image URL from the block.
+	 * @param  string[] $types         Image types the provider takes.
+	 * @param  int      $max_side      Longest side the provider takes, in pixels.
+	 * @return array{path: string, mime: string}|string|null File path and real type, a reason, or null.
 	 */
-	protected function get_image_file( int $attachment_id, string $url, array $types = self::DEFAULT_PROVIDER_TYPES, int $max_side = self::DEFAULT_MAX_SIDE ): array|string|null {
+	protected function get_image_file( int $attachment_id, string $url, array $types, int $max_side ): array|string|null {
 		$attachment = get_post( $attachment_id );
 		if (
 			! $attachment instanceof \WP_Post
@@ -319,11 +327,11 @@ class Review_Images {
 	 */
 	protected static function read_image_info( string $path ): ?array {
 		$info = wp_getimagesize( $path );
-		if ( ! is_array( $info ) || ! is_int( $info[0] ?? null ) || ! is_int( $info[1] ?? null ) || $info[0] < 1 || $info[1] < 1 ) {
+		if ( ! is_array( $info ) || $info[0] < 1 || $info[1] < 1 ) {
 			return null;
 		}
-		$mime = is_string( $info['mime'] ?? null ) && '' !== $info['mime'] ? $info['mime'] : wp_get_image_mime( $path );
-		if ( ! is_string( $mime ) || '' === $mime ) {
+		$mime = '' !== $info['mime'] ? $info['mime'] : wp_get_image_mime( $path );
+		if ( false === $mime || '' === $mime ) {
 			return null;
 		}
 		return array(

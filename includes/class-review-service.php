@@ -241,7 +241,7 @@ class Review_Service {
 				$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 1 );
 
 				// The text alone worked, so the images were the problem.
-				if ( ! is_wp_error( $ai_response ) && is_string( $model ) && Image_Refusals::is_lasting_refusal( $refusal ) ) {
+				if ( ! is_wp_error( $ai_response ) && Image_Refusals::is_lasting_refusal( $refusal ) ) {
 					Logger::debug( sprintf( 'Model %s will not be sent images for a while', $model ) );
 					Image_Refusals::remember( $this->get_model_provider( $model ), $model );
 				}
