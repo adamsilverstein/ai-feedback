@@ -469,6 +469,14 @@ class Fresh_Eyes_User {
 			return;
 		}
 
+		// Deleting a user deletes their posts. The account should author
+		// none, so if it has, keep it rather than lose content silently.
+		$posts = count_user_posts( $id, array_values( get_post_types() ) );
+		if ( (int) $posts > 0 ) {
+			Logger::debug( 'Fresh_Eyes_User: kept user ' . $id . ', which authored ' . $posts . ' posts, instead of deleting it.' );
+			return;
+		}
+
 		if ( is_multisite() ) {
 			if ( ! function_exists( 'wpmu_delete_user' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/ms.php';

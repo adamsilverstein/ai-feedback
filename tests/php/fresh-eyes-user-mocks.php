@@ -65,6 +65,7 @@ function ai_feedback_test_reset_users(): void {
 	$GLOBALS['test_insert_user_error'] = null;
 	$GLOBALS['test_next_user_id']      = 100;
 	$GLOBALS['test_deleted_users']     = array();
+	$GLOBALS['test_user_posts']        = array();
 	$GLOBALS['test_updated_users']     = array();
 	$GLOBALS['test_count_users']       = array();
 	$GLOBALS['test_is_author']         = false;
@@ -144,7 +145,24 @@ if ( ! function_exists( 'wp_delete_user' ) ) {
 	function wp_delete_user( $id, $reassign = null ) {
 		$GLOBALS['test_deleted_users'][] = array( $id, $reassign );
 		unset( $GLOBALS['test_user_objects'][ $id ] );
+		// Like core's deleted_user action, which the plugin hooks.
+		\AI_Feedback\Fresh_Eyes_User::on_deleted_user( (int) $id );
 		return true;
+	}
+}
+
+if ( ! function_exists( 'count_user_posts' ) ) {
+	function count_user_posts( $user_id, $post_type = 'post', $public_only = false ) {
+		return (string) ( $GLOBALS['test_user_posts'][ $user_id ] ?? 0 );
+	}
+}
+
+if ( ! function_exists( 'get_post_types' ) ) {
+	function get_post_types( $args = array(), $output = 'names', $operator = 'and' ) {
+		return array(
+			'post' => 'post',
+			'page' => 'page',
+		);
 	}
 }
 

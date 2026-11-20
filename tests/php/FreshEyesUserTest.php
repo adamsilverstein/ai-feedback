@@ -287,6 +287,35 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertFalse( Mentions::has_user_chip( '<span class="wp-note-mention user-' . $id . '">@Fresh Eyes</span>' ) );
 	}
 
+	public function test_removing_the_account_forgets_its_id_before_deleting_it(): void {
+		$id = $this->create_user();
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
+
+		// The delete fires deleted_user, which must not bring the account back.
+		Fresh_Eyes_User::remove();
+
+		$this->assertSame( array( array( $id, null ) ), $GLOBALS['test_deleted_users'] );
+		$this->assertCount( 1, $GLOBALS['test_inserted_users'] );
+		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
+
+		// On uninstall the filter has no say, so only clearing the ID first keeps it gone.
+		unset( $GLOBALS['test_filter_results'] );
+		$id = $this->create_user();
+		Fresh_Eyes_User::uninstall();
+		$this->assertCount( 2, $GLOBALS['test_inserted_users'] );
+		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
+	}
+
+	public function test_an_account_with_posts_is_kept_rather_than_deleted(): void {
+		$id                                   = $this->create_user();
+		$GLOBALS['test_user_posts'][ $id ] = 2;
+
+		Fresh_Eyes_User::uninstall();
+
+		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
+		$this->assertArrayHasKey( $id, $GLOBALS['test_user_objects'] );
+	}
+
 	public function test_turning_the_filter_back_on_creates_the_account_again(): void {
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
 		Fresh_Eyes_User::maybe_ensure();
