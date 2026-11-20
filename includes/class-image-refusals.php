@@ -117,7 +117,7 @@ class Image_Refusals {
 			$text = $code . ' ' . $message;
 			// An image too large, or too many, may pass in a later review.
 			$lasting = 1 === preg_match( '/(?<![a-z])(?:image|vision|modalit|media[ _]type|mime)/i', $text )
-				&& 1 !== preg_match( '/\b(?:too (?:large|big|many)|exceed|limit|maximum)/i', $text );
+				&& 1 !== preg_match( '/(?<![a-z])(?:too[ _](?:large|big|many)|exceed|limit|max(?:imum)?(?![a-z]))/i', $text );
 		} else {
 			$lasting = false;
 		}

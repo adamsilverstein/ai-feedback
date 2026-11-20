@@ -828,13 +828,14 @@ class ReviewImagesTest extends TestCase {
 	 * text-only run after a refusal doesn't charge it again.
 	 */
 	public function test_text_retry_does_not_charge_rate_limit(): void {
-		$GLOBALS['test_user_meta'] = array( 1 => array( 'ai_feedback_reviews' => array( time() ) ) );
+		$before                    = array( 1 => array( 'ai_feedback_reviews' => array( time() ) ) );
+		$GLOBALS['test_user_meta'] = $before;
 
 		$this->review(
 			'gpt-4o',
 			array( new WP_Error( 'prompt_client_error', 'Image input is not supported.', array( 'status' => 400 ) ), self::alt_response() )
 		);
 
-		$this->assertSame( array( 1 => array( 'ai_feedback_reviews' => array( time() ) ) ), $GLOBALS['test_user_meta'] );
+		$this->assertSame( $before, $GLOBALS['test_user_meta'] );
 	}
 }
