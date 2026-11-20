@@ -16,6 +16,7 @@ import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
 import FocusAreaSelector from './FocusAreaSelector';
 import ToneSelector from './ToneSelector';
+import HouseStyle from './HouseStyle';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
 import ExportReview from './ExportReview';
@@ -214,6 +215,7 @@ export default function AIFeedbackPanel() {
 					<LanguageSelector />
 					<ToneSelector />
 					<FocusAreaSelector />
+					<HouseStyle />
 				</PanelBody>
 			</div>
 

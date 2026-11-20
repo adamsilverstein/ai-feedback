@@ -1070,3 +1070,89 @@ $ai-feedback-reply-error: #cc1818;
 	gap: 2px;
 	margin: 0 0 4px;
 }
+
+/* House style rules in Review Settings; the fieldset shares the focus area styles */
+.ai-feedback-house-style {
+	margin-top: 16px;
+}
+
+.ai-feedback-house-style-heading {
+	margin: 0 0 4px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.ai-feedback-house-style-group {
+	margin-bottom: 12px;
+}
+
+.ai-feedback-house-style-rules {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ai-feedback-house-style-rule {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 4px 8px;
+	padding: 4px 0;
+	border-bottom: 1px solid #ddd;
+
+	&.is-editing {
+		display: block;
+	}
+}
+
+.ai-feedback-house-style-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.ai-feedback-house-style-actions,
+.ai-feedback-remember-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.ai-feedback-house-style-empty {
+	margin: 4px 0;
+	font-size: 12px;
+	color: $ai-feedback-text-muted;
+}
+
+.ai-feedback-house-style-add {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+
+	.components-base-control {
+		width: 100%;
+	}
+}
+
+/* "Remember this for future reviews" under an AI reply */
+.ai-feedback-remember {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+	margin-top: 8px;
+	font-style: normal;
+
+	&.is-saved {
+		margin: 4px 0 0;
+		font-size: 12px;
+		color: $ai-feedback-text-muted;
+	}
+}
+
+.ai-feedback-remember-error {
+	margin: 0;
+	color: $ai-feedback-reply-error;
+}
