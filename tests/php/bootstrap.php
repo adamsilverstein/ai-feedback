@@ -33,6 +33,18 @@ if (! defined('ABSPATH') ) {
     define('ABSPATH', dirname(__DIR__, 2) . '/');
 }
 
+if ( ! function_exists( 'did_action' ) ) {
+	/**
+	 * Number of times an action ran, from `$GLOBALS['test_did_action']`.
+	 *
+	 * @param  string $hook_name Action name.
+	 * @return int Count, 0 by default.
+	 */
+	function did_action( $hook_name ) {
+		return (int) ( $GLOBALS['test_did_action'][ $hook_name ] ?? 0 );
+	}
+}
+
 // Loaded after ABSPATH, which it requires.
 require_once $includes_dir . 'class-suggestions.php';
 require_once $includes_dir . 'class-mentions.php';
@@ -553,9 +565,31 @@ if (! function_exists('sanitize_text_field') ) {
      * @param  string $str The input string to sanitize (returned unchanged).
      * @return string The original string unchanged.
      */
+    /**
+     * Sanitize a single line of text, as core does: strip tags, collapse
+     * line breaks, tabs and extra spaces, trim, and drop percent-encoded
+     * octets. Simplified from core's `_sanitize_text_fields()`.
+     *
+     * @param  mixed $str Value.
+     * @return string Sanitized text.
+     */
     function sanitize_text_field( $str )
     {
-        return $str;
+        if ( is_object( $str ) || is_array( $str ) ) {
+            return '';
+        }
+        $filtered = (string) $str;
+        if ( str_contains( $filtered, '<' ) ) {
+            $filtered = wp_strip_all_tags( $filtered );
+        }
+        $filtered = (string) preg_replace( '/[\r\n\t ]+/', ' ', $filtered );
+        $filtered = trim( $filtered );
+        $found    = false;
+        while ( preg_match( '/%[a-f0-9]{2}/i', $filtered, $match ) ) {
+            $filtered = str_replace( $match[0], '', $filtered );
+            $found    = true;
+        }
+        return $found ? trim( (string) preg_replace( '/ +/', ' ', $filtered ) ) : $filtered;
     }
 }
 
@@ -586,7 +620,13 @@ if (! function_exists('wp_strip_all_tags') ) {
      */
     function wp_strip_all_tags( $text, $remove_breaks = false )
     {
-        return strip_tags( $text );
+        // As core: drop script and style contents along with the tags.
+        $text = (string) preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', (string) $text );
+        $text = strip_tags( $text );
+        if ( $remove_breaks ) {
+            $text = (string) preg_replace( '/[\r\n\t ]+/', ' ', $text );
+        }
+        return trim( $text );
     }
 }
 // Post meta, user and hook mocks backed by globals, for history tests.
