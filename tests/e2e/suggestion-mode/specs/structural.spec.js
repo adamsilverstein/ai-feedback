@@ -60,11 +60,16 @@ async function reviewPost(fixtures) {
 			PARAGRAPHS[2],
 			PARAGRAPHS[3],
 		]);
+	// Suggestions are added one after another.
+	await expect
+		.poll(() => suggestionMarkers(editor))
+		.toEqual({
+			[PARAGRAPHS[1]]: expect.objectContaining({ type: 'pending-move' }),
+			[PARAGRAPHS[2]]: expect.objectContaining({
+				type: 'pending-remove',
+			}),
+		});
 	const markers = await suggestionMarkers(editor);
-	expect(markers).toEqual({
-		[PARAGRAPHS[1]]: expect.objectContaining({ type: 'pending-move' }),
-		[PARAGRAPHS[2]]: expect.objectContaining({ type: 'pending-remove' }),
-	});
 
 	return {
 		move: markers[PARAGRAPHS[1]].commentId,

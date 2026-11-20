@@ -125,6 +125,8 @@ test.describe('Proofreading suggestions', () => {
 		]);
 		page.on('dialog', (dialog) => dialog.accept());
 		await admin.editPost(post.id);
+		// The cleanup runs when the Fresh Eyes sidebar loads the last review.
+		await aiFeedback.openSidebar();
 
 		await expect
 			.poll(() =>
