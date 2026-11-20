@@ -47,7 +47,7 @@ Runs PHP unit tests using PHPUnit on the minimum supported PHP version (8.1) and
 ### E2E Tests (Suggestion Mode)
 **File**: `.github/workflows/test-e2e-suggestion-mode.yml`
 
-Runs `tests/e2e/suggestion-mode/specs` against a Gutenberg build of the commit pinned in `tests/e2e/suggestion-mode/gutenberg.json`, with the Suggestion Mode experiment on. The build is cached by commit, so only the first run after a bump builds Gutenberg (about 15 minutes).
+Runs `tests/e2e/suggestion-mode/specs` against a Gutenberg build of the commit pinned in `tests/e2e/suggestion-mode/gutenberg.json`, with the Suggestion Mode experiment on. The build is cached by commit, so only the first run after a bump builds Gutenberg (about 5 minutes in CI, longer on a laptop).
 
 The job has `continue-on-error: true` and should not be a required check: it tracks Gutenberg work that is not merged yet. A failure still shows on the pull request. See [TESTING.md](./TESTING.md#suggestion-mode-e2e-tests).
 

@@ -1263,7 +1263,7 @@ gh pr view 78994 --repo WordPress/gutenberg --json headRefOid --jq .headRefOid
 
 If that PR is force-pushed, GitHub normally keeps the old commit fetchable, but a pin to a commit that is gone fails the cold build. Bump to the current head when that happens.
 
-CI caches the build by commit (and by the build script's contents), so the first run after a bump builds Gutenberg again (about 15 minutes) and later runs reuse it. Locally the build script rebuilds when the commit in `.cache/suggestion-mode/gutenberg/.built-sha` differs.
+CI caches the build by commit (and by the build script's contents), so the first run after a bump builds Gutenberg again (about 5 minutes in CI, longer on a laptop) and later runs reuse it. Locally the build script rebuilds when the commit in `.cache/suggestion-mode/gutenberg/.built-sha` differs.
 
 #### In CI
 
