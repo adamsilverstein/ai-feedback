@@ -20,6 +20,43 @@ const EDITOR = {
 	password: 'fresh-eyes-e2e-password',
 	roles: ['editor'],
 };
+const FRANK = {
+	username: 'frank-e2e',
+	email: 'frank-e2e@example.com',
+	password: 'frank-e2e-password',
+	roles: ['editor'],
+};
+
+/**
+ * Run steps with a user that exists only for them, removed afterwards
+ * even when a step fails, and first if an earlier run left it behind.
+ *
+ * @param {Object}   requestUtils Request utils.
+ * @param {Object}   user         User to create.
+ * @param {Function} steps        Steps, given the created user.
+ */
+async function withUser(requestUtils, user, steps) {
+	const remove = async (id) =>
+		requestUtils.rest({
+			method: 'DELETE',
+			path: `/wp/v2/users/${id}`,
+			params: { force: true, reassign: 1 },
+		});
+	const [left] = await requestUtils.rest({
+		path: '/wp/v2/users',
+		params: { slug: user.username, context: 'edit' },
+	});
+	if (left) {
+		await remove(left.id);
+	}
+
+	const created = await requestUtils.createUser({ ...user });
+	try {
+		await steps(created);
+	} finally {
+		await remove(created.id);
+	}
+}
 
 /**
  * Open a new post with one paragraph and read the Fresh Eyes user ID the
@@ -159,17 +196,22 @@ test.describe('Fresh Eyes user', () => {
 		admin,
 		requestUtils,
 	}) => {
-		await openPost({ page, editor, admin, requestUtils });
+		await withUser(requestUtils, FRANK, async () => {
+			await openPost({ page, editor, admin, requestUtils });
 
-		await editor.canvas.locator('p').first().click();
-		await page.keyboard.press('End');
-		const searched = waitForUserSearch(page, 'fr');
-		await page.keyboard.type(' @fr');
-		await searched;
+			await editor.canvas.locator('p').first().click();
+			await page.keyboard.press('End');
+			await page.keyboard.type(' @fr');
 
-		await expect(
-			page.getByRole('option', { name: /Fresh Eyes/ })
-		).toHaveCount(0);
+			// Another user the search matches shows up, so the list has
+			// rendered, and Fresh Eyes is not in it.
+			await expect(
+				page.getByRole('option', { name: /frank-e2e/ })
+			).toBeVisible();
+			await expect(
+				page.getByRole('option', { name: /Fresh Eyes/ })
+			).toHaveCount(0);
+		});
 	});
 
 	test('user lists leave Fresh Eyes out unless the completer searches its name', async ({
@@ -251,30 +293,25 @@ test.describe('Fresh Eyes user', () => {
 		baseURL,
 	}) => {
 		const userId = await openPost({ page, editor, admin, requestUtils });
-		const created = await requestUtils.createUser({ ...EDITOR });
 
-		const editorUtils = await RequestUtils.setup({
-			user: EDITOR,
-			baseURL,
-			storageStatePath: path.join(
-				process.env.WP_ARTIFACTS_PATH,
-				'storage-states/fresh-eyes-editor.json'
-			),
-		});
+		await withUser(requestUtils, EDITOR, async () => {
+			const editorUtils = await RequestUtils.setup({
+				user: EDITOR,
+				baseURL,
+				storageStatePath: path.join(
+					process.env.WP_ARTIFACTS_PATH,
+					'storage-states/fresh-eyes-editor.json'
+				),
+			});
 
-		const view = { context: 'view', _locale: 'user' };
-		expect(
-			await listUsers(editorUtils, { ...view, search: 'fr' })
-		).toContain(userId);
-		expect(await listUsers(editorUtils, {})).not.toContain(userId);
-		expect(
-			await listUsers(editorUtils, { ...view, search: 'eyes' })
-		).not.toContain(userId);
-
-		await requestUtils.rest({
-			method: 'DELETE',
-			path: `/wp/v2/users/${created.id}`,
-			params: { force: true, reassign: 1 },
+			const view = { context: 'view', _locale: 'user' };
+			expect(
+				await listUsers(editorUtils, { ...view, search: 'fr' })
+			).toContain(userId);
+			expect(await listUsers(editorUtils, {})).not.toContain(userId);
+			expect(
+				await listUsers(editorUtils, { ...view, search: 'eyes' })
+			).not.toContain(userId);
 		});
 	});
 });
