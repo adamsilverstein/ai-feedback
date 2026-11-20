@@ -1,0 +1,136 @@
+name: E2E Tests (Suggestion Mode)
+
+# Runs the Suggestion Mode specs against a Gutenberg build of the commit
+# pinned in tests/e2e/suggestion-mode/gutenberg.json. That work is not merged
+# into Gutenberg yet, so this job may fail without failing the workflow.
+
+on:
+    pull_request:
+        branches:
+            - main
+            - develop
+        paths:
+            - 'src/**'
+            - 'includes/**'
+            - 'tests/e2e/**'
+            - 'tests/mu-plugins/**'
+            - 'bin/build-suggestion-mode-gutenberg.sh'
+            - 'playwright.suggestion-mode.config.js'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.wp-env.suggestion-mode.json'
+            - '.github/workflows/test-e2e-suggestion-mode.yml'
+    push:
+        branches:
+            - main
+            - develop
+        paths:
+            - 'src/**'
+            - 'includes/**'
+            - 'tests/e2e/**'
+            - 'tests/mu-plugins/**'
+            - 'bin/build-suggestion-mode-gutenberg.sh'
+            - 'playwright.suggestion-mode.config.js'
+            - 'package.json'
+            - 'package-lock.json'
+            - '.wp-env.suggestion-mode.json'
+            - '.github/workflows/test-e2e-suggestion-mode.yml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    e2e-suggestion-mode:
+        name: E2E Tests (Suggestion Mode, pinned Gutenberg)
+        runs-on: ubuntu-latest
+        # Not required: the pinned Gutenberg work is still moving upstream.
+        continue-on-error: true
+        timeout-minutes: 75
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v7
+              with:
+                  # Keep the token out of .git/config while Gutenberg's npm scripts run.
+                  persist-credentials: false
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: 'npm'
+
+            - name: Read the pinned Gutenberg commit
+              id: pin
+              run: echo "sha=$(jq -r .sha tests/e2e/suggestion-mode/gutenberg.json)" >> "$GITHUB_OUTPUT"
+
+            - name: Restore the Gutenberg build
+              id: gutenberg-cache
+              uses: actions/cache/restore@v6
+              with:
+                  path: .cache/suggestion-mode/gutenberg
+                  key: gutenberg-suggestion-mode-${{ runner.os }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('bin/build-suggestion-mode-gutenberg.sh') }}
+
+            # Gutenberg pins its own Node version.
+            - name: Read Gutenberg's Node version
+              id: gutenberg-node
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              env:
+                  SHA: ${{ steps.pin.outputs.sha }}
+              run: |
+                  version="$(curl -fsSL --retry 3 "https://raw.githubusercontent.com/WordPress/gutenberg/$SHA/.nvmrc")"
+                  test -n "$version"
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Setup Gutenberg's Node.js
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              uses: actions/setup-node@v7
+              with:
+                  node-version: ${{ steps.gutenberg-node.outputs.version }}
+
+            - name: Build Gutenberg at the pinned commit
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              run: bin/build-suggestion-mode-gutenberg.sh
+
+            # Saved right away, so a failing test run does not throw the build away.
+            - name: Save the Gutenberg build
+              if: steps.gutenberg-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v6
+              with:
+                  path: .cache/suggestion-mode/gutenberg
+                  key: gutenberg-suggestion-mode-${{ runner.os }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('bin/build-suggestion-mode-gutenberg.sh') }}
+
+            - name: Setup Node.js for the plugin
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install Playwright browsers
+              run: npx playwright install chromium --with-deps
+
+            - name: Build plugin assets
+              run: npm run build
+
+            - name: Start WordPress with Suggestion Mode
+              run: npm run env:suggestion-mode:start
+
+            - name: Wait for WordPress to be ready
+              run: npx wait-on http://localhost:8892 --timeout 60000
+
+            - name: Run Suggestion Mode E2E tests
+              run: npm run test:e2e:suggestion-mode
+
+            - name: Upload test artifacts
+              uses: actions/upload-artifact@v7
+              if: failure()
+              with:
+                  name: e2e-suggestion-mode-results-${{ github.run_id }}
+                  path: artifacts/suggestion-mode/
+                  retention-days: 7
+
+            - name: Stop WordPress environment
+              if: always()
+              run: npm run env:suggestion-mode:stop
