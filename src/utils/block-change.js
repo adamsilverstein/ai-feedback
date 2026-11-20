@@ -63,6 +63,12 @@ const LIST_GAP =
 	/^[\s,;、，；]+(?:(?:and|or|&|und|oder|et|ou|y|o|e|en)\s+)?$/iu;
 
 /**
+ * An introduction ending like this leaves list items out. Matches
+ * Block_Change::LIST_SEPARATOR_END.
+ */
+const LIST_SEPARATOR_END = /[,;、，；]$/u;
+
+/**
  * Text allowed after the last list item.
  */
 const LIST_TAIL = /^[\s.,;!?…。]*$/u;
@@ -165,6 +171,10 @@ export function matchListItems(text, items) {
 				return null;
 			}
 			lead = [0, gap.trimEnd().length];
+			// An introduction ending in a separator left items out.
+			if (LIST_SEPARATOR_END.test(gap.trimEnd())) {
+				return null;
+			}
 		} else if (!LIST_GAP.test(gap)) {
 			return null;
 		}

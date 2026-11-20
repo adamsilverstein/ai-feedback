@@ -128,6 +128,14 @@ describe('text matching', () => {
 			matchListItems('Node and npm are needed.', ['Node', 'npm'])
 		).toBeNull();
 		expect(matchListItems('Nodes, npm', ['odes', 'npm'])).toBeNull();
+		// An introduction ending in a separator left items out of the list.
+		expect(
+			matchListItems('You need Node, npm, Docker and Git.', [
+				'Docker',
+				'Git',
+			])
+		).toBeNull();
+		expect(matchListItems('需要：书，笔，纸', ['笔', '纸'])).toBeNull();
 	});
 
 	it('finds a split at a sentence that appears once', () => {

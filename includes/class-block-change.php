@@ -110,6 +110,12 @@ class Block_Change {
 	private const LIST_GAP = '/^[\s,;、，；]+(?:(?:and|or|&|und|oder|et|ou|y|o|e|en)\s+)?$/iu';
 
 	/**
+	 * An introduction ending like this leaves list items out. Matches
+	 * LIST_SEPARATOR_END in src/utils/block-change.js.
+	 */
+	private const LIST_SEPARATOR_END = '/[,;、，；]$/u';
+
+	/**
 	 * Text allowed after the last list item.
 	 */
 	private const LIST_TAIL = '/^[\s.,;!?…。]*$/u';
@@ -369,7 +375,8 @@ class Block_Change {
 	 *
 	 * The items must appear in the text in order, separated only by commas,
 	 * semicolons and a conjunction, with nothing but punctuation after the
-	 * last one. Text before the first item stays as an introduction. So
+	 * last one. Text before the first item stays as an introduction, unless
+	 * it ends in a separator, which means items were left out. So
 	 * turning the paragraph into a list only drops separators.
 	 *
 	 * @param  string   $text  Paragraph text, normalized.
@@ -391,6 +398,11 @@ class Block_Change {
 					return null;
 				}
 				$lead = trim( $gap );
+				// An introduction ending in a separator means items before
+				// the first one were left out of the list.
+				if ( 1 === preg_match( self::LIST_SEPARATOR_END, $lead ) ) {
+					return null;
+				}
 			} elseif ( 1 !== preg_match( self::LIST_GAP, $gap ) ) {
 				return null;
 			}
