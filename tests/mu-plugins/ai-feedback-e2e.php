@@ -19,6 +19,16 @@ if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type
 	return;
 }
 
+// Lets a test treat pending suggestions as old enough to clean up.
+if ( isset( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) && is_string( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) ) {
+	$ai_feedback_e2e_cleanup_delay = absint( $_COOKIE['ai_feedback_e2e_cleanup_delay'] );
+	add_filter(
+		'ai_feedback_suggestion_cleanup_delay',
+		static fn (): int => $ai_feedback_e2e_cleanup_delay
+	);
+	unset( $ai_feedback_e2e_cleanup_delay );
+}
+
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', true );
 }
@@ -107,6 +117,21 @@ add_filter(
 			|| ! str_contains( $block[1], 'last year' )
 		) {
 			return $reply;
+		}
+
+		// Asked to change text across a footnote, the edit's find reads the
+		// footnote's number, which the editor never matches.
+		if ( str_contains( $user_reply[1], 'footnote number' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: "growth1 was" now reads "growth is".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => 'growth1 was',
+						'replace' => 'growth is',
+					),
+				)
+			);
 		}
 
 		// Asked to change both lines of a block split by a line break, the

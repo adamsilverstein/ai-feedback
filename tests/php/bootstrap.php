@@ -56,6 +56,7 @@ if ( ! function_exists( 'get_network_option' ) ) {
 }
 require_once $includes_dir . 'class-fresh-eyes-user.php';
 require_once $includes_dir . 'class-mentions.php';
+require_once $includes_dir . 'class-editor-text.php';
 
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {
