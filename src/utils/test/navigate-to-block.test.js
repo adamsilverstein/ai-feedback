@@ -37,6 +37,13 @@ describe('resolveBlockClientId', () => {
 		expect(resolveBlockClientId('old-id', 12)).toBe('b');
 	});
 
+	it('finds a block that links several notes', () => {
+		blocks.d = { attributes: { metadata: { noteId: [20, '21'] } } };
+
+		expect(resolveBlockClientId(null, 21)).toBe('d');
+		expect(resolveBlockClientId(null, 20)).toBe('d');
+	});
+
 	it('finds the block holding a suggestion marker', () => {
 		expect(resolveBlockClientId('old-id', 14)).toBe('c');
 	});
