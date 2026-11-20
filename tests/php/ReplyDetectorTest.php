@@ -130,6 +130,81 @@ class ReplyDetectorTest extends TestCase {
 	}
 
 	/**
+	 * AI notes written before the Fresh Eyes user (author 0), and after it
+	 * (author 41), side by side.
+	 *
+	 * @return array<string, array{int}>
+	 */
+	public static function ai_note_authors(): array {
+		return array(
+			'old note, no author'          => array( 0 ),
+			'new note, the Fresh Eyes user' => array( 41 ),
+		);
+	}
+
+	/**
+	 * An AI reply never asks for an AI answer, whoever its author, even one
+	 * that mentions Fresh Eyes.
+	 *
+	 * @dataProvider ai_note_authors
+	 *
+	 * @param int $author AI note's user ID.
+	 */
+	public function test_ai_reply_is_ignored_whoever_its_author( int $author ): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+		$GLOBALS['test_comment_meta'][200] = array( 'ai_feedback' => '1' );
+
+		$this->detector->maybe_dispatch_reply(
+			200,
+			(object) array(
+				'comment_type'    => 'note',
+				'comment_parent'  => 100,
+				'comment_post_ID' => 42,
+				'user_id'         => (string) $author,
+				'comment_content' => 'Ask @fresh-eyes again if you like.',
+			)
+		);
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
+	 * A person's reply to an AI note is answered, whoever wrote the AI note:
+	 * the thread is Fresh Eyes' by its meta, not its author.
+	 *
+	 * @dataProvider ai_note_authors
+	 *
+	 * @param int $author AI note's user ID.
+	 */
+	public function test_reply_to_an_ai_note_is_answered_whoever_its_author( int $author ): void {
+		$GLOBALS['test_comment_meta'][100] = array(
+			'ai_feedback' => '1',
+			'block_id'    => 'abc-123',
+		);
+		$GLOBALS['test_comments'][100]     = (object) array(
+			'comment_parent' => 0,
+			'user_id'        => (string) $author,
+		);
+
+		$this->detector->maybe_dispatch_reply(
+			200,
+			(object) array(
+				'comment_type'    => 'note',
+				'comment_parent'  => 100,
+				'comment_post_ID' => 42,
+				'user_id'         => '7',
+				'comment_content' => 'Thanks, but I disagree.',
+			)
+		);
+
+		$this->assertCount( 1, $GLOBALS['test_dispatched_calls'] );
+		$this->assertSame( array( 200, 100, 42, 'abc-123' ), $GLOBALS['test_dispatched_calls'][0]['args'] );
+	}
+
+	/**
 	 * A non-note reply (e.g. a regular post comment) is ignored.
 	 */
 	public function test_non_note_is_ignored(): void {
