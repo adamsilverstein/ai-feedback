@@ -16,7 +16,7 @@ Fresh Eyes is an AI agent that reviews your posts right in the block editor, lik
 
 = Features =
 
-* 🤖 **AI-Powered Reviews**: Intelligent feedback on content quality, tone, flow, and design
+* 🤖 **AI-Powered Reviews**: Intelligent feedback on content quality, tone, flow, design, and grammar and spelling
 * 📝 **Native Notes Integration**: Feedback appears as WordPress block comments
 * 🔌 **Core Connectors API**: Uses the credentials you've already configured in Settings → Connectors
 * 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other registered AI provider

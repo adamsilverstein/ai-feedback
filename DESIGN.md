@@ -390,7 +390,7 @@ PROMPT;
       "type": "array",
       "items": {
         "block_index": "integer",
-        "category": "content|tone|flow|design",
+        "category": "content|tone|flow|design|grammar",
         "severity": "suggestion|important|critical",
         "title": "string (max 50 chars)",
         "feedback": "string (max 200 chars)",
@@ -447,7 +447,7 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 |----------|------|-------------|
 | `ai_feedback` | bool | True if note was created by AI |
 | `review_id` | string | UUID linking notes from same review |
-| `feedback_category` | string | content, tone, flow, design |
+| `feedback_category` | string | content, tone, flow, design, grammar |
 | `feedback_severity` | string | suggestion, important, critical |
 | `ai_model` | string | Model used for this feedback |
 
@@ -806,7 +806,7 @@ See [TESTING.md](./docs/TESTING.md) for comprehensive testing documentation.
 | Note | A comment attached to a specific block in WordPress 6.9+ |
 | Review | A complete AI analysis of a document |
 | Feedback Item | A single piece of feedback within a review |
-| Focus Area | Category of feedback (content, tone, flow, design) |
+| Focus Area | Category of feedback (content, tone, flow, design, grammar) |
 
 ### B. References
 
