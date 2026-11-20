@@ -94,7 +94,8 @@ class Image_Refusals {
 	 *   text alone working means none takes its images;
 	 * - a 415, the provider refusing the media type;
 	 * - a 400 or 422 whose code or message names images (`image_url` too),
-	 *   vision, modalities, media types or MIME types.
+	 *   vision, modalities, media types or MIME types, unless it says they
+	 *   are too large or too many, or exceed a limit.
 	 *
 	 * Not remembered: a 413 (that request was too large, the next may not
 	 * be), any other 400 or 422, and every other error.
@@ -113,7 +114,10 @@ class Image_Refusals {
 		} elseif ( 415 === $status ) {
 			$lasting = true;
 		} elseif ( in_array( $status, array( 400, 422 ), true ) ) {
-			$lasting = 1 === preg_match( '/\b(?:image|vision|modalit|media[ _]type|mime)/i', $code . ' ' . $message );
+			$text = $code . ' ' . $message;
+			// An image too large, or too many, may pass in a later review.
+			$lasting = 1 === preg_match( '/\b(?:image|vision|modalit|media[ _]type|mime)/i', $text )
+				&& 1 !== preg_match( '/\b(?:too (?:large|big|many)|exceed|limit|maximum)/i', $text );
 		} else {
 			$lasting = false;
 		}

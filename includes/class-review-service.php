@@ -423,9 +423,11 @@ class Review_Service {
 	 *
 	 * Images are only sent to a model that reads them: given an image, core
 	 * would otherwise switch to another model that does, or refuse the prompt.
-	 * The model is only asked about once there are images to send or report
-	 * as left out, since the answer can need a request to the provider for
-	 * its model list. A model that refused images recently gets none. That
+	 * The model's provider is only looked up when a block may be an image to
+	 * send, and the model is only asked about once there are images to send
+	 * or report as left out, since either can need a request to the
+	 * provider for its model list. A model that refused images recently
+	 * gets none. That
 	 * request uses the WordPress HTTP timeout (`http_request_timeout`, 5
 	 * seconds by default), as core's `wp_ai_client_default_request_timeout`
 	 * only applies to prompt requests.
@@ -435,6 +437,9 @@ class Review_Service {
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
+		if ( ! Review_Images::has_candidates( $blocks ) ) {
+			return array();
+		}
 		$provider = $this->get_model_provider( $model );
 		$images   = $this->collect_review_images( $blocks, $provider );
 		if ( array() === $images && array() === $this->skipped_images ) {

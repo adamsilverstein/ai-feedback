@@ -606,6 +606,37 @@ class ReviewImagesTest extends TestCase {
 	}
 
 	/**
+	 * A filter returning something other than a list of types sends no
+	 * images rather than failing.
+	 */
+	public function test_types_filter_garbage(): void {
+		foreach ( array( 'image/png', null, array( 42, array( 'image/png' ) ) ) as $garbage ) {
+			$GLOBALS['test_filter_results'] = array( 'ai_feedback_review_image_types' => $garbage );
+			$this->assertSame( array(), Review_Images::get_provider_types( 'openai' ) );
+		}
+	}
+
+	/**
+	 * The provider is only looked up when a block may be an image to send.
+	 */
+	public function test_has_candidates(): void {
+		$this->assertFalse( Review_Images::has_candidates( array() ) );
+		$this->assertFalse(
+			Review_Images::has_candidates(
+				array(
+					array(
+						'name'    => 'core/paragraph',
+						'content' => 'Text',
+					),
+					self::image( 'alt', 12, 'http://example.com/wp-content/uploads/2026/11/chart.png', 'A chart' ),
+					self::image( 'external', 0, 'http://example.com/chart.png' ),
+				)
+			)
+		);
+		$this->assertTrue( Review_Images::has_candidates( array( self::attachment( 'img', 12 ) ) ) );
+	}
+
+	/**
 	 * The longest side is capped as well as the width: a long image is sent
 	 * from a size that fits, or left out when none does.
 	 */

@@ -170,6 +170,27 @@ class Review_Images {
 	}
 
 	/**
+	 * Whether any block is an image collect() might send: a Media Library
+	 * image without alt text. Cheap, so the model's provider is only looked
+	 * up when there may be images.
+	 *
+	 * @param  array<mixed> $blocks Blocks from the review request.
+	 * @return bool
+	 */
+	public static function has_candidates( array $blocks ): bool {
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) || 'core/image' !== ( $block['name'] ?? '' ) ) {
+				continue;
+			}
+			$attrs = Block_Change::get_block_attributes( $block );
+			if ( '' === trim( is_string( $attrs['alt'] ?? null ) ? $attrs['alt'] : '' ) && is_int( $attrs['id'] ?? null ) && 0 !== $attrs['id'] ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Images the last collect() left out because the provider would refuse
 	 * them or the request would be too large, in block order.
 	 *
