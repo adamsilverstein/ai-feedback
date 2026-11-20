@@ -561,12 +561,6 @@ if (! function_exists('wp_kses') ) {
 
 if (! function_exists('sanitize_text_field') ) {
     /**
-     * No-op sanitizer used in tests that returns the given string unchanged.
-     *
-     * @param  string $str The input string to sanitize (returned unchanged).
-     * @return string The original string unchanged.
-     */
-    /**
      * Sanitize a single line of text, as core does: strip tags, collapse
      * line breaks, tabs and extra spaces, trim, and drop percent-encoded
      * octets. Simplified from core's `_sanitize_text_fields()`.

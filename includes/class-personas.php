@@ -123,6 +123,15 @@ class Personas {
 	}
 
 	/**
+	 * Flush the cache whenever core switches the site or the language, since
+	 * the personas can differ per site and their labels are translated.
+	 */
+	public static function register(): void {
+		add_action( 'switch_blog', array( self::class, 'flush_cache' ) );
+		add_action( 'change_locale', array( self::class, 'flush_cache' ) );
+	}
+
+	/**
 	 * Forget the cached personas, for example after adding a filter late.
 	 */
 	public static function flush_cache(): void {

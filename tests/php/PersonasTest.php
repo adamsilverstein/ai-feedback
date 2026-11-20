@@ -11,6 +11,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Personas;
 
+require_once __DIR__ . '/reply-service-mocks.php';
+
 /**
  * Test cases for Personas.
  */
@@ -20,7 +22,7 @@ class PersonasTest extends TestCase {
 	 * Clear forced filter results.
 	 */
 	protected function tearDown(): void {
-		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_did_action'] );
+		unset( $GLOBALS['test_filter_results'], $GLOBALS['test_did_action'], $GLOBALS['test_added_actions'] );
 		Personas::flush_cache();
 		parent::tearDown();
 	}
@@ -205,6 +207,55 @@ class PersonasTest extends TestCase {
 
 		Personas::flush_cache();
 		$this->assertTrue( Personas::is_valid( 'later_reader' ) );
+	}
+
+	/**
+	 * Run the flush callback registered for a core action.
+	 *
+	 * @param string $hook Action name.
+	 */
+	private function do_registered_action( string $hook ): void {
+		$GLOBALS['test_added_actions'] = array();
+		Personas::register();
+		$callbacks = array_column(
+			array_filter( $GLOBALS['test_added_actions'], static fn ( array $added ): bool => $hook === $added['hook'] ),
+			'callback'
+		);
+		$this->assertCount( 1, $callbacks, $hook . ' is hooked once' );
+		call_user_func( $callbacks[ array_key_first( $callbacks ) ] );
+	}
+
+	/**
+	 * Switching site or language flushes the cached personas.
+	 *
+	 * @param string $hook Core action.
+	 */
+	#[DataProvider( 'flushing_action_provider' )]
+	public function test_switching_site_or_locale_flushes_cache( string $hook ): void {
+		$GLOBALS['test_did_action'] = array( 'init' => 1 );
+		$this->filter_personas( array( 'first_reader' => array( 'label' => 'First' ) ) );
+		$this->assertTrue( Personas::is_valid( 'first_reader' ) );
+
+		// Another site or language, with other personas.
+		$this->filter_personas( array( 'second_reader' => array( 'label' => 'Second' ) ) );
+		$this->assertFalse( Personas::is_valid( 'second_reader' ) );
+
+		$this->do_registered_action( $hook );
+
+		$this->assertTrue( Personas::is_valid( 'second_reader' ) );
+		$this->assertFalse( Personas::is_valid( 'first_reader' ) );
+	}
+
+	/**
+	 * Core actions that flush the cache.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function flushing_action_provider(): array {
+		return array(
+			'switch_to_blog()'   => array( 'switch_blog' ),
+			'switch_to_locale()' => array( 'change_locale' ),
+		);
 	}
 
 	/**

@@ -928,7 +928,7 @@ add_filter( 'ai_feedback_chunk_size', function( int $size ): int {
 
 #### `ai_feedback_personas`
 
-Add, relabel or remove the reader personas offered under "Read it as". Keys are persona IDs (lowercase letters, numbers, `_` and `-`, up to 40 characters); `guidance` describes the reader for the prompt. The copy editor is always offered and never adds guidance, so the default review is unchanged. Labels are cut to 60 characters, descriptions to 200 and guidance to 1000. The list is cached for the request once `init` has run; call `AI_Feedback\Personas::flush_cache()` after adding the filter later than that. Notes keep their persona ID; once a filter removes a persona, its notes lose their badge and their review summary drops its takeaway.
+Add, relabel or remove the reader personas offered under "Read it as". Keys are persona IDs (lowercase letters, numbers, `_` and `-`, up to 40 characters); `guidance` describes the reader for the prompt. The copy editor is always offered and never adds guidance, so the default review is unchanged. Labels are cut to 60 characters, descriptions to 200 and guidance to 1000. The list is cached for the request once `init` has run; call `AI_Feedback\Personas::flush_cache()` after adding the filter later than that. The cache is flushed on `switch_blog` and `change_locale`; a filter whose personas vary by user should call `Personas::flush_cache()` after `wp_set_current_user()`. Notes keep their persona ID; once a filter removes a persona, its notes lose their badge and their review summary drops its takeaway.
 
 ```php
 add_filter( 'ai_feedback_personas', function( array $personas ): array {
