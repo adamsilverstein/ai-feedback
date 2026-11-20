@@ -149,11 +149,17 @@ export function isFixInPlace(content, fix) {
  * A match that already sits inside the fix's replacement doesn't count, so
  * a fix that adds words ("data" → "the data") is never applied twice.
  *
+ * U+FFFC stands for an object, like a footnote or an image, which a text
+ * fix would delete or can't write back, so a fix holding one never applies.
+ *
  * @param {Object} value Rich text value.
  * @param {Object} fix   Quick fix with `find` and `replace`.
  * @return {number} Start offset, or -1 unless the text appears exactly once and not already replaced.
  */
 export function findUniqueOffset(value, fix) {
+	if (`${fix?.find ?? ''}${fix?.replace ?? ''}`.includes('\ufffc')) {
+		return -1;
+	}
 	const matches = findMatches(value.text, fix?.find);
 	return matches.length === 1 && !isReplacementAt(value.text, fix, matches[0])
 		? matches[0]

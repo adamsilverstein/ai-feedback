@@ -35,6 +35,10 @@ import {
 	splitProofreading,
 	undoAcceptAll,
 } from '../proofreading';
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
 
 // Gutenberg registers its suggestion markers as formats when Suggestion
 // Mode is on; without them rich text drops the marker attributes.
@@ -366,5 +370,36 @@ describe('Accept all with Suggestion Mode', () => {
 		expect(plan.accepted).toEqual([]);
 		expect(plan.skipped).toEqual([7]);
 		expect(plan.updates).toEqual({});
+	});
+});
+
+describe('Accept all beside a footnote', () => {
+	// With core's formats, as in the editor, a footnote is one object.
+	beforeAll(registerEditorFormats);
+	afterAll(unregisterEditorFormats);
+
+	const FOOTNOTE =
+		'<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+
+	it('applies fixes on both sides and keeps the footnote once', () => {
+		const { registry, blocks } = setUp([
+			`Teh growth${FOOTNOTE} was strnog.`,
+		]);
+		const [block] = blocks;
+
+		const plan = acceptAllFixes(registry, [
+			note(1, block.clientId, 'Teh', 'The'),
+			note(2, block.clientId, 'strnog', 'strong'),
+			// Across the footnote's number, which the editor never reads.
+			note(3, block.clientId, 'growth1', 'growth'),
+		]);
+
+		const result = html(registry, block);
+		expect(result).toContain('The growth<sup');
+		expect(result).toContain('</sup> was strong.');
+		expect(result.split('data-fn="f1"')).toHaveLength(2);
+		expect(result.split('>1</a>')).toHaveLength(2);
+		expect(plan.applied.sort()).toEqual([1, 2]);
+		expect(plan.skipped).toEqual([3]);
 	});
 });
