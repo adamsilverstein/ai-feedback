@@ -103,10 +103,25 @@ add_filter(
 		if (
 			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $user_reply )
 			|| ! preg_match( '/make (?:this|that) change/i', $user_reply[1] )
-			|| ! preg_match( '/^Block content: (.*)$/m', $prompt, $block )
+			|| ! preg_match( '/^Block content: (.*?)\n\n/ms', $prompt, $block )
 			|| ! str_contains( $block[1], 'last year' )
 		) {
 			return $reply;
+		}
+
+		// Asked to change both lines of a block split by a line break, the
+		// edit's find runs across the break, copying it as a newline.
+		if ( str_contains( $user_reply[1], 'both lines' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: both lines now read "in 2025".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => "40%\nlast year",
+						'replace' => "40%\nin 2025",
+					),
+				)
+			);
 		}
 
 		return (string) wp_json_encode(
