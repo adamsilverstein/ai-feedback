@@ -57,8 +57,9 @@ if ( ! function_exists( 'wp_insert_comment' ) ) {
 		$GLOBALS['test_comments'][ $id ]      = $comment;
 		$GLOBALS['test_inserted_args'][ $id ] = $data;
 
+		// Like core, which stores each value through add_comment_meta(), and so unslashes it.
 		foreach ( $data['comment_meta'] ?? array() as $key => $value ) {
-			$GLOBALS['test_comment_meta'][ $id ][ $key ] = $value;
+			$GLOBALS['test_comment_meta'][ $id ][ $key ] = wp_unslash( $value );
 		}
 
 		return $id;

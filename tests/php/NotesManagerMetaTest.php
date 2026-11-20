@@ -91,4 +91,68 @@ class NotesManagerMetaTest extends TestCase {
 
 		$this->assertSame( '1x2y3z', $meta['block_anchor'] );
 	}
+
+	/**
+	 * An AI reply's edit is stored as JSON.
+	 */
+	public function test_stores_reply_edit(): void {
+		$edit = array(
+			'type'    => 'replace_text',
+			'find'    => 'last year',
+			'replace' => 'in 2025',
+		);
+		$meta = $this->build_note_meta(
+			array(
+				'block_id'   => 'block-1',
+				'feedback'   => 'Done.',
+				'reply_edit' => $edit,
+			)
+		);
+
+		$this->assertSame( $edit, Notes_Manager::decode_reply_edit( $meta[ Notes_Manager::REPLY_EDIT_META_KEY ] ) );
+	}
+
+	/**
+	 * Data provider for stored reply edits.
+	 *
+	 * @return array<string, array{0: mixed, 1: array<string, string>|null}>
+	 */
+	public static function stored_reply_edit_provider(): array {
+		return array(
+			'none'              => array( '', null ),
+			'not a string'      => array( array( 'type' => 'replace_text' ), null ),
+			'invalid JSON'      => array( '{nope', null ),
+			'unknown type'      => array( '{"type":"delete_block"}', null ),
+			'missing field'     => array( '{"type":"replace_text","find":"a"}', null ),
+			'non-string field'  => array( '{"type":"rewrite_block","content":"a","original":5}', null ),
+			'text replacement'  => array(
+				'{"type":"replace_text","find":"a","replace":"b","extra":"x"}',
+				array(
+					'type'    => 'replace_text',
+					'find'    => 'a',
+					'replace' => 'b',
+				),
+			),
+			'block rewrite'     => array(
+				'{"type":"rewrite_block","content":"<em>New</em>","original":"Old"}',
+				array(
+					'type'     => 'rewrite_block',
+					'content'  => '<em>New</em>',
+					'original' => 'Old',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Stored reply edits are decoded only when well formed.
+	 *
+	 * @dataProvider stored_reply_edit_provider
+	 *
+	 * @param mixed                      $stored   Stored meta value.
+	 * @param array<string, string>|null $expected Decoded edit.
+	 */
+	public function test_decode_reply_edit( mixed $stored, ?array $expected ): void {
+		$this->assertSame( $expected, Notes_Manager::decode_reply_edit( $stored ) );
+	}
 }

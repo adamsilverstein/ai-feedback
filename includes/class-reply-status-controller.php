@@ -148,7 +148,8 @@ class Reply_Status_Controller extends WP_REST_Controller {
 	 *
 	 * Lists the replies under each AI Feedback note in a post, oldest first,
 	 * as plain text, plus the newest user reply in each thread that is still
-	 * waiting for an AI response. One request covers the whole sidebar.
+	 * waiting for an AI response. An AI reply that proposes a change to the
+	 * note's block carries it as `edit`. One request covers the whole sidebar.
 	 *
 	 * @param  WP_REST_Request $request Request.
 	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
@@ -196,6 +197,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 				'content' => trim( wp_strip_all_tags( $comment->comment_content ) ),
 				'is_ai'   => $is_ai,
 				'date'    => $comment->comment_date,
+				'edit'    => $is_ai ? Notes_Manager::decode_reply_edit( get_comment_meta( $id, Notes_Manager::REPLY_EDIT_META_KEY, true ) ) : null,
 			);
 
 			if ( ! $is_ai ) {

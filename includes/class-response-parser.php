@@ -43,6 +43,32 @@ class Response_Parser {
 	public const MAX_QUICK_FIX_LENGTH = 200;
 
 	/**
+	 * Edit types an AI reply can carry.
+	 */
+	public const REPLY_EDIT_TYPES = array( 'replace_text', 'rewrite_block' );
+
+	/**
+	 * Maximum length of a `rewrite_block` edit's content.
+	 */
+	public const MAX_REWRITE_LENGTH = 4000;
+
+	/**
+	 * Inline formatting tags a `rewrite_block` edit may contain.
+	 */
+	public const REWRITE_ALLOWED_TAGS = array(
+		'a'      => array( 'href' => true ),
+		'b'      => array(),
+		'br'     => array(),
+		'code'   => array(),
+		'em'     => array(),
+		'i'      => array(),
+		's'      => array(),
+		'strong' => array(),
+		'sub'    => array(),
+		'sup'    => array(),
+	);
+
+	/**
 	 * Maximum character lengths for feedback fields.
 	 */
 	public const FIELD_MAX_LENGTHS = array(
@@ -533,6 +559,201 @@ class Response_Parser {
 		$count = preg_match_all( '/' . $pattern . '/u', $content );
 
 		return false === $count ? 0 : $count;
+	}
+
+	/**
+	 * Parse an AI reply into its prose and optional edit.
+	 *
+	 * Replies are a JSON object, `{ "reply": "...", "edit": null }`. A reply
+	 * that is not JSON is used as prose with no edit. An invalid edit is
+	 * dropped and the prose still posts.
+	 *
+	 * @param  string $response      Raw AI response.
+	 * @param  string $block_content Plain text of the note's block, as the AI saw it.
+	 * @param  bool   $can_rewrite   Whether the block can take a `rewrite_block` edit.
+	 * @return array{reply: string, edit: array<string, string>|null}|null Parsed reply, or null when it has no text.
+	 */
+	public function parse_reply( string $response, string $block_content, bool $can_rewrite ): ?array {
+		$data = $this->decode_reply_json( $response );
+
+		if ( null === $data ) {
+			// Broken JSON is not prose; posting it would show the raw object.
+			$reply = trim( $response );
+			return '' === $reply || self::looks_like_json( $reply ) ? null : array(
+				'reply' => $reply,
+				'edit'  => null,
+			);
+		}
+
+		$edit  = $this->validate_reply_edit( $data['edit'] ?? null, $block_content, $can_rewrite );
+		$reply = is_string( $data['reply'] ?? null ) ? trim( $data['reply'] ) : '';
+
+		if ( '' === $reply ) {
+			if ( null === $edit ) {
+				return null;
+			}
+			$reply = __( 'Here is that change.', 'fresh-eyes' );
+		}
+
+		return array(
+			'reply' => $reply,
+			'edit'  => $edit,
+		);
+	}
+
+	/**
+	 * Decode a reply's JSON object, allowing a code fence or text around it.
+	 *
+	 * Tries the whole response, then a fenced block, then the first `{` to
+	 * the last `}`. When none decodes, for example with two objects or a
+	 * truncated one, the `reply` string is read on its own if it can be, so
+	 * the raw JSON is never shown to the author.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return array<mixed>|null Decoded object with a `reply` or `edit` key, or null.
+	 */
+	private function decode_reply_json( string $response ): ?array {
+		$response   = trim( $response );
+		$candidates = array( $response );
+		if ( preg_match( '/```(?:json)?\s*(.*?)```/s', $response, $fenced ) ) {
+			$candidates[] = trim( $fenced[1] );
+		}
+		$start = strpos( $response, '{' );
+		$end   = strrpos( $response, '}' );
+		if ( false !== $start && false !== $end && $end > $start ) {
+			$candidates[] = substr( $response, $start, $end - $start + 1 );
+		}
+
+		foreach ( $candidates as $candidate ) {
+			$data = json_decode( $candidate, true );
+			if ( is_array( $data ) && ( array_key_exists( 'reply', $data ) || array_key_exists( 'edit', $data ) ) ) {
+				return $data;
+			}
+		}
+
+		if ( preg_match( '/"reply"\s*:\s*("(?:[^"\\\\]|\\\\.)*")/s', $response, $reply ) ) {
+			$text = json_decode( $reply[1] );
+			if ( is_string( $text ) ) {
+				return array( 'reply' => $text );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a non-empty reply could be read, as JSON or as prose.
+	 *
+	 * False for a reply meant as JSON whose object can't be decoded, which
+	 * parse_reply() rejects rather than posting it raw.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return bool
+	 */
+	public function is_readable_reply( string $response ): bool {
+		return '' === trim( $response )
+			|| null !== $this->decode_reply_json( $response )
+			|| ! self::looks_like_json( $response );
+	}
+
+	/**
+	 * Whether a response that did not decode was meant to be JSON.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return bool
+	 */
+	private static function looks_like_json( string $response ): bool {
+		$response = ltrim( $response );
+		return str_starts_with( $response, '{' ) || str_starts_with( $response, '```' );
+	}
+
+	/**
+	 * Validate the edit an AI reply proposes for its note's block.
+	 *
+	 * `replace_text` follows the quick fix rules. `rewrite_block` needs a
+	 * block with a rich text `content` attribute and may only hold inline
+	 * formatting; any other markup drops the edit. An edit naming another
+	 * block is dropped.
+	 *
+	 * @param  mixed  $edit          Edit from the AI response.
+	 * @param  string $block_content Plain text of the note's block, as the AI saw it.
+	 * @param  bool   $can_rewrite   Whether the block can take a `rewrite_block` edit.
+	 * @return array<string, string>|null Sanitized edit, or null if unusable.
+	 */
+	public function validate_reply_edit( mixed $edit, string $block_content, bool $can_rewrite ): ?array {
+		if ( ! is_array( $edit ) || isset( $edit['block_id'] ) ) {
+			return null;
+		}
+
+		$type = $edit['type'] ?? null;
+
+		if ( 'replace_text' === $type ) {
+			// A missing replacement is not a deletion; only an empty string is.
+			if ( ! is_string( $edit['replace'] ?? null ) ) {
+				return null;
+			}
+			$fix = $this->validate_quick_fix( $edit, $block_content );
+			return null === $fix ? null : array( 'type' => 'replace_text' ) + $fix;
+		}
+
+		if ( 'rewrite_block' !== $type || ! $can_rewrite || '' === trim( $block_content ) ) {
+			return null;
+		}
+
+		$content = $edit['content'] ?? null;
+		if ( ! is_string( $content ) || '' === trim( $content ) || mb_strlen( $content ) > self::MAX_REWRITE_LENGTH ) {
+			return null;
+		}
+
+		if ( ! self::has_only_inline_tags( $content ) ) {
+			Logger::debug( 'Reply rewrite contains disallowed markup, dropping it' );
+			return null;
+		}
+
+		$content = trim( wp_kses( $content, self::REWRITE_ALLOWED_TAGS ) );
+		$text    = html_entity_decode( wp_strip_all_tags( $content ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		if ( self::normalize_text( $text ) === self::normalize_text( $block_content ) ) {
+			return null;
+		}
+
+		return array(
+			'type'     => 'rewrite_block',
+			'content'  => $content,
+			// What the rewrite replaces, so the editor can tell when it is outdated.
+			'original' => $block_content,
+		);
+	}
+
+	/**
+	 * Whether HTML uses only the inline tags a rewrite may contain.
+	 *
+	 * @param  string $html HTML to check.
+	 * @return bool
+	 */
+	private static function has_only_inline_tags( string $html ): bool {
+		// Comments and doctype-like tags can hide block markup.
+		if ( str_contains( $html, '<!' ) || str_contains( $html, '<?' ) ) {
+			return false;
+		}
+
+		preg_match_all( '#</?([a-zA-Z][a-zA-Z0-9-]*)#', $html, $matches );
+		foreach ( $matches[1] as $tag ) {
+			if ( ! isset( self::REWRITE_ALLOWED_TAGS[ strtolower( $tag ) ] ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Collapse whitespace so texts compare the same however they wrap.
+	 *
+	 * @param  string $text Text.
+	 * @return string
+	 */
+	private static function normalize_text( string $text ): string {
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/**

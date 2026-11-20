@@ -32,6 +32,18 @@ vi.mock('@wordpress/components', () => ({
 	),
 }));
 
+// QuickFix pulls in the block editor; render what it is given instead.
+vi.mock('./QuickFix', () => ({
+	default: ({ item, edit, noteId }) => (
+		<div
+			data-testid="reply-edit"
+			data-note={item.id}
+			data-owner={noteId}
+			data-edit={edit.type}
+		/>
+	),
+}));
+
 import FeedbackReplies from './FeedbackReplies';
 
 describe('FeedbackReplies', () => {
@@ -245,5 +257,49 @@ describe('FeedbackReplies', () => {
 		);
 
 		expect(speak).not.toHaveBeenCalled();
+	});
+
+	describe('reply edits', () => {
+		const edit = {
+			type: 'replace_text',
+			find: 'last year',
+			replace: 'in 2025',
+		};
+		const replies = [
+			{ id: 301, author: 'Jane', content: 'Do it.', is_ai: false, edit },
+			{
+				id: 302,
+				author: 'Fresh Eyes',
+				content: 'Done.',
+				is_ai: true,
+				edit,
+			},
+			{ id: 303, author: 'Fresh Eyes', content: 'Sure.', is_ai: true },
+		];
+
+		it('shows the edit of an AI reply against the thread note', () => {
+			mockStatus = 'complete';
+			render(
+				<FeedbackReplies
+					replies={replies}
+					note={{ id: 300, block_id: 'block-1' }}
+				/>
+			);
+
+			const edits = screen.getAllByTestId('reply-edit');
+			expect(edits).toHaveLength(1);
+			expect(edits[0].dataset).toMatchObject({
+				note: '300',
+				owner: '302',
+				edit: 'replace_text',
+			});
+		});
+
+		it('hides edits without the thread note', () => {
+			mockStatus = 'complete';
+			render(<FeedbackReplies replies={replies} />);
+
+			expect(screen.queryByTestId('reply-edit')).not.toBeInTheDocument();
+		});
 	});
 });

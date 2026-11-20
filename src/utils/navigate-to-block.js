@@ -5,6 +5,21 @@ import { dispatch, select } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 
 /**
+ * Whether a block's `metadata.noteId` includes a note.
+ *
+ * The editor stores one thread as a number and several as an array.
+ *
+ * @param {number|string|Array|undefined} linked `metadata.noteId` value.
+ * @param {number}                        noteId Note ID.
+ * @return {boolean} True when the block links the note.
+ */
+function linksNote(linked, noteId) {
+	return (Array.isArray(linked) ? linked : [linked]).some(
+		(id) => id !== undefined && id !== null && Number(id) === Number(noteId)
+	);
+}
+
+/**
  * Finds the block a note belongs to.
  *
  * Client IDs change on every editor load, so the ID stored with a note only
@@ -34,7 +49,7 @@ export function resolveBlockClientId(clientId, noteId) {
 		getClientIdsWithDescendants().find((id) => {
 			const attributes = getBlock(id)?.attributes || {};
 			return (
-				Number(attributes.metadata?.noteId) === Number(noteId) ||
+				linksNote(attributes.metadata?.noteId, noteId) ||
 				Object.values(attributes).some((value) =>
 					// RichTextData and plain strings both stringify to HTML.
 					typeof value === 'string' || value?.toHTMLString

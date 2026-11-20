@@ -168,7 +168,7 @@ class ReplyServiceTest extends TestCase {
 
 		// Model + system instruction routed through.
 		$this->assertSame( 'claude-sonnet-4', $service->captured_model );
-		$this->assertStringContainsString( 'Plain text only', $service->captured_system_instruction );
+		$this->assertStringContainsString( '"edit": null', $service->captured_system_instruction );
 
 		// Persisted as a child of the parent note with the canned AI reply.
 		$this->assertSame( 100, $fake_notes->last_reply['parent_id'] );
@@ -704,5 +704,191 @@ class ReplyServiceTest extends TestCase {
 		$this->assertSame( 999, $result );
 		$this->assertStringNotContainsString( 'Some other block.', $service->captured_prompt );
 		$this->assertStringContainsString( "Block content: \n", $service->captured_prompt );
+	}
+
+	/**
+	 * Run a reply against a linked paragraph with a canned AI response.
+	 *
+	 * @param string $ai_response Canned AI response.
+	 * @param string $html        HTML of the linked block.
+	 * @return Reply_Service_Fake_Notes_Manager Notes manager holding the saved reply.
+	 */
+	private function reply_with( string $ai_response, string $html = '<p>Revenue grew 40% last year.</p>' ): Reply_Service_Fake_Notes_Manager {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$fake_notes               = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_response = $ai_response;
+
+		$this->assertSame( 999, $service->handle_reply( 999, 100, 42, 'abc-123' ) );
+
+		return $fake_notes;
+	}
+
+	/**
+	 * A reply asking for the change saves the edit with the prose reply.
+	 */
+	public function test_reply_with_text_edit_saves_the_edit(): void {
+		$notes = $this->reply_with( '{"reply": "Done, I added the year.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
+
+		$item = $notes->last_reply['feedback_item'];
+		$this->assertSame( 'Done, I added the year.', $item['feedback'] );
+		$this->assertSame(
+			array(
+				'type'    => 'replace_text',
+				'find'    => 'last year',
+				'replace' => 'in 2025',
+			),
+			$item['reply_edit']
+		);
+	}
+
+	/**
+	 * A reply that only answers a question has no edit.
+	 */
+	public function test_reply_without_edit_saves_prose_only(): void {
+		$notes = $this->reply_with( '{"reply": "It is the growth figure.", "edit": null}' );
+
+		$this->assertSame( 'It is the growth figure.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * An invalid edit is dropped and the prose still posts.
+	 */
+	public function test_invalid_edit_is_dropped_and_reply_still_posts(): void {
+		$notes = $this->reply_with( '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "missing text", "replace": "x"}}' );
+
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A rewrite is dropped unless the block type supports it.
+	 */
+	public function test_rewrite_is_dropped_for_unsupported_block(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => false );
+		$notes                          = $this->reply_with( '{"reply": "Rewrote it.", "edit": {"type": "rewrite_block", "content": "Revenue grew a lot."}}' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A supported block takes a rewrite, stored with the text it replaces.
+	 */
+	public function test_rewrite_is_kept_for_supported_block(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$notes                          = $this->reply_with( '{"reply": "Rewrote it.", "edit": {"type": "rewrite_block", "content": "Revenue grew <strong>40%</strong> in 2025."}}' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertSame(
+			array(
+				'type'     => 'rewrite_block',
+				'content'  => 'Revenue grew <strong>40%</strong> in 2025.',
+				'original' => 'Revenue grew 40% last year.',
+			),
+			$notes->last_reply['feedback_item']['reply_edit']
+		);
+	}
+
+	/**
+	 * Data provider for blocks whose markup a plain text rewrite would drop.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function formatted_block_provider(): array {
+		return array(
+			'link'       => array( '<p>Revenue grew 40% <a href="https://example.com">last year</a>.</p>' ),
+			'bold'       => array( '<p>Revenue grew <strong>40%</strong> last year.</p>' ),
+			'line break' => array( '<p>Revenue grew 40%<br>last year.</p>' ),
+		);
+	}
+
+	/**
+	 * A block with links, formatting or line breaks can't be rewritten, and
+	 * the prompt does not offer it.
+	 *
+	 * @dataProvider formatted_block_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_rewrite_is_dropped_for_formatted_block( string $html ): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Rewrote it.", "edit": {"type": "rewrite_block", "content": "Revenue grew 40% in 2025."}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertStringNotContainsString( 'rewrite_block', $service->captured_prompt );
+		$this->assertSame( 'Rewrote it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A plain text block offers the rewrite in the prompt.
+	 */
+	public function test_prompt_offers_rewrite_for_plain_block(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p class="has-text-align-center">Revenue grew 40% last year.</p>', 100 ) ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertStringContainsString( '"type": "rewrite_block"', $service->captured_prompt );
+	}
+
+	/**
+	 * A block too long to send in full can't be rewritten.
+	 */
+	public function test_rewrite_is_dropped_for_truncated_block(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$long                           = str_repeat( 'word ', 500 );
+		$notes                          = $this->reply_with( '{"reply": "Rewrote it.", "edit": {"type": "rewrite_block", "content": "Short."}}', '<p>' . $long . '</p>' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A reply meant as JSON that can't be decoded gets its own error.
+	 */
+	public function test_unreadable_json_reply_returns_its_own_error(): void {
+		$this->seed_parent_and_reply();
+
+		$fake_notes               = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_response = '{"edit": {"type": ';
+
+		$result = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ai_unreadable_reply', $result->get_error_code() );
+		$this->assertSame( 'The AI reply could not be read. Please try again.', $result->get_error_message() );
+		$this->assertSame( array(), $fake_notes->last_reply );
+	}
+
+	/**
+	 * A JSON reply with neither text nor a usable edit is an empty reply.
+	 */
+	public function test_json_reply_without_text_returns_wp_error(): void {
+		$this->seed_parent_and_reply();
+
+		$fake_notes               = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_response = '{"reply": "", "edit": null}';
+
+		$result = $service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'ai_empty_reply', $result->get_error_code() );
+		$this->assertSame( array(), $fake_notes->last_reply );
 	}
 }

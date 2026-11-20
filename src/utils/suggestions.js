@@ -16,7 +16,7 @@ import {
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
-import { _n, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import {
 	concat,
 	create,
@@ -25,6 +25,8 @@ import {
 	toHTMLString,
 } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
+import { getRewriteRuns } from './reply-edit';
+import { resolveBlockClientId } from './navigate-to-block';
 
 const STORE_NAME = 'ai-feedback/store';
 
@@ -145,6 +147,69 @@ export function buildSuggestionContent(content, fix, { id, authorId = null }) {
 }
 
 /**
+ * Wraps a `rewrite_block` edit's word diff in suggestion markers.
+ *
+ * Each changed run becomes an `add` run with the new text followed by a
+ * `del` run over the old text, all under the one suggestion id, so the
+ * author accepts or rejects the rewrite as a whole.
+ *
+ * @param {string|RichTextData} content          Current attribute value.
+ * @param {Object}              edit             `rewrite_block` edit.
+ * @param {Object}              options          Marker options.
+ * @param {number}              options.id       Suggestion (note) id.
+ * @param {number|null}         options.authorId Suggester's user id.
+ * @return {string|RichTextData|null} New value, or null if the edit no longer applies or the block already holds suggestions.
+ */
+export function buildRewriteSuggestionContent(
+	content,
+	edit,
+	{ id, authorId = null }
+) {
+	if (hasSuggestionMarkers(content)) {
+		return null;
+	}
+
+	const runs = getRewriteRuns(content, edit);
+	if (!runs) {
+		return null;
+	}
+
+	const markup = runs
+		.map((run) => {
+			if (run.type === 'equal') {
+				return run.html;
+			}
+			const added = run.html
+				? `${openMarker('add', id, authorId)}${run.html}</mark>`
+				: '';
+			const removed = run.removedHtml
+				? `${openMarker('del', id, authorId)}${run.removedHtml}</mark>`
+				: '';
+			return added + removed;
+		})
+		.join('');
+	const updated = create({ html: markup });
+
+	return content instanceof RichTextData
+		? new RichTextData(updated)
+		: toHTMLString({ value: updated });
+}
+
+/**
+ * Wraps a quick fix or reply edit in suggestion markers.
+ *
+ * @param {string|RichTextData} content Current attribute value.
+ * @param {Object}              edit    Quick fix, `replace_text` or `rewrite_block` edit.
+ * @param {Object}              options Marker options, see buildSuggestionContent().
+ * @return {string|RichTextData|null} New value, or null if the edit can't be suggested.
+ */
+export function buildEditSuggestionContent(content, edit, options) {
+	return edit?.type === 'rewrite_block'
+		? buildRewriteSuggestionContent(content, edit, options)
+		: buildSuggestionContent(content, edit, options);
+}
+
+/**
  * Reads a block's rich text attribute.
  *
  * @param {string} clientId Block client id.
@@ -165,11 +230,12 @@ function getBlockContent(clientId) {
  * Builds the `_wp_suggestion` payload for a quick fix.
  *
  * An empty replacement is a deletion; anything else is a replacement, which
- * Gutenberg stores as an `add` run followed by a `del` run under one id.
+ * Gutenberg stores as an `add` run followed by a `del` run under one id. A
+ * rewrite is a replacement made of several such pairs.
  *
  * @param {string} blockName Block name, eg. `core/paragraph`.
  * @param {string} attribute Rich text attribute holding the markers.
- * @param {Object} fix       Quick fix with `find` and `replace`.
+ * @param {Object} fix       Quick fix or reply edit.
  * @return {Object} Suggestion payload.
  */
 export function buildSuggestionPayload(blockName, attribute, fix) {
@@ -181,7 +247,10 @@ export function buildSuggestionPayload(blockName, attribute, fix) {
 			{
 				type: 'inline-suggestion',
 				attribute,
-				suggestionType: fix.replace ? 'replace' : 'del',
+				suggestionType:
+					fix.type === 'rewrite_block' || fix.replace
+						? 'replace'
+						: 'del',
 			},
 		],
 	};
@@ -204,37 +273,36 @@ function saveNoteMeta(noteId, meta) {
 }
 
 /**
- * Turns one note's quick fix into a suggestion.
+ * Turns an edit into a suggestion on the note that proposed it.
  *
  * The payload is stored first; if the server dropped it, or the block
  * changed while the request ran, it is removed again. A reload between the
  * two steps leaves a pending suggestion without markers, which
  * `removeOrphanedSuggestions()` later turns back into a plain note.
  *
- * @param {Object} note Feedback note with `id`, `block_id` and `quick_fix`.
+ * @param {Object} options         Suggestion options.
+ * @param {number} options.noteId  Note that owns the suggestion.
+ * @param {string} options.blockId Client id of the block to edit.
+ * @param {Object} options.edit    Quick fix or reply edit.
  * @return {Promise<boolean>} Whether the suggestion was added.
  */
-export async function suggestQuickFix(note) {
-	const target = getBlockContent(note.block_id);
+export async function suggestEdit({ noteId, blockId, edit }) {
+	const target = getBlockContent(blockId);
 	if (
 		!target ||
-		!buildSuggestionContent(target.content, note.quick_fix, { id: note.id })
+		!buildEditSuggestionContent(target.content, edit, { id: noteId })
 	) {
 		return false;
 	}
 
-	const saved = await saveNoteMeta(note.id, {
+	const saved = await saveNoteMeta(noteId, {
 		_wp_suggestion: JSON.stringify(
-			buildSuggestionPayload(
-				target.block.name,
-				target.key,
-				note.quick_fix
-			)
+			buildSuggestionPayload(target.block.name, target.key, edit)
 		),
 		_wp_suggestion_status: 'pending',
 	});
 
-	const current = getBlockContent(note.block_id);
+	const current = getBlockContent(blockId);
 	// Gutenberg's sanitize callback stores '' for a payload it rejects.
 	// Markers carry the note's author (0 for AI notes): Gutenberg tints and
 	// names markers by matching it, and lets a user grow or remove markers
@@ -243,20 +311,79 @@ export async function suggestQuickFix(note) {
 	const updated =
 		!!saved?.meta?._wp_suggestion &&
 		current &&
-		buildSuggestionContent(current.content, note.quick_fix, {
-			id: note.id,
+		buildEditSuggestionContent(current.content, edit, {
+			id: noteId,
 			authorId: saved.author ?? null,
 		});
 
 	if (!updated) {
-		await removeSuggestion(note.id);
+		await removeSuggestion(noteId);
 		return false;
 	}
 
-	dataDispatch(blockEditorStore).updateBlockAttributes(note.block_id, {
+	dataDispatch(blockEditorStore).updateBlockAttributes(blockId, {
 		[current.key]: updated,
 	});
-	dataDispatch(STORE_NAME).setSuggestionStatus(note.id, 'pending');
+	dataDispatch(STORE_NAME).setSuggestionStatus(noteId, 'pending');
+	return true;
+}
+
+/**
+ * Turns one note's quick fix into a suggestion.
+ *
+ * @param {Object} note Feedback note with `id`, `block_id` and `quick_fix`.
+ * @return {Promise<boolean>} Whether the suggestion was added.
+ */
+export function suggestQuickFix(note) {
+	return suggestEdit({
+		noteId: note.id,
+		blockId: note.block_id,
+		edit: note.quick_fix,
+	});
+}
+
+/**
+ * Turns the edit an AI reply proposed into a suggestion on the reply.
+ *
+ * The block is the one the thread's note is attached to, found by the note
+ * id in its metadata when the stored client id is stale.
+ *
+ * @param {Object}      reply     AI reply with `id` and `edit`.
+ * @param {number}      threadId  Root note of the reply's thread.
+ * @param {string|null} [blockId] Client id stored with the root note, if known.
+ * @return {Promise<boolean>} Whether the suggestion was added.
+ */
+export async function suggestReplyEdit(reply, threadId, blockId = null) {
+	if (!isSuggestionModeAvailable() || !reply?.id || !reply.edit) {
+		return false;
+	}
+	const clientId = resolveBlockClientId(blockId, threadId);
+	if (!clientId) {
+		return false;
+	}
+
+	try {
+		if (
+			!(await suggestEdit({
+				noteId: reply.id,
+				blockId: clientId,
+				edit: reply.edit,
+			}))
+		) {
+			return false;
+		}
+	} catch {
+		// The edit stays available to preview and apply in the sidebar.
+		return false;
+	}
+
+	dataDispatch(noticesStore).createInfoNotice(
+		__(
+			'The AI reply’s edit was added as a suggestion. Save the post to keep it.',
+			'fresh-eyes'
+		),
+		{ type: 'snackbar', id: `ai-feedback-reply-suggestion-${reply.id}` }
+	);
 	return true;
 }
 

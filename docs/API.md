@@ -200,6 +200,56 @@ X-WP-Nonce: {nonce}
 
 ---
 
+### GET /replies
+
+List the replies under every AI Feedback note in a post, oldest first, in one request. The sidebar uses this to show each conversation.
+
+#### Request
+
+```http
+GET /wp-json/ai-feedback/v1/replies?post={post_id}
+X-WP-Nonce: {nonce}
+```
+
+The current user must be able to edit the post.
+
+#### Response
+
+```json
+{
+  "post": 123,
+  "threads": {
+    "456": {
+      "replies": [
+        { "id": 789, "author": "Jane", "content": "Make that change.", "is_ai": false, "date": "2026-11-19 10:00:00", "edit": null },
+        {
+          "id": 790,
+          "author": "Fresh Eyes",
+          "content": "Done: \"last year\" now reads \"in 2025\".",
+          "is_ai": true,
+          "date": "2026-11-19 10:00:05",
+          "edit": { "type": "replace_text", "find": "last year", "replace": "in 2025" }
+        }
+      ],
+      "pending_reply_id": null
+    }
+  }
+}
+```
+
+`threads` is keyed by the AI note's ID. `content` is plain text. `pending_reply_id` is the newest user reply still waiting on the AI, or null.
+
+`edit` is the change an AI reply proposes for the note's block, or null. The AI only proposes one when the user's reply asks for a change. It is one of:
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `replace_text` | `find`, `replace` | Plain text find and replace. `find` appears exactly once in the block, as with a review's `quick_fix` |
+| `rewrite_block` | `content`, `original` | New text for the whole block, with inline formatting only (`a`, `b`, `br`, `code`, `em`, `i`, `s`, `strong`, `sub`, `sup`). `original` is the block text the AI saw, so the editor can tell once the edit is outdated. Only for blocks with a rich text `content` attribute whose text has no links, formatting or line breaks, since the AI only sees plain text and a rewrite would drop them |
+
+Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
+
+---
+
 ### GET /replies/{id}/status
 
 Poll the state of an AI reply. When a user replies to an AI Feedback note, the plugin marks the reply `pending` and schedules a single `ai_feedback_generate_reply` WP-Cron event. The editor then answers the reply right away through [`POST /replies/{id}/process`](#post-repliesidprocess), and the cron event is the fallback for replies posted outside the editor. Whichever runs first generates the AI response, saves it as a child note, and records the result on the user's reply.
@@ -859,6 +909,29 @@ add_filter( 'ai_feedback_note_content', function( string $content, array $note_d
         default     => '🟢',
     };
     return $badge . ' ' . $content;
+}, 10, 2 );
+```
+
+#### `ai_feedback_reply_can_rewrite_block`
+
+Choose which blocks an AI reply may rewrite as a whole (`rewrite_block` edits). By default, blocks whose `content` attribute is rich text.
+
+```php
+add_filter( 'ai_feedback_reply_can_rewrite_block', function( bool $supported, string $block_name ): bool {
+    return 'core/code' === $block_name ? false : $supported;
+}, 10, 2 );
+```
+
+#### `ai_feedback_mock_reply`
+
+Change the reply returned in `AI_FEEDBACK_MOCK_MODE`, for example to test an edit. Return prose, or the JSON a model returns.
+
+```php
+add_filter( 'ai_feedback_mock_reply', function( string $reply, string $prompt ): string {
+    return wp_json_encode( array(
+        'reply' => 'Done.',
+        'edit'  => array( 'type' => 'replace_text', 'find' => 'utilize', 'replace' => 'use' ),
+    ) );
 }, 10, 2 );
 ```
 

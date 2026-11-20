@@ -355,6 +355,27 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * An AI reply's edit is returned with the thread; other replies have none.
+	 */
+	public function test_threads_include_ai_reply_edit(): void {
+		$this->seed_thread( 'complete' );
+		$edit = array(
+			'type'    => 'replace_text',
+			'find'    => '40%',
+			'replace' => '42%',
+		);
+
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY ] = (string) json_encode( $edit );
+		// A user reply can't carry an edit, even with the meta set.
+		$GLOBALS['test_comment_meta'][301][ \AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY ] = (string) json_encode( $edit );
+
+		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$replies = ( (array) $data['threads'] )[300]['replies'];
+
+		$this->assertSame( array( null, $edit, null ), array_column( $replies, 'edit' ) );
+	}
+
+	/**
 	 * The newest user reply awaiting an AI response is exposed for polling.
 	 */
 	public function test_threads_expose_pending_reply_id(): void {

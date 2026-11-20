@@ -17,6 +17,8 @@ import {
  * Internal dependencies
  */
 import {
+	buildEditSuggestionContent,
+	buildRewriteSuggestionContent,
 	buildSuggestionContent,
 	buildSuggestionPayload,
 	canSuggest,
@@ -26,6 +28,7 @@ import {
 	removeOrphanedSuggestions,
 	suggestQuickFix,
 	suggestQuickFixes,
+	suggestReplyEdit,
 } from '../suggestions';
 
 const mocks = vi.hoisted(() => ({
@@ -51,6 +54,8 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 				case 'core/block-editor':
 					return {
 						getBlock: (clientId) => mocks.blocks[clientId] ?? null,
+						getClientIdsWithDescendants: () =>
+							Object.keys(mocks.blocks),
 					};
 				case 'core/blocks':
 					return {
@@ -576,5 +581,254 @@ describe('removeOrphanedSuggestions', () => {
 		await expect(removeOrphanedSuggestions(42)).resolves.toBe(2);
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(12, null);
 		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(13, null);
+	});
+});
+
+describe('buildRewriteSuggestionContent', () => {
+	const rewrite = {
+		type: 'rewrite_block',
+		content: 'We met to plan the launch.',
+		original: 'We met in order to plan the launch.',
+	};
+	const add = (id, html) =>
+		`<mark class="wp-suggestion-add" data-suggestion-id="${id}" data-suggestion-type="add">${html}</mark>`;
+	const del = (id, html) =>
+		`<mark class="wp-suggestion-del" data-suggestion-id="${id}" data-suggestion-type="del">${html}</mark>`;
+
+	it('marks each changed run as an add then a del under one id', () => {
+		expect(
+			buildRewriteSuggestionContent(
+				'We met in order to plan the launch.',
+				{
+					...rewrite,
+					content: 'We met to plan the <em>launch</em> today.',
+				},
+				{ id: 30 }
+			)
+		).toBe(
+			`We met ${del(30, 'in order ')}to plan the ${add(30, '<em>launch</em> today')}${del(30, 'launch')}.`
+		);
+	});
+
+	it('goes through buildEditSuggestionContent for rewrites', () => {
+		expect(
+			buildEditSuggestionContent(
+				'We met in order to plan the launch.',
+				rewrite,
+				{ id: 31 }
+			)
+		).toBe(`We met ${del(31, 'in order ')}to plan the launch.`);
+	});
+
+	it('returns RichTextData for RichTextData input', () => {
+		const result = buildRewriteSuggestionContent(
+			RichTextData.fromHTMLString('We met in order to plan the launch.'),
+			rewrite,
+			{ id: 32 }
+		);
+		expect(result).toBeInstanceOf(RichTextData);
+		expect(result.text).toBe('We met in order to plan the launch.');
+	});
+
+	it.each([
+		['outdated text', 'We met to plan.'],
+		[
+			'existing suggestions',
+			'We met <mark class="wp-suggestion-del" data-suggestion-id="1">in order</mark> to plan the launch.',
+		],
+	])('refuses %s', (label, content) => {
+		expect(
+			buildRewriteSuggestionContent(content, rewrite, { id: 1 })
+		).toBeNull();
+	});
+
+	it('describes a rewrite as a replacement', () => {
+		expect(
+			buildSuggestionPayload('core/paragraph', 'content', rewrite)
+				.operations[0].suggestionType
+		).toBe('replace');
+	});
+});
+
+describe('suggestReplyEdit', () => {
+	const reply = {
+		id: 40,
+		is_ai: true,
+		edit: { type: 'replace_text', find: 'in order to', replace: 'to' },
+	};
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		window.__experimentalSuggestionMode = true;
+		window.aiFeedbackData = { suggestions: true };
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			savedRecord(record)
+		);
+		mocks.blocks = {
+			'block-1': {
+				name: 'core/paragraph',
+				attributes: { content: 'We met in order to plan.' },
+			},
+		};
+	});
+
+	afterEach(() => {
+		delete window.__experimentalSuggestionMode;
+		delete window.aiFeedbackData;
+	});
+
+	it('adds the edit as a suggestion on the reply', async () => {
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			true
+		);
+
+		expect(mocks.saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			expect.objectContaining({ id: 40 }),
+			{ throwOnError: true }
+		);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content:
+				'We met <mark class="wp-suggestion-add" data-suggestion-id="40" data-suggestion-type="add" data-author="0">to</mark><mark class="wp-suggestion-del" data-suggestion-id="40" data-suggestion-type="del" data-author="0">in order to</mark> plan.',
+		});
+		expect(mocks.createInfoNotice).toHaveBeenCalledTimes(1);
+	});
+
+	it('finds the block by the thread note, as the threads hook calls it', async () => {
+		mocks.blocks = {
+			'other-block': {
+				name: 'core/paragraph',
+				attributes: { content: 'Unrelated in order to text.' },
+			},
+			'linked-block': {
+				name: 'core/paragraph',
+				attributes: {
+					content: 'We met in order to plan.',
+					metadata: { noteId: [12, 39] },
+				},
+			},
+		};
+
+		await expect(suggestReplyEdit(reply, 39)).resolves.toBe(true);
+
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith(
+			'linked-block',
+			expect.objectContaining({
+				content: expect.stringContaining('data-suggestion-id="40"'),
+			})
+		);
+	});
+
+	it('does nothing when no block links the thread', async () => {
+		await expect(suggestReplyEdit(reply, 39)).resolves.toBe(false);
+
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('adds a rewrite as one replace suggestion with a marker pair per change', async () => {
+		mocks.blocks['block-1'].attributes.metadata = { noteId: 39 };
+		const rewrite = {
+			id: 41,
+			is_ai: true,
+			edit: {
+				type: 'rewrite_block',
+				content: 'We met to plan the <em>launch</em>.',
+				original: 'We met in order to plan.',
+			},
+		};
+
+		await expect(suggestReplyEdit(rewrite, 39)).resolves.toBe(true);
+
+		const [, , record] = mocks.saveEntityRecord.mock.calls[0];
+		expect(record.id).toBe(41);
+		expect(JSON.parse(record.meta._wp_suggestion)).toMatchObject({
+			blockName: 'core/paragraph',
+			operations: [
+				{
+					type: 'inline-suggestion',
+					attribute: 'content',
+					suggestionType: 'replace',
+				},
+			],
+		});
+		expect(record.meta._wp_suggestion_status).toBe('pending');
+
+		// Markers are built after the save, carrying the saved author.
+		const marker = (type, html) =>
+			`<mark class="wp-suggestion-${type}" data-suggestion-id="41" data-suggestion-type="${type}" data-author="0">${html}</mark>`;
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: `We met ${marker('del', 'in order ')}to plan${marker('add', ' the <em>launch</em>')}.`,
+		});
+	});
+
+	it('removes the suggestion again when the server drops the payload', async () => {
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, { id, meta }) => ({
+				id,
+				author: 0,
+				meta: {
+					_wp_suggestion: '',
+					_wp_suggestion_status: meta._wp_suggestion_status ?? '',
+				},
+			})
+		);
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+
+		expect(mocks.saveEntityRecord).toHaveBeenLastCalledWith(
+			'root',
+			'comment',
+			{
+				id: 40,
+				meta: { _wp_suggestion: null, _wp_suggestion_status: null },
+			},
+			{ throwOnError: true }
+		);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(40, null);
+	});
+
+	it('leaves a block that already holds suggestions alone', async () => {
+		mocks.blocks['block-1'].attributes.content =
+			'We <mark class="wp-suggestion-del" data-suggestion-id="7">met</mark> in order to plan.';
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('does nothing without Suggestion Mode', async () => {
+		delete window.__experimentalSuggestionMode;
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('leaves an outdated edit to the sidebar', async () => {
+		mocks.blocks['block-1'].attributes.content = 'We met to plan.';
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('leaves the edit to the sidebar when saving fails', async () => {
+		mocks.saveEntityRecord.mockRejectedValue(new Error('nope'));
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 });

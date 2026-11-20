@@ -110,7 +110,7 @@ class Suggestions {
 				'post_id'    => $post_id,
 				'type'       => 'note',
 				'status'     => 'all',
-				'parent'     => 0,
+				// Replies too: an AI reply's edit can be a suggestion.
 				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 				'meta_query' => array(
 					'relation' => 'AND',
