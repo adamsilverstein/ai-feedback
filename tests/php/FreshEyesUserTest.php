@@ -306,14 +306,57 @@ class FreshEyesUserTest extends TestCase {
 		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
 	}
 
-	public function test_an_account_with_posts_is_kept_rather_than_deleted(): void {
-		$id                                   = $this->create_user();
-		$GLOBALS['test_user_posts'][ $id ] = 2;
+	/**
+	 * Content the account could own that deleting it would remove, none of it published.
+	 *
+	 * @return array<string, array{string, string, string}>
+	 */
+	public static function data_owned_content(): array {
+		return array(
+			'a draft'          => array( 'test_posts', 'post', 'draft' ),
+			'a trashed post'   => array( 'test_posts', 'post', 'trash' ),
+			'a scheduled page' => array( 'test_posts', 'page', 'future' ),
+			'an attachment'    => array( 'test_posts', 'attachment', 'inherit' ),
+			'a revision'       => array( 'test_posts', 'revision', 'inherit' ),
+			'a link'           => array( 'test_links', '', '' ),
+		);
+	}
+
+	/**
+	 * An account that owns anything deleting it would remove is kept, on
+	 * uninstall and when the filter turns it off.
+	 *
+	 * @param string $table  Rows global.
+	 * @param string $type   Post type.
+	 * @param string $status Post status.
+	 */
+	#[DataProvider( 'data_owned_content' )]
+	public function test_an_account_owning_content_is_kept_rather_than_deleted( string $table, string $type, string $status ): void {
+		$id = $this->create_user();
+		$GLOBALS['test_posts'][] = array( 'post_author' => 7, 'post_type' => 'post', 'post_status' => 'publish' );
+		$GLOBALS[ $table ][]     = 'test_links' === $table
+			? array( 'link_owner' => $id )
+			: array( 'post_author' => $id, 'post_type' => $type, 'post_status' => $status );
+
+		Fresh_Eyes_User::uninstall();
+		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
+		$this->assertArrayHasKey( $id, $GLOBALS['test_user_objects'] );
+
+		$GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] = $id;
+		Fresh_Eyes_User::reset_cache();
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_create_mention_user' => false );
+		Fresh_Eyes_User::ensure();
+		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
+	}
+
+	public function test_another_users_content_does_not_keep_the_account(): void {
+		$id = $this->create_user();
+		$GLOBALS['test_posts'][] = array( 'post_author' => 7, 'post_type' => 'post', 'post_status' => 'draft' );
+		$GLOBALS['test_links'][] = array( 'link_owner' => 7 );
 
 		Fresh_Eyes_User::uninstall();
 
-		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
-		$this->assertArrayHasKey( $id, $GLOBALS['test_user_objects'] );
+		$this->assertSame( array( array( $id, null ) ), $GLOBALS['test_deleted_users'] );
 	}
 
 	public function test_turning_the_filter_back_on_creates_the_account_again(): void {
