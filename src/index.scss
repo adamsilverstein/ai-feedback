@@ -1174,3 +1174,10 @@ $ai-feedback-reply-error: #cc1818;
 	margin: 0;
 	color: $ai-feedback-reply-error;
 }
+
+/* House style rule fields grow to show the whole rule */
+.ai-feedback-rule-textarea textarea {
+	field-sizing: content;
+	min-height: 3lh;
+	resize: vertical;
+}

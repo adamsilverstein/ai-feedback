@@ -5,15 +5,11 @@
  * Settings. Anyone can keep their own rules; site rules are shown to
  * everyone they apply to and can be changed by users who manage options.
  */
-import {
-	Button,
-	Notice,
-	SelectControl,
-	TextControl,
-} from '@wordpress/components';
+import { Button, Notice, SelectControl } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import useHouseStyle from '../hooks/useHouseStyle';
+import RuleTextarea from './RuleTextarea';
 import {
 	SCOPE_SITE,
 	SCOPE_USER,
@@ -58,12 +54,15 @@ function RuleItem({ rule, scope, canEdit, maxLength, onError }) {
 	if (draft !== null) {
 		return (
 			<li className="ai-feedback-house-style-rule is-editing">
-				<TextControl
-					__next40pxDefaultSize
-					__nextHasNoMarginBottom
+				<RuleTextarea
 					label={__('Edit rule', 'fresh-eyes')}
 					value={draft}
 					onChange={setDraft}
+					onSubmit={() =>
+						!isBusy &&
+						draft.trim() &&
+						run(() => updateRule(rule.id, draft, scope))
+					}
 					maxLength={maxLength}
 				/>
 				<div className="ai-feedback-house-style-actions">
@@ -231,13 +230,12 @@ export default function HouseStyle() {
 			/>
 
 			<form className="ai-feedback-house-style-add" onSubmit={handleAdd}>
-				<TextControl
-					__next40pxDefaultSize
-					__nextHasNoMarginBottom
+				<RuleTextarea
 					label={__('New rule', 'fresh-eyes')}
 					placeholder={__('Headings use sentence case', 'fresh-eyes')}
 					value={text}
 					onChange={setText}
+					onSubmit={(event) => event?.target?.form?.requestSubmit?.()}
 					maxLength={rules.max_length}
 				/>
 				{canManageSite && (

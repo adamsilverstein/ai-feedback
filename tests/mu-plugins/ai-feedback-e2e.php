@@ -440,7 +440,7 @@ add_filter(
 			array(
 				'reply'    => 'Got it, sentence case it is.',
 				'edit'     => null,
-				'remember' => 'Headings use sentence case',
+				'remember' => 'Headings use sentence case, except product names such as WordPress and Gutenberg, which keep their own capital letters',
 			)
 		);
 	},

@@ -2,14 +2,17 @@
  * RememberRule component.
  *
  * Shown under an AI reply that offers to remember a stated preference as a
- * house style rule. The author can edit the rule before saving it; nothing
- * is saved until they click Remember.
+ * house style rule. The whole rule is shown, since the AI wrote it and it
+ * may say more than the author did. The author can edit it before saving;
+ * nothing is saved until they click Remember, and the confirmation shows
+ * the rule as saved.
  */
-import { Button, SelectControl, TextControl } from '@wordpress/components';
+import { Button, SelectControl } from '@wordpress/components';
 import { speak } from '@wordpress/a11y';
 import { useState } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import useHouseStyle from '../hooks/useHouseStyle';
+import RuleTextarea from './RuleTextarea';
 import {
 	SCOPE_SITE,
 	SCOPE_USER,
@@ -34,6 +37,7 @@ export default function RememberRule({ noteId, proposal }) {
 	const [text, setText] = useState(proposal?.text || '');
 	const [scope, setScope] = useState(SCOPE_USER);
 	const [status, setStatus] = useState(proposal?.status || '');
+	const [savedText, setSavedText] = useState(null);
 	const [isBusy, setIsBusy] = useState(false);
 	const [error, setError] = useState(null);
 
@@ -45,7 +49,13 @@ export default function RememberRule({ noteId, proposal }) {
 	if (status === 'saved' || (!isBusy && hasRule(rules, proposal.text))) {
 		return (
 			<p className="ai-feedback-remember is-saved">
-				{__('Saved to house style.', 'fresh-eyes')}
+				{savedText
+					? sprintf(
+							/* translators: %s: house style rule. */
+							__('Saved to house style: “%s”', 'fresh-eyes'),
+							savedText
+						)
+					: __('Saved to house style.', 'fresh-eyes')}
 			</p>
 		);
 	}
@@ -60,7 +70,8 @@ export default function RememberRule({ noteId, proposal }) {
 			scope: canManageSite ? scope : SCOPE_USER,
 			noteId,
 		})
-			.then(() => {
+			.then((state) => {
+				setSavedText(state?.rule?.text || null);
 				setStatus('saved');
 				speak(__('Saved to house style.', 'fresh-eyes'));
 			})
@@ -81,9 +92,7 @@ export default function RememberRule({ noteId, proposal }) {
 
 	return (
 		<div className="ai-feedback-remember">
-			<TextControl
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
+			<RuleTextarea
 				label={__('Remember this for future reviews', 'fresh-eyes')}
 				help={__(
 					'Saved as a house style rule. You can edit it first.',
@@ -91,6 +100,7 @@ export default function RememberRule({ noteId, proposal }) {
 				)}
 				value={text}
 				onChange={setText}
+				onSubmit={() => !isBusy && text.trim() && save()}
 				maxLength={rules?.max_length || DEFAULT_MAX_LENGTH}
 			/>
 			{canManageSite && (

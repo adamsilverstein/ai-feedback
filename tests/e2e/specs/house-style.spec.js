@@ -2,13 +2,15 @@
  * E2E tests for house style rules.
  *
  * Runs with the mock AI provider from tests/mu-plugins/ai-feedback-e2e.php:
- * a reply that mentions sentence case offers to remember "Headings use
- * sentence case", and a review whose prompt carries that rule adds a
- * "Follow the house style" note.
+ * a reply that mentions sentence case offers to remember a long rule that
+ * starts "Headings use sentence case", and a review whose prompt carries
+ * that rule adds a "Follow the house style" note.
  */
 const { test, expect } = require('../fixtures');
 
-const RULE = 'Headings use sentence case';
+// Long enough to wrap in the sidebar, so the test can check it all shows.
+const RULE =
+	'Headings use sentence case, except product names such as WordPress and Gutenberg, which keep their own capital letters';
 const HOUSE_STYLE = '/ai-feedback/v1/house-style';
 
 /**
@@ -124,6 +126,17 @@ test.describe('House style', () => {
 		);
 		const field = thread.getByLabel('Remember this for future reviews');
 		await expect(field).toHaveValue(RULE);
+		// The whole rule shows, with nothing scrolled out of view.
+		expect(
+			await field.evaluate(
+				(element) => element.scrollHeight <= element.clientHeight + 1
+			)
+		).toBe(true);
+		expect(
+			await field.evaluate((element) => element.scrollWidth)
+		).toBeLessThanOrEqual(
+			await field.evaluate((element) => element.clientWidth + 1)
+		);
 
 		// Nothing is saved until the author confirms.
 		expect(
@@ -137,7 +150,9 @@ test.describe('House style', () => {
 		);
 		await thread.getByRole('button', { name: 'Remember' }).click();
 		expect((await saved).status()).toBe(201);
-		await expect(thread.getByText('Saved to house style.')).toBeVisible();
+		await expect(
+			thread.getByText(`Saved to house style: “${RULE}”`)
+		).toBeVisible();
 
 		// The rule shows in Review Settings.
 		await aiFeedback.expandReviewSettings();
