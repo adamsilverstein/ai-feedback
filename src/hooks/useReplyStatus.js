@@ -9,9 +9,13 @@
  *
  * The server ignores a retry for a few seconds after a failed attempt, and
  * reports the time left as `retry_after`. `canRetry` is false until then.
+ *
+ * A note that mentions Fresh Eyes is linked to its block in the editor
+ * before the post is saved, so its request carries the editor's content.
  */
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { select } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import { debugLog } from '../utils/debug';
 
@@ -64,14 +68,30 @@ function initialState(id) {
 }
 
 /**
- * @param {number|null} replyId User reply comment ID to poll for, or null/0 to disable.
+ * Get the editor's current post content, or '' outside the post editor.
+ *
+ * @return {string} Serialized blocks.
+ */
+export function getEditorContent() {
+	try {
+		const content = select('core/editor')?.getEditedPostContent?.();
+		return typeof content === 'string' ? content : '';
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * @param {number|null} replyId               User reply comment ID to poll for, or null/0 to disable.
+ * @param {Object}      [options]             Options.
+ * @param {boolean}     [options.sendContent] Whether to send the editor's content with the request, for a mention.
  * @return {{status: string, aiReplyCommentId: number | null, error: string | null, isSlow: boolean, canRetry: boolean, retry: () => void}}
  *         Current reply status. `status` is one of `idle | pending | complete | failed | unknown`.
  *         `isSlow` is true once a pending reply has waited SLOW_REPLY_MS,
  *         `retry()` asks the server to try again, and `canRetry` is false
  *         while the server would ignore a retry.
  */
-export default function useReplyStatus(replyId) {
+export default function useReplyStatus(replyId, { sendContent = false } = {}) {
 	const [state, setState] = useState(() => initialState(replyId));
 	// Retries count per reply, so a new reply starts with a plain request.
 	const [retries, setRetries] = useState({ id: replyId, count: 0 });
@@ -81,6 +101,9 @@ export default function useReplyStatus(replyId) {
 	const timeoutRef = useRef(null);
 	const slowTimeoutRef = useRef(null);
 	const cooldownTimeoutRef = useRef(null);
+	// Read when the request is sent, so it does not restart polling.
+	const sendContentRef = useRef(sendContent);
+	sendContentRef.current = sendContent;
 
 	const retry = useCallback(
 		() =>
@@ -153,7 +176,9 @@ export default function useReplyStatus(replyId) {
 		apiFetch({
 			path: `/ai-feedback/v1/replies/${replyId}/process`,
 			method: 'POST',
-			data: { retry: attempt > 0 },
+			data: sendContentRef.current
+				? { retry: attempt > 0, content: getEditorContent() }
+				: { retry: attempt > 0 },
 		})
 			.then((response) => {
 				isAnswering = false;

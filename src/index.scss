@@ -1044,3 +1044,29 @@ $ai-feedback-reply-error: #cc1818;
 		margin-top: 8px;
 	}
 }
+
+// Conversations started with an @fresh-eyes mention.
+.ai-feedback-mention-hint {
+	color: $ai-feedback-text-muted;
+}
+
+.ai-feedback-mention-threads {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.ai-feedback-mention-thread {
+	margin: 0 0 16px;
+
+	&:last-child {
+		margin-bottom: 0;
+	}
+}
+
+.ai-feedback-mention-question {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin: 0 0 4px;
+}

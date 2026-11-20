@@ -21,6 +21,7 @@ import {
 	supersedeSuggestions,
 } from '../utils/suggestions';
 import { getThreadEdits } from '../utils/revisions';
+import { mayAwaitAnswer } from '../utils/mentions';
 
 /**
  * AI replies whose edit this editor has already tried to suggest, shared by
@@ -113,12 +114,15 @@ export function getNotesQuery(postId) {
 }
 
 /**
- * A reply thread under one AI Feedback note.
+ * A reply thread under one AI Feedback note, or a thread a person started
+ * in which someone asked Fresh Eyes (`is_mention`).
  *
  * @typedef {Object} ReplyThread
  * @property {Array<Object>} replies          Replies, oldest first: { id, author, content, is_ai, edit }.
  *                                            `edit` is the change an AI reply proposes, or null.
  * @property {number|null}   pending_reply_id User reply awaiting an AI response.
+ * @property {boolean}       [is_mention]     Whether a person started the thread and asked Fresh Eyes in it.
+ * @property {Object}        [root]           For a mention thread, its opening note: { id, author, content }.
  */
 
 /**
@@ -132,8 +136,9 @@ export default function useReplyThreads(postId) {
 	const knownRepliesRef = useRef(null);
 	const { invalidateResolution } = useDispatch('core');
 
-	// IDs of the note replies the editor knows about. This changes when the
-	// user replies in the Notes UI, which is the cue to refetch.
+	// IDs of the note replies and mentions the editor knows about. This
+	// changes when the user replies or asks Fresh Eyes in the Notes UI, which
+	// is the cue to refetch.
 	const replySignature = useSelect(
 		(select) => {
 			if (!postId) {
@@ -145,7 +150,7 @@ export default function useReplyThreads(postId) {
 				getNotesQuery(postId)
 			);
 			return (notes || [])
-				.filter((note) => note.parent > 0)
+				.filter(mayAwaitAnswer)
 				.map((note) => note.id)
 				.join(',');
 		},
