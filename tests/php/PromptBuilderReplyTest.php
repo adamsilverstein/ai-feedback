@@ -261,4 +261,113 @@ class PromptBuilderReplyTest extends TestCase {
 			$this->builder->get_reply_system_instruction()
 		);
 	}
+
+	/**
+	 * A pending edit is described, with instructions to revise it, and each
+	 * AI entry's edit shows in the conversation.
+	 */
+	public function test_reply_prompt_includes_pending_edit(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'thread'        => array(
+					array(
+						'author'  => 'AI',
+						'content' => 'Done.',
+						'is_ai'   => true,
+						'edit'    => array(
+							'type'    => 'replace_text',
+							'find'    => 'last year',
+							'replace' => 'in 2025',
+						),
+					),
+				),
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => 'Revenue grew <strong>40%</strong> in 2025.',
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringContainsString( "- AI: Done.\n  (Suggested edit: replace \"last year\" with \"in 2025\")\n", $prompt );
+		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nrewrite the block as \"Revenue grew 40% in 2025.\"\n", $prompt );
+		$this->assertStringContainsString( 'return a new edit that replaces it', $prompt );
+		$this->assertStringContainsString( 'that suggestion stays as it is', $prompt );
+	}
+
+	/**
+	 * Without a pending edit there is nothing to revise.
+	 */
+	public function test_reply_prompt_without_pending_edit(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
+		$this->assertStringNotContainsString( 'return a new edit that replaces it', $prompt );
+	}
+
+	/**
+	 * A pending rewrite is sent whole, up to the length the parser accepts,
+	 * so a detail at its end can be kept.
+	 */
+	public function test_reply_prompt_keeps_whole_pending_rewrite(): void {
+		$rewrite = str_repeat( 'Revenue grew. ', 200 ) . 'Source: annual report.';
+		$prompt  = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => $rewrite,
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Keep the source.',
+			)
+		);
+
+		$this->assertGreaterThan( \AI_Feedback\Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT, strlen( $rewrite ) );
+		$this->assertStringContainsString( 'Source: annual report."', $prompt );
+	}
+
+	/**
+	 * Earlier rewrites in the conversation are shortened, while the pending
+	 * one is sent whole.
+	 */
+	public function test_reply_prompt_shortens_earlier_rewrites(): void {
+		$old     = str_repeat( 'Old rewrite. ', 300 ) . 'OLD_TAIL';
+		$pending = str_repeat( 'New rewrite. ', 300 ) . 'NEW_TAIL';
+		$prompt  = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'thread'        => array(
+					array(
+						'author'  => 'AI',
+						'content' => 'Rewrote it.',
+						'is_ai'   => true,
+						'edit'    => array(
+							'type'     => 'rewrite_block',
+							'content'  => $old,
+							'original' => 'Revenue grew 40% last year.',
+						),
+					),
+				),
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => $pending,
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'OLD_TAIL', $prompt );
+		$this->assertStringContainsString( '(Suggested edit: rewrite the block as "Old rewrite.', $prompt );
+		$this->assertStringContainsString( 'NEW_TAIL"', $prompt );
+		$this->assertLessThan( strlen( $old ) + strlen( $pending ), strlen( $prompt ) );
+	}
 }

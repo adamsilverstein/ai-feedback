@@ -891,4 +891,280 @@ class ReplyServiceTest extends TestCase {
 		$this->assertSame( 'ai_empty_reply', $result->get_error_code() );
 		$this->assertSame( array(), $fake_notes->last_reply );
 	}
+
+	/**
+	 * Add an earlier AI reply with an edit to the seeded thread.
+	 *
+	 * @param int                  $id   Reply ID, below the user reply's 999.
+	 * @param array<string, mixed> $edit Stored edit.
+	 * @param array<string, mixed> $meta Extra meta.
+	 */
+	private function seed_ai_edit_reply( int $id, array $edit, array $meta = array() ): void {
+		$GLOBALS['test_comments'][ $id ]     = (object) array(
+			'comment_ID'      => $id,
+			'comment_content' => 'Done, here is the change.',
+			'comment_author'  => 'Fresh Eyes',
+			'comment_parent'  => 100,
+		);
+		$GLOBALS['test_comment_meta'][ $id ] = array(
+			'ai_feedback'                       => '1',
+			Notes_Manager::REPLY_EDIT_META_KEY => (string) wp_json_encode( $edit ),
+		) + $meta;
+	}
+
+	/**
+	 * Run a reply in a thread already seeded, with a canned AI response.
+	 *
+	 * @param string $ai_response Canned AI response.
+	 * @param string $html        HTML of the linked block.
+	 * @return Reply_Service_Stub Service holding the captured prompt.
+	 */
+	private function refine_with( string $ai_response, string $html = '<p>Revenue grew 40% last year.</p>' ): Reply_Service_Stub {
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->canned_response = $ai_response;
+		$this->assertSame( 999, $service->handle_reply( 999, 100, 42, 'abc-123' ) );
+
+		return $service;
+	}
+
+	/**
+	 * The newest edit in the thread is sent as the pending suggestion, and
+	 * each earlier edit shows in the conversation.
+	 */
+	public function test_prompt_includes_pending_edit_from_latest_reply(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ) );
+		$this->seed_ai_edit_reply( 600, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in fiscal 2025' ) );
+
+		$prompt = $this->refine_with( '{"reply": "Shorter.", "edit": null}' )->captured_prompt;
+
+		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nreplace \"last year\" with \"in fiscal 2025\"", $prompt );
+		$this->assertStringContainsString( '(Suggested edit: replace "last year" with "in 2025")', $prompt );
+		$this->assertStringContainsString( 'return a new edit that replaces it', $prompt );
+	}
+
+	/**
+	 * The review's quick fix is the pending edit until a reply proposes another.
+	 */
+	public function test_prompt_includes_quick_fix_as_pending_edit(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2025"}';
+
+		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}' )->captured_prompt;
+
+		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nreplace \"last year\" with \"in 2025\"", $prompt );
+	}
+
+	/**
+	 * A thread without edits sends no pending edit.
+	 */
+	public function test_prompt_has_no_pending_edit_without_edits(): void {
+		$this->seed_parent_and_reply();
+
+		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}' )->captured_prompt;
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
+		$this->assertStringNotContainsString( 'return a new edit that replaces it', $prompt );
+	}
+
+	/**
+	 * An edit whose text is gone from the block, for example because it was
+	 * applied, is no longer pending.
+	 */
+	public function test_applied_edit_is_not_pending(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ) );
+
+		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}', '<p>Revenue grew 40% in 2025.</p>' )->captured_prompt;
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
+	}
+
+	/**
+	 * A rewrite stays pending while the block reads as the text it replaces.
+	 */
+	public function test_rewrite_is_pending_while_block_is_unchanged(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_ai_edit_reply(
+			500,
+			array(
+				'type'     => 'rewrite_block',
+				'content'  => 'Revenue grew <strong>40%</strong> in 2025.',
+				'original' => 'Revenue grew 40% last year.',
+			)
+		);
+
+		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}' )->captured_prompt;
+
+		$this->assertStringContainsString( 'rewrite the block as "Revenue grew 40% in 2025."', $prompt );
+	}
+
+	/**
+	 * An edit the author accepted or rejected as a suggestion is not pending.
+	 *
+	 * @dataProvider decided_suggestion_statuses
+	 *
+	 * @param string $status Suggestion status.
+	 */
+	public function test_decided_suggestion_is_not_pending( string $status ): void {
+		$this->seed_parent_and_reply();
+		$this->seed_ai_edit_reply(
+			500,
+			array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ),
+			array(
+				'_wp_suggestion'        => '{"schemaVersion":2}',
+				'_wp_suggestion_status' => $status,
+			)
+		);
+
+		$prompt = $this->refine_with( '{"reply": "Sure.", "edit": null}' )->captured_prompt;
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
+	}
+
+	/**
+	 * Suggestion statuses the author has decided.
+	 *
+	 * @return array<string, array{string}>
+	 */
+	public static function decided_suggestion_statuses(): array {
+		return array(
+			'rejected'         => array( 'rejected' ),
+			'rejected-unsaved' => array( 'rejected-unsaved' ),
+			'applied'          => array( 'applied' ),
+			'applied-unsaved'  => array( 'applied-unsaved' ),
+		);
+	}
+
+	/**
+	 * A pending suggestion's markers are left out of the block text, so the
+	 * AI sees, and edits, the text as it reads without the suggestion.
+	 */
+	public function test_block_text_leaves_out_pending_suggestion_markers(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_ai_edit_reply(
+			500,
+			array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in 2025' ),
+			array( '_wp_suggestion' => '{"schemaVersion":2}' )
+		);
+		$html = '<p>Revenue grew 40% <mark class="wp-suggestion-add" data-suggestion-id="500" data-suggestion-type="add">in 2025</mark><mark class="wp-suggestion-del" data-suggestion-id="500" data-suggestion-type="del">last year</mark>.</p>';
+
+		$service = $this->refine_with( '{"reply": "Shorter.", "edit": {"type": "replace_text", "find": "last year", "replace": "2025"}}', $html );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% last year.\n", $service->captured_prompt );
+		$this->assertStringContainsString( 'replace "last year" with "in 2025"', $service->captured_prompt );
+	}
+
+	/**
+	 * A new edit is numbered after the thread's earlier ones, counting the
+	 * review's quick fix.
+	 */
+	public function test_new_edit_is_numbered_after_earlier_edits(): void {
+		$this->seed_parent_and_reply();
+		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2025"}';
+		$this->seed_ai_edit_reply( 500, array( 'type' => 'replace_text', 'find' => 'last year', 'replace' => 'in fiscal 2025' ) );
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% last year.</p>', 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Shorter.", "edit": {"type": "replace_text", "find": "last year", "replace": "2025"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertSame( 3, $notes->last_reply['feedback_item']['revision'] );
+	}
+
+	/**
+	 * The first edit in a thread without a quick fix is revision 1, and a
+	 * reply without an edit has no revision.
+	 */
+	public function test_first_edit_is_revision_one(): void {
+		$with_edit = $this->reply_with( '{"reply": "Done.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
+		$this->assertSame( 1, $with_edit->last_reply['feedback_item']['revision'] );
+
+		$without_edit = $this->reply_with( '{"reply": "It is the growth figure.", "edit": null}' );
+		$this->assertArrayNotHasKey( 'revision', $without_edit->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * Data provider for strip_suggestion_markers().
+	 *
+	 * @return array<string, array{string, string}>
+	 */
+	public static function suggestion_marker_provider(): array {
+		return array(
+			'add and del'              => array(
+				'<p>A <mark class="wp-suggestion-add" data-suggestion-id="5">b</mark><mark class="wp-suggestion-del" data-suggestion-id="5">c</mark> d</p>',
+				'<p>A c d</p>',
+			),
+			'format inside a deletion' => array(
+				'<p>A <mark class="wp-suggestion-del" data-suggestion-id="5">b <mark class="wp-suggestion-format" data-suggestion-id="6"><strong>c</strong></mark> e</mark> f</p>',
+				'<p>A b <strong>c</strong> e f</p>',
+			),
+			'single quoted class'      => array(
+				"<p>A <mark class='wp-suggestion-add'>b</mark>c</p>",
+				'<p>A c</p>',
+			),
+			'highlight is kept'        => array(
+				'<p>A <mark class="wp-suggestion-del"><mark class="has-inline-color">b</mark></mark><mark class="wp-suggestion-add">x</mark> <mark style="color:red">c</mark></p>',
+				'<p>A <mark class="has-inline-color">b</mark> <mark style="color:red">c</mark></p>',
+			),
+			'unclosed suggestion mark' => array(
+				'<p>A <mark class="wp-suggestion-del">b</p>',
+				'<p>A <mark class="wp-suggestion-del">b</p>',
+			),
+			'NUL bytes in a kept mark' => array(
+				"<p>A <mark>\x000\x00</mark><mark class=\"wp-suggestion-add\">x</mark></p>",
+				'<p>A <mark>0</mark></p>',
+			),
+			'space before closing >'   => array(
+				'<p>A <mark class="wp-suggestion-add">b</mark ><mark class="wp-suggestion-del">c</mark	> d</p>',
+				'<p>A c d</p>',
+			),
+			'> in an attribute value'  => array(
+				'<p>A <mark title="x > y" class="wp-suggestion-add" data-note=\'a>b\'>b</mark>c</p>',
+				'<p>A c</p>',
+			),
+			'no markers'               => array(
+				'<p>A <mark>b</mark></p>',
+				'<p>A <mark>b</mark></p>',
+			),
+		);
+	}
+
+	/**
+	 * Suggestion markers are taken out as a rejection would, nested or not.
+	 *
+	 * @dataProvider suggestion_marker_provider
+	 *
+	 * @param string $html     Block HTML.
+	 * @param string $expected HTML without suggestion markers.
+	 */
+	public function test_strip_suggestion_markers( string $html, string $expected ): void {
+		$method = new \ReflectionMethod( Reply_Service::class, 'strip_suggestion_markers' );
+		$this->assertSame( $expected, $method->invoke( null, $html ) );
+	}
+
+	/**
+	 * When the marker regex fails, the block keeps its markup instead of
+	 * losing its text.
+	 */
+	public function test_strip_suggestion_markers_keeps_input_when_the_regex_fails(): void {
+		$html   = '<p>A <mark class="wp-suggestion-del">' . str_repeat( 'b', 5000 ) . '</mark> c</p>';
+		$limit  = ini_get( 'pcre.backtrack_limit' );
+		$jit    = ini_get( 'pcre.jit' );
+		$method = new \ReflectionMethod( Reply_Service::class, 'strip_suggestion_markers' );
+
+		ini_set( 'pcre.jit', '0' );
+		ini_set( 'pcre.backtrack_limit', '10' );
+		try {
+			$result = $method->invoke( null, $html );
+		} finally {
+			ini_set( 'pcre.backtrack_limit', (string) $limit );
+			ini_set( 'pcre.jit', (string) $jit );
+		}
+
+		$this->assertSame( $html, $result );
+	}
 }

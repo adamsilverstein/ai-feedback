@@ -725,6 +725,27 @@ class Response_Parser {
 	}
 
 	/**
+	 * Whether a stored edit still applies to a block's text.
+	 *
+	 * A `replace_text` edit (or a review's quick fix) applies while its `find`
+	 * appears exactly once, and a `rewrite_block` edit while the block still
+	 * reads as the text it was written for.
+	 *
+	 * @param  array<string, string> $edit          Edit, as decoded by Notes_Manager.
+	 * @param  string                $block_content Plain text of the block.
+	 * @return bool
+	 */
+	public function edit_applies( array $edit, string $block_content ): bool {
+		if ( 'rewrite_block' === ( $edit['type'] ?? null ) ) {
+			return isset( $edit['original'] ) && '' !== trim( $block_content )
+				&& self::normalize_text( $edit['original'] ) === self::normalize_text( $block_content );
+		}
+
+		$find = $edit['find'] ?? '';
+		return '' !== $find && 1 === $this->count_quick_fix_matches( $find, $block_content );
+	}
+
+	/**
 	 * Whether HTML uses only the inline tags a rewrite may contain.
 	 *
 	 * @param  string $html HTML to check.

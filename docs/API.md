@@ -221,14 +221,15 @@ The current user must be able to edit the post.
   "threads": {
     "456": {
       "replies": [
-        { "id": 789, "author": "Jane", "content": "Make that change.", "is_ai": false, "date": "2026-11-19 10:00:00", "edit": null },
+        { "id": 789, "author": "Jane", "content": "Make that change.", "is_ai": false, "date": "2026-11-19 10:00:00", "edit": null, "revision": null },
         {
           "id": 790,
           "author": "Fresh Eyes",
           "content": "Done: \"last year\" now reads \"in 2025\".",
           "is_ai": true,
           "date": "2026-11-19 10:00:05",
-          "edit": { "type": "replace_text", "find": "last year", "replace": "in 2025" }
+          "edit": { "type": "replace_text", "find": "last year", "replace": "in 2025" },
+          "revision": 1
         }
       ],
       "pending_reply_id": null
@@ -247,6 +248,10 @@ The current user must be able to edit the post.
 | `rewrite_block` | `content`, `original` | New text for the whole block, with inline formatting only (`a`, `b`, `br`, `code`, `em`, `i`, `s`, `strong`, `sub`, `sup`). `original` is the block text the AI saw, so the editor can tell once the edit is outdated. Only for blocks with a rich text `content` attribute whose text has no links, formatting or line breaks, since the AI only sees plain text and a rewrite would drop them |
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
+
+`revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
+
+Only the newest edit in a thread can be acted on. A new edit supersedes the earlier ones: the editor shows them as replaced, and with Suggestion Mode on it takes their markers out of the block and marks them `rejected-unsaved`, which Gutenberg finalizes as `rejected` when the post is saved (its status list has no `superseded`). When the author replies to a thread whose newest edit is still pending, the reply prompt includes that edit, so the AI can revise it. The block text in the prompt reads as it does with any pending suggestion rejected.
 
 ---
 

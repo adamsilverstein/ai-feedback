@@ -166,4 +166,27 @@ class NotesManagerBadgesTest extends TestCase {
 		$this->assertSame( 'Hello', Notes_Manager::add_badges_to_comment_text( 'Hello', $this->note( 7, 'comment' ) ) );
 		$this->assertSame( 'Hello', Notes_Manager::add_badges_to_comment_text( 'Hello' ) );
 	}
+
+	/**
+	 * An AI reply with an edit is labeled with its revision.
+	 */
+	public function test_reply_edit_gets_revision_badge(): void {
+		$GLOBALS['test_comment_meta'][8] = array(
+			'ai_feedback'                      => '1',
+			Notes_Manager::REVISION_META_KEY => '2',
+		);
+		$GLOBALS['test_comment_meta'][9] = array(
+			'ai_feedback'                      => '1',
+			Notes_Manager::REVISION_META_KEY => '1',
+		);
+
+		$this->assertSame(
+			"Shorter.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Revised suggestion (2)</span>',
+			Notes_Manager::add_badges_to_comment_text( 'Shorter.', $this->note( 8 ) )
+		);
+		$this->assertSame(
+			"Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Suggested edit</span>',
+			Notes_Manager::add_badges_to_comment_text( 'Done.', $this->note( 9 ) )
+		);
+	}
 }

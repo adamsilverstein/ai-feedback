@@ -388,6 +388,135 @@ export async function suggestReplyEdit(reply, threadId, blockId = null) {
 }
 
 /**
+ * Takes one suggestion's markers out of content, as Reject does: its added
+ * runs are dropped and its deleted runs keep their text.
+ *
+ * @param {string|RichTextData} content Attribute value.
+ * @param {number}              id      Suggestion (note) id.
+ * @return {string|RichTextData|null} New value, or null when the content holds no marker for the id.
+ */
+export function removeSuggestionMarkers(content, id) {
+	const html = toHtml(content);
+	if (!hasSuggestionMarker(html, Number(id))) {
+		return null;
+	}
+
+	// An inert document, so nothing in the content runs or loads.
+	const { body } = document.implementation.createHTMLDocument('');
+	body.innerHTML = html;
+	body.querySelectorAll(`mark[data-suggestion-id="${Number(id)}"]`).forEach(
+		(mark) => {
+			if (mark.classList.contains('wp-suggestion-add')) {
+				mark.remove();
+			} else {
+				mark.replaceWith(...mark.childNodes);
+			}
+		}
+	);
+
+	return content instanceof RichTextData
+		? new RichTextData(create({ html: body.innerHTML }))
+		: body.innerHTML;
+}
+
+/**
+ * Reads a note's suggestion status from the record core-data has loaded.
+ *
+ * @param {number} noteId Note ID.
+ * @return {string|null} Status, or null when unknown or not a suggestion.
+ */
+function getLoadedSuggestionStatus(noteId) {
+	const postId = dataSelect(EDITOR_STORE).getCurrentPostId?.();
+	// The query the Notes UI loads, as in getNotesQuery(), so this reads
+	// records already fetched rather than fetching each note.
+	const notes = postId
+		? dataSelect(CORE_STORE).getEntityRecords?.('root', 'comment', {
+				post: postId,
+				type: 'note',
+				status: 'all',
+				per_page: -1,
+			})
+		: null;
+	const record = notes?.find((note) => note.id === Number(noteId));
+	if (!record?.meta?._wp_suggestion) {
+		return null;
+	}
+	return record.meta._wp_suggestion_status || 'pending';
+}
+
+/**
+ * Notes whose superseding is in progress, so the sidebar and the reply
+ * watcher never both do it.
+ */
+const supersedingIds = new Set();
+
+/**
+ * Retires the suggestions a newer edit in the same thread replaces.
+ *
+ * Each pending suggestion's markers are taken out of the block and it is
+ * marked `rejected-unsaved`, which Gutenberg finalizes as `rejected` when
+ * the post is saved: its status list has no `superseded`. Suggestions the
+ * author already accepted or rejected are left alone.
+ *
+ * @param {number}   threadId Root note of the thread, used to find its block.
+ * @param {number[]} noteIds  Notes whose edits the newest edit supersedes.
+ * @return {Promise<number[]>} IDs of the suggestions retired.
+ */
+export async function supersedeSuggestions(threadId, noteIds) {
+	if (!isSuggestionModeAvailable() || !noteIds?.length) {
+		return [];
+	}
+	const clientId = resolveBlockClientId(null, threadId);
+	if (!clientId) {
+		return [];
+	}
+
+	const retired = [];
+	for (const noteId of noteIds) {
+		const target = getBlockContent(clientId);
+		const withoutMarkers = target
+			? removeSuggestionMarkers(target.content, noteId)
+			: null;
+		if (
+			supersedingIds.has(noteId) ||
+			(!withoutMarkers && getLoadedSuggestionStatus(noteId) !== 'pending')
+		) {
+			continue;
+		}
+
+		supersedingIds.add(noteId);
+		try {
+			// Markers first, so the new edit can be suggested even if the
+			// status save fails; the orphan cleanup then tidies the note.
+			if (withoutMarkers !== null) {
+				dataDispatch(blockEditorStore).updateBlockAttributes(clientId, {
+					[target.key]: withoutMarkers,
+				});
+			}
+			await saveNoteMeta(noteId, {
+				_wp_suggestion_status: 'rejected-unsaved',
+			});
+			dataDispatch(STORE_NAME).setSuggestionStatus(
+				noteId,
+				'rejected-unsaved'
+			);
+			retired.push(noteId);
+		} catch (error) {
+			// eslint-disable-next-line no-console
+			console.warn(
+				'[AI-Feedback] Could not retire a superseded suggestion:',
+				noteId,
+				error
+			);
+		} finally {
+			supersedingIds.delete(noteId);
+		}
+	}
+
+	return retired;
+}
+
+/**
  * Turns a pending suggestion back into a plain note.
  *
  * @param {number} noteId Note ID.
