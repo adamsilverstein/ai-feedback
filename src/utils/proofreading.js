@@ -83,6 +83,56 @@ export function isOpenFix(
 }
 
 /**
+ * Note saves in flight, so reopening a note never lands before resolving it.
+ */
+const pendingSaves = new Map();
+
+/**
+ * Remember the save that resolves some notes until it settles.
+ *
+ * @param {number[]}         noteIds Note ids.
+ * @param {Promise<unknown>} saving  Save in flight.
+ * @return {Promise<unknown>} The same save.
+ */
+export function trackSaves(noteIds, saving) {
+	const settled = Promise.resolve(saving).catch(() => {});
+	noteIds.forEach((id) => pendingSaves.set(id, settled));
+	settled.then(() =>
+		noteIds.forEach((id) => {
+			if (pendingSaves.get(id) === settled) {
+				pendingSaves.delete(id);
+			}
+		})
+	);
+	return saving;
+}
+
+/**
+ * Wait for any tracked save of a note to settle.
+ *
+ * @param {number} noteId Note id.
+ * @return {Promise<void>} Resolves once no save of the note is in flight.
+ */
+export function whenSaved(noteId) {
+	return pendingSaves.get(noteId) ?? Promise.resolve();
+}
+
+/**
+ * Whether a fix's text is in a block again, so the fix can be applied:
+ * after the editor's Undo takes back a fix that was applied.
+ *
+ * @param {string|RichTextData} content Current attribute value.
+ * @param {Object}              fix     Quick fix with `find` and `replace`.
+ * @return {boolean} True when the fix's text appears exactly once.
+ */
+export function isFixTextBack(content, fix) {
+	if (!fix?.find || hasSuggestionMarkers(content)) {
+		return false;
+	}
+	return findUniqueOffset(create({ html: toHtml(content) }), fix) !== -1;
+}
+
+/**
  * Apply several quick fixes to one block's content at once.
  *
  * Every fix is located in the content as it is; fixes whose text no longer

@@ -18,6 +18,7 @@ import { saveSuggestionStatuses } from '../utils/suggestions';
 import {
 	acceptAllFixes,
 	isOpenFix,
+	trackSaves,
 	undoAcceptAll,
 } from '../utils/proofreading';
 
@@ -223,10 +224,13 @@ export default function ProofreadingGroup({
 			done.forEach((id) => setFixApplied(id, true));
 
 			// Undo waits on these, so its writes never land before them.
-			plan.saving = Promise.all([
-				setResolved(plan.applied, true),
-				saveStatuses(plan.accepted, 'applied-unsaved'),
-			]);
+			plan.saving = trackSaves(
+				[...plan.applied, ...plan.accepted],
+				Promise.all([
+					setResolved(plan.applied, true),
+					saveStatuses(plan.accepted, 'applied-unsaved'),
+				])
+			);
 
 			createSuccessNotice(
 				describeAcceptAll(done.length, plan.skipped.length),

@@ -15,6 +15,7 @@ import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import { hasSuggestionMarkers } from '../utils/suggestions';
 import { getRichTextAttributeKey } from '../utils/quick-fix';
+import { trackSaves } from '../utils/proofreading';
 import {
 	applyEditToContent,
 	describeEdit,
@@ -252,7 +253,7 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 		updateBlockAttributes(item.block_id, { [attributeKey]: updated });
 		markLastChangeAsPersistent?.();
 		setApplied(true);
-		setResolved(true);
+		trackSaves([item.id], setResolved(true));
 		setIsPreviewOpen(false);
 
 		createSuccessNotice(

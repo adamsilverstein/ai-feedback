@@ -125,5 +125,10 @@ test.describe('Proofreading', () => {
 			window.wp.data.dispatch('core/editor').undo()
 		);
 		await expect.poll(() => texts(editor)).toEqual(beforeAccept);
+		// The typos are back, so their fixes are open again.
+		await expect(group).toContainText('6 proofreading fixes');
+		await expect(
+			group.locator('.ai-feedback-item', { hasText: 'Teh → The' })
+		).toContainText('Apply fix');
 	});
 });

@@ -12,6 +12,7 @@ import { store as editorStore } from '@wordpress/editor';
 import FeedbackItem from './FeedbackItem';
 import ProofreadingGroup from './ProofreadingGroup';
 import useReplyThreads from '../hooks/useReplyThreads';
+import useRevertedFixes from '../hooks/useRevertedFixes';
 import {
 	SORT_CATEGORY,
 	SORT_DOCUMENT,
@@ -45,6 +46,7 @@ export default function FeedbackList({ feedbackItems }) {
 		[]
 	);
 	const { threads, onReplyComplete } = useReplyThreads(postId);
+	useRevertedFixes(feedbackItems);
 
 	if (!feedbackItems || feedbackItems.length === 0) {
 		return null;
