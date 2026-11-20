@@ -4,12 +4,17 @@
  * When Gutenberg's Suggestion Mode is available the same fixes become
  * suggestions instead (see suggestions.js).
  */
+import { create, insert, RichTextData } from '@wordpress/rich-text';
+
+/**
+ * Internal dependencies
+ */
 import {
-	create,
-	insert,
-	RichTextData,
-	toHTMLString,
-} from '@wordpress/rich-text';
+	createFromSource,
+	markReplacement,
+	readValue,
+	toContent,
+} from './source-newlines';
 
 /**
  * Find the block's main rich text attribute.
@@ -166,8 +171,8 @@ export function findUniqueOffset(value, fix) {
  * @return {string|RichTextData|null} New attribute value, or null if the fix no longer applies.
  */
 export function applyFixToContent(content, fix) {
-	const value = create({ html: toHtml(content) });
-	const start = findUniqueOffset(value, fix);
+	const value = createFromSource(toHtml(content));
+	const start = findUniqueOffset(readValue(value), fix);
 
 	if (start === -1) {
 		return null;
@@ -175,19 +180,16 @@ export function applyFixToContent(content, fix) {
 
 	// Carry over the formatting of the replaced text's first character, so a
 	// fix inside bold or a link stays bold or linked.
+	const end = start + fix.find.length;
 	const length = fix.replace.length;
 	const replacement = {
-		text: fix.replace,
+		text: markReplacement(value.text.slice(start, end), fix.replace),
 		formats: Array.from({ length }, () => value.formats[start]),
 		// Sparse, like the arrays rich text builds: core-data reads every
 		// entry that exists when it orders footnotes.
 		replacements: new Array(length),
 	};
-	const updated = insert(value, replacement, start, start + fix.find.length);
-
-	return content instanceof RichTextData
-		? new RichTextData(updated)
-		: toHTMLString({ value: updated });
+	return toContent(content, insert(value, replacement, start, end));
 }
 
 /**

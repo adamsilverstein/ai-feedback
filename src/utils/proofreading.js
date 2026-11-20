@@ -11,13 +11,14 @@
  */
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
-import {
-	create,
-	insert,
-	RichTextData,
-	toHTMLString,
-} from '@wordpress/rich-text';
+import { insert, RichTextData } from '@wordpress/rich-text';
 import { findUniqueOffset, getRichTextAttributeKey, toHtml } from './quick-fix';
+import {
+	createFromSource,
+	markReplacement,
+	readValue,
+	toContent,
+} from './source-newlines';
 import { acceptSuggestionMarkers, hasSuggestionMarkers } from './suggestions';
 
 /**
@@ -204,7 +205,8 @@ export function isRecordedSuggestion(noteId) {
  * @return {{content: (string|RichTextData|null), applied: number[], skipped: number[]}} New value (null when nothing applied) and the indexes of the fixes applied and skipped.
  */
 export function applyFixesToContent(content, fixes) {
-	let value = create({ html: toHtml(content) });
+	let value = createFromSource(toHtml(content));
+	const read = readValue(value);
 	const skipped = [];
 	const located = [];
 
@@ -214,7 +216,7 @@ export function applyFixesToContent(content, fixes) {
 			typeof fix?.replace === 'string' &&
 			fix.find !== '' &&
 			fix.find !== fix.replace;
-		const start = usable ? findUniqueOffset(value, fix) : -1;
+		const start = usable ? findUniqueOffset(read, fix) : -1;
 		if (start === -1) {
 			skipped.push(index);
 		} else {
@@ -246,7 +248,10 @@ export function applyFixesToContent(content, fixes) {
 		value = insert(
 			value,
 			{
-				text: fix.replace,
+				text: markReplacement(
+					value.text.slice(start, end),
+					fix.replace
+				),
 				formats: Array.from({ length }, () => value.formats[start]),
 				// Sparse, like the arrays rich text builds.
 				replacements: new Array(length),
@@ -257,10 +262,7 @@ export function applyFixesToContent(content, fixes) {
 	}
 
 	return {
-		content:
-			content instanceof RichTextData
-				? new RichTextData(value)
-				: toHTMLString({ value }),
+		content: toContent(content, value),
 		applied: kept.map((entry) => entry.index).sort((a, b) => a - b),
 		skipped: skipped.sort((a, b) => a - b),
 	};
