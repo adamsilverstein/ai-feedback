@@ -105,6 +105,20 @@ export function getBlockTexts(block) {
 }
 
 /**
+ * Every reading of a block's own text, without its inner blocks, as the
+ * server keeps a move target's text: a quote's citation, a details
+ * block's summary, a list item's text without its nested list.
+ *
+ * @param {Object|null} block Block from the block editor store.
+ * @return {string[]} Whitespace-collapsed texts, as getBlockTexts().
+ */
+export function getOwnBlockTexts(block) {
+	return getBlockTexts(
+		block?.innerBlocks?.length ? { ...block, innerBlocks: [] } : block
+	);
+}
+
+/**
  * Text of the block an insert adds.
  *
  * @param {Object} spec The edit's `block`.
@@ -254,8 +268,8 @@ export function matchesTargetText(blockText, targetText) {
  * Finds the block a move puts the note's block next to.
  *
  * Its client ID wins while it still names a block of the same type.
- * Otherwise the one block of that type whose text starts with the stored
- * text is used, preferring the note block's own siblings when there are
+ * Otherwise the one block of that type whose own text starts with the
+ * stored text is used, preferring the note block's own siblings when there are
  * several.
  *
  * @param {Object} selectors Block editor selectors.
@@ -278,16 +292,28 @@ export function findMoveTarget(selectors, action, clientId) {
 		return null;
 	}
 
-	const matches = selectors.getClientIdsWithDescendants().filter((id) => {
-		const block = selectors.getBlock(id);
-		return (
-			id !== clientId &&
-			block?.name === action.target_name &&
-			getBlockTexts(block).some((blockText) =>
-				matchesTargetText(blockText, text)
-			)
+	const candidates = selectors
+		.getClientIdsWithDescendants()
+		.map((id) => ({ id, block: selectors.getBlock(id) }))
+		.filter(
+			({ id, block }) =>
+				id !== clientId && block?.name === action.target_name
 		);
-	});
+	const matching = (read) =>
+		candidates
+			.filter(({ block }) =>
+				read(block).some((blockText) =>
+					matchesTargetText(blockText, text)
+				)
+			)
+			.map(({ id }) => id);
+	// A block's own text first, as the server keeps it now. Moves saved
+	// before kept a parent's text with its inner blocks', so that reading
+	// is only tried when no block's own text matches.
+	let matches = matching(getOwnBlockTexts);
+	if (matches.length === 0) {
+		matches = matching(getBlockTexts);
+	}
 	if (matches.length === 1) {
 		return matches[0];
 	}
