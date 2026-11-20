@@ -371,7 +371,14 @@ class HouseStyleTest extends TestCase {
 				'text' => 'Rule from before per-site rules',
 			),
 		);
-		$GLOBALS['test_user_meta'][ self::USER_ID ]['wp_unrelated_key'] = 'kept';
+		// Similarly named keys from elsewhere are not ours.
+		$others = array(
+			'wp_unrelated_key'                             => 'kept',
+			'wp_other_ai_feedback_personal_house_style'    => array( array( 'id' => 'x1', 'text' => 'Not ours' ) ),
+			'myplugin_ai_feedback_personal_house_style'    => array( array( 'id' => 'x2', 'text' => 'Not ours' ) ),
+			'wp_ai_feedback_personal_house_style_backup'   => array( array( 'id' => 'x3', 'text' => 'Not ours' ) ),
+		);
+		$GLOBALS['test_user_meta'][ self::USER_ID ] += $others;
 
 		$texts = array_map(
 			static fn ( array $item ): string => (string) end( $item['data'] )['value'],
@@ -380,7 +387,15 @@ class HouseStyleTest extends TestCase {
 		sort( $texts );
 		$this->assertSame( array( 'Rule from before per-site rules', 'Rule on a site the user left' ), $texts );
 
+		// A site that can't be found is labeled by its key.
+		$sites = array_map(
+			static fn ( array $item ): string => (string) $item['data'][0]['value'],
+			House_Style::export_personal_data( 'jane@example.test' )['data']
+		);
+		sort( $sites );
+		$this->assertSame( array( House_Style::USER_META_KEY, 'wp_3_' . House_Style::USER_META_KEY ), $sites );
+
 		$this->assertTrue( House_Style::erase_personal_data( 'jane@example.test' )['items_removed'] );
-		$this->assertSame( array( 'wp_unrelated_key' => 'kept' ), $GLOBALS['test_user_meta'][ self::USER_ID ] );
+		$this->assertSame( $others, $GLOBALS['test_user_meta'][ self::USER_ID ] );
 	}
 }

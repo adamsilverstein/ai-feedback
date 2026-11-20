@@ -494,7 +494,8 @@ class House_Style {
 	 * before rules were per site.
 	 *
 	 * @param  int $user_id User ID.
-	 * @return array<string, string> Site name by meta key; empty when the site is unknown.
+	 * @return array<string, string> Site label by meta key: the site's name when it is a live site,
+	 *                               otherwise the meta key itself.
 	 */
 	private static function get_user_rule_keys( int $user_id ): array {
 		global $wpdb;
@@ -509,7 +510,8 @@ class House_Style {
 			}
 			$is_legacy    = self::USER_META_KEY === $key && '' !== $base;
 			$site_id      = isset( $match[1] ) && '' !== $match[1] ? (int) $match[1] : ( $is_legacy ? 0 : ( function_exists( 'get_main_site_id' ) ? get_main_site_id() : 1 ) );
-			$keys[ $key ] = $site_id > 0 ? self::site_name( $site_id ) : '';
+			$name         = $site_id > 0 ? self::site_name( $site_id ) : '';
+			$keys[ $key ] = '' !== $name ? $name : $key;
 		}
 		return $keys;
 	}
