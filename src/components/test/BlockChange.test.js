@@ -125,7 +125,7 @@ function renderChange({
 }
 
 describe('BlockChange', () => {
-	it('previews and applies a heading level fix, and resolves the note', () => {
+	it('previews and applies a heading level fix, and resolves the note', async () => {
 		const { registry, heading, spies } = renderChange();
 
 		expect(screen.getByText('Change to a level 3 heading')).toBeTruthy();
@@ -139,6 +139,8 @@ describe('BlockChange', () => {
 		act(() => {
 			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
 		});
+		// Note writes run in order, after the change.
+		await act(async () => {});
 
 		expect(
 			registry.select(blockEditorStore).getBlock(heading.clientId)
@@ -233,6 +235,56 @@ describe('BlockChange', () => {
 		expect(spies.setNoteResolved.mock.calls).toEqual([
 			[7, true],
 			[7, false],
+		]);
+	});
+
+	it('writes the note state in order across Apply, Undo and Apply', async () => {
+		let finish;
+		const pending = new Promise((resolve) => {
+			finish = resolve;
+		});
+		let first = true;
+		const { registry, heading, spies } = renderChange({
+			// Only the first resolve request is slow.
+			resolveWith: () => {
+				if (first) {
+					first = false;
+					return pending;
+				}
+				return undefined;
+			},
+		});
+
+		act(() => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+		const [notice] = registry.select(noticesStore).getNotices();
+		let undone;
+		act(() => {
+			undone = notice.actions[0].onClick();
+		});
+		// The stub Undo doesn't touch blocks; put the level back as Undo would.
+		act(() => {
+			registry
+				.dispatch(blockEditorStore)
+				.updateBlockAttributes(heading.clientId, { level: 4 });
+		});
+		act(() => {
+			fireEvent.click(screen.getByRole('button', { name: 'Apply fix' }));
+		});
+
+		await act(async () => {});
+		expect(spies.setNoteResolved.mock.calls).toEqual([[7, true]]);
+
+		await act(async () => {
+			finish();
+			await undone;
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		});
+		expect(spies.setNoteResolved.mock.calls).toEqual([
+			[7, true],
+			[7, false],
+			[7, true],
 		]);
 	});
 });

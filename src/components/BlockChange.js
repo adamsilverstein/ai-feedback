@@ -11,7 +11,7 @@
  */
 import { Button } from '@wordpress/components';
 import { useDispatch, useRegistry, useSelect } from '@wordpress/data';
-import { useEffect, useState } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as noticesStore } from '@wordpress/notices';
@@ -66,6 +66,9 @@ function isSameEdits(a, b) {
 export default function BlockChange({ item, isSuperseded = false }) {
 	const change = item.block_change;
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+	// Resolve and reopen requests run one after another, in the order the
+	// author applied and undid, so the note ends up as the block does.
+	const noteWrites = useRef(Promise.resolve());
 
 	const { clientId, block, state, isApplied } = useSelect(
 		(select) => {
@@ -131,10 +134,7 @@ export default function BlockChange({ item, isSuperseded = false }) {
 		);
 	}
 
-	const setResolved = async (resolved) => {
-		if (!item.id) {
-			return;
-		}
+	const writeResolved = async (resolved) => {
 		try {
 			await setNoteResolved(item.id, resolved);
 		} catch {
@@ -151,6 +151,15 @@ export default function BlockChange({ item, isSuperseded = false }) {
 				{ type: 'snackbar' }
 			);
 		}
+	};
+
+	const setResolved = (resolved) => {
+		if (item.id) {
+			noteWrites.current = noteWrites.current.then(() =>
+				writeResolved(resolved)
+			);
+		}
+		return noteWrites.current;
 	};
 
 	const handleApply = () => {
@@ -173,8 +182,7 @@ export default function BlockChange({ item, isSuperseded = false }) {
 		const appliedBlocks = registry.select(blockEditorStore).getBlocks();
 		const appliedEdits = getOtherPostEdits(registry);
 		setFixApplied(item.id, true);
-		// Undo waits for this, so the note ends up as open as the block.
-		const resolving = setResolved(true);
+		setResolved(true);
 
 		createSuccessNotice(__('Change applied.', 'fresh-eyes'), {
 			type: 'snackbar',
@@ -203,8 +211,7 @@ export default function BlockChange({ item, isSuperseded = false }) {
 						}
 						registry.dispatch('core/editor').undo();
 						setFixApplied(item.id, false);
-						await resolving;
-						setResolved(false);
+						await setResolved(false);
 					},
 				},
 			],
