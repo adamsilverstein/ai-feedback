@@ -229,7 +229,7 @@ class Prompt_Builder {
 
 		$instruction  = "\n\n## PROOFREADING\n\n";
 		$instruction .= '- Report each spelling, typo or grammar error as its own item with "category": "grammar" and "severity": "suggestion", not under "content".' . "\n";
-		$instruction .= '- Every "grammar" item must have a "quick_fix" that corrects just that error; items without one are discarded. Keep "find" short: the word or phrase with the error, plus a neighboring word only if it would otherwise appear more than once in the block.' . "\n";
+		$instruction .= '- Every "grammar" item must have a "quick_fix" that corrects just that error; items without one are discarded. Keep "find" short: the word or phrase with the error. When that text appears more than once in the block, even correctly elsewhere, widen "find" with a neighboring word so it matches only the error; a "find" that matches twice is discarded.' . "\n";
 		$instruction .= '- Two errors in one block are two items. Their "find" texts must not overlap.' . "\n";
 		$instruction .= '- Keep the title to the correction itself, for example "teh → the", and the feedback to one short sentence.' . "\n";
 		$instruction .= sprintf( '- Spelling and grammar follow %s. Do not flag a spelling that is correct there, even if another variant of the language spells it differently.', $variant ) . "\n";
@@ -737,7 +737,6 @@ Design example (severity: suggestion):
   ]
 }
 
-GRAMMAR_EXAMPLE_PLACEHOLDER
 When content is well-written, return minimal or no feedback:
 {
   "summary": "Well-structured content with clear arguments and consistent tone.",
@@ -771,7 +770,9 @@ Grammar example (severity: suggestion):
 
 EOT;
 
-		$examples = str_replace( "GRAMMAR_EXAMPLE_PLACEHOLDER\n", $include_grammar ? $grammar_example : '', $examples );
+		if ( $include_grammar ) {
+			$examples .= "\n\n" . $grammar_example;
+		}
 		$examples = $language_note . $examples;
 
 		/**

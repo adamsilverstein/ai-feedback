@@ -72,7 +72,6 @@ class PromptBuilderGrammarTest extends TestCase {
 		$this->assertStringNotContainsString( '- Grammar & Spelling - ', $without );
 		$this->assertStringNotContainsString( '## PROOFREADING', $without );
 		$this->assertStringNotContainsString( 'Grammar example', $without );
-		$this->assertStringNotContainsString( 'GRAMMAR_EXAMPLE_PLACEHOLDER', $without );
 	}
 
 	/**

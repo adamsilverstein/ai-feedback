@@ -218,6 +218,23 @@ class ResponseParserGrammarTest extends TestCase {
 	}
 
 	/**
+	 * A typo repeated in one block needs a wider find for each copy; a bare
+	 * word that matches twice is dropped rather than applied to the wrong one.
+	 */
+	public function test_repeated_typo_needs_a_unique_find(): void {
+		$feedback = $this->parse(
+			array(
+				self::grammar( 'b1', 'teh', 'the' ),
+				self::grammar( 'b1', 'teh cat', 'the cat' ),
+				self::grammar( 'b1', 'teh mat', 'the mat' ),
+			),
+			array( 'b1' => 'teh cat sat on teh mat.' )
+		);
+
+		$this->assertSame( array( 'teh cat>the cat', 'teh mat>the mat' ), self::fixes( $feedback ) );
+	}
+
+	/**
 	 * A fix whose text overlaps a kept fix on the same block is dropped.
 	 */
 	public function test_overlapping_fixes_keep_the_first(): void {
