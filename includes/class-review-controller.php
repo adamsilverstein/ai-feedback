@@ -352,10 +352,11 @@ class Review_Controller extends WP_REST_Controller {
 							'required' => true,
 							'format'   => 'text-field',
 						),
+						// Keeps the newline the editor sends for a line break.
 						'content'    => array(
 							'type'     => 'string',
 							'required' => true,
-							'format'   => 'text-field',
+							'format'   => 'textarea-field',
 						),
 						'anchor'     => array(
 							'type'    => 'string',

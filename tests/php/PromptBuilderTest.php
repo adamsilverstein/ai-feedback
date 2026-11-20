@@ -476,6 +476,24 @@ class PromptBuilderTest extends TestCase {
 
 		$this->assertStringContainsString( '"quick_fix": { "find":', $prompt );
 		$this->assertStringContainsString( 'copied exactly', $prompt );
+		$this->assertStringContainsString( 'keep "find" on one line, or write the break as \\n', $prompt );
+	}
+
+	/**
+	 * A line break in a block's content reaches the prompt as a newline.
+	 */
+	public function test_format_blocks_keeps_line_breaks(): void {
+		$blocks = array(
+			array(
+				'clientId' => 'abc-123',
+				'name'     => 'core/paragraph',
+				'content'  => "First line\nsecond line.",
+			),
+		);
+
+		$result = $this->invoke_private( 'format_blocks_for_prompt', array( $blocks ) );
+
+		$this->assertStringContainsString( "\nFirst line\nsecond line.", $result );
 	}
 	/**
 	 * Test the prompt describes the optional block_action field, listing

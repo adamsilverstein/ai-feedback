@@ -203,6 +203,32 @@ describe('findMoveTarget', () => {
 		).toBe('h');
 	});
 
+	// The server keeps a target's line break as a space, from a review's
+	// text ("\n") or a reply's (Reply_Service::html_text()); reviews from
+	// before dropped it.
+	it.each([
+		['new review or reply', 'Background on the project.'],
+		['older review', 'Backgroundon the project.'],
+	])(
+		'finds a target with a line break, stored by a %s',
+		(_label, targetText) => {
+			const selectors = treeSelectors(
+				{ '': ['bg', 'open'] },
+				{
+					bg: ['core/paragraph', 'Background<br>on the project.'],
+					open: ['core/paragraph', 'The real opening.'],
+				}
+			);
+			expect(
+				findMoveTarget(
+					selectors,
+					move('stale', 'before', { target_text: targetText }),
+					'open'
+				)
+			).toBe('bg');
+		}
+	);
+
 	it('ignores a client ID that now names another type of block', () => {
 		expect(
 			findMoveTarget(

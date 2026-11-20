@@ -168,6 +168,7 @@ class PromptBuilderReplyTest extends TestCase {
 		$this->assertStringContainsString( '"type": "replace_text"', $prompt );
 		$this->assertStringContainsString( 'in any language', $prompt );
 		$this->assertStringContainsString( 'asks a short question', $prompt );
+		$this->assertStringContainsString( 'keep "find" on one line, or write the break as \\n.', $prompt );
 		// Rewrites are off unless the block supports them.
 		$this->assertStringNotContainsString( 'rewrite_block', $prompt );
 	}

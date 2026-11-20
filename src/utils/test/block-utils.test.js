@@ -4,9 +4,20 @@
 import { describe, expect, it } from 'vitest';
 
 /**
+ * WordPress dependencies
+ */
+import { create, RichTextData } from '@wordpress/rich-text';
+
+/**
  * Internal dependencies
  */
-import { extractBlockData } from '../block-utils';
+import {
+	extractBlockData,
+	extractEditorText,
+	getBlockAnchor,
+} from '../block-utils';
+
+const EDITOR_TEXT = require('../../../tests/fixtures/editor-text.json');
 
 const block = (clientId, content, innerBlocks = []) => ({
 	clientId,
@@ -84,5 +95,90 @@ describe('extractBlockData', () => {
 			},
 		});
 		expect(data[0].anchor).not.toBe(data[1].anchor);
+	});
+
+	// The editor reads a break as "\n", so the review sees the same text a
+	// quick fix's `find` is later matched against.
+	it.each([
+		['br', '<p>First line<br>second line.</p>'],
+		['self-closing', '<p>First line<br />second line.</p>'],
+	])('sends a %s line break as a newline', (_label, html) => {
+		const [data] = extractBlockData([block('p', html)]);
+
+		expect(data.content).toBe('First line\nsecond line.');
+	});
+
+	it('keeps wrapped source text as written, as the editor does', () => {
+		const [data] = extractBlockData([
+			block('p', '<p>First\n\tline<br />\nsecond line.</p>'),
+		]);
+
+		expect(data.content).toBe('First\n\tline\n\nsecond line.');
+	});
+
+	it('keeps the anchor notes saved before were linked by', () => {
+		const [data] = extractBlockData([
+			block('p', '<p>First line<br>second line.</p>'),
+		]);
+
+		expect(data.anchor).toBe(
+			getBlockAnchor('core/paragraph', 'First linesecond line.')
+		);
+	});
+});
+
+// Shared with Reply_Service::editor_text() on the server.
+describe('extractEditorText', () => {
+	it.each(EDITOR_TEXT.cases.map((item) => [item.name, item]))(
+		'reads %s as the editor does',
+		(_name, { html, text }) => {
+			// The fixture is what rich text itself reads, not a guess.
+			expect(create({ html }).text).toBe(text);
+			expect(extractEditorText(html)).toBe(text);
+		}
+	);
+
+	it('drops comments, which are block delimiters here', () => {
+		expect(
+			extractEditorText(
+				'<!-- wp:paragraph -->\n<p>a<br>b</p>\n<!-- /wp:paragraph -->'
+			)
+		).toBe('\na\nb\n');
+	});
+});
+
+// Shared with ReplyServiceTest::test_text_edit_matches_own_text_of_a_block_with_inner_blocks().
+describe('extractBlockData for a block with inner blocks', () => {
+	it.each(
+		EDITOR_TEXT.blocks.flatMap((item) => [
+			[item.name, 'a string', item, item.content],
+			[
+				item.name,
+				'rich text',
+				item,
+				RichTextData.fromHTMLString(item.content),
+			],
+		])
+	)('sends the own text of a %s, as %s', (_name, _type, item, content) => {
+		const [data] = extractBlockData([
+			{
+				clientId: 'item',
+				name: item.block,
+				attributes: { content },
+				originalContent: item.before + item.inner + item.after,
+				innerBlocks: [
+					{
+						clientId: 'nested',
+						name: 'core/list',
+						attributes: {},
+						originalContent: item.inner,
+						innerBlocks: [],
+					},
+				],
+			},
+		]);
+
+		expect(create({ html: item.content }).text).toBe(item.text);
+		expect(data.content).toBe(item.text.trim());
 	});
 });
