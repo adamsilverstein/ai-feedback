@@ -63,9 +63,14 @@ function getReviewText(block, rawContent) {
 		);
 	}
 	// An image block's <img> is the block, not an inline image in its text.
-	return block.name === 'core/image'
-		? extractTextContent(rawContent)
-		: extractEditorText(rawContent);
+	if (block.name === 'core/image') {
+		return extractTextContent(rawContent);
+	}
+	// Rich text reads an empty element with attributes, like the wrapper a
+	// group keeps once its inner blocks are left out, as an object (U+FFFC).
+	// Only an <img> is one, as Reply_Service::editor_text() reads it.
+	const text = extractEditorText(rawContent);
+	return /<img\b/i.test(rawContent) ? text : text.replace(/\uFFFC/g, '');
 }
 
 /**

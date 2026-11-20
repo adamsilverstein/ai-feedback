@@ -932,6 +932,36 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for the shared parent blocks whose own HTML is a wrapper.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function wrapper_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['wrappers'] ?? null ) ? $fixture['wrappers'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['own'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['own'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * A parent block's own text, from its HTML without the inner blocks, is
+	 * the text the editor sends for it (block-utils-editor.test.js runs the
+	 * same cases), so an empty wrapper has none.
+	 *
+	 * @dataProvider wrapper_text_provider
+	 *
+	 * @param string $own  The block's own HTML.
+	 * @param string $text Its own text.
+	 */
+	public function test_editor_text_reads_a_wrapper_as_the_editor_does( string $own, string $text ): void {
+		$this->assertSame( $text, Reply_Service::editor_text( $own ) );
+	}
+
+	/**
 	 * Data provider for the shared blocks with inner blocks.
 	 *
 	 * @return array<string, array{0: string, 1: string, 2: string, 3: string, 4: string}>

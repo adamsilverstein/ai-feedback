@@ -36,7 +36,7 @@ describe('getNoteRelinks on loaded blocks', () => {
 			.dispatch(blockEditorStore)
 			.resetBlocks(
 				parse(
-					'<!-- wp:quote --><blockquote><p>Old text.</p><cite>Someone</cite></blockquote><!-- /wp:quote -->'
+					'<!-- wp:quote --><blockquote class="wp-block-quote"><p>Old text.</p><cite>Someone</cite></blockquote><!-- /wp:quote -->'
 				)
 			);
 		const blocks = registry.select(blockEditorStore).getBlocks();
@@ -70,7 +70,7 @@ describe('getNoteRelinks on loaded blocks', () => {
 			.dispatch(blockEditorStore)
 			.resetBlocks(
 				parse(
-					'<!-- wp:quote --><blockquote><p>Old text.</p><cite>Someone</cite></blockquote><!-- /wp:quote -->'
+					'<!-- wp:quote --><blockquote class="wp-block-quote"><p>Old text.</p><cite>Someone</cite></blockquote><!-- /wp:quote -->'
 				)
 			);
 		const blocks = registry.select(blockEditorStore).getBlocks();

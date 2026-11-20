@@ -97,7 +97,7 @@ describe('extractBlockData on editor blocks', () => {
 
 	it('does not repeat inner blocks’ text on their parent', () => {
 		const parsed = parse(
-			'<!-- wp:group --><div><!-- wp:paragraph --><p>Parsed inner.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
+			'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Parsed inner.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
 		);
 		const created = createBlock('core/group', {}, [
 			createBlock('core/paragraph', { content: 'New inner.' }),
@@ -130,7 +130,7 @@ describe('extractBlockData on editor blocks', () => {
 
 	it('finds text that is only in inner blocks', () => {
 		const parsed = parse(
-			'<!-- wp:group --><div><!-- wp:paragraph --><p>Inner only.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
+			'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Inner only.</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
 		);
 		const created = createBlock('core/group', {}, [
 			createBlock('core/paragraph', { content: 'Inner only.' }),
@@ -178,12 +178,12 @@ describe('anchors of loaded blocks', () => {
 			[
 				'<!-- wp:paragraph --><p>Plain, <strong>bold</strong> and <a href="https://example.com">linked</a> &amp; escaped.</p><!-- /wp:paragraph -->',
 				'<!-- wp:paragraph --><p>Two<br>lines.</p><!-- /wp:paragraph -->',
-				'<!-- wp:heading {"level":3} --><h3>A heading</h3><!-- /wp:heading -->',
-				'<!-- wp:list --><ul><!-- wp:list-item --><li>One</li><!-- /wp:list-item --><!-- wp:list-item --><li>Two</li><!-- /wp:list-item --></ul><!-- /wp:list -->',
-				'<!-- wp:quote --><blockquote><!-- wp:paragraph --><p>Quoted.</p><!-- /wp:paragraph --><cite>Someone</cite></blockquote><!-- /wp:quote -->',
-				'<!-- wp:group --><div><!-- wp:paragraph --><p>In a group.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
-				'<!-- wp:preformatted --><pre>Line one\nLine  two</pre><!-- /wp:preformatted -->',
-				'<!-- wp:code --><pre><code>if ( a &lt; b ) {}</code></pre><!-- /wp:code -->',
+				'<!-- wp:heading {"level":3} --><h3 class="wp-block-heading">A heading</h3><!-- /wp:heading -->',
+				'<!-- wp:list --><ul class="wp-block-list"><!-- wp:list-item --><li>One</li><!-- /wp:list-item --><!-- wp:list-item --><li>Two</li><!-- /wp:list-item --></ul><!-- /wp:list -->',
+				'<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>Quoted.</p><!-- /wp:paragraph --><cite>Someone</cite></blockquote><!-- /wp:quote -->',
+				'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>In a group.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+				'<!-- wp:preformatted --><pre class="wp-block-preformatted">Line one\nLine  two</pre><!-- /wp:preformatted -->',
+				'<!-- wp:code --><pre class="wp-block-code"><code>if ( a &lt; b ) {}</code></pre><!-- /wp:code -->',
 			].join('\n\n')
 		);
 		const blockList = loadEditor(blocks)
@@ -197,9 +197,7 @@ describe('anchors of loaded blocks', () => {
 			])
 		);
 
-		// Valid blocks, so the new anchors come from their save output. The
-		// markup has no generated `wp-block-*` classes, as the hook adding
-		// them is not loaded here.
+		// Valid blocks, so the new anchors come from their save output.
 		const flat = (list) =>
 			list.flatMap((block) => [block, ...flat(block.innerBlocks)]);
 		expect(flat(blockList).every(({ isValid }) => isValid)).toBe(true);
@@ -307,7 +305,7 @@ describe('a block’s own text, shared with the server', () => {
 		(_name, item) => {
 			const registry = loadEditor(
 				parse(
-					`<!-- wp:list --><ul><!-- wp:${item.block.replace(
+					`<!-- wp:list --><ul class="wp-block-list"><!-- wp:${item.block.replace(
 						'core/',
 						''
 					)} -->${item.before}<!-- wp:list -->${item.inner}<!-- /wp:list -->${item.after}<!-- /wp:${item.block.replace(
@@ -342,6 +340,27 @@ describe('a block’s own text, shared with the server', () => {
 				'Edited\nown text.',
 				'Edited\nown text.',
 			]);
+		}
+	);
+});
+
+// Shared with ReplyServiceTest::test_editor_text_reads_a_wrapper_as_the_editor_does().
+describe('a parent block’s own text, shared with the server', () => {
+	it.each(EDITOR_TEXT.wrappers.map((item) => [item.name, item]))(
+		'reads the own text of a %s as the server does',
+		(_name, item) => {
+			const [block] = loadEditor(parse(item.markup))
+				.select(blockEditorStore)
+				.getBlocks();
+			expect(block.isValid).toBe(true);
+			expect(extractTextContent(getBlockOwnHTML(block)).trim()).toBe(
+				item.text
+			);
+
+			const sent = extractBlockData([block]).find(
+				({ clientId }) => clientId === block.clientId
+			);
+			expect(sent?.content ?? '').toBe(item.text);
 		}
 	);
 });
