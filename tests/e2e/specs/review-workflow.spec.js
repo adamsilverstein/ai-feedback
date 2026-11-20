@@ -282,6 +282,45 @@ test.describe('Review Workflow', () => {
 		]);
 	});
 
+	test('stops offering a review once a loaded table is emptied', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Emptied table',
+			content:
+				'<!-- wp:table --><figure class="wp-block-table"><table class="has-fixed-layout"><tbody><tr><td>Old cell</td></tr></tbody></table><figcaption class="wp-element-caption">Old caption</figcaption></figure><!-- /wp:table -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(aiFeedback.getReviewButton()).toBeVisible();
+
+		// Delete every row and the caption. A table with none saves nothing.
+		await page.evaluate(() => {
+			const { select, dispatch } = window.wp.data;
+			const [table] = select('core/block-editor').getBlocks();
+			dispatch('core/block-editor').updateBlockAttributes(
+				table.clientId,
+				{ head: [], body: [], foot: [], caption: '' }
+			);
+		});
+
+		await expect(
+			panel.getByText('Add some content to your post')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Review Document' })
+		).toHaveCount(0);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,

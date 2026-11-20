@@ -278,23 +278,35 @@ describe('Custom HTML and blocks that save nothing', () => {
 		}
 	});
 
-	it('falls back to the loaded markup of a block that saves nothing', () => {
-		registerBlockType('test/saves-nothing', {
-			title: 'Saves nothing',
-			category: 'text',
-			attributes: {},
-			save: () => null,
-		});
-		try {
-			const block = {
-				...createBlock('test/saves-nothing'),
-				originalContent: '<p>Loaded only</p>',
-			};
-			expect(extractBlockData([block])[0].content).toBe('Loaded only');
-		} finally {
-			unregisterBlockType('test/saves-nothing');
+	it.each([
+		[
+			'a table with its rows and caption deleted',
+			'<!-- wp:table --><figure class="wp-block-table"><table class="has-fixed-layout"><tbody><tr><td>Old cell</td></tr></tbody></table><figcaption class="wp-element-caption">Old caption</figcaption></figure><!-- /wp:table -->',
+			{ head: [], body: [], foot: [], caption: '' },
+		],
+		[
+			'an embed with its URL removed',
+			'<!-- wp:embed {"url":"https://www.youtube.com/watch?v=old","type":"video","providerNameSlug":"youtube","responsive":true} --><figure class="wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube"><div class="wp-block-embed__wrapper">\nhttps://www.youtube.com/watch?v=old\n</div><figcaption class="wp-element-caption">Old caption</figcaption></figure><!-- /wp:embed -->',
+			{ url: undefined, caption: '' },
+		],
+	])(
+		'reads no text from %s, which then saves nothing',
+		(_name, markup, emptied) => {
+			const registry = loadEditor(parse(markup));
+			const [block] = registry.select(blockEditorStore).getBlocks();
+			expect(block.isValid).toBe(true);
+			expect(extractBlockData([block])[0].content).toContain('Old');
+
+			registry
+				.dispatch(blockEditorStore)
+				.updateBlockAttributes(block.clientId, emptied);
+			const blocks = registry.select(blockEditorStore).getBlocks();
+
+			expect(getBlockOwnHTML(blocks[0])).toBe('');
+			expect(extractBlockData(blocks)).toEqual([]);
+			expect(hasTextContent(blocks)).toBe(false);
 		}
-	});
+	);
 });
 
 // The editor's notion of a block's own text, from its save output without

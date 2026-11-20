@@ -150,16 +150,16 @@ export function getBlockOwnHTML(block) {
 	const attributes = block.attributes ?? {};
 	try {
 		const html = getSaveContent(block.name, attributes, []);
-		// A save that renders nothing has no current markup to read, so the
-		// loaded markup is all there is. A block emptied in the editor still
-		// renders its wrapper, so it never gets here.
+		// A save that renders nothing, like a table with its rows deleted or
+		// an embed without a URL, has no text now. Its loaded markup would
+		// bring deleted text back. A Custom HTML block made with its markup
+		// in the deprecated `content` attribute, not yet moved to
+		// `innerContent`, saves nothing but still has that markup.
 		if (!html && getSaveElement(block.name, attributes, []) === null) {
-			// A Custom HTML block made with its markup in the deprecated
-			// `content` attribute, not yet moved to `innerContent`.
 			return block.name === 'core/html' &&
 				typeof attributes.content === 'string'
 				? attributes.content
-				: saved;
+				: '';
 		}
 		return html;
 	} catch (error) {
