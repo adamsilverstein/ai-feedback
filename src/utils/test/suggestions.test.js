@@ -26,9 +26,11 @@ import {
 	hasSuggestionMarkers,
 	isSuggestionModeAvailable,
 	removeOrphanedSuggestions,
+	removeSuggestionMarkers,
 	suggestQuickFix,
 	suggestQuickFixes,
 	suggestReplyEdit,
+	supersedeSuggestions,
 } from '../suggestions';
 
 const mocks = vi.hoisted(() => ({
@@ -39,6 +41,7 @@ const mocks = vi.hoisted(() => ({
 	updateBlockAttributes: vi.fn(),
 	setSuggestionStatus: vi.fn(),
 	createInfoNotice: vi.fn(),
+	notes: null,
 }));
 
 vi.mock('@wordpress/api-fetch', () => ({ default: mocks.apiFetch }));
@@ -71,10 +74,13 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 									__unstableIsEditorReady: () =>
 										mocks.editorReady,
 								}),
+						getCurrentPostId: () => 42,
 						getEditedPostContent: () => mocks.postContent,
 						getCurrentPostAttribute: (name) =>
 							name === 'content' ? mocks.savedContent : undefined,
 					};
+				case 'core':
+					return { getEntityRecords: () => mocks.notes };
 				default:
 					return actual.select(store);
 			}
@@ -830,5 +836,154 @@ describe('suggestReplyEdit', () => {
 			false
 		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+});
+
+const ADD_40 =
+	'<mark class="wp-suggestion-add" data-suggestion-id="40" data-suggestion-type="add" data-author="0">to</mark>';
+const DEL_40 =
+	'<mark class="wp-suggestion-del" data-suggestion-id="40" data-suggestion-type="del" data-author="0">in order to</mark>';
+
+describe('removeSuggestionMarkers', () => {
+	it('drops the added run and keeps the deleted text, as Reject does', () => {
+		expect(
+			removeSuggestionMarkers(`We met ${ADD_40}${DEL_40} plan.`, 40)
+		).toBe('We met in order to plan.');
+	});
+
+	it('leaves other suggestions in place', () => {
+		const other =
+			'<mark class="wp-suggestion-del" data-suggestion-id="41" data-suggestion-type="del">soon</mark>';
+		expect(
+			removeSuggestionMarkers(
+				`We met ${ADD_40}${DEL_40} plan ${other}.`,
+				40
+			)
+		).toBe(`We met in order to plan ${other}.`);
+	});
+
+	it('keeps formatting inside the deleted run', () => {
+		expect(
+			removeSuggestionMarkers(
+				'A <mark class="wp-suggestion-add" data-suggestion-id="7">b</mark><mark class="wp-suggestion-del" data-suggestion-id="7"><strong>c</strong></mark> d',
+				7
+			)
+		).toBe('A <strong>c</strong> d');
+	});
+
+	it('returns rich text for rich text content', () => {
+		const result = removeSuggestionMarkers(
+			RichTextData.fromHTMLString(`We met ${ADD_40}${DEL_40} plan.`),
+			40
+		);
+		expect(result).toBeInstanceOf(RichTextData);
+		expect(result.toHTMLString()).toBe('We met in order to plan.');
+	});
+
+	it('returns null when the content has no marker for the id', () => {
+		expect(removeSuggestionMarkers('We met in order to plan.', 40)).toBe(
+			null
+		);
+	});
+});
+
+describe('supersedeSuggestions', () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		window.__experimentalSuggestionMode = true;
+		window.aiFeedbackData = { suggestions: true };
+		mocks.notes = null;
+		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
+			savedRecord(record)
+		);
+		mocks.blocks = {
+			'block-1': {
+				name: 'core/paragraph',
+				attributes: {
+					content: `We met ${ADD_40}${DEL_40} plan.`,
+					metadata: { noteId: 39 },
+				},
+			},
+		};
+	});
+
+	afterEach(() => {
+		delete window.__experimentalSuggestionMode;
+		delete window.aiFeedbackData;
+	});
+
+	it('takes out the markers and marks the suggestion rejected', async () => {
+		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([40]);
+
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'We met in order to plan.',
+		});
+		expect(mocks.saveEntityRecord).toHaveBeenCalledTimes(1);
+		expect(mocks.saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			{ id: 40, meta: { _wp_suggestion_status: 'rejected-unsaved' } },
+			{ throwOnError: true }
+		);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(
+			40,
+			'rejected-unsaved'
+		);
+	});
+
+	it('retires a pending suggestion whose markers are already gone', async () => {
+		mocks.blocks['block-1'].attributes.content = 'We met in order to plan.';
+		mocks.notes = [
+			{
+				id: 39,
+				meta: {
+					_wp_suggestion: '{}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+
+		await expect(supersedeSuggestions(39, [39])).resolves.toEqual([39]);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('leaves accepted and rejected suggestions alone', async () => {
+		mocks.blocks['block-1'].attributes.content = 'We met to plan.';
+		mocks.notes = [
+			{
+				id: 40,
+				meta: {
+					_wp_suggestion: '{}',
+					_wp_suggestion_status: 'applied-unsaved',
+				},
+			},
+		];
+
+		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([]);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('does nothing without Suggestion Mode', async () => {
+		delete window.__experimentalSuggestionMode;
+
+		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('does nothing when the thread’s block is not loaded', async () => {
+		mocks.blocks = {};
+
+		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('keeps the markers out when the status cannot be saved', async () => {
+		mocks.saveEntityRecord.mockRejectedValue(new Error('offline'));
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
+		warn.mockRestore();
 	});
 });

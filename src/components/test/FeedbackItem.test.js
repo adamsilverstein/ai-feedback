@@ -731,3 +731,182 @@ describe('FeedbackItem reply edits', () => {
 		).not.toBeInTheDocument();
 	});
 });
+
+describe('FeedbackItem refinement', () => {
+	const blocks = {
+		'block-1': {
+			name: 'core/paragraph',
+			attributes: { content: 'Revenue grew 40% last year.' },
+		},
+	};
+	const quickFix = { find: 'last year', replace: 'in 2025' };
+	const firstEdit = {
+		type: 'replace_text',
+		find: 'last year',
+		replace: 'in fiscal 2025',
+	};
+	const revisedEdit = {
+		type: 'replace_text',
+		find: 'last year',
+		replace: 'in FY25',
+	};
+	const thread = {
+		replies: [
+			{ id: 8, is_ai: false, author: 'Jane', content: 'Shorter.' },
+			{
+				id: 9,
+				is_ai: true,
+				author: 'Fresh Eyes',
+				content: 'Done.',
+				edit: firstEdit,
+				revision: 2,
+			},
+			{ id: 10, is_ai: false, author: 'Jane', content: 'Shorter.' },
+			{
+				id: 11,
+				is_ai: true,
+				author: 'Fresh Eyes',
+				content: 'Shorter now.',
+				edit: revisedEdit,
+				revision: 3,
+			},
+		],
+		pending_reply_id: null,
+	};
+
+	it('only lets the newest revision be applied', async () => {
+		const updateBlockAttributes = vi.fn();
+		renderItem({ quick_fix: quickFix }, vi.fn(), {
+			blocks,
+			updateBlockAttributes,
+			thread,
+		});
+
+		// The review's quick fix and the first revision are replaced.
+		expect(
+			screen.getAllByText('Replaced by a revised suggestion.')
+		).toHaveLength(2);
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
+		expect(screen.getByText('Revised suggestion (2)')).toBeInTheDocument();
+		expect(screen.getByText('Revised suggestion (3)')).toBeInTheDocument();
+
+		const apply = screen.getAllByRole('button', { name: 'Apply change' });
+		expect(apply).toHaveLength(1);
+		await act(async () => {
+			fireEvent.click(apply[0]);
+		});
+
+		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'Revenue grew 40% in FY25.',
+		});
+	});
+
+	it('keeps an applied revision applied once a newer one arrives', () => {
+		renderItem({}, vi.fn(), {
+			blocks,
+			thread,
+			appliedFixes: { 9: true },
+		});
+
+		expect(
+			screen.getByText('You applied this change.')
+		).toBeInTheDocument();
+		expect(
+			screen.queryByText('Replaced by a revised suggestion.')
+		).not.toBeInTheDocument();
+	});
+
+	it('offers to refine a pending edit with quick replies', async () => {
+		const saveEntityRecord = vi.fn();
+		renderItem({}, vi.fn(), { blocks, thread, saveEntityRecord });
+
+		const group = screen.getByRole('group', { name: 'Quick replies' });
+		expect(
+			within(group)
+				.getAllByRole('button')
+				.map((button) => button.textContent)
+		).toEqual(['Shorter', 'Try another', 'Why?']);
+
+		await act(async () => {
+			fireEvent.click(
+				within(group).getByRole('button', { name: 'Shorter' })
+			);
+		});
+
+		expect(saveEntityRecord).toHaveBeenCalledWith(
+			'root',
+			'comment',
+			{
+				post: 1,
+				parent: 7,
+				type: 'note',
+				status: 'hold',
+				content: 'Make it shorter.',
+			},
+			{ throwOnError: true }
+		);
+		// Hidden until the thread shows the reply, so it is sent once.
+		expect(
+			screen.queryByRole('group', { name: 'Quick replies' })
+		).not.toBeInTheDocument();
+	});
+
+	it('offers a review quick fix the same quick replies', () => {
+		renderItem({ quick_fix: quickFix }, vi.fn(), { blocks });
+
+		expect(
+			within(screen.getByRole('group', { name: 'Quick replies' }))
+				.getAllByRole('button')
+				.map((button) => button.textContent)
+		).toEqual(['Shorter', 'Try another', 'Why?']);
+	});
+
+	it.each([
+		['applied', { appliedFixes: { 11: true } }],
+		[
+			'rejected',
+			{
+				notes: [
+					{
+						id: 11,
+						meta: {
+							_wp_suggestion: '{}',
+							_wp_suggestion_status: 'rejected',
+						},
+					},
+				],
+			},
+		],
+	])(
+		'offers to make a change once the newest edit is %s',
+		(_label, options) => {
+			renderItem({}, vi.fn(), { blocks, thread, ...options });
+
+			expect(
+				within(screen.getByRole('group', { name: 'Quick replies' }))
+					.getAllByRole('button')
+					.map((button) => button.textContent)
+			).toEqual(['Make that change', 'Show me an example', 'Why?']);
+		}
+	);
+
+	it('keeps the quick replies after a failed send', async () => {
+		renderItem({}, vi.fn(), {
+			blocks,
+			thread,
+			saveEntityRecord: () => {
+				throw new Error('Offline');
+			},
+		});
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: 'Why?' }));
+		});
+
+		expect(
+			screen.getByRole('group', { name: 'Quick replies' })
+		).toBeInTheDocument();
+	});
+});
