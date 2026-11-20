@@ -151,6 +151,34 @@ add_filter(
 	2
 );
 
+// A review of a post opening with "Strengths fixture" also says what works in
+// its first two blocks. The second strength carries markup, which must reach
+// the sidebar as plain text.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		$first = is_array( $blocks[0] ?? null ) ? $blocks[0] : array();
+		if ( ! is_string( $first['content'] ?? null ) || ! str_starts_with( $first['content'], 'Strengths fixture' ) || ! is_array( $blocks[1] ?? null ) ) {
+			return $response;
+		}
+
+		$response['strengths'] = array(
+			array(
+				'block_id' => $first['clientId'] ?? '',
+				'text'     => 'The opening example makes the problem concrete.',
+			),
+			array(
+				'block_id' => $blocks[1]['clientId'] ?? '',
+				'text'     => '<b>Clear</b> steps in "Getting started".',
+			),
+		);
+
+		return $response;
+	},
+	10,
+	2
+);
+
 // A review of a post holding the structural fixture text proposes one of
 // each structural edit: move "The real opening" above "Background", remove
 // "This repeats section two" and add a heading above "Next steps".
