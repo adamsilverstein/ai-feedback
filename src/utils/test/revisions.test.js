@@ -86,6 +86,7 @@ describe('isEditPending', () => {
 		'rejected',
 		'rejected-unsaved',
 		'outdated',
+		'some-future-status',
 	])('is not pending once its suggestion is %s', (status) => {
 		expect(isEditPending(latest, { status })).toBe(false);
 	});

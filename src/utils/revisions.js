@@ -77,17 +77,6 @@ export function getRevisionLabel(revision) {
 }
 
 /**
- * Suggestion statuses after which an edit is no longer waiting on the author.
- */
-const DECIDED_STATUSES = [
-	'applied',
-	'applied-unsaved',
-	'rejected',
-	'rejected-unsaved',
-	'outdated',
-];
-
-/**
  * Whether the newest edit in a thread is still waiting on the author.
  *
  * @param {Object|null} latest          Newest edit, from getLatestEdit().
@@ -97,7 +86,13 @@ const DECIDED_STATUSES = [
  * @return {boolean} True when there is an edit to refine.
  */
 export function isEditPending(latest, { status = null, isApplied = false }) {
-	return !!latest && !isApplied && !DECIDED_STATUSES.includes(status);
+	// Only an unsuggested edit or a pending suggestion is waiting; any other
+	// status, including one Gutenberg adds later, means the author acted.
+	return (
+		!!latest &&
+		!isApplied &&
+		(status === null || status === undefined || status === 'pending')
+	);
 }
 
 /**
