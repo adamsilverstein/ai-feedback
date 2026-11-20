@@ -100,7 +100,7 @@ class Review_History {
 						'by_category' => $count_map,
 					),
 				),
-				'strengths'     => array(
+				'strengths'        => array(
 					'type'     => 'array',
 					'maxItems' => Response_Parser::MAX_STRENGTHS,
 					'items'    => array(
@@ -118,7 +118,7 @@ class Review_History {
 						),
 					),
 				),
-				'progress'      => array(
+				'progress'         => array(
 					'description'          => __( 'How the notes left open by the previous review stood when this one ran. Null for a post\'s first review.', 'fresh-eyes' ),
 					'type'                 => array( 'object', 'null' ),
 					'additionalProperties' => false,
@@ -127,7 +127,7 @@ class Review_History {
 						'still_open' => array( 'type' => 'integer' ),
 					),
 				),
-				'open_note_ids' => array(
+				'open_note_ids'    => array(
 					'description' => __( 'Notes still open when this review ran, compared by the next review.', 'fresh-eyes' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'integer' ),
