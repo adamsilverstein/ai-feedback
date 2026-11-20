@@ -537,6 +537,8 @@ class Reply_Service {
 			'post_id'   => $post_id,
 			'model'     => $model,
 			'timestamp' => current_time( 'c', true ),
+			// The answer speaks as the same reader as the note it answers.
+			'persona'   => is_string( $context['persona'] ?? null ) ? $context['persona'] : '',
 		);
 
 		return $this->notes_manager->add_reply_to_thread( $feedback_item, $post_id, $parent_id, $review_data );
@@ -759,6 +761,7 @@ class Reply_Service {
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
+			'persona'           => self::meta_string( $parent_id, Personas::META_KEY ),
 		);
 	}
 
