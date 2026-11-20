@@ -100,16 +100,22 @@ class Model_Capabilities {
 
 		try {
 			$providers = '' !== $provider ? array( $provider ) : $this->registered_providers( $registry );
-			foreach ( $providers as $provider_id ) {
-				$metadata = $this->find_model_metadata( $registry, $provider_id, $model_id );
-				if ( null !== $metadata ) {
-					return self::metadata_accepts_images( $metadata );
-				}
-			}
 		} catch ( \Throwable $e ) {
-			// Listing models can need a request to the provider; treat a
-			// failure as no answer rather than failing the review.
-			Logger::debug( sprintf( 'Could not read model metadata for %s: %s', $model_id, $e->getMessage() ) );
+			return null;
+		}
+
+		foreach ( $providers as $provider_id ) {
+			try {
+				$metadata = $this->find_model_metadata( $registry, $provider_id, $model_id );
+			} catch ( \Throwable $e ) {
+				// Listing models can need a request to the provider; a failure
+				// is no answer from it, so the next provider is asked.
+				Logger::debug( sprintf( 'Could not read %s model metadata for %s: %s', $provider_id, $model_id, $e->getMessage() ) );
+				continue;
+			}
+			if ( null !== $metadata ) {
+				return self::metadata_accepts_images( $metadata );
+			}
 		}
 
 		return null;

@@ -434,6 +434,26 @@ class ModelCapabilitiesTest extends TestCase {
 	}
 
 	/**
+	 * One provider failing to list its models doesn't stop the next one
+	 * answering for a model the plugin doesn't list.
+	 */
+	public function test_metadata_failure_skips_to_next_provider(): void {
+		Stub_Provider_A::$directory = new Stub_Model_Directory( array(), true );
+		Stub_Provider_B::$directory = new Stub_Model_Directory( array( 'house-model' => self::model( true ) ) );
+		$capabilities               = new Testable_Model_Capabilities();
+		$capabilities->registry     = new Stub_Capability_Registry(
+			array(
+				'a' => Stub_Provider_A::class,
+				'b' => Stub_Provider_B::class,
+			),
+			array( 'a', 'b' )
+		);
+
+		$this->assertTrue( $capabilities->core_supports_images( 'house-model', '' ) );
+		$this->assertTrue( $capabilities->supports_vision( 'house-model' ) );
+	}
+
+	/**
 	 * A model the plugin doesn't list is looked up in every configured
 	 * provider.
 	 */
