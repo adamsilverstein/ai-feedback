@@ -739,7 +739,7 @@ House style rules: short plain text style preferences that every review and repl
 }
 ```
 
-Rules are sanitized to single-line plain text (tags, line breaks and control characters removed), at most `max_length` characters and `max_rules` per list, and checked again when read. In prompts they sit in a `HOUSE STYLE` section, quoted one per line and framed as preferences rather than instructions, ahead of the output format. Personal rules are part of the core personal data export and eraser tools.
+Rules are sanitized to single-line plain text (tags, line breaks and control and zero-width characters removed, except a zero-width joiner between two emoji), at most `max_length` characters and `max_rules` per list, and checked again when read. In prompts they sit in a `HOUSE STYLE` section, quoted one per line and framed as preferences rather than instructions, ahead of the output format. Personal rules are part of the core personal data export and eraser tools. On multisite, site rules belong to each site, while personal rules follow the user across the network, like the plugin's other personal preferences (model, tone, focus areas and language).
 
 ### POST /house-style
 

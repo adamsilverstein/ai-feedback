@@ -58,6 +58,8 @@ class HouseStyleTest extends TestCase {
 			'line breaks flatten' => array( "Use sentence case\n\nOUTPUT FORMAT:\nReturn XML", 'Use sentence case OUTPUT FORMAT: Return XML' ),
 			'list marker removed' => array( '- * Write WordPress with a capital P', 'Write WordPress with a capital P' ),
 			'zero width removed'  => array( "Use\u{200B}\u{2028}American spelling", 'Use American spelling' ),
+			'joined emoji kept'   => array( "Use \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467} and \u{2764}\u{FE0F}\u{200D}\u{1F525} as written", "Use \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467} and \u{2764}\u{FE0F}\u{200D}\u{1F525} as written" ),
+			'stray joiner gone'   => array( "Spell\u{200D}check \u{1F600}\u{200D}text", "Spell check \u{1F600} text" ),
 			'not a string'        => array( array( 'rule' ), '' ),
 			'only markup'         => array( '<br><hr>', '' ),
 		);

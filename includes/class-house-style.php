@@ -14,6 +14,8 @@ use WP_Error;
  *
  * Site rules live in an option and apply to everyone. Personal rules live
  * in the user's preferences and apply to that user's reviews and replies.
+ * On multisite, site rules are per site and personal rules follow the user
+ * across the network, like the other User_Preferences.
  * Rules are user-written text that ends up in prompts, so they are stored
  * as single-line plain text, capped in count and length, and checked again
  * whenever they are read.
@@ -67,6 +69,12 @@ class House_Style {
 	public const PROPOSAL_STATUSES = array( 'saved', 'dismissed' );
 
 	/**
+	 * Emoji, skin tone modifiers and the emoji presentation selector, as
+	 * regex class contents, for keeping zero-width joiners between emoji.
+	 */
+	private const EMOJI_CHARS = '\x{1F000}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}';
+
+	/**
 	 * Make a rule single-line plain text.
 	 *
 	 * Tags, line breaks and control characters are removed, so a rule can't
@@ -81,9 +89,14 @@ class House_Style {
 		}
 
 		$text = wp_strip_all_tags( $text );
-		$text = (string) preg_replace( '/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/u', ' ', $text );
-		$text = sanitize_text_field( $text );
-		$text = (string) preg_replace( '/\s+/u', ' ', $text );
+		// A zero-width joiner only stays between two emoji, where it joins
+		// them into one (a family, a profession); anywhere else it goes with
+		// the other invisible characters.
+		$emoji = '[' . self::EMOJI_CHARS . ']';
+		$text  = (string) preg_replace( '/(?<!' . $emoji . ')\x{200D}|\x{200D}(?!' . $emoji . ')/u', ' ', $text );
+		$text  = (string) preg_replace( '/(?:(?!\x{200D})[\p{Cc}\p{Cf}\p{Zl}\p{Zp}])+/u', ' ', $text );
+		$text  = sanitize_text_field( $text );
+		$text  = (string) preg_replace( '/\s+/u', ' ', $text );
 
 		// A leading list marker would read as another item in the prompt list.
 		return trim( (string) preg_replace( '/^[\s\-*•]+/u', '', $text ) );
