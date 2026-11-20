@@ -58,6 +58,8 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 				case 'core/block-editor':
 					return {
 						getBlock: (id) => mocks.blocks[id] ?? null,
+						getBlockAttributes: (id) =>
+							mocks.blocks[id]?.attributes ?? null,
 						getClientIdsWithDescendants: () =>
 							Object.values(mocks.order).flat(),
 						getBlockRootClientId: (id) => parentOf(id) || null,

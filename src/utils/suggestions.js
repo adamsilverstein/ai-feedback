@@ -534,9 +534,9 @@ function canSuggestNow(selectors, action, clientId) {
  * or moves it back. The marker carries the note's id, so the suggestion is
  * found again after a reload.
  *
- * Meant for Gutenberg's Edit intent. Its Suggest intent can only be read
- * through a private selector, so it is not checked; there, Gutenberg's own
- * capture may record the move a second time.
+ * In Gutenberg's Suggest intent, which only a private selector reports, a
+ * move is recorded by Gutenberg as the current user's suggestion. The note
+ * then goes back to being a plain note, so the move is suggested once.
  *
  * If the server did not store the payload as
  * sent, the note goes back to being a plain note and the edit stays with
@@ -608,12 +608,29 @@ export async function suggestBlockAction(note) {
 			clientId,
 			targetId
 		);
+		const markersBefore = fromOrder.map(
+			(id) => current.getBlockAttributes(id)?.metadata?.suggestion
+		);
 		editor.moveBlocksToPosition(
 			[clientId],
 			fromRootClientId,
 			toRootClientId,
 			index
 		);
+
+		// In Suggest intent Gutenberg tags the move as it lands, on this
+		// block or a neighbor, and saves its own suggestion for it.
+		const moved = dataSelect(blockEditorStore);
+		if (
+			fromOrder.some(
+				(id, i) =>
+					moved.getBlockAttributes(id)?.metadata?.suggestion !==
+					markersBefore[i]
+			)
+		) {
+			await removeSuggestion(note.id);
+			return false;
+		}
 	}
 
 	const metadata =
