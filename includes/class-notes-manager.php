@@ -298,6 +298,7 @@ class Notes_Manager {
 				'category' => self::first_meta( $meta, 'feedback_category' ),
 				'severity' => self::first_meta( $meta, 'feedback_severity' ),
 				'revision' => self::first_meta( $meta, self::REVISION_META_KEY ),
+				'persona'  => self::first_meta( $meta, Personas::META_KEY ),
 			)
 		);
 		if ( '' === $badges ) {
@@ -345,6 +346,15 @@ class Notes_Manager {
 	 */
 	private static function build_badges( array $feedback_item ): string {
 		$badges = array();
+
+		// Persona badge first, so it is clear which reader is speaking.
+		$persona_label = Personas::is_custom( $feedback_item['persona'] ?? null ) ? Personas::get_label( $feedback_item['persona'] ) : '';
+		if ( '' !== $persona_label ) {
+			$badges[] = sprintf(
+				'<span class="ai-feedback-badge ai-feedback-persona">%s</span>',
+				esc_html( $persona_label )
+			);
+		}
 
 		// Category badge.
 		$category = $feedback_item['category'] ?? '';
@@ -464,6 +474,11 @@ class Notes_Manager {
 		// Lets the editor re-link the note when the block's noteId was never saved.
 		if ( ! empty( $feedback_item['block_anchor'] ) ) {
 			$meta['block_anchor'] = $feedback_item['block_anchor'];
+		}
+
+		// The default persona is left out, so its notes look as they always have.
+		if ( Personas::is_custom( $review_data['persona'] ?? null ) && is_string( $review_data['persona'] ) ) {
+			$meta[ Personas::META_KEY ] = $review_data['persona'];
 		}
 
 		// Add review metadata.
@@ -663,6 +678,7 @@ class Notes_Manager {
 
 			$note['block_anchor'] = get_comment_meta( $note['id'], 'block_anchor', true );
 			$note                += $this->get_feedback_fields( $note['id'] );
+			$note                += self::get_persona_fields( $note['id'] );
 
 			// Add grouping information if available.
 			if ( $is_group ) {
@@ -991,7 +1007,23 @@ class Notes_Manager {
 			'is_ai'       => $is_ai,
 		);
 
-		return $note + $this->get_feedback_fields( $note['id'] );
+		return $note + $this->get_feedback_fields( $note['id'] ) + self::get_persona_fields( $note['id'] );
+	}
+
+	/**
+	 * Get the persona a note was written as, for the sidebar.
+	 *
+	 * @param  int $note_id Note ID.
+	 * @return array{persona: string, persona_label: string} Persona ID and label, empty for the default persona.
+	 */
+	public static function get_persona_fields( int $note_id ): array {
+		$persona = get_comment_meta( $note_id, Personas::META_KEY, true );
+		$custom  = Personas::is_custom( $persona ) && is_string( $persona );
+
+		return array(
+			'persona'       => $custom ? $persona : '',
+			'persona_label' => $custom ? Personas::get_label( $persona ) : '',
+		);
 	}
 
 	/**

@@ -76,17 +76,23 @@ class Review_History {
 			'type'                 => 'object',
 			'additionalProperties' => false,
 			'properties'           => array(
-				'review_id'    => array( 'type' => 'string' ),
-				'timestamp'    => array( 'type' => 'string' ),
-				'model'        => array( 'type' => 'string' ),
-				'note_count'   => array( 'type' => 'integer' ),
-				'notes_failed' => array( 'type' => 'boolean' ),
-				'user_id'      => array( 'type' => 'integer' ),
-				'summary_text' => array(
+				'review_id'        => array( 'type' => 'string' ),
+				'timestamp'        => array( 'type' => 'string' ),
+				'model'            => array( 'type' => 'string' ),
+				'note_count'       => array( 'type' => 'integer' ),
+				'notes_failed'     => array( 'type' => 'boolean' ),
+				'user_id'          => array( 'type' => 'integer' ),
+				'summary_text'     => array(
 					'type'      => 'string',
 					'maxLength' => self::MAX_SUMMARY_LENGTH,
 				),
-				'summary'      => array(
+				'persona'          => array( 'type' => 'string' ),
+				'persona_label'    => array( 'type' => 'string' ),
+				'persona_takeaway' => array(
+					'type'      => 'string',
+					'maxLength' => Personas::MAX_TAKEAWAY_LENGTH,
+				),
+				'summary'          => array(
 					'type'                 => 'object',
 					'additionalProperties' => false,
 					'properties'           => array(
@@ -162,12 +168,12 @@ class Review_History {
 	 * Reduce a full review result to the fields kept in history.
 	 *
 	 * @param  array<string, mixed> $review Review result.
-	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}}
+	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, persona?: string, persona_label?: string, persona_takeaway?: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}}
 	 */
 	public static function build_entry( array $review ): array {
 		$summary = is_array( $review['summary'] ?? null ) ? $review['summary'] : array();
 
-		return array(
+		return self::build_persona_fields( $review ) + array(
 			'review_id'    => is_string( $review['review_id'] ?? null ) ? $review['review_id'] : '',
 			'timestamp'    => is_string( $review['timestamp'] ?? null ) ? $review['timestamp'] : '',
 			'model'        => is_string( $review['model'] ?? null ) ? $review['model'] : '',
@@ -195,6 +201,28 @@ class Review_History {
 		$entry = self::find( $post_id, $review_id );
 
 		return is_string( $entry['summary_text'] ?? null ) ? $entry['summary_text'] : '';
+	}
+
+	/**
+	 * Get the persona fields of a review, for a history entry.
+	 *
+	 * @param  array<mixed> $review Review result or history entry.
+	 * @return array{persona?: string, persona_label?: string, persona_takeaway?: string} Fields, empty for the default persona.
+	 */
+	public static function build_persona_fields( array $review ): array {
+		$persona = $review['persona'] ?? null;
+		if ( ! is_string( $persona ) || 1 !== preg_match( '/^[a-z0-9_-]{1,40}$/', $persona ) || Personas::DEFAULT_PERSONA === $persona ) {
+			return array();
+		}
+
+		// Kept as stored, so the summary still names a persona a filter later removed.
+		$label = is_string( $review['persona_label'] ?? null ) ? sanitize_text_field( $review['persona_label'] ) : '';
+
+		return array(
+			'persona'          => $persona,
+			'persona_label'    => '' === $label ? Personas::get_label( $persona ) : $label,
+			'persona_takeaway' => Personas::sanitize_takeaway( $review['persona_takeaway'] ?? '' ),
+		);
 	}
 
 	/**
