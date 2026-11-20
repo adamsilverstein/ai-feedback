@@ -20,7 +20,7 @@
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { createBlock, serialize } from '@wordpress/blocks';
-import { extractTextContent } from './block-utils';
+import { extractEditorText, extractTextContent } from './block-utils';
 import { isBlockAction } from './is-reply-edit';
 
 export { isBlockAction };
@@ -54,13 +54,14 @@ export function excerpt(text) {
 }
 
 /**
- * Plain text of an HTML string.
+ * Plain text of an HTML string, read as the editor reads it, so a line
+ * break separates words as it does in the text the server stores.
  *
  * @param {string} html HTML.
  * @return {string} Text.
  */
 function htmlText(html) {
-	return normalizeText(extractTextContent(html || ''));
+	return normalizeText(extractEditorText(html || ''));
 }
 
 /**
@@ -78,6 +79,29 @@ export function getBlockText(block) {
 	} catch {
 		return '';
 	}
+}
+
+/**
+ * Every reading of a block's text the server may have stored for it.
+ *
+ * Besides getBlockText(): without inline images, as a reply reads the
+ * block, and with line breaks dropped, as reviews read it before.
+ *
+ * @param {Object|null} block Block from the block editor store.
+ * @return {string[]} Whitespace-collapsed texts, getBlockText() first.
+ */
+export function getBlockTexts(block) {
+	const text = getBlockText(block);
+	if (!block) {
+		return [text];
+	}
+	let legacy = '';
+	try {
+		legacy = normalizeText(extractTextContent(serialize(block)));
+	} catch {}
+	return [
+		...new Set([text, normalizeText(text.replace(/\ufffc/g, '')), legacy]),
+	];
 }
 
 /**
@@ -259,7 +283,9 @@ export function findMoveTarget(selectors, action, clientId) {
 		return (
 			id !== clientId &&
 			block?.name === action.target_name &&
-			matchesTargetText(getBlockText(block), text)
+			getBlockTexts(block).some((blockText) =>
+				matchesTargetText(blockText, text)
+			)
 		);
 	});
 	if (matches.length === 1) {
