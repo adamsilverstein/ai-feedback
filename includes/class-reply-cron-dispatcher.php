@@ -135,7 +135,16 @@ class Reply_Cron_Dispatcher {
 		// Lets the editor answer the reply without waiting for WP-Cron.
 		update_comment_meta( $comment_id, self::JOB_META_KEY, array( $parent_id, $post_id, $block_id ) );
 
-		$delay     = get_comment_meta( $comment_id, Mentions::META_KEY, true ) ? self::MENTION_DELAY : 0;
+		$delay = 0;
+		if ( get_comment_meta( $comment_id, Mentions::META_KEY, true ) ) {
+			/**
+			 * Filters how many seconds WP-Cron waits before answering a mention.
+			 *
+			 * @param int $delay      Seconds. Default Reply_Cron_Dispatcher::MENTION_DELAY.
+			 * @param int $comment_id Note ID.
+			 */
+			$delay = max( 0, (int) apply_filters( 'ai_feedback_mention_reply_delay', self::MENTION_DELAY, $comment_id ) );
+		}
 		$scheduled = wp_schedule_single_event( time() + $delay, self::CRON_HOOK, $args, true );
 		if ( true !== $scheduled ) {
 			// Without an event nothing would ever move the reply out of pending.

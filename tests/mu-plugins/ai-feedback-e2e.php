@@ -48,6 +48,10 @@ add_filter(
 	3
 );
 
+// Queue mentions for right away, so the cron run after each test drains
+// them in mock mode even when a test fails before the editor answers.
+add_filter( 'ai_feedback_mention_reply_delay', '__return_zero' );
+
 // Let tests set a UTC offset site timezone through the settings endpoint.
 add_action(
 	'rest_api_init',

@@ -190,6 +190,11 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			)
 		);
 
+		$parents = array();
+		foreach ( $comments as $comment ) {
+			$parents[ (int) $comment->comment_ID ] = (int) $comment->comment_parent;
+		}
+
 		$ai_note_ids = array();
 		$mention_ids = array();
 		$roots       = array();
@@ -207,7 +212,7 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			}
 			if ( get_comment_meta( $id, Mentions::META_KEY, true ) ) {
 				// A thread a person started, in which someone asked Fresh Eyes.
-				$mention_ids[ 0 === $parent ? $id : $parent ] = true;
+				$mention_ids[ self::thread_root( $id, $parents ) ] = true;
 			}
 		}
 
@@ -231,7 +236,8 @@ class Reply_Status_Controller extends WP_REST_Controller {
 		}
 
 		foreach ( $replies as $comment ) {
-			$parent_id = (int) $comment->comment_parent;
+			// A reply to a reply belongs to the same thread.
+			$parent_id = self::thread_root( (int) $comment->comment_ID, $parents );
 			if ( ! isset( $ai_note_ids[ $parent_id ] ) && ! isset( $threads[ $parent_id ] ) ) {
 				continue;
 			}
@@ -286,6 +292,25 @@ class Reply_Status_Controller extends WP_REST_Controller {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Find a note's thread root among the post's notes.
+	 *
+	 * @param int             $note_id Note ID.
+	 * @param array<int, int> $parents Parent note ID by note ID.
+	 * @return int Root note ID.
+	 */
+	private static function thread_root( int $note_id, array $parents ): int {
+		// Bounded like Reply_Detector::find_thread_root(), against a parent cycle.
+		for ( $depth = 0; $depth < 10; $depth++ ) {
+			$parent = $parents[ $note_id ] ?? 0;
+			if ( $parent <= 0 ) {
+				break;
+			}
+			$note_id = $parent;
+		}
+		return $note_id;
 	}
 
 	/**

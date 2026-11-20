@@ -152,11 +152,14 @@ class ReplyCronDispatcherTest extends TestCase {
 	public function test_mention_is_scheduled_after_a_delay(): void {
 		$GLOBALS['test_comment_meta'][300] = array( Mentions::META_KEY => '1' );
 
+		$before = time();
 		$this->dispatcher->schedule_reply( 300, 300, 42, '' );
+		$after = time();
 
 		$event = $GLOBALS['test_scheduled_events'][0] ?? array();
 		$this->assertSame( array( 300, 300, 42, '' ), $event['args'] ?? null );
-		$this->assertGreaterThanOrEqual( time() + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? 0 );
+		$this->assertGreaterThanOrEqual( $before + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? 0 );
+		$this->assertLessThanOrEqual( $after + Reply_Cron_Dispatcher::MENTION_DELAY, $event['timestamp'] ?? PHP_INT_MAX );
 		$this->assertSame( 'pending', $GLOBALS['test_comment_meta'][300][ Reply_Cron_Dispatcher::STATUS_META_KEY ] ?? null );
 	}
 
@@ -165,7 +168,8 @@ class ReplyCronDispatcherTest extends TestCase {
 	 */
 	public function test_reply_is_scheduled_right_away(): void {
 		$this->dispatcher->schedule_reply( 200, 100, 42, 'abc-123' );
+		$after = time();
 
-		$this->assertLessThanOrEqual( time(), $GLOBALS['test_scheduled_events'][0]['timestamp'] ?? PHP_INT_MAX );
+		$this->assertLessThanOrEqual( $after, $GLOBALS['test_scheduled_events'][0]['timestamp'] ?? PHP_INT_MAX );
 	}
 }
