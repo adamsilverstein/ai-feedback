@@ -108,6 +108,7 @@ class ReviewHistoryTest extends TestCase {
 					),
 					'by_category' => array( 'content' => 2 ),
 				),
+				'strengths'    => array(),
 			),
 			$entry
 		);

@@ -428,6 +428,11 @@ class Notes_Controller extends WP_REST_Controller {
 			$review['summary_text'] = Review_History::get_summary_text( $post->ID, $review['review_id'] );
 		}
 
+		// Nor the strengths or the comparison with the review before.
+		if ( is_string( $review['review_id'] ?? null ) ) {
+			$review += Review_History::get_review_extras( $post->ID, $review['review_id'] );
+		}
+
 		return rest_ensure_response(
 			array(
 				'has_review' => true,

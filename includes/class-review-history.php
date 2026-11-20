@@ -76,23 +76,55 @@ class Review_History {
 			'type'                 => 'object',
 			'additionalProperties' => false,
 			'properties'           => array(
-				'review_id'    => array( 'type' => 'string' ),
-				'timestamp'    => array( 'type' => 'string' ),
-				'model'        => array( 'type' => 'string' ),
-				'note_count'   => array( 'type' => 'integer' ),
-				'notes_failed' => array( 'type' => 'boolean' ),
-				'user_id'      => array( 'type' => 'integer' ),
-				'summary_text' => array(
+				'review_id'     => array( 'type' => 'string' ),
+				'timestamp'     => array( 'type' => 'string' ),
+				'model'         => array( 'type' => 'string' ),
+				'note_count'    => array( 'type' => 'integer' ),
+				'notes_failed'  => array( 'type' => 'boolean' ),
+				'user_id'       => array( 'type' => 'integer' ),
+				'summary_text'  => array(
 					'type'      => 'string',
 					'maxLength' => self::MAX_SUMMARY_LENGTH,
 				),
-				'summary'      => array(
+				'summary'       => array(
 					'type'                 => 'object',
 					'additionalProperties' => false,
 					'properties'           => array(
 						'by_severity' => $count_map,
 						'by_category' => $count_map,
 					),
+				),
+				'strengths'     => array(
+					'type'     => 'array',
+					'maxItems' => Response_Parser::MAX_STRENGTHS,
+					'items'    => array(
+						'type'                 => 'object',
+						'additionalProperties' => false,
+						'properties'           => array(
+							'block_id'     => array( 'type' => 'string' ),
+							'block_name'   => array( 'type' => 'string' ),
+							'block_index'  => array( 'type' => array( 'integer', 'null' ) ),
+							'block_anchor' => array( 'type' => 'string' ),
+							'text'         => array(
+								'type'      => 'string',
+								'maxLength' => Response_Parser::MAX_STRENGTH_LENGTH,
+							),
+						),
+					),
+				),
+				'progress'      => array(
+					'description'          => __( 'How the notes left open by the previous review stood when this one ran. Null for a post\'s first review.', 'fresh-eyes' ),
+					'type'                 => array( 'object', 'null' ),
+					'additionalProperties' => false,
+					'properties'           => array(
+						'addressed'  => array( 'type' => 'integer' ),
+						'still_open' => array( 'type' => 'integer' ),
+					),
+				),
+				'open_note_ids' => array(
+					'description' => __( 'Notes still open when this review ran, compared by the next review.', 'fresh-eyes' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'integer' ),
 				),
 			),
 		);
@@ -114,11 +146,37 @@ class Review_History {
 				return;
 			}
 
+			$note_ids = self::int_list( $review['note_ids'] ?? array() );
+
 			// Read-modify-write: two reviews finishing at the same instant on one
 			// post could drop an entry. Acceptable for a short display history.
-			$history   = self::get( $post_id );
-			$history[] = $entry;
-			$history   = array_slice( $history, -self::MAX_ENTRIES );
+			$history = self::get( $post_id );
+
+			// Each part of a chunked review reports separately under one ID.
+			$existing = null;
+			foreach ( $history as $index => $stored ) {
+				if ( ( $stored['review_id'] ?? '' ) === $entry['review_id'] ) {
+					$existing = $index;
+				}
+			}
+
+			if ( null !== $existing ) {
+				$history[ $existing ] = self::merge_part( $history[ $existing ], $entry, $note_ids );
+			} else {
+				$previous = end( $history );
+				if ( is_array( $previous ) ) {
+					$comparison             = Review_Progress::compare( $post_id, $previous );
+					$entry['progress']      = array(
+						'addressed'  => $comparison['addressed'],
+						'still_open' => $comparison['still_open'],
+					);
+					$entry['open_note_ids'] = Review_Progress::merge_ids( $comparison['open_ids'], $note_ids );
+				} else {
+					$entry['open_note_ids'] = Review_Progress::merge_ids( $note_ids );
+				}
+				$history[] = $entry;
+			}
+			$history = array_slice( $history, -self::MAX_ENTRIES );
 
 			// update_post_meta() unslashes, which would strip backslashes from the summary.
 			update_post_meta( $post_id, self::META_KEY, wp_slash( $history ) );
@@ -143,6 +201,39 @@ class Review_History {
 	}
 
 	/**
+	 * Fold a later part of a chunked review into its entry.
+	 *
+	 * The comparison with the previous review was made by the first part,
+	 * before this review created any notes, so it is kept.
+	 *
+	 * @param  array<mixed>         $stored   Entry recorded by the earlier parts.
+	 * @param  array<string, mixed> $part     Entry built from this part.
+	 * @param  int[]                $note_ids Notes this part created.
+	 * @return array<mixed>
+	 */
+	private static function merge_part( array $stored, array $part, array $note_ids ): array {
+		$stored_summary = is_array( $stored['summary'] ?? null ) ? $stored['summary'] : array();
+		$part_summary   = is_array( $part['summary'] ?? null ) ? $part['summary'] : array();
+
+		$stored['timestamp']     = $part['timestamp'];
+		$stored['note_count']    = ( is_int( $stored['note_count'] ?? null ) ? $stored['note_count'] : 0 ) + ( is_int( $part['note_count'] ?? null ) ? $part['note_count'] : 0 );
+		$stored['notes_failed']  = ! empty( $stored['notes_failed'] ) || ! empty( $part['notes_failed'] );
+		$stored['summary']       = array(
+			'by_severity' => self::add_counts( $stored_summary['by_severity'] ?? array(), $part_summary['by_severity'] ?? array() ),
+			'by_category' => self::add_counts( $stored_summary['by_category'] ?? array(), $part_summary['by_category'] ?? array() ),
+		);
+		$stored['strengths']     = self::sanitize_strengths( array_merge( is_array( $stored['strengths'] ?? null ) ? $stored['strengths'] : array(), is_array( $part['strengths'] ?? null ) ? $part['strengths'] : array() ) );
+		$stored['open_note_ids'] = Review_Progress::merge_ids( self::int_list( $stored['open_note_ids'] ?? array() ), $note_ids );
+
+		// The last part's summary covers the whole document.
+		if ( is_string( $part['summary_text'] ?? null ) && '' !== $part['summary_text'] ) {
+			$stored['summary_text'] = $part['summary_text'];
+		}
+
+		return $stored;
+	}
+
+	/**
 	 * Find one history entry by review ID.
 	 *
 	 * @param  int    $post_id   Post ID.
@@ -163,7 +254,7 @@ class Review_History {
 	 * Reduce a full review result to the fields kept in history.
 	 *
 	 * @param  array<string, mixed> $review Review result.
-	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}}
+	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}, strengths: list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>}
 	 */
 	public static function build_entry( array $review ): array {
 		$summary = is_array( $review['summary'] ?? null ) ? $review['summary'] : array();
@@ -180,7 +271,98 @@ class Review_History {
 				'by_severity' => self::int_map( $summary['by_severity'] ?? array() ),
 				'by_category' => self::int_map( $summary['by_category'] ?? array() ),
 			),
+			'strengths'    => self::sanitize_strengths( $review['strengths'] ?? array() ),
 		);
+	}
+
+	/**
+	 * Keep only well-formed strengths, as plain text, one per block and
+	 * capped in number. Also merges the strengths of a chunked review's
+	 * parts, in order, like mergeStrengths() in src/utils/strengths.js.
+	 *
+	 * @param  mixed $strengths Strengths from the review result.
+	 * @return list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>
+	 */
+	public static function sanitize_strengths( mixed $strengths ): array {
+		$clean = array();
+		foreach ( is_array( $strengths ) ? $strengths : array() as $strength ) {
+			if ( ! is_array( $strength ) || ! is_string( $strength['block_id'] ?? null ) || '' === $strength['block_id'] ) {
+				continue;
+			}
+			$text = Response_Parser::sanitize_strength_text( $strength['text'] ?? null );
+			if ( '' === $text ) {
+				continue;
+			}
+			$block_id = sanitize_text_field( $strength['block_id'] );
+			if ( isset( $clean[ $block_id ] ) ) {
+				continue;
+			}
+			$clean[ $block_id ] = array(
+				'block_id'     => $block_id,
+				'block_name'   => is_string( $strength['block_name'] ?? null ) ? sanitize_text_field( $strength['block_name'] ) : '',
+				'block_index'  => is_int( $strength['block_index'] ?? null ) ? $strength['block_index'] : null,
+				'block_anchor' => is_string( $strength['block_anchor'] ?? null ) && 1 === preg_match( '/^[a-z0-9]{1,32}$/', $strength['block_anchor'] ) ? $strength['block_anchor'] : '',
+				'text'         => $text,
+			);
+			if ( count( $clean ) >= Response_Parser::MAX_STRENGTHS ) {
+				break;
+			}
+		}
+
+		return array_values( $clean );
+	}
+
+	/**
+	 * Get what a review stored for the editor to show after a reload.
+	 *
+	 * @param  int    $post_id   Post ID.
+	 * @param  string $review_id Review ID.
+	 * @return array{strengths: list<array<mixed>>, progress: array{addressed: int, still_open: int}|null}
+	 */
+	public static function get_review_extras( int $post_id, string $review_id ): array {
+		$entry    = self::find( $post_id, $review_id );
+		$progress = is_array( $entry['progress'] ?? null ) ? $entry['progress'] : null;
+
+		return array(
+			'strengths' => self::sanitize_strengths( $entry['strengths'] ?? array() ),
+			'progress'  => null === $progress ? null : array(
+				'addressed'  => is_int( $progress['addressed'] ?? null ) ? $progress['addressed'] : 0,
+				'still_open' => is_int( $progress['still_open'] ?? null ) ? $progress['still_open'] : 0,
+			),
+		);
+	}
+
+	/**
+	 * Read a list of positive integer IDs.
+	 *
+	 * @param  mixed $ids Raw IDs.
+	 * @return list<int>
+	 */
+	private static function int_list( mixed $ids ): array {
+		$clean = array();
+		foreach ( is_array( $ids ) ? $ids : array() as $id ) {
+			if ( is_numeric( $id ) && (int) $id > 0 ) {
+				$clean[] = (int) $id;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Add two count maps.
+	 *
+	 * @param  mixed $a First counts.
+	 * @param  mixed $b Second counts.
+	 * @return array<string, int>
+	 */
+	private static function add_counts( mixed $a, mixed $b ): array {
+		$sum = self::int_map( $a );
+		foreach ( self::int_map( $b ) as $key => $count ) {
+			$sum[ $key ] = ( $sum[ $key ] ?? 0 ) + $count;
+		}
+
+		return $sum;
 	}
 
 	/**
