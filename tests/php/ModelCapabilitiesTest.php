@@ -87,10 +87,10 @@ class Stub_Model_Metadata {
 	/**
 	 * Constructor.
 	 *
-	 * @param list<string>            $capabilities Capability IDs.
-	 * @param list<list<Stub_Enum>>|null $modalities Input modality sets, or null for no input modalities option.
-	 * @param string                     $option     Name of the input modalities option. Core 7.0
-	 *                                               reports `inputModalities`.
+	 * @param list<string>               $capabilities Capability IDs.
+	 * @param list<list<Stub_Enum>>|null $modalities   Input modality sets, or null for no input modalities option.
+	 * @param string                     $option       Name of the input modalities option. Core 7.0
+	 *                                                 reports `inputModalities`.
 	 */
 	public function __construct( private array $capabilities, private ?array $modalities, private string $option = 'inputModalities' ) {}
 
