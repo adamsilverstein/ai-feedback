@@ -203,7 +203,9 @@ class House_Style_Controller extends WP_REST_Controller {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function create_rule( WP_REST_Request $request ): WP_REST_Response|WP_Error {
-		$rule = House_Style::add_rule( self::scope( $request ), $request->get_param( 'text' ) );
+		$scope    = self::scope( $request );
+		$existing = array_column( House_Style::get_rules( $scope ), 'id' );
+		$rule     = House_Style::add_rule( $scope, $request->get_param( 'text' ) );
 		if ( is_wp_error( $rule ) ) {
 			return $rule;
 		}
@@ -213,7 +215,8 @@ class House_Style_Controller extends WP_REST_Controller {
 			House_Style::set_proposal_status( $note_id, 'saved' );
 		}
 
-		return new WP_REST_Response( self::get_state( $rule ), 201 );
+		// 200 when the list already had the rule.
+		return new WP_REST_Response( self::get_state( $rule ), in_array( $rule['id'], $existing, true ) ? 200 : 201 );
 	}
 
 	/**

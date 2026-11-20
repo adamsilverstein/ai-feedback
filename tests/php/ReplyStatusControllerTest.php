@@ -512,7 +512,7 @@ class ReplyStatusControllerTest extends TestCase {
 	public function test_threads_include_house_rule_proposal(): void {
 		$this->seed_thread( 'complete' );
 		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\House_Style::PROPOSAL_META_KEY ]        = 'Headings use sentence case';
-		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\House_Style::PROPOSAL_STATUS_META_KEY ] = 'saved';
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\House_Style::PROPOSAL_STATUS_META_KEY ] = array( get_current_user_id() => 'saved' );
 		// A user reply can't carry a proposal, even with the meta set.
 		$GLOBALS['test_comment_meta'][301][ \AI_Feedback\House_Style::PROPOSAL_META_KEY ] = 'Anything';
 

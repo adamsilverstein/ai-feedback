@@ -310,4 +310,38 @@ class HouseStyleControllerTest extends TestCase {
 		$this->assertSame( 'dismissed', $data['proposal']['status'] );
 		$this->assertSame( array(), House_Style::get_prompt_rules( self::USER_ID ) );
 	}
+
+	/**
+	 * A proposal one user saved is still offered to everyone else.
+	 */
+	public function test_proposal_status_is_per_user(): void {
+		House_Style::set_proposal_status( self::NOTE_ID, 'saved' );
+
+		$this->assertSame( 'saved', House_Style::get_proposal( self::NOTE_ID )['status'] ?? null );
+		$this->assertSame( '', House_Style::get_proposal( self::NOTE_ID, 8 )['status'] ?? null );
+	}
+
+	/**
+	 * Dismissing a proposal after saving it keeps it saved.
+	 */
+	public function test_dismiss_does_not_undo_a_save(): void {
+		House_Style::set_proposal_status( self::NOTE_ID, 'saved' );
+
+		$data = $this->data( $this->controller->dismiss_proposal( $this->request( array( 'note_id' => self::NOTE_ID ) ) ) );
+
+		$this->assertSame( 'saved', $data['proposal']['status'] );
+	}
+
+	/**
+	 * Adding a rule the list already has answers 200 with the existing rule.
+	 */
+	public function test_create_duplicate_rule_returns_200(): void {
+		$first = House_Style::add_rule( House_Style::SCOPE_USER, 'Use sentence case' );
+		$this->assertIsArray( $first );
+
+		$response = $this->controller->create_rule( $this->request( array( 'text' => 'use sentence case.' ) ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( $first, $this->data( $response )['rule'] );
+	}
 }

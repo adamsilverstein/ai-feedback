@@ -300,7 +300,7 @@ A thread a person started is listed once a note in it mentions Fresh Eyes. It is
 
 Invalid edits are dropped on the server and the reply posts without one. A `replace_text` edit needs a `replace` string; an empty one deletes `find`. A reply with a valid edit but no text reads "Here is that change.", and a reply whose JSON can't be read at all fails, so it can be retried, rather than posting the raw JSON. The edit is stored as JSON in the reply's `feedback_reply_edit` comment meta. The editor never applies it on its own: with Gutenberg's Suggestion Mode on it becomes a pending suggestion on the AI reply, otherwise the sidebar offers Preview and Apply.
 
-`proposal` is a house style rule an AI reply offers to remember, as `{ "text": "Headings use sentence case", "status": "" }`, or null. `status` is `saved` or `dismissed` once the author acts on it. See [house style](#get-house-style).
+`proposal` is a house style rule an AI reply offers to remember, as `{ "text": "Headings use sentence case", "status": "" }`, or null. `status` is `saved` or `dismissed` once the current user acts on it. Each user decides for themselves, since a personal rule one user saves does not apply to others, and dismissing never undoes a save. See [house style](#get-house-style).
 
 `revision` numbers the suggested edits in a thread, oldest first, or is null for a reply without an edit. The review's `quick_fix`, `block_action` or `block_change` on the note counts as the first, so the first reply edit after one is revision 2. It is stored in the reply's `feedback_revision` comment meta, and the Notes UI shows it as a "Suggested edit" or "Revised suggestion (2)" badge.
 
@@ -725,7 +725,7 @@ Rules are sanitized to single-line plain text (tags, line breaks and control cha
 
 ### POST /house-style
 
-Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and a closing full stop) returns that rule. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
+Add a rule. `scope` is `user` (default) or `site`; `site` requires `manage_options`. Adding a rule the list already has (ignoring case and a closing full stop) returns that rule with `200`. Returns `201` with the lists above plus the new `rule`, or `400` when the text is empty, too long or the list is full.
 
 ```json
 { "text": "Headings use sentence case", "scope": "user", "note_id": 790 }

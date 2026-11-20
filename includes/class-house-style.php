@@ -56,7 +56,8 @@ class House_Style {
 	public const PROPOSAL_META_KEY = 'feedback_house_rule';
 
 	/**
-	 * Comment meta recording whether a proposed rule was saved or dismissed.
+	 * Comment meta recording, per user, whether a proposed rule was saved or
+	 * dismissed: user ID => status.
 	 */
 	public const PROPOSAL_STATUS_META_KEY = 'feedback_house_rule_status';
 
@@ -287,35 +288,69 @@ class House_Style {
 	}
 
 	/**
-	 * Get the rule an AI reply proposed, with whether it was acted on.
+	 * Get the rule an AI reply proposed, with what a user did about it.
+	 *
+	 * Each user who can see the thread decides for themselves, since a
+	 * personal rule one user saves does not apply to anyone else.
 	 *
 	 * @param  int $comment_id AI reply ID.
+	 * @param  int $user_id    User. Defaults to the current user.
 	 * @return array{text: string, status: string}|null Proposal, or null when there is none.
 	 */
-	public static function get_proposal( int $comment_id ): ?array {
+	public static function get_proposal( int $comment_id, int $user_id = 0 ): ?array {
 		$text = self::sanitize_rule( get_comment_meta( $comment_id, self::PROPOSAL_META_KEY, true ) );
 		if ( '' === $text || self::is_too_long( $text ) ) {
 			return null;
 		}
 
-		$status = get_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, true );
+		$user_id  = $user_id > 0 ? $user_id : get_current_user_id();
+		$statuses = self::get_proposal_statuses( $comment_id );
 
 		return array(
 			'text'   => $text,
-			'status' => in_array( $status, self::PROPOSAL_STATUSES, true ) ? $status : '',
+			'status' => $statuses[ $user_id ] ?? '',
 		);
 	}
 
 	/**
-	 * Record that a proposed rule was saved or dismissed.
+	 * Record that a user saved or dismissed a proposed rule.
+	 *
+	 * Dismissing never undoes a save.
 	 *
 	 * @param  int    $comment_id AI reply ID.
 	 * @param  string $status     One of PROPOSAL_STATUSES.
+	 * @param  int    $user_id    User. Defaults to the current user.
 	 */
-	public static function set_proposal_status( int $comment_id, string $status ): void {
-		if ( in_array( $status, self::PROPOSAL_STATUSES, true ) ) {
-			update_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, $status );
+	public static function set_proposal_status( int $comment_id, string $status, int $user_id = 0 ): void {
+		$user_id = $user_id > 0 ? $user_id : get_current_user_id();
+		if ( $user_id <= 0 || ! in_array( $status, self::PROPOSAL_STATUSES, true ) ) {
+			return;
 		}
+
+		$statuses = self::get_proposal_statuses( $comment_id );
+		if ( 'dismissed' === $status && 'saved' === ( $statuses[ $user_id ] ?? '' ) ) {
+			return;
+		}
+
+		$statuses[ $user_id ] = $status;
+		update_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, $statuses );
+	}
+
+	/**
+	 * Read the stored proposal statuses, dropping malformed entries.
+	 *
+	 * @param  int $comment_id AI reply ID.
+	 * @return array<int, string> Status by user ID.
+	 */
+	private static function get_proposal_statuses( int $comment_id ): array {
+		$stored   = get_comment_meta( $comment_id, self::PROPOSAL_STATUS_META_KEY, true );
+		$statuses = array();
+		foreach ( is_array( $stored ) ? $stored : array() as $user_id => $status ) {
+			if ( is_int( $user_id ) && $user_id > 0 && in_array( $status, self::PROPOSAL_STATUSES, true ) ) {
+				$statuses[ $user_id ] = $status;
+			}
+		}
+		return $statuses;
 	}
 
 	/**
@@ -434,28 +469,36 @@ class House_Style {
 	 * @return list<array{id: string, text: string}>
 	 */
 	private static function normalize( mixed $stored ): array {
-		$rules = array();
+		$rules   = array();
+		$dropped = 0;
 		foreach ( is_array( $stored ) ? $stored : array() as $rule ) {
 			if ( ! is_array( $rule ) || ! is_string( $rule['id'] ?? null ) || ! preg_match( '/^[a-z0-9-]{1,64}$/', $rule['id'] ) ) {
+				++$dropped;
 				continue;
 			}
 			$text = self::sanitize_rule( $rule['text'] ?? null );
-			if ( '' === $text || self::is_too_long( $text ) ) {
+			if ( '' === $text || self::is_too_long( $text ) || count( $rules ) >= self::MAX_RULES ) {
+				++$dropped;
 				continue;
 			}
 			$rules[] = array(
 				'id'   => $rule['id'],
 				'text' => $text,
 			);
-			if ( count( $rules ) >= self::MAX_RULES ) {
-				break;
-			}
+		}
+
+		if ( $dropped > 0 ) {
+			Logger::debug( sprintf( 'House_Style: ignored %d stored rules that were malformed, too long or over the limit.', $dropped ) );
 		}
 		return $rules;
 	}
 
 	/**
 	 * Save the rules of a scope.
+	 *
+	 * The whole list is written back, so of two changes saved at the same
+	 * moment the later wins. Lists are short and edited by hand, which keeps
+	 * that unlikely.
 	 *
 	 * @param string                                $scope SCOPE_SITE, or SCOPE_USER for the current user.
 	 * @param list<array{id: string, text: string}> $rules Rules.
