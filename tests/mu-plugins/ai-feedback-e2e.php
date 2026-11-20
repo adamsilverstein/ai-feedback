@@ -19,6 +19,16 @@ if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type
 	return;
 }
 
+// Lets a test treat pending suggestions as old enough to clean up.
+if ( isset( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) && is_string( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) ) {
+	$ai_feedback_e2e_cleanup_delay = absint( $_COOKIE['ai_feedback_e2e_cleanup_delay'] );
+	add_filter(
+		'ai_feedback_suggestion_cleanup_delay',
+		static fn (): int => $ai_feedback_e2e_cleanup_delay
+	);
+	unset( $ai_feedback_e2e_cleanup_delay );
+}
+
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', true );
 }
