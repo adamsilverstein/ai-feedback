@@ -565,8 +565,9 @@ describe('FeedbackItem reply edits', () => {
 		expect(updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content: 'Revenue grew 40% in 2025.',
 		});
-		expect(setNoteResolved).toHaveBeenCalledWith(7, true);
-		expect(setFixApplied).toHaveBeenCalledWith(7, true);
+		// The thread stays open so the author can ask for a tweak.
+		expect(setNoteResolved).not.toHaveBeenCalled();
+		expect(setFixApplied).toHaveBeenCalledTimes(1);
 		expect(setFixApplied).toHaveBeenCalledWith(9, true);
 		expect(
 			registry

@@ -85,9 +85,10 @@ function EditDiff({ parts }) {
 /**
  * Quick fix component.
  *
- * Applying resolves the note `item.id`, like dismissing it, and marks it
- * fixed. For an AI reply's edit, `noteId` is the reply, which is the note
- * that becomes the Gutenberg suggestion and is marked applied too.
+ * Applying a quick fix resolves the note `item.id`, like dismissing it, and
+ * marks it fixed. For an AI reply's edit, `noteId` is the reply, which is
+ * the note that becomes the Gutenberg suggestion and is marked applied. The
+ * thread stays open, so the author can keep refining the change.
  *
  * @param {Object} props          Component props.
  * @param {Object} props.item     Feedback note with `id` and `block_id`, and `quick_fix` unless `edit` is given.
@@ -174,14 +175,11 @@ export default function QuickFix({ item, edit, noteId }) {
 		: __('Apply fix', 'fresh-eyes');
 
 	const setApplied = (applied) => {
-		setFixApplied(item.id, applied);
-		if (isReplyEdit) {
-			setFixApplied(ownerId, applied);
-		}
+		setFixApplied(ownerId, applied);
 	};
 
 	const setResolved = async (resolved) => {
-		if (!item.id) {
+		if (!item.id || isReplyEdit) {
 			return;
 		}
 		try {
