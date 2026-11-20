@@ -2,6 +2,8 @@ const wpScriptsConfig = require('@wordpress/scripts/config/eslint.config.cjs');
 
 module.exports = [
 	...wpScriptsConfig,
+	// The Gutenberg build the Suggestion Mode e2e suite runs against.
+	{ ignores: ['.cache/**'] },
 	{
 		rules: {
 			'jsdoc/no-undefined-types': [

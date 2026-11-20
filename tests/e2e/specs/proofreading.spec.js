@@ -5,8 +5,8 @@
  * Runs on the server with the mock AI provider from
  * tests/mu-plugins/ai-feedback-e2e.php, which finds seven typos in this
  * post, three of them in the first paragraph. Suggestion Mode is off in
- * wp-env, so the fixes are applied directly; the suggestion path is covered
- * by unit tests.
+ * wp-env, so the fixes are applied directly; the suggestion path is in
+ * tests/e2e/suggestion-mode.
  */
 const { test, expect } = require('../fixtures');
 
