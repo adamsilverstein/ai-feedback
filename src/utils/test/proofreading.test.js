@@ -294,6 +294,25 @@ describe('Accept all with the real block editor', () => {
 	});
 });
 
+describe('Fixes already in place', () => {
+	it('never applies a fix that adds words twice, after a reload', () => {
+		// The fix was applied before the reload, so nothing in this session
+		// remembers it; its note was reopened.
+		const { registry, blocks } = setUp(['Read the data now.']);
+		const items = [note(1, blocks[0].clientId, 'data', 'the data')];
+
+		const plan = acceptAllFixes(registry, items);
+
+		expect(plan.skipped).toEqual([1]);
+		expect(html(registry, blocks[0])).toBe('Read the data now.');
+		expect(
+			applyFixesToContent('Read the data now.', [
+				{ find: 'data', replace: 'the data' },
+			]).content
+		).toBeNull();
+	});
+});
+
 describe('Accept all with Suggestion Mode', () => {
 	const marker = (type, id, text) =>
 		`<mark class="wp-suggestion-${type}" data-suggestion-id="${id}" data-suggestion-type="${type}" data-author="0">${text}</mark>`;

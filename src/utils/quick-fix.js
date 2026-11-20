@@ -84,15 +84,63 @@ export function findMatches(text, find) {
 }
 
 /**
+ * Whether the text at a match of a fix's `find` is already part of its
+ * replacement, as after applying "data" → "the data".
+ *
+ * @param {string} text  Plain text.
+ * @param {Object} fix   Quick fix with `find` and `replace`.
+ * @param {number} start Offset of a match of `find`.
+ * @return {boolean} True when the replacement surrounds the match.
+ */
+export function isReplacementAt(text, fix, start) {
+	if (!fix?.find || !fix.replace) {
+		return false;
+	}
+	for (
+		let at = fix.replace.indexOf(fix.find);
+		at !== -1;
+		at = fix.replace.indexOf(fix.find, at + 1)
+	) {
+		const from = start - at;
+		if (
+			from >= 0 &&
+			text.slice(from, from + fix.replace.length) === fix.replace
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Whether a fix's change is already in content: its text appears once,
+ * inside its replacement.
+ *
+ * @param {string|RichTextData} content Attribute value.
+ * @param {Object}              fix     Quick fix with `find` and `replace`.
+ * @return {boolean} True when applying the fix again would repeat it.
+ */
+export function isFixInPlace(content, fix) {
+	const { text } = create({ html: toHtml(content) });
+	const matches = findMatches(text, fix?.find);
+	return matches.length === 1 && isReplacementAt(text, fix, matches[0]);
+}
+
+/**
  * Locate the fix's text in rich text content.
+ *
+ * A match that already sits inside the fix's replacement doesn't count, so
+ * a fix that adds words ("data" → "the data") is never applied twice.
  *
  * @param {Object} value Rich text value.
  * @param {Object} fix   Quick fix with `find` and `replace`.
- * @return {number} Start offset, or -1 unless the text appears exactly once.
+ * @return {number} Start offset, or -1 unless the text appears exactly once and not already replaced.
  */
 export function findUniqueOffset(value, fix) {
 	const matches = findMatches(value.text, fix?.find);
-	return matches.length === 1 ? matches[0] : -1;
+	return matches.length === 1 && !isReplacementAt(value.text, fix, matches[0])
+		? matches[0]
+		: -1;
 }
 
 /**
