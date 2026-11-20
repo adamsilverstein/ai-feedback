@@ -569,4 +569,33 @@ class MentionFlowTest extends TestCase {
 
 		$this->assertSame( 'The source is https://real.example/study.', $this->notes->saved[900]['feedback'] ?? null );
 	}
+
+	/**
+	 * A change outside the selected text is dropped, and the answer says so.
+	 */
+	public function test_change_outside_the_selection_is_dropped(): void {
+		$this->service->response = '{"reply": "Tightened the intro.", "edit": {"type": "replace_text", "find": "Intro", "replace": "Start"}}';
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->process( 300 );
+
+		$this->assertArrayNotHasKey( 'reply_edit', $this->notes->saved[900] ?? array() );
+		$this->assertSame(
+			'Tightened the intro. (The suggested change was left out because it went beyond the selected text.)',
+			$this->notes->saved[900]['feedback'] ?? null
+		);
+	}
+
+	/**
+	 * Asking Fresh Eyes, even with a mention chip, sends no email.
+	 */
+	public function test_mention_sends_no_email(): void {
+		$GLOBALS['test_mail'] = array();
+		$this->service->response = '{"reply": "Shortened it.", "edit": {"type": "replace_text", "find": "very long", "replace": "short"}}';
+		$this->insert_note( 300, '<span class="wp-note-mention user-9">@Fresh Eyes</span> simplify this' );
+
+		$this->assertSame( 'complete', $this->process( 300 )['status'] );
+		$this->assertSame( array(), $GLOBALS['test_mail'] );
+		unset( $GLOBALS['test_mail'] );
+	}
 }

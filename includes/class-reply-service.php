@@ -514,6 +514,7 @@ class Reply_Service {
 
 		if ( $is_mention ) {
 			$parsed = self::remove_unsourced_links( $parsed, self::context_sources( $context ) );
+			$parsed = self::keep_edit_in_selection( $parsed, $context, $parent_id );
 		}
 
 		if ( ! $this->owns_claim( $comment_id ) ) {
@@ -590,6 +591,37 @@ class Reply_Service {
 			$parsed['edit']   = null;
 			$parsed['reply'] .= ' ' . __( '(The suggested change was left out because it added a link Fresh Eyes could not check.)', 'fresh-eyes' );
 		}
+		return $parsed;
+	}
+
+	/**
+	 * Drop a text change outside the text the note is anchored to.
+	 *
+	 * The prompt asks for changes scoped to the selection; this holds the
+	 * AI to it. A note on a whole block has no selection and is left alone.
+	 *
+	 * @param array{reply: string, edit: array<string, mixed>|null} $parsed    Parsed reply.
+	 * @param array<string, mixed>                                  $context   Reply context.
+	 * @param int                                                   $parent_id Root note ID.
+	 * @return array{reply: string, edit: array<string, mixed>|null} Parsed reply.
+	 */
+	private static function keep_edit_in_selection( array $parsed, array $context, int $parent_id ): array {
+		$edit = $parsed['edit'];
+		if ( null === $edit || 'replace_text' !== ( $edit['type'] ?? null ) || ! is_string( $edit['find'] ?? null ) ) {
+			return $parsed;
+		}
+
+		$block_html = is_string( $context['block_html'] ?? null ) ? $context['block_html'] : '';
+		// The whole selection, not the prompt's shortened copy.
+		$selection = Mentions::get_selected_text( $block_html, $parent_id, PHP_INT_MAX );
+		$find      = trim( (string) preg_replace( '/\s+/u', ' ', $edit['find'] ) );
+		if ( '' === $selection || ( '' !== $find && str_contains( $selection, $find ) ) ) {
+			return $parsed;
+		}
+
+		Logger::debug( 'Reply_Service: dropped an edit outside the selected text.' );
+		$parsed['edit']   = null;
+		$parsed['reply'] .= ' ' . __( '(The suggested change was left out because it went beyond the selected text.)', 'fresh-eyes' );
 		return $parsed;
 	}
 
