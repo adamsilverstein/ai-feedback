@@ -29,6 +29,8 @@ export default function ReviewButton() {
 		focusAreas,
 		targetTone,
 		feedbackLocale,
+		persona,
+		audience,
 		chunkSize,
 		reviewProgress,
 	} = useSelect(
@@ -43,6 +45,8 @@ export default function ReviewButton() {
 			focusAreas: select(STORE_NAME).getFocusAreas(),
 			targetTone: select(STORE_NAME).getTargetTone(),
 			feedbackLocale: select(STORE_NAME).getFeedbackLocale(),
+			persona: select(STORE_NAME).getPersona(),
+			audience: select(STORE_NAME).getReviewAudience(),
 			chunkSize: select(STORE_NAME).getChunkSize(),
 			reviewProgress: select(STORE_NAME).getReviewProgress(),
 		}),
@@ -79,6 +83,8 @@ export default function ReviewButton() {
 				focusAreas,
 				targetTone,
 				locale: feedbackLocale,
+				persona,
+				audience,
 				chunkSize,
 			});
 		} catch (error) {

@@ -995,3 +995,21 @@ describe('FeedbackItem structural edits', () => {
 		).not.toBeInTheDocument();
 	});
 });
+
+describe('FeedbackItem persona', () => {
+	it('names the reader persona the note came from', () => {
+		renderItem({ persona: 'busy_skimmer', persona_label: 'Busy skimmer' });
+
+		expect(screen.getByText('Busy skimmer')).toHaveClass(
+			'ai-feedback-persona-badge'
+		);
+	});
+
+	it('shows no persona for a default review', () => {
+		renderItem();
+
+		expect(screen.getByText('Passive voice')).toBeInTheDocument();
+		expect(screen.queryByText('Copy editor')).not.toBeInTheDocument();
+		expect(screen.queryByText(/skimmer|expert/i)).not.toBeInTheDocument();
+	});
+});

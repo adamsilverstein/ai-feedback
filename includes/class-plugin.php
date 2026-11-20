@@ -129,6 +129,7 @@ class Plugin {
 	 */
 	private function init_hooks(): void {
 		add_action( 'init', array( Review_History::class, 'register_meta' ) );
+		Personas::register();
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
 		add_action( 'ai_feedback_after_review', array( Analytics::class, 'track_review' ), 10, 2 );

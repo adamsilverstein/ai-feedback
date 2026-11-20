@@ -408,3 +408,18 @@ add_filter(
 	30,
 	2
 );
+
+// A reply in a persona thread answers as that persona, so tests can see the
+// reply prompt kept the note's voice.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if ( ! preg_match( '/^- You gave the original feedback as this reader: ([^-\n]+?) - /m', $prompt, $persona ) ) {
+			return $reply;
+		}
+
+		return 'Still speaking as the ' . $persona[1] . ': link the benchmark.';
+	},
+	40,
+	2
+);
