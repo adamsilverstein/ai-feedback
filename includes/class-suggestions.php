@@ -55,6 +55,31 @@ class Suggestions {
 	}
 
 	/**
+	 * Gutenberg function that only ships with structural suggestions.
+	 */
+	public const STRUCTURAL_FEATURE = 'gutenberg_strip_pending_structural_suggestions';
+
+	/**
+	 * Checks whether Gutenberg supports structural suggestions (adding,
+	 * removing and moving blocks), which came after inline ones.
+	 *
+	 * Detected by a function Gutenberg ships with them, so a Gutenberg that
+	 * has only inline suggestions never gets structural ones.
+	 *
+	 * @return bool True when structural edits may become suggestions.
+	 */
+	public static function is_structural_available(): bool {
+		$available = self::is_available() && function_exists( self::STRUCTURAL_FEATURE );
+
+		/**
+		 * Filters whether AI structural edits are added as Gutenberg suggestions.
+		 *
+		 * @param bool $available Whether structural suggestions are available.
+		 */
+		return (bool) apply_filters( 'ai_feedback_use_structural_suggestions', $available );
+	}
+
+	/**
 	 * Returns a note's suggestion status.
 	 *
 	 * @param  int $note_id Note ID.

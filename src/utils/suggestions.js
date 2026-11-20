@@ -399,6 +399,49 @@ export async function suggestReplyEdit(reply, threadId, blockId = null) {
 }
 
 /**
+ * Checks whether structural edits should become suggestions: Suggestion
+ * Mode is on, and the server found the Gutenberg code that handles them.
+ *
+ * @return {boolean} True when structural suggestions are supported.
+ */
+export function isStructuralSuggestionAvailable() {
+	return (
+		isSuggestionModeAvailable() &&
+		!!window.aiFeedbackData?.structuralSuggestions
+	);
+}
+
+/**
+ * Whether the suggestion payload the server stored is the one sent.
+ *
+ * Gutenberg's sanitizer accepts any operation, so a change in how it
+ * stores structural suggestions only shows when it is read back.
+ *
+ * @param {string} stored    `_wp_suggestion` as saved.
+ * @param {Object} operation Operation that was sent.
+ * @return {boolean} True when the stored payload holds that operation.
+ */
+export function isStoredStructuralPayload(stored, operation) {
+	let payload;
+	try {
+		payload = JSON.parse(stored || '');
+	} catch {
+		return false;
+	}
+	const operations = Array.isArray(payload?.operations)
+		? payload.operations
+		: [];
+	const [first] = operations;
+	return (
+		payload.schemaVersion === SCHEMA_VERSION &&
+		operations.length === 1 &&
+		first?.type === operation.type &&
+		first?.clientId === operation.clientId &&
+		first?.blockName === operation.blockName
+	);
+}
+
+/**
  * Structural edits that can become Gutenberg suggestions.
  *
  * An insert would have to move the note onto the new block, so it stays
@@ -489,12 +532,17 @@ function canSuggestNow(selectors, action, clientId) {
  * in its new place, marked `pending-move` with where it came from. Accept
  * then removes the block or keeps it where it is; Reject clears the mark
  * or moves it back. The marker carries the note's id, so the suggestion is
- * found again after a reload.
+ * found again after a reload. If the server did not store the payload as
+ * sent, the note goes back to being a plain note and the edit stays with
+ * Preview and Apply.
  *
  * @param {Object} note Feedback note with `id`, `block_id` and `block_action`.
  * @return {Promise<boolean>} Whether the suggestion was added.
  */
 export async function suggestBlockAction(note) {
+	if (!isStructuralSuggestionAvailable()) {
+		return false;
+	}
 	const action = note.block_action;
 	const selectors = dataSelect(blockEditorStore);
 	const clientId = findNoteBlock(selectors, note.block_id, note.id);
@@ -521,7 +569,7 @@ export async function suggestBlockAction(note) {
 	// The blocks may have changed while the request ran.
 	const current = dataSelect(blockEditorStore);
 	if (
-		!saved?.meta?._wp_suggestion ||
+		!isStoredStructuralPayload(saved?.meta?._wp_suggestion, operation) ||
 		!canSuggestNow(current, action, clientId) ||
 		current.getBlock(clientId)?.attributes?.metadata?.suggestion
 	) {

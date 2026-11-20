@@ -74,7 +74,9 @@ A note can carry a `block_action`: a change to the document's structure the auth
 
 The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_id", "position" }` and `{ "type": "insert", "position", "block" }`. `Response_Parser` drops any that fail validation and keeps the note: the target must be one of the blocks in the same request (so a chunked review only moves within its part), a block can't move next to itself, next to one of its own inner blocks (found through `parent`), or to where it already is, a review gets at most one per block, inserted blocks must be on the allow-list (`ai_feedback_insertable_blocks`), and inserted text may only hold inline formatting and goes through `wp_kses()`. Groups of similar notes have none.
 
-The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”". With Gutenberg's Suggestion Mode on, a review note's removal or move becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). Inserts, and structural edits from replies, stay with Preview and Apply in the sidebar. Apply is a single undo step. An edit whose block or move target is gone shows as outdated.
+The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”" or "Remove this block and the 2 blocks inside it". Apply is a single undo step. An edit whose block or move target is gone shows as outdated, a move next to one of the block's own inner blocks is never offered, and a removal that would take a block linked to another note with it is not offered.
+
+With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
 
 **Example Request:**
 
@@ -951,6 +953,14 @@ Choose which block types a structural edit may insert. By default `core/paragrap
 add_filter( 'ai_feedback_insertable_blocks', function( array $blocks ): array {
     return array_diff( $blocks, array( 'core/list' ) );
 } );
+```
+
+#### `ai_feedback_use_structural_suggestions`
+
+Turn structural suggestions in Suggestion Mode on or off. By default on when Suggestion Mode is available and Gutenberg ships `gutenberg_strip_pending_structural_suggestions()`.
+
+```php
+add_filter( 'ai_feedback_use_structural_suggestions', '__return_false' );
 ```
 
 #### `ai_feedback_mock_review`

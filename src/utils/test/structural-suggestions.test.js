@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 import {
 	buildStructuralPayload,
+	isStoredStructuralPayload,
 	canSuggestBlockAction,
 	hasSuggestionMarker,
 	suggestBlockAction,
@@ -157,7 +158,7 @@ const moveNote = {
 
 beforeEach(() => {
 	window.__experimentalSuggestionMode = true;
-	window.aiFeedbackData = { suggestions: true };
+	window.aiFeedbackData = { suggestions: true, structuralSuggestions: true };
 	mocks.order = { '': ['intro', 'bg', 'open', 'rep'] };
 	mocks.blocks = {
 		intro: paragraph('intro', 'Intro.'),
@@ -277,6 +278,40 @@ describe('suggestBlockAction', () => {
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
+	it('does nothing without Gutenberg’s structural suggestions', async () => {
+		window.aiFeedbackData.structuralSuggestions = false;
+
+		expect(await suggestBlockAction(removeNote)).toBe(false);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('falls back when the stored payload is not the one sent', async () => {
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, { id, meta }) => ({
+				id,
+				author: 0,
+				meta: {
+					_wp_suggestion: JSON.stringify({
+						...JSON.parse(meta._wp_suggestion ?? '{}'),
+						operations: [{ type: 'block-delete', clientId: 'rep' }],
+					}),
+				},
+			})
+		);
+
+		expect(await suggestBlockAction(removeNote)).toBe(false);
+		expect(mocks.saveEntityRecord).toHaveBeenLastCalledWith(
+			'root',
+			'comment',
+			{
+				id: 12,
+				meta: { _wp_suggestion: null, _wp_suggestion_status: null },
+			},
+			{ throwOnError: true }
+		);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
 	it('leaves a block that already carries a structural suggestion alone', async () => {
 		mocks.blocks.rep.attributes.metadata.suggestion = {
 			type: 'pending-move',
@@ -366,5 +401,32 @@ describe('hasSuggestionMarker', () => {
 			'<!-- wp:paragraph {"metadata":{"suggestion":{"type":"pending-remove","commentId":12}}} --><p>x</p><!-- /wp:paragraph -->';
 		expect(hasSuggestionMarker(html, 12)).toBe(true);
 		expect(hasSuggestionMarker(html, 1)).toBe(false);
+	});
+});
+
+describe('isStoredStructuralPayload', () => {
+	const operation = {
+		type: 'block-move',
+		clientId: 'a',
+		blockName: 'core/paragraph',
+	};
+
+	it('accepts the payload as sent and nothing else', () => {
+		expect(
+			isStoredStructuralPayload(
+				JSON.stringify(
+					buildStructuralPayload('core/paragraph', operation)
+				),
+				operation
+			)
+		).toBe(true);
+		expect(isStoredStructuralPayload('', operation)).toBe(false);
+		expect(isStoredStructuralPayload('{nope', operation)).toBe(false);
+		expect(
+			isStoredStructuralPayload(
+				JSON.stringify({ schemaVersion: 3, operations: [operation] }),
+				operation
+			)
+		).toBe(false);
 	});
 });

@@ -345,6 +345,19 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * Structural suggestions also need the Gutenberg code that ships
+		 * with them, and can be filtered.
+		 */
+		public function test_structural_suggestions_need_gutenberg_support(): void {
+			$this->assertTrue( Suggestions::is_available() );
+			$this->assertFalse( function_exists( Suggestions::STRUCTURAL_FEATURE ) );
+			$this->assertFalse( Suggestions::is_structural_available() );
+
+			$GLOBALS['test_filter_results'] = array( 'ai_feedback_use_structural_suggestions' => true );
+			$this->assertTrue( Suggestions::is_structural_available() );
+		}
+
+		/**
 		 * The `ai_feedback_use_suggestions` filter has the last word.
 		 */
 		public function test_filter_overrides_availability(): void {
