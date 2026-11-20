@@ -22,6 +22,7 @@ Fresh Eyes is an AI agent that reviews your posts right in the block editor, lik
 * 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other registered AI provider
 * 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
 * 👀 **Reader Personas**: Read it as a Copy editor, Skeptical expert, First-time visitor or Busy skimmer, and say who the post is for
+* 📏 **House Style**: Tell it how you write once, in a reply or in Review Settings, and later reviews follow it
 
 = Requirements =
 
@@ -77,7 +78,7 @@ When the selected model can see images (the built-in Claude, GPT and Gemini mode
 
 = Why is there a Fresh Eyes user? =
 
-So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter; typing `@fresh-eyes` still works.
+So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter (network-wide on multisite); typing `@fresh-eyes` still works. Tools that switch the current user directly, such as single sign-on or "log in as" plugins, can still make it the current user, but it has no role or capabilities, so it can't edit anything. Another account named "Fresh Eyes" would show next to it in the `@` menu; WordPress emails that account about the mention like any other user.
 
 == Screenshots ==
 

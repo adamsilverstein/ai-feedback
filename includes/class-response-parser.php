@@ -925,6 +925,12 @@ class Response_Parser {
 			return null;
 		}
 
+		// U+FFFC stands for a footnote, an image or another object in the
+		// block's text, which a text edit would delete or can't write back.
+		if ( str_contains( $find, Editor_Text::OBJECT ) || str_contains( $replace, Editor_Text::OBJECT ) ) {
+			return null;
+		}
+
 		if ( '' === trim( $find ) || $find === $replace ) {
 			return null;
 		}
@@ -1178,6 +1184,22 @@ class Response_Parser {
 			'reply' => $reply,
 			'edit'  => $edit,
 		);
+	}
+
+	/**
+	 * Read the house style rule an AI reply proposes, from its `remember` key.
+	 *
+	 * The rule is sanitized like a saved one. A rule that is not a string,
+	 * is empty or is too long is dropped; the reply itself is unaffected.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @return string|null Rule text, or null when there is none.
+	 */
+	public function parse_reply_rule( string $response ): ?string {
+		$data = $this->decode_reply_json( $response );
+		$rule = House_Style::sanitize_rule( $data['remember'] ?? null );
+
+		return '' === $rule || House_Style::is_too_long( $rule ) ? null : $rule;
 	}
 
 	/**

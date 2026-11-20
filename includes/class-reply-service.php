@@ -532,6 +532,12 @@ class Reply_Service {
 			'feedback' => $parsed['reply'],
 			'block_id' => $block_id,
 		);
+		// Offer to remember a stated preference unless the author's reviews
+		// already follow it.
+		$house_rule = $this->response_parser->parse_reply_rule( $ai_text );
+		if ( null !== $house_rule && ! House_Style::list_has_rule( $context['house_style'] ?? array(), $house_rule ) ) {
+			$feedback_item['house_rule'] = $house_rule;
+		}
 		if ( null !== $parsed['edit'] ) {
 			$feedback_item['reply_edit'] = $parsed['edit'];
 		}
@@ -735,15 +741,34 @@ class Reply_Service {
 		// What an edit's `find` is matched against: the block's own text as
 		// the editor holds it, without its inner blocks, like a list item's
 		// text without its nested list.
-		$block_text    = null !== $block ? self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) : '';
+		$own_html      = null !== $block ? self::strip_suggestion_markers( self::get_own_html( $block ) ) : '';
+		$block_text    = null !== $block ? self::editor_text( $own_html ) : '';
 		$block_content = '';
-		if ( null !== $block ) {
+		$inner_text    = '';
+		$inner_blocks  = null !== $block && is_array( $block['innerBlocks'] ?? null ) ? $block['innerBlocks'] : array();
+		if ( array() !== $inner_blocks && self::has_rich_text_content( $block_type ) ) {
+			// An edit applies to the block's own text, like a list item's
+			// text without its nested list, so the prompt shows that, with
+			// the inner blocks as context.
+			$block_content = $block_text;
+			$inner_html    = '';
+			foreach ( $inner_blocks as $inner ) {
+				$inner_html .= is_array( $inner ) ? ' ' . self::get_block_html( $inner ) : '';
+			}
+			$inner_text = self::html_text( self::strip_suggestion_markers( $inner_html ) );
+		} elseif ( null !== $block ) {
 			// The prompt reads a block with inner blocks, or an image block,
 			// whose <img> is the block, the collapsed way, which is easier to
 			// follow.
 			$block_content = empty( $block['innerBlocks'] ) && 'core/image' !== $block_type
 				? $block_text
 				: self::html_text( $block_html );
+		}
+		if ( '' === $block_text && '' === $block_content ) {
+			// A block too large or odd to read as the editor does reads as
+			// '', so no text edit matches it. The prompt still shows its text
+			// as context.
+			$block_content = self::html_text( $own_html );
 		}
 		$nearby = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
@@ -754,6 +779,7 @@ class Reply_Service {
 			'selected_text'     => $is_mention ? Mentions::get_selected_text( $block_html, $parent_id ) : '',
 			'block_html'        => $block_html,
 			'block_content'     => $block_content,
+			'inner_blocks_text' => $inner_text,
 			'block_text'        => $block_text,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
@@ -762,6 +788,7 @@ class Reply_Service {
 			// prompt truncates it, and not when links, formatting or line
 			// breaks would be lost.
 			'block_can_rewrite' => '' !== $block_content
+				&& '' !== $block_text
 				&& ! self::has_inline_markup( $block_html )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),
@@ -775,6 +802,7 @@ class Reply_Service {
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
+			'house_style'       => House_Style::get_prompt_rules( $user_id ),
 			'persona'           => self::meta_string( $parent_id, Personas::META_KEY ),
 		);
 	}
@@ -1132,6 +1160,28 @@ class Reply_Service {
 
 	/**
 	 * Whether a block type keeps its text in a rich text `content` attribute,
+	 * which the editor applies a text edit to.
+	 *
+	 * Matches getRichTextAttributeKey() in src/utils/quick-fix.js.
+	 *
+	 * @param string $block_name Block name.
+	 * @return bool
+	 */
+	private static function has_rich_text_content( string $block_name ): bool {
+		if ( '' === $block_name || ! class_exists( 'WP_Block_Type_Registry' ) ) {
+			return false;
+		}
+
+		$block_type = \WP_Block_Type_Registry::get_instance()->get_registered( $block_name );
+		$attribute  = null !== $block_type && is_array( $block_type->attributes ) ? ( $block_type->attributes['content'] ?? null ) : null;
+		return is_array( $attribute ) && (
+			'rich-text' === ( $attribute['type'] ?? null )
+			|| in_array( $attribute['source'] ?? null, array( 'rich-text', 'html' ), true )
+		);
+	}
+
+	/**
+	 * Whether a block type keeps its text in a rich text `content` attribute,
 	 * which a `rewrite_block` edit replaces.
 	 *
 	 * Matches getRichTextAttributeKey() in src/utils/quick-fix.js.
@@ -1140,16 +1190,7 @@ class Reply_Service {
 	 * @return bool
 	 */
 	private static function supports_rewrite( string $block_name ): bool {
-		$supported = false;
-
-		if ( '' !== $block_name && class_exists( 'WP_Block_Type_Registry' ) ) {
-			$block_type = \WP_Block_Type_Registry::get_instance()->get_registered( $block_name );
-			$attribute  = null !== $block_type && is_array( $block_type->attributes ) ? ( $block_type->attributes['content'] ?? null ) : null;
-			$supported  = is_array( $attribute ) && (
-				'rich-text' === ( $attribute['type'] ?? null )
-				|| in_array( $attribute['source'] ?? null, array( 'rich-text', 'html' ), true )
-			);
-		}
+		$supported = self::has_rich_text_content( $block_name );
 
 		/**
 		 * Filters whether an AI reply may rewrite a whole block of this type.
@@ -1260,27 +1301,18 @@ class Reply_Service {
 	 *
 	 * An edit's `find` is matched against this text here and against
 	 * `create( { html } ).text` in the editor, so they must agree: a line
-	 * break is "\n", an inline image is U+FFFC, entities are decoded and
-	 * whitespace is kept as written. The outer ends are trimmed. Shares its
-	 * cases with extractEditorText() in src/utils/block-utils.js through
-	 * tests/fixtures/editor-text.json.
+	 * break is "\n", a footnote, an inline image or a comment is U+FFFC,
+	 * entities are decoded and whitespace is kept as written. The outer ends
+	 * are trimmed. Shares its cases with extractEditorText() in
+	 * src/utils/block-utils.js through tests/fixtures/editor-text.json.
 	 *
-	 * Table cells and list items, which the editor never matches across,
-	 * end with a space so their text doesn't run together in the prompt.
-	 * A rich text block's own closing tag ends the text, so it is trimmed.
+	 * @see Editor_Text::read()
 	 *
 	 * @param string $html Block HTML.
 	 * @return string Block text.
 	 */
 	public static function editor_text( string $html ): string {
-		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
-		// Comments are block delimiters here, not text.
-		$html = (string) preg_replace( '#<!--.*?-->#s', '', $html );
-		$html = (string) preg_replace( '#<br\b[^>]*>#i', "\n", $html );
-		$html = (string) preg_replace( '#</(?:p|li|td|th|h[1-6]|div|figcaption|blockquote|pre)\b[^>]*>#i', '$0 ', $html );
-		$html = (string) preg_replace( '#<img\b[^>]*>#i', "\u{FFFC}", $html );
-		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-		return trim( str_replace( "\u{FEFF}", '', $text ) );
+		return Editor_Text::read( $html );
 	}
 
 	/**

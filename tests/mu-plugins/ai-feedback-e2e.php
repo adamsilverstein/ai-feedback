@@ -19,6 +19,16 @@ if ( empty( $_COOKIE['ai_feedback_e2e'] ) || 'local' !== wp_get_environment_type
 	return;
 }
 
+// Lets a test treat pending suggestions as old enough to clean up.
+if ( isset( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) && is_string( $_COOKIE['ai_feedback_e2e_cleanup_delay'] ) ) {
+	$ai_feedback_e2e_cleanup_delay = absint( $_COOKIE['ai_feedback_e2e_cleanup_delay'] );
+	add_filter(
+		'ai_feedback_suggestion_cleanup_delay',
+		static fn (): int => $ai_feedback_e2e_cleanup_delay
+	);
+	unset( $ai_feedback_e2e_cleanup_delay );
+}
+
 if ( ! defined( 'AI_FEEDBACK_MOCK_MODE' ) ) {
 	define( 'AI_FEEDBACK_MOCK_MODE', true );
 }
@@ -107,6 +117,21 @@ add_filter(
 			|| ! str_contains( $block[1], 'last year' )
 		) {
 			return $reply;
+		}
+
+		// Asked to change text across a footnote, the edit's find reads the
+		// footnote's number, which the editor never matches.
+		if ( str_contains( $user_reply[1], 'footnote number' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: "growth1 was" now reads "growth is".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => 'growth1 was',
+						'replace' => 'growth is',
+					),
+				)
+			);
 		}
 
 		// Asked to change both lines of a block split by a line break, the
@@ -468,4 +493,52 @@ add_filter(
 	},
 	40,
 	2
+);
+
+// A reply that mentions sentence case states a standing preference, so the
+// mock reply offers to remember it as a house style rule.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/sentence case/i', $asked[1] )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply'    => 'Got it, sentence case it is.',
+				'edit'     => null,
+				'remember' => 'Headings use sentence case, except product names such as WordPress and Gutenberg, which keep their own capital letters',
+			)
+		);
+	},
+	40,
+	2
+);
+
+// A review whose prompt carries the sentence case house style rule flags the
+// first block for breaking it, so tests can see a saved rule reach the
+// next review.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks, string $prompt = '' ): array {
+		$block = $blocks[0] ?? null;
+		if ( ! str_contains( $prompt, "HOUSE STYLE:\n" ) || ! preg_match( '/^- "Headings use sentence case\b/mi', $prompt ) || ! is_array( $block ) ) {
+			return $response;
+		}
+
+		$response['feedback'][] = array(
+			'block_id' => $block['clientId'] ?? '',
+			'category' => 'tone',
+			'severity' => 'suggestion',
+			'title'    => 'Follow the house style',
+			'feedback' => 'House style: headings use sentence case.',
+		);
+		return $response;
+	},
+	30,
+	3
 );

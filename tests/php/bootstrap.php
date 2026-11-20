@@ -12,6 +12,7 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 $includes_dir = dirname(__DIR__, 2) . '/includes/';
 require_once $includes_dir . 'class-logger.php';
 require_once $includes_dir . 'class-user-preferences.php';
+require_once $includes_dir . 'class-house-style.php';
 require_once $includes_dir . 'class-personas.php';
 require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-block-change.php';
@@ -55,6 +56,7 @@ if ( ! function_exists( 'get_network_option' ) ) {
 }
 require_once $includes_dir . 'class-fresh-eyes-user.php';
 require_once $includes_dir . 'class-mentions.php';
+require_once $includes_dir . 'class-editor-text.php';
 
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {

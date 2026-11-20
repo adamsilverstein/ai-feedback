@@ -40,6 +40,32 @@ if ( ! class_exists( 'WP_User_Query' ) ) {
 if ( ! class_exists( 'wpdb' ) ) {
 	// The bootstrap's database stand-in, with the INSERT IGNORE lock, as the real class name.
 	class wpdb extends Test_WPDB {
+		public $prefix = 'wp_';
+
+		/**
+		 * Answer COUNT queries from rows in $GLOBALS['test_posts'] and
+		 * $GLOBALS['test_links'], each with its own status and type, the way
+		 * the database would: only the columns named in the WHERE clause filter.
+		 */
+		public function get_var( $prepared ) {
+			$query = $prepared['query'];
+			if ( ! str_starts_with( $query, 'SELECT COUNT(*)' ) ) {
+				return parent::get_var( $prepared );
+			}
+			$rows   = str_contains( $query, 'link_owner' ) ? ( $GLOBALS['test_links'] ?? array() ) : ( $GLOBALS['test_posts'] ?? array() );
+			$column = str_contains( $query, 'link_owner' ) ? 'link_owner' : 'post_author';
+			$count  = 0;
+			foreach ( $rows as $row ) {
+				if ( (int) $row[ $column ] !== (int) $prepared['args'][1] ) {
+					continue;
+				}
+				if ( str_contains( $query, 'post_status' ) && ! in_array( $row['post_status'], array( 'publish', 'private' ), true ) ) {
+					continue;
+				}
+				++$count;
+			}
+			return (string) $count;
+		}
 	}
 }
 
@@ -65,6 +91,8 @@ function ai_feedback_test_reset_users(): void {
 	$GLOBALS['test_insert_user_error'] = null;
 	$GLOBALS['test_next_user_id']      = 100;
 	$GLOBALS['test_deleted_users']     = array();
+	$GLOBALS['test_posts']             = array();
+	$GLOBALS['test_links']             = array();
 	$GLOBALS['test_updated_users']     = array();
 	$GLOBALS['test_count_users']       = array();
 	$GLOBALS['test_is_author']         = false;
@@ -144,7 +172,18 @@ if ( ! function_exists( 'wp_delete_user' ) ) {
 	function wp_delete_user( $id, $reassign = null ) {
 		$GLOBALS['test_deleted_users'][] = array( $id, $reassign );
 		unset( $GLOBALS['test_user_objects'][ $id ] );
+		// Like core's deleted_user action, which the plugin hooks.
+		\AI_Feedback\Fresh_Eyes_User::on_deleted_user( (int) $id );
 		return true;
+	}
+}
+
+if ( ! function_exists( 'get_post_types' ) ) {
+	function get_post_types( $args = array(), $output = 'names', $operator = 'and' ) {
+		return array(
+			'post' => 'post',
+			'page' => 'page',
+		);
 	}
 }
 

@@ -9,6 +9,7 @@ namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Reply_Service;
+use AI_Feedback\Editor_Text;
 use AI_Feedback\Prompt_Builder;
 use AI_Feedback\Notes_Manager;
 
@@ -88,7 +89,8 @@ class ReplyServiceTest extends TestCase {
 			$GLOBALS['test_post_content'],
 			$GLOBALS['test_parsed_blocks'],
 			$GLOBALS['test_parse_blocks_calls'],
-			$GLOBALS['test_missing_posts']
+			$GLOBALS['test_missing_posts'],
+			$GLOBALS['test_block_types']
 		);
 		parent::tearDown();
 	}
@@ -933,6 +935,56 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for edits beside and across a footnote, which the editor
+	 * reads as one object character.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function footnote_provider(): array {
+		$footnote = '<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+		$html     = "<p>Revenue growth{$footnote} was strong last year.</p>";
+		return array(
+			'find across the footnote number'   => array( $html, 'growth1 was', false ),
+			'find holding the object character' => array( $html, "growth\u{FFFC} was", false ),
+			'find skipping the footnote'        => array( $html, 'growth was', false ),
+			'find beside the footnote'          => array( $html, 'was strong', true ),
+			'find ending at the footnote'       => array( $html, 'Revenue growth', true ),
+			'find across an inline comment'     => array( '<p>Revenue grew<!-- check -->fast.</p>', 'grewfast', false ),
+			'find beside an empty anchor'       => array( '<p>Revenue<a id="q3"></a> grew fast.</p>', 'grew fast', true ),
+		);
+	}
+
+	/**
+	 * An edit is kept only when the editor can match it: a footnote is one
+	 * object character there, not its number, and a text edit can't write
+	 * the footnote back, so a `find` across it is dropped.
+	 *
+	 * @dataProvider footnote_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	public function test_text_edit_beside_a_footnote( string $html, string $find, bool $kept ): void {
+		$notes = $this->reply_with(
+			(string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			),
+			$html
+		);
+
+		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
 	 * Data provider for the block text cases shared with the editor.
 	 *
 	 * @return array<string, array{0: string, 1: string}>
@@ -1057,6 +1109,84 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "Block content: Revenue grew 40% \nlast year.\n", $service->captured_prompt );
+	}
+
+	/**
+	 * Seed a list item with a nested list and a line break.
+	 */
+	private function seed_list_item_with_nested_list(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array(
+				array(
+					'blockName'    => 'core/list-item',
+					'attrs'        => array( 'metadata' => array( 'noteId' => 100 ) ),
+					'innerBlocks'  => array( self::leaf_block( 'core/list', '<ul class="wp-block-list"><li>Nested item</li></ul>' ) ),
+					'innerHTML'    => '<li>Revenue grew 40%<br>last year.</li>',
+					'innerContent' => array( '<li>Revenue grew 40%<br>last year.', null, '</li>' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * For a block whose own rich text an edit applies to, like a list item
+	 * with a nested list, the prompt shows that text as the editor reads
+	 * it, with the nested blocks as context.
+	 */
+	public function test_prompt_shows_own_text_of_a_list_item_with_a_nested_list(): void {
+		$GLOBALS['test_block_types'] = array(
+			'core/list-item' => array(
+				'content' => array(
+					'type'     => 'rich-text',
+					'source'   => 'rich-text',
+					'selector' => 'li',
+				),
+			),
+		);
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString(
+			"Block content: Revenue grew 40%\nlast year.\nBlocks inside it (context only; an edit changes the block content above, not these): Nested item\n\n",
+			$service->captured_prompt
+		);
+	}
+
+	/**
+	 * A block with inner blocks whose type keeps no rich text `content`, like
+	 * a quote, keeps the collapsed reading of all its text.
+	 */
+	public function test_prompt_keeps_the_full_text_of_a_block_without_own_rich_text(): void {
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% last year. Nested item\n\n", $service->captured_prompt );
+		$this->assertStringNotContainsString( 'Blocks inside it', $service->captured_prompt );
+	}
+
+	/**
+	 * A block over Editor_Text::MAX_BYTES, like a large data table, still
+	 * shows in the reply prompt as context, but a text edit on it is
+	 * dropped, since the server can't read it as the editor does.
+	 */
+	public function test_block_over_the_size_cap_is_context_only(): void {
+		$html = '<p>Revenue grew 40% last year. ' . str_repeat( 'Row of data. ', intdiv( Editor_Text::MAX_BYTES, 13 ) + 1 ) . '</p>';
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year. Row of data.', $service->captured_prompt );
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
 	}
 
 	/**
@@ -1675,5 +1805,48 @@ class ReplyServiceTest extends TestCase {
 		$this->seed_ai_edit_reply( 500, $heading( 2 ) );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
+	}
+
+	/**
+	 * A reply that proposes a house style rule saves it with the reply.
+	 */
+	public function test_reply_saves_proposed_house_rule(): void {
+		$notes = $this->reply_with( '{"reply": "Got it, sentence case it is.", "edit": null, "remember": "Headings use <b>sentence case</b>"}' );
+
+		$this->assertSame( 'Headings use sentence case', $notes->last_reply['feedback_item']['house_rule'] );
+	}
+
+	/**
+	 * A proposed rule the author's reviews already follow is not offered again.
+	 */
+	public function test_reply_skips_rule_that_already_exists(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Headings use sentence case',
+			),
+		);
+
+		$notes = $this->reply_with( '{"reply": "Got it.", "edit": null, "remember": "headings use sentence case."}' );
+
+		$this->assertArrayNotHasKey( 'house_rule', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * The reply prompt carries the house style rules.
+	 */
+	public function test_reply_prompt_includes_house_style(): void {
+		$GLOBALS['test_options'][ \AI_Feedback\House_Style::SITE_OPTION ] = array(
+			array(
+				'id'   => 'r1',
+				'text' => 'Write WordPress with a capital P',
+			),
+		);
+		$this->seed_parent_and_reply();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( '- "Write WordPress with a capital P"', $service->captured_prompt );
 	}
 }

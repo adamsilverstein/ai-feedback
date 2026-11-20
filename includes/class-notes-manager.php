@@ -503,6 +503,10 @@ class Notes_Manager {
 			$meta[ self::REPLY_EDIT_META_KEY ] = wp_json_encode( $feedback_item['reply_edit'] );
 		}
 
+		if ( ! empty( $feedback_item['house_rule'] ) && is_string( $feedback_item['house_rule'] ) ) {
+			$meta[ House_Style::PROPOSAL_META_KEY ] = House_Style::sanitize_rule( $feedback_item['house_rule'] );
+		}
+
 		// Add block ID (clientId) if available.
 		// Note: clientId is ephemeral and changes on each editor load.
 		if ( ! empty( $feedback_item['block_id'] ) ) {

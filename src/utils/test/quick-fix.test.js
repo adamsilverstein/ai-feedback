@@ -1,8 +1,8 @@
 /**
  * WordPress dependencies
  */
-import { describe, it, expect } from 'vitest';
-import { RichTextData } from '@wordpress/rich-text';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import { create, RichTextData, toHTMLString } from '@wordpress/rich-text';
 
 /**
  * Internal dependencies
@@ -14,6 +14,10 @@ import {
 	getRichTextAttributeKey,
 	isFixInPlace,
 } from '../quick-fix';
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
 
 describe('getRichTextAttributeKey', () => {
 	it.each([
@@ -230,5 +234,66 @@ describe('non-breaking spaces', () => {
 				replace: 'the data',
 			})
 		).toBe(true);
+	});
+});
+
+describe('footnotes', () => {
+	// With core's formats, as in the editor, a footnote is one object.
+	beforeAll(registerEditorFormats);
+	afterAll(unregisterEditorFormats);
+
+	const FOOTNOTE =
+		'<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+	const content = `Revenue growth${FOOTNOTE} was strong last year.`;
+	// Rich text writes a footnote's attributes in its own order.
+	const normalize = (html) => toHTMLString({ value: create({ html }) });
+	const footnotes = (html) => html.split('data-fn="f1"').length - 1;
+
+	it('applies a fix beside a footnote and keeps the footnote once', () => {
+		const result = applyFixToContent(content, {
+			find: 'strong',
+			replace: 'steady',
+		});
+
+		expect(result).toBe(
+			normalize(`Revenue growth${FOOTNOTE} was steady last year.`)
+		);
+		expect(footnotes(result)).toBe(1);
+	});
+
+	it('applies a fix that ends at the footnote', () => {
+		const result = applyFixToContent(RichTextData.fromHTMLString(content), {
+			find: 'Revenue growth',
+			replace: 'Sales growth',
+		});
+
+		expect(result).toBeInstanceOf(RichTextData);
+		expect(result.toHTMLString()).toBe(
+			normalize(`Sales growth${FOOTNOTE} was strong last year.`)
+		);
+	});
+
+	it('never matches the footnote number', () => {
+		expect(
+			applyFixToContent(content, { find: 'growth1 was', replace: 'x' })
+		).toBeNull();
+	});
+
+	it('never applies a fix holding the object character', () => {
+		expect(
+			applyFixToContent(content, {
+				find: 'growth\ufffc was',
+				replace: 'growth was',
+			})
+		).toBeNull();
+		expect(
+			applyFixToContent(content, {
+				find: 'strong',
+				replace: 'strong\ufffc',
+			})
+		).toBeNull();
+		expect(
+			getFixPreview(content, { find: 'growth\ufffc', replace: 'x' })
+		).toBeNull();
 	});
 });
