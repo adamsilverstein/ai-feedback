@@ -1,7 +1,7 @@
 /**
  * Utility functions for block content extraction.
  */
-import { serialize } from '@wordpress/blocks';
+import { getBlockType, getSaveContent } from '@wordpress/blocks';
 
 /**
  * Extract text content from a block's innerHTML.
@@ -70,6 +70,28 @@ export function getFormattingAttributes(block) {
 }
 
 /**
+ * Get a block's own HTML as it is now, without its inner blocks.
+ *
+ * `originalContent` is the markup the block was parsed from and is not
+ * updated when the block is edited, so it is only used for blocks that
+ * failed validation, as core's serializer does, or cannot be saved here.
+ *
+ * @param {Object} block Block from the editor.
+ * @return {string} Block HTML.
+ */
+function getOwnHTML(block) {
+	const saved = block.originalContent || '';
+	if (block.isValid === false || !getBlockType(block.name)) {
+		return saved;
+	}
+	try {
+		return getSaveContent(block.name, block.attributes ?? {}, []);
+	} catch {
+		return saved;
+	}
+}
+
+/**
  * Recursively extract blocks with their clientIds and content.
  *
  * Inner blocks carry their parent's client ID, so the server can tell a
@@ -83,11 +105,7 @@ export function extractBlockData(blocks, parent = '') {
 	const result = [];
 
 	for (const block of blocks) {
-		// Get the serialized content for this block.
-		// Use originalContent if available (parsed from existing HTML),
-		// otherwise serialize the current block state.
-		const rawContent = block.originalContent || serialize(block);
-		const content = extractTextContent(rawContent);
+		const content = extractTextContent(getOwnHTML(block));
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
@@ -128,9 +146,9 @@ export function hasTextContent(blocks) {
 		if (!block.name) {
 			return false;
 		}
-		// Get text content from the block
-		const content = block.originalContent || serialize(block);
-		const text = extractTextContent(content);
-		return text.trim().length > 0;
+		const text = extractTextContent(getOwnHTML(block));
+		return (
+			text.trim().length > 0 || hasTextContent(block.innerBlocks ?? [])
+		);
 	});
 }
