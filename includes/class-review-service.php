@@ -215,10 +215,9 @@ class Review_Service {
 			// Call AI with retry logic.
 			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model, 3, $images );
 
-			// A model may refuse image input, which fails the request without
-			// a retry; review the text alone then.
-			if ( is_wp_error( $ai_response ) && array() !== $images && $this->is_non_retryable_error( $ai_response ) && ! $this->is_service_unavailable_error( $ai_response ) ) {
-				Logger::debug( sprintf( 'AI request with images failed (%s), retrying without them', $ai_response->get_error_code() ) );
+			// A model may refuse image input; review the text alone then.
+			if ( is_wp_error( $ai_response ) && array() !== $images && self::is_refused_input( $ai_response ) ) {
+				Logger::debug( sprintf( 'AI request with images was refused (%s: %s), retrying without them', $ai_response->get_error_code(), $ai_response->get_error_message() ) );
 				$attached                = array();
 				$options['image_blocks'] = array();
 				$prompt                  = $this->prompt_builder->build_review_prompt( $blocks, $options, $existing_feedback );
@@ -320,6 +319,24 @@ class Review_Service {
 		$this->fire_review_completed( $post_id, $result );
 
 		return $result;
+	}
+
+	/**
+	 * Whether an error looks like the provider refusing the request's input,
+	 * such as images a model can't take, rather than an auth, billing, rate
+	 * or availability failure, which a request without images would hit too.
+	 *
+	 * @param  WP_Error $error Error from the AI request.
+	 * @return bool
+	 */
+	private static function is_refused_input( WP_Error $error ): bool {
+		$data   = $error->get_error_data();
+		$status = is_array( $data ) && is_numeric( $data['status'] ?? null ) ? (int) $data['status'] : 0;
+		if ( in_array( $status, array( 400, 413, 415, 422 ), true ) ) {
+			return true;
+		}
+		$text = strtolower( $error->get_error_code() . ' ' . $error->get_error_message() );
+		return 0 === $status && 1 === preg_match( '/image|vision|modalit|unsupported|file/', $text );
 	}
 
 	/**

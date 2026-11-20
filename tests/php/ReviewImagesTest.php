@@ -226,8 +226,8 @@ class ReviewImagesTest extends TestCase {
 	}
 
 	/**
-	 * An ID left over from another image, or a URL on another host path,
-	 * doesn't send the attachment.
+	 * An ID left over from another image, or a URL in another directory or
+	 * on another origin, doesn't send the attachment.
 	 */
 	public function test_url_must_be_the_attachment(): void {
 		$collector = new Review_Images();
@@ -235,6 +235,13 @@ class ReviewImagesTest extends TestCase {
 		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, 'http://example.com/wp-content/uploads/2026/11/photo.png' ) ) ) );
 		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, 'http://example.com/elsewhere/chart.png' ) ) ) );
 		$this->assertCount( 1, $collector->collect( array( self::image( 'img', 12, 'http://example.com/wp-content/uploads/2026/11/chart-scaled.png' ) ) ) );
+
+		// The same path on another host, or another scheme or port, is a different image.
+		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, 'http://evil.example/wp-content/uploads/2026/11/chart.png' ) ) ) );
+		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, 'https://example.com/wp-content/uploads/2026/11/chart.png' ) ) ) );
+		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, 'http://example.com:8080/wp-content/uploads/2026/11/chart.png' ) ) ) );
+		$this->assertSame( array(), $collector->collect( array( self::image( 'img', 12, '/wp-content/uploads/2026/11/chart.png' ) ) ) );
+		$this->assertCount( 1, $collector->collect( array( self::image( 'img', 12, 'http://EXAMPLE.com:80/wp-content/uploads/2026/11/chart.png' ) ) ) );
 	}
 
 	/**
@@ -368,5 +375,18 @@ class ReviewImagesTest extends TestCase {
 		$this->assertNotEmpty( $service->sent[0] );
 		$this->assertSame( array(), $service->sent[1] );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
+	}
+
+	/**
+	 * An auth, billing or rate failure would hit a text-only request too, so
+	 * the review isn't sent again.
+	 */
+	public function test_no_text_retry_for_other_failures(): void {
+		list( $service ) = $this->review(
+			'gpt-4o',
+			array( new WP_Error( 'unauthorized', 'Invalid API key.', array( 'status' => 401 ) ), self::alt_response() )
+		);
+
+		$this->assertCount( 1, $service->sent );
 	}
 }

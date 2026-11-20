@@ -24,26 +24,26 @@ if ( ! class_exists( 'WP_Post' ) ) {
 	}
 }
 
-function wp_get_upload_dir() {
+function wp_get_upload_dir(): array {
 	return array(
 		'basedir' => $GLOBALS['test_uploads_dir'],
 		'baseurl' => 'http://example.com/wp-content/uploads',
 	);
 }
 
-function wp_attachment_is_image( $id ) {
+function wp_attachment_is_image( int $id ): bool {
 	return isset( $GLOBALS['test_attachments'][ $id ] ) && str_starts_with( $GLOBALS['test_attachments'][ $id ]['mime'], 'image/' );
 }
 
-function get_attached_file( $id ) {
+function get_attached_file( int $id ): string|false {
 	return isset( $GLOBALS['test_attachments'][ $id ] ) ? $GLOBALS['test_uploads_dir'] . '/' . $GLOBALS['test_attachments'][ $id ]['file'] : false;
 }
 
-function wp_get_attachment_url( $id ) {
+function wp_get_attachment_url( int $id ): string|false {
 	return isset( $GLOBALS['test_attachments'][ $id ] ) ? 'http://example.com/wp-content/uploads/' . $GLOBALS['test_attachments'][ $id ]['file'] : false;
 }
 
-function image_get_intermediate_size( $id, $size ) {
+function image_get_intermediate_size( int $id, string $size ): array|false {
 	$file = $GLOBALS['test_attachments'][ $id ]['sizes'][ $size ] ?? null;
 	return null === $file ? false : array(
 		'file'   => basename( $file ),
@@ -54,11 +54,11 @@ function image_get_intermediate_size( $id, $size ) {
 	);
 }
 
-function wp_check_filetype( $filename ) {
+function wp_check_filetype( string $filename ): array {
 	$types = array(
-		'png'  => 'image/png',
-		'jpg'  => 'image/jpeg',
-		'svg'  => 'image/svg+xml',
+		'png' => 'image/png',
+		'jpg' => 'image/jpeg',
+		'svg' => 'image/svg+xml',
 	);
 	$ext   = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
 	return array(
@@ -68,7 +68,7 @@ function wp_check_filetype( $filename ) {
 }
 
 if ( ! function_exists( 'wp_parse_url' ) ) {
-	function wp_parse_url( $url, $component = -1 ) {
+	function wp_parse_url( string $url, int $component = -1 ): mixed {
 		return parse_url( $url, $component );
 	}
 }

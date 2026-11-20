@@ -55,7 +55,10 @@ class BlockChangeTest extends TestCase {
 		return array(
 			'name'       => 'core/image',
 			'content'    => $caption,
-			'attributes' => array( 'alt' => $alt ),
+			'attributes' => array(
+				'alt' => $alt,
+				'url' => 'http://example.com/wp-content/uploads/chart.png',
+			),
 		);
 	}
 
@@ -193,6 +196,7 @@ class BlockChangeTest extends TestCase {
 				'type'       => 'set_attributes',
 				'attributes' => array( 'alt' => 'Bar chart of test times' ),
 				'from'       => array( 'alt' => '' ),
+				'image'      => 'http://example.com/wp-content/uploads/chart.png',
 			),
 			Block_Change::validate( $change, self::image(), true )
 		);
@@ -351,6 +355,7 @@ class BlockChangeTest extends TestCase {
 				'type'  => 'transform',
 				'to'    => 'core/heading',
 				'level' => 3,
+				'text'  => 'Getting started',
 			),
 			Block_Change::validate( $transform( 'core/heading', array( 'level' => 3 ) ), self::paragraph( 'Getting started' ) )
 		);
@@ -358,6 +363,7 @@ class BlockChangeTest extends TestCase {
 			array(
 				'type' => 'transform',
 				'to'   => 'core/paragraph',
+				'text' => 'Setup',
 			),
 			Block_Change::validate( $transform( 'core/paragraph' ), self::heading() )
 		);
@@ -377,6 +383,7 @@ class BlockChangeTest extends TestCase {
 			array(
 				'type'  => 'split',
 				'after' => 'idea ends here.',
+				'next'  => 'The second idea starts here and goes on.',
 			),
 			Block_Change::validate(
 				array(
@@ -518,12 +525,31 @@ class BlockChangeTest extends TestCase {
 			'heading level on another block'    => array( wp_json_encode( $level ), 'core/paragraph', null ),
 			'list transform'                    => array( wp_json_encode( $list ), 'core/paragraph', $list ),
 			'list transform from a heading'     => array( wp_json_encode( $list ), 'core/heading', null ),
-			'split'                             => array( '{"type":"split","after":"One."}', '', array( 'type' => 'split', 'after' => 'One.' ) ),
+			'split'                             => array(
+				'{"type":"split","after":"One.","next":"Two."}',
+				'',
+				array(
+					'type'  => 'split',
+					'after' => 'One.',
+					'next'  => 'Two.',
+				),
+			),
+			'split without next'                => array( '{"type":"split","after":"One."}', '', null ),
+			'alt without its image'             => array( '{"type":"set_attributes","attributes":{"alt":"A chart"},"from":{"alt":""}}', 'core/image', null ),
+			'heading without its text'          => array( '{"type":"transform","to":"core/paragraph"}', 'core/heading', null ),
 			'attribute off the allow-list'      => array( '{"type":"set_attributes","attributes":{"className":"x"},"from":{"className":""}}', '', null ),
 			'missing from'                      => array( '{"type":"set_attributes","attributes":{"level":3}}', 'core/heading', null ),
 			'alt with markup'                   => array( '{"type":"set_attributes","attributes":{"alt":"<b>x</b>"},"from":{"alt":""}}', 'core/image', null ),
 			'transform off the allow-list'      => array( '{"type":"transform","to":"core/quote"}', '', null ),
-			'extra fields are dropped'          => array( '{"type":"transform","to":"core/paragraph","html":"<script>"}', 'core/heading', array( 'type' => 'transform', 'to' => 'core/paragraph' ) ),
+			'extra fields are dropped'          => array(
+				'{"type":"transform","to":"core/paragraph","text":"Setup","html":"<script>"}',
+				'core/heading',
+				array(
+					'type' => 'transform',
+					'to'   => 'core/paragraph',
+					'text' => 'Setup',
+				),
+			),
 			'unknown type'                      => array( '{"type":"set_style"}', '', null ),
 			'not JSON'                          => array( 'nope', '', null ),
 			'empty'                             => array( '', '', null ),

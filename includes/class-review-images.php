@@ -119,8 +119,11 @@ class Review_Images {
 			|| 'attachment' !== $attachment->post_type
 			|| ! wp_attachment_is_image( $attachment_id )
 			|| ! current_user_can( 'read_post', $attachment_id )
-			|| ! $this->url_matches_attachment( $url, $attachment_id )
 		) {
+			return null;
+		}
+		if ( ! $this->url_matches_attachment( $url, $attachment_id ) ) {
+			Logger::debug( sprintf( 'Image URL does not match attachment %d, so it is not sent', $attachment_id ) );
 			return null;
 		}
 
@@ -174,8 +177,13 @@ class Review_Images {
 		if ( ! is_string( $attachment_url ) || '' === $attachment_url ) {
 			return false;
 		}
-		$path     = wp_parse_url( $url, PHP_URL_PATH );
-		$expected = wp_parse_url( $attachment_url, PHP_URL_PATH );
+		$actual = wp_parse_url( $url );
+		$wanted = wp_parse_url( $attachment_url );
+		if ( ! is_array( $actual ) || ! is_array( $wanted ) || self::origin( $actual ) !== self::origin( $wanted ) ) {
+			return false;
+		}
+		$path     = $actual['path'] ?? null;
+		$expected = $wanted['path'] ?? null;
 		if ( ! is_string( $path ) || ! is_string( $expected ) || dirname( $path ) !== dirname( $expected ) ) {
 			return false;
 		}
@@ -184,6 +192,22 @@ class Review_Images {
 		$stem = preg_replace( '/-scaled$/', '', pathinfo( $expected, PATHINFO_FILENAME ) );
 		$name = pathinfo( $path, PATHINFO_FILENAME );
 		return is_string( $stem ) && '' !== $stem && 1 === preg_match( '/^' . preg_quote( $stem, '/' ) . '(?:-scaled)?(?:-\d+x\d+)?$/', $name );
+	}
+
+	/**
+	 * The origin of a parsed URL: scheme, host and effective port.
+	 *
+	 * @param  array<string, int|string> $parts URL parts from wp_parse_url().
+	 * @return string Origin, or '' when the URL has no scheme or host.
+	 */
+	private static function origin( array $parts ): string {
+		$scheme = strtolower( (string) ( $parts['scheme'] ?? '' ) );
+		$host   = strtolower( (string) ( $parts['host'] ?? '' ) );
+		if ( '' === $scheme || '' === $host ) {
+			return '';
+		}
+		$port = $parts['port'] ?? ( 'https' === $scheme ? 443 : 80 );
+		return $scheme . '://' . $host . ':' . $port;
 	}
 
 	/**

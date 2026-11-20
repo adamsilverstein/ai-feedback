@@ -293,6 +293,15 @@ class Response_Parser {
 			}
 		}
 
+		// A block with a structural edit or formatting fix gets no quick fix
+		// from any item, so the review proposes one change per block.
+		foreach ( $parsed as $index => $validated ) {
+			$block_id = is_string( $validated['block_id'] ?? null ) ? $validated['block_id'] : '';
+			if ( isset( $actioned[ $block_id ] ) && ! isset( $validated['block_action'] ) && ! isset( $validated['block_change'] ) ) {
+				unset( $parsed[ $index ]['quick_fix'] );
+			}
+		}
+
 		Logger::debug( sprintf( 'Parsed %d valid feedback items', count( $parsed ) ) );
 
 		// Group similar feedback items to reduce noise.

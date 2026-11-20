@@ -290,4 +290,44 @@ class ResponseParserBlockChangeTest extends TestCase {
 		$this->assertArrayNotHasKey( 'block_change', self::find( $feedback, 'Use a list' ) );
 		$this->assertArrayNotHasKey( 'block_change', self::find( $feedback, 'Style it' ) );
 	}
+
+	/**
+	 * A quick fix on another item for the same block is dropped once the
+	 * block gets a formatting fix, whichever item comes first.
+	 */
+	public function test_shared_slot_across_items(): void {
+		$quick = self::item(
+			'needs',
+			'Word choice',
+			array(
+				'category'  => 'tone',
+				'quick_fix' => array(
+					'find'    => 'Node',
+					'replace' => 'Python',
+				),
+			)
+		);
+		$list  = self::item(
+			'needs',
+			'Use a list',
+			array(
+				'block_change' => array(
+					'type'  => 'transform',
+					'to'    => 'core/list',
+					'items' => array( 'Node', 'npm', 'Docker', 'Git' ),
+				),
+			)
+		);
+
+		foreach ( array( array( $quick, $list ), array( $list, $quick ) ) as $items ) {
+			$feedback = self::parse( $items );
+			$this->assertArrayNotHasKey( 'quick_fix', self::find( $feedback, 'Word choice' ) );
+			$this->assertArrayHasKey( 'block_change', self::find( $feedback, 'Use a list' ) );
+		}
+
+		// Without a surviving formatting fix, the quick fix stays.
+		$list['block_change']['items'] = array( 'Node', 'Rust' );
+		$feedback                      = self::parse( array( $quick, $list ) );
+		$this->assertArrayHasKey( 'quick_fix', self::find( $feedback, 'Word choice' ) );
+	}
 }

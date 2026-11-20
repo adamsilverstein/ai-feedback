@@ -16,7 +16,10 @@ namespace AI_Feedback;
  *
  * - `{ "type": "set_attributes", "attributes": { "level": 3 }, "from": { "level": 4 } }`
  *   sets allow-listed attributes. `from` holds the values the AI saw, so the
- *   editor can tell a stale change from one that is ready.
+ *   editor can tell a stale change from one that is ready. Alt text and a
+ *   caption also keep the reviewed image's URL as `image`.
+ * - Heading and paragraph transforms keep the reviewed `text`, and a split
+ *   the start of the text after it as `next`, for the same reason.
  * - `{ "type": "transform", "to": "core/list", "items": [ ... ] }` turns a
  *   paragraph of separated items into a list; `to` may also be a heading
  *   (with `level`) or, from a heading, a paragraph.
@@ -81,6 +84,11 @@ class Block_Change {
 	 * Maximum length of the sentence ending a split is made after.
 	 */
 	public const MAX_SPLIT_LENGTH = 200;
+
+	/**
+	 * Length of the text after a split kept with it as `next`.
+	 */
+	public const MAX_NEXT_LENGTH = 80;
 
 	/**
 	 * Maximum length of a paragraph that may become a heading.
@@ -240,11 +248,19 @@ class Block_Change {
 			$from[ $key ] = $current;
 		}
 
-		return array(
+		$change = array(
 			'type'       => 'set_attributes',
 			'attributes' => $to,
 			'from'       => $from,
 		);
+		// Alt text describes one image; a different image is a stale change.
+		if ( array() !== array_intersect( array_keys( $to ), self::IMAGE_ATTRIBUTES ) ) {
+			if ( ! is_string( $attrs['url'] ?? null ) || '' === $attrs['url'] ) {
+				return null;
+			}
+			$change['image'] = $attrs['url'];
+		}
+		return $change;
 	}
 
 	/**
@@ -274,21 +290,28 @@ class Block_Change {
 			);
 		}
 
+		// A heading is short; the text kept checks the block is unchanged.
+		if ( mb_strlen( $text ) > self::MAX_HEADING_LENGTH ) {
+			return null;
+		}
+
 		if ( 'core/heading' === $to ) {
 			$level = $change['level'] ?? 2;
-			if ( ! is_int( $level ) || $level < 2 || $level > 6 || mb_strlen( $text ) > self::MAX_HEADING_LENGTH ) {
+			if ( ! is_int( $level ) || $level < 2 || $level > 6 ) {
 				return null;
 			}
 			return array(
 				'type'  => 'transform',
 				'to'    => $to,
 				'level' => $level,
+				'text'  => $text,
 			);
 		}
 
 		return array(
 			'type' => 'transform',
 			'to'   => $to,
+			'text' => $text,
 		);
 	}
 
@@ -323,6 +346,7 @@ class Block_Change {
 		return array(
 			'type'  => 'split',
 			'after' => $after,
+			'next'  => mb_substr( trim( $rest ), 0, self::MAX_NEXT_LENGTH ),
 		);
 	}
 
@@ -436,10 +460,13 @@ class Block_Change {
 				return self::decode_transform( $decoded, $block_name );
 			case 'split':
 				$after = $decoded['after'] ?? null;
+				$next  = $decoded['next'] ?? null;
 				return is_string( $after ) && '' !== $after && mb_strlen( $after ) <= self::MAX_SPLIT_LENGTH && ! str_contains( $after, '<' )
+					&& is_string( $next ) && '' !== $next && mb_strlen( $next ) <= self::MAX_NEXT_LENGTH
 					? array(
 						'type'  => 'split',
 						'after' => $after,
+						'next'  => $next,
 					)
 					: null;
 			default:
@@ -487,6 +514,14 @@ class Block_Change {
 			$clean['from'][ $key ]       = $from[ $key ];
 		}
 
+		if ( array() !== array_intersect( array_keys( $clean['attributes'] ), self::IMAGE_ATTRIBUTES ) ) {
+			$image = $decoded['image'] ?? null;
+			if ( ! is_string( $image ) || '' === $image || strlen( $image ) > self::MAX_URL_LENGTH ) {
+				return null;
+			}
+			$clean['image'] = $image;
+		}
+
 		return $clean;
 	}
 
@@ -516,18 +551,25 @@ class Block_Change {
 			);
 		}
 
+		$text = $decoded['text'] ?? null;
+		if ( ! is_string( $text ) || '' === $text || mb_strlen( $text ) > self::MAX_HEADING_LENGTH ) {
+			return null;
+		}
+
 		if ( 'core/heading' === $to ) {
 			$level = $decoded['level'] ?? null;
 			return is_int( $level ) && $level >= 2 && $level <= 6 ? array(
 				'type'  => 'transform',
 				'to'    => $to,
 				'level' => $level,
+				'text'  => $text,
 			) : null;
 		}
 
 		return array(
 			'type' => 'transform',
 			'to'   => $to,
+			'text' => $text,
 		);
 	}
 }
