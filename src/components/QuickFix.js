@@ -1,45 +1,28 @@
 /**
  * Quick Fix Component
  *
- * Preview and apply an AI quick fix (a plain text find/replace) to a block.
+ * Preview and apply an edit to a note's block: a review's quick fix (a plain
+ * text find/replace) or an edit an AI reply proposed (see reply-edit.js).
  */
 import { Button, Modal } from '@wordpress/components';
 import { useDispatch, useRegistry, useSelect } from '@wordpress/data';
 import { useState } from '@wordpress/element';
-import { __, sprintf } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { store as blocksStore } from '@wordpress/blocks';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import { hasSuggestionMarkers } from '../utils/suggestions';
+import { getRichTextAttributeKey } from '../utils/quick-fix';
 import {
-	applyFixToContent,
-	getFixPreview,
-	getRichTextAttributeKey,
-} from '../utils/quick-fix';
+	applyEditToContent,
+	describeEdit,
+	describeFix,
+	getEditPreview,
+} from '../utils/reply-edit';
 
-/**
- * Describe a quick fix in one short sentence.
- *
- * @param {Object} fix Quick fix with `find` and `replace`.
- * @return {string} Description.
- */
-export function describeFix(fix) {
-	if (!fix.replace) {
-		return sprintf(
-			/* translators: %s: text to delete */
-			__('Delete “%s”', 'fresh-eyes'),
-			fix.find
-		);
-	}
-	return sprintf(
-		/* translators: 1: text to replace, 2: replacement text */
-		__('Replace “%1$s” with “%2$s”', 'fresh-eyes'),
-		fix.find,
-		fix.replace
-	);
-}
+export { describeFix };
 
 /**
  * Describe where a quick fix stands as a Gutenberg suggestion.
@@ -77,18 +60,51 @@ export function describeSuggestionStatus(status) {
 }
 
 /**
+ * Render preview parts as inline text with deletions and insertions marked.
+ *
+ * @param {Object}                              props       Component props.
+ * @param {Array<{type: string, text: string}>} props.parts Preview parts.
+ * @return {Element} Diff paragraph.
+ */
+function EditDiff({ parts }) {
+	return (
+		<p className="ai-feedback-quick-fix-diff">
+			{parts.map((part, index) => {
+				if (part.type === 'removed') {
+					return <del key={index}>{part.text}</del>;
+				}
+				if (part.type === 'added') {
+					return <ins key={index}>{part.text}</ins>;
+				}
+				return <span key={index}>{part.text}</span>;
+			})}
+		</p>
+	);
+}
+
+/**
  * Quick fix component.
  *
- * @param {Object} props      Component props.
- * @param {Object} props.item Feedback item with `quick_fix` and `block_id`.
- * @return {Element} Quick fix component.
+ * Applying resolves the note `item.id`, like dismissing it, and marks it
+ * fixed. For an AI reply's edit, `noteId` is the reply, which is the note
+ * that becomes the Gutenberg suggestion and is marked applied too.
+ *
+ * @param {Object} props          Component props.
+ * @param {Object} props.item     Feedback note with `id` and `block_id`, and `quick_fix` unless `edit` is given.
+ * @param {Object} [props.edit]   Edit to apply. Defaults to the note's quick fix.
+ * @param {number} [props.noteId] Note that owns the edit. Defaults to `item.id`.
+ * @return {Element|null} Quick fix component.
  */
-export default function QuickFix({ item }) {
-	const fix = item.quick_fix;
+export default function QuickFix({ item, edit, noteId }) {
+	const fix = edit ?? item.quick_fix;
+	const ownerId = noteId ?? item.id;
+	const isReplyEdit = ownerId !== item.id;
 	const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-	const suggestionStatus = useSuggestionStatus(item);
+	const suggestionStatus = useSuggestionStatus(
+		isReplyEdit ? { id: ownerId } : item
+	);
 
-	const { attributeKey, content } = useSelect(
+	const { attributeKey, content, isApplied } = useSelect(
 		(select) => {
 			const block = select(blockEditorStore).getBlock(item.block_id);
 			const key = block
@@ -99,24 +115,30 @@ export default function QuickFix({ item }) {
 			return {
 				attributeKey: key,
 				content: key ? block.attributes[key] : undefined,
+				isApplied: select(STORE_NAME).isFixApplied(ownerId),
 			};
 		},
-		[item.block_id]
+		[item.block_id, ownerId]
 	);
 
 	const registry = useRegistry();
-	const { updateBlockAttributes } = useDispatch(blockEditorStore);
+	const {
+		updateBlockAttributes,
+		__unstableMarkLastChangeAsPersistent: markLastChangeAsPersistent,
+	} = useDispatch(blockEditorStore);
 	const { setNoteResolved, setFixApplied } = useDispatch(STORE_NAME);
 	const { createSuccessNotice, createWarningNotice } =
 		useDispatch(noticesStore);
+
+	const summary = (
+		<p className="ai-feedback-quick-fix-summary">{describeEdit(fix)}</p>
+	);
 
 	// Gutenberg's suggestion UI owns fixes that became suggestions.
 	if (suggestionStatus) {
 		return (
 			<div className="ai-feedback-quick-fix">
-				<p className="ai-feedback-quick-fix-summary">
-					{describeFix(fix)}
-				</p>
+				{summary}
 				<p className="ai-feedback-quick-fix-suggested description">
 					{describeSuggestionStatus(suggestionStatus)}
 				</p>
@@ -130,11 +152,33 @@ export default function QuickFix({ item }) {
 		return null;
 	}
 
+	// A reply stays in the thread after its edit is applied.
+	if (isReplyEdit && isApplied) {
+		return (
+			<div className="ai-feedback-quick-fix">
+				{summary}
+				<p className="ai-feedback-quick-fix-applied description">
+					{__('You applied this change.', 'fresh-eyes')}
+				</p>
+			</div>
+		);
+	}
+
 	// Marker text holds both the added and the deleted runs, so a fix could
 	// match inside a deletion and inherit its format.
 	const hasSuggestions = hasSuggestionMarkers(content);
-	const preview = hasSuggestions ? null : getFixPreview(content, fix);
+	const preview = hasSuggestions ? null : getEditPreview(content, fix);
 	const canApply = !!preview;
+	const applyLabel = isReplyEdit
+		? __('Apply change', 'fresh-eyes')
+		: __('Apply fix', 'fresh-eyes');
+
+	const setApplied = (applied) => {
+		setFixApplied(item.id, applied);
+		if (isReplyEdit) {
+			setFixApplied(ownerId, applied);
+		}
+	};
 
 	const setResolved = async (resolved) => {
 		if (!item.id) {
@@ -160,53 +204,65 @@ export default function QuickFix({ item }) {
 	};
 
 	const handleApply = () => {
-		const updated = applyFixToContent(content, fix);
+		const updated = applyEditToContent(content, fix);
 		if (!updated) {
 			return;
 		}
 
 		const previous = content;
+		// One attribute update in its own undo level: an update to the
+		// attribute the author just typed in would otherwise merge with the
+		// typing, and their next keystroke would merge with this.
+		markLastChangeAsPersistent?.();
 		updateBlockAttributes(item.block_id, { [attributeKey]: updated });
-		setFixApplied(item.id, true);
+		markLastChangeAsPersistent?.();
+		setApplied(true);
 		setResolved(true);
 		setIsPreviewOpen(false);
 
-		createSuccessNotice(__('Fix applied.', 'fresh-eyes'), {
-			type: 'snackbar',
-			id: `ai-feedback-fix-applied-${item.id}`,
-			actions: [
-				{
-					label: __('Undo', 'fresh-eyes'),
-					onClick: () => {
-						// Don't overwrite edits made after the fix.
-						const current = registry
-							.select(blockEditorStore)
-							.getBlock(item.block_id)?.attributes[attributeKey];
-						if (String(current) !== String(updated)) {
-							createWarningNotice(
-								__(
-									'The block has changed since the fix was applied. Use the editor’s Undo instead.',
-									'fresh-eyes'
-								),
-								{ type: 'snackbar' }
-							);
-							return;
-						}
+		createSuccessNotice(
+			isReplyEdit
+				? __('Change applied.', 'fresh-eyes')
+				: __('Fix applied.', 'fresh-eyes'),
+			{
+				type: 'snackbar',
+				id: `ai-feedback-fix-applied-${ownerId}`,
+				actions: [
+					{
+						label: __('Undo', 'fresh-eyes'),
+						onClick: () => {
+							// Don't overwrite edits made after the fix.
+							const current = registry
+								.select(blockEditorStore)
+								.getBlock(item.block_id)?.attributes[
+								attributeKey
+							];
+							if (String(current) !== String(updated)) {
+								createWarningNotice(
+									__(
+										'The block has changed since the fix was applied. Use the editor’s Undo instead.',
+										'fresh-eyes'
+									),
+									{ type: 'snackbar' }
+								);
+								return;
+							}
 
-						updateBlockAttributes(item.block_id, {
-							[attributeKey]: previous,
-						});
-						setFixApplied(item.id, false);
-						setResolved(false);
+							updateBlockAttributes(item.block_id, {
+								[attributeKey]: previous,
+							});
+							setApplied(false);
+							setResolved(false);
+						},
 					},
-				},
-			],
-		});
+				],
+			}
+		);
 	};
 
 	return (
 		<div className="ai-feedback-quick-fix">
-			<p className="ai-feedback-quick-fix-summary">{describeFix(fix)}</p>
+			{summary}
 			{hasSuggestions && (
 				<p className="ai-feedback-quick-fix-unavailable description">
 					{__(
@@ -217,10 +273,15 @@ export default function QuickFix({ item }) {
 			)}
 			{!canApply && !hasSuggestions && (
 				<p className="ai-feedback-quick-fix-unavailable description">
-					{__(
-						'The block text has changed, so this fix can no longer be applied.',
-						'fresh-eyes'
-					)}
+					{isReplyEdit
+						? __(
+								'This change is outdated: the block text has changed since the reply.',
+								'fresh-eyes'
+							)
+						: __(
+								'The block text has changed, so this fix can no longer be applied.',
+								'fresh-eyes'
+							)}
 				</p>
 			)}
 			<div className="ai-feedback-item-actions">
@@ -231,7 +292,7 @@ export default function QuickFix({ item }) {
 					disabled={!canApply}
 					accessibleWhenDisabled
 				>
-					{__('Apply fix', 'fresh-eyes')}
+					{applyLabel}
 				</Button>
 				<Button
 					variant="secondary"
@@ -246,16 +307,15 @@ export default function QuickFix({ item }) {
 
 			{isPreviewOpen && preview && (
 				<Modal
-					title={__('Preview fix', 'fresh-eyes')}
+					title={
+						isReplyEdit
+							? __('Preview change', 'fresh-eyes')
+							: __('Preview fix', 'fresh-eyes')
+					}
 					onRequestClose={() => setIsPreviewOpen(false)}
 					className="ai-feedback-quick-fix-modal"
 				>
-					<p className="ai-feedback-quick-fix-diff">
-						{preview.before}
-						<del>{preview.removed}</del>
-						{preview.added && <ins>{preview.added}</ins>}
-						{preview.after}
-					</p>
+					<EditDiff parts={preview} />
 					<div className="ai-feedback-quick-fix-modal-actions">
 						<Button
 							variant="tertiary"
@@ -264,7 +324,7 @@ export default function QuickFix({ item }) {
 							{__('Cancel', 'fresh-eyes')}
 						</Button>
 						<Button variant="primary" onClick={handleApply}>
-							{__('Apply fix', 'fresh-eyes')}
+							{applyLabel}
 						</Button>
 					</div>
 				</Modal>
