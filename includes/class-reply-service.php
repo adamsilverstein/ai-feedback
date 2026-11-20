@@ -489,8 +489,13 @@ class Reply_Service {
 			'block_content'     => $block_content,
 			'block_is_text'     => true,
 			'block_type'        => $block_type,
-			// A rewrite must see the whole block, so not once the prompt truncates it.
+			// A rewrite replaces the whole block from the plain text the AI
+			// sees, so only when that text is the whole block: not once the
+			// prompt truncates it, and not when links, formatting or line
+			// breaks would be lost.
 			'block_can_rewrite' => '' !== $block_content
+				&& null !== $block
+				&& ! self::has_inline_markup( $block )
 				&& mb_strlen( $block_content ) <= Prompt_Builder::REPLY_BLOCK_CONTENT_LIMIT
 				&& self::supports_rewrite( $block_type ),
 			'original_feedback' => $parent->comment_content,
@@ -501,6 +506,19 @@ class Reply_Service {
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
 		);
+	}
+
+	/**
+	 * Whether a block's text holds any markup inside its wrapper element,
+	 * such as a link, bold text or a line break.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return bool
+	 */
+	private static function has_inline_markup( array $block ): bool {
+		$html  = trim( self::get_block_html( $block ) );
+		$inner = (string) preg_replace( '#^<[a-zA-Z][^>]*>|</[a-zA-Z][a-zA-Z0-9-]*>$#', '', $html );
+		return str_contains( $inner, '<' );
 	}
 
 	/**

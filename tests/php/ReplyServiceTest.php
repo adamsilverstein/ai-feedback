@@ -794,6 +794,58 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for blocks whose markup a plain text rewrite would drop.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function formatted_block_provider(): array {
+		return array(
+			'link'       => array( '<p>Revenue grew 40% <a href="https://example.com">last year</a>.</p>' ),
+			'bold'       => array( '<p>Revenue grew <strong>40%</strong> last year.</p>' ),
+			'line break' => array( '<p>Revenue grew 40%<br>last year.</p>' ),
+		);
+	}
+
+	/**
+	 * A block with links, formatting or line breaks can't be rewritten, and
+	 * the prompt does not offer it.
+	 *
+	 * @dataProvider formatted_block_provider
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public function test_rewrite_is_dropped_for_formatted_block( string $html ): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Rewrote it.", "edit": {"type": "rewrite_block", "content": "Revenue grew 40% in 2025."}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertStringNotContainsString( 'rewrite_block', $service->captured_prompt );
+		$this->assertSame( 'Rewrote it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
+	}
+
+	/**
+	 * A plain text block offers the rewrite in the prompt.
+	 */
+	public function test_prompt_offers_rewrite_for_plain_block(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_reply_can_rewrite_block' => true );
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p class="has-text-align-center">Revenue grew 40% last year.</p>', 100 ) ) );
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+		unset( $GLOBALS['test_filter_results'] );
+
+		$this->assertStringContainsString( '"type": "rewrite_block"', $service->captured_prompt );
+	}
+
+	/**
 	 * A block too long to send in full can't be rewritten.
 	 */
 	public function test_rewrite_is_dropped_for_truncated_block(): void {

@@ -4,7 +4,9 @@
  * An edit is either `{ type: 'replace_text', find, replace }`, applied like a
  * quick fix, or `{ type: 'rewrite_block', content, original }`, which
  * replaces the block's whole text. `original` is the block text the AI saw,
- * so a rewrite is outdated once the block no longer reads the same.
+ * so a rewrite is outdated once the block no longer reads the same. The AI
+ * only sees plain text, so a rewrite also never applies to a block with
+ * links, formatting or line breaks, which it would drop.
  * Response_Parser validates both on the server.
  */
 import { __, sprintf } from '@wordpress/i18n';
@@ -51,9 +53,13 @@ export function normalizeText(text) {
  * @return {boolean} True when the edit can be applied.
  */
 export function isEditCurrent(content, edit) {
-	const value = create({ html: toHtml(content) });
+	const html = toHtml(content);
+	const value = create({ html });
 	if (edit?.type === 'rewrite_block') {
-		return normalizeText(value.text) === normalizeText(edit.original);
+		return (
+			!html.includes('<') &&
+			normalizeText(value.text) === normalizeText(edit.original)
+		);
 	}
 	return findUniqueOffset(value, edit) !== -1;
 }

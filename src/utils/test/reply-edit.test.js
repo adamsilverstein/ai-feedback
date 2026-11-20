@@ -63,12 +63,35 @@ describe('isEditCurrent', () => {
 
 	it('needs the block to read as the rewrite expects', () => {
 		expect(isEditCurrent(CONTENT, REWRITE)).toBe(true);
-		// Formatting and wrapping do not matter, the words do.
-		expect(
-			isEditCurrent('Revenue <b>grew</b>  40% last year.', REWRITE)
-		).toBe(true);
+		// Wrapping does not matter, the words do.
+		expect(isEditCurrent('Revenue grew\n 40%  last year.', REWRITE)).toBe(
+			true
+		);
 		expect(isEditCurrent('Revenue grew 45% last year.', REWRITE)).toBe(
 			false
+		);
+	});
+});
+
+describe('rewrites of formatted blocks', () => {
+	// The AI only saw the plain text, so applying would drop the link.
+	const linked =
+		'Revenue grew 40% <a href="https://example.com">last year</a>.';
+
+	it.each([
+		['a link', linked],
+		['bold text', 'Revenue grew <strong>40%</strong> last year.'],
+		['a line break', 'Revenue grew 40%<br>last year.'],
+	])('never apply to a block with %s', (_label, content) => {
+		expect(isEditCurrent(content, REWRITE)).toBe(false);
+		expect(applyEditToContent(content, REWRITE)).toBeNull();
+		expect(getEditPreview(content, REWRITE)).toBeNull();
+		expect(getRewriteRuns(content, REWRITE)).toBeNull();
+	});
+
+	it('still lets a text edit through', () => {
+		expect(applyEditToContent(linked, TEXT_EDIT)).toBe(
+			'Revenue grew 40% <a href="https://example.com">in 2025</a>.'
 		);
 	});
 });
@@ -166,18 +189,13 @@ describe('getEditPreview', () => {
 });
 
 describe('getRewriteRuns', () => {
-	it('keeps the formatting of each side', () => {
-		expect(
-			getRewriteRuns(
-				'Revenue grew <strong>40%</strong> last year.',
-				REWRITE
-			)
-		).toEqual([
+	it('keeps the formatting of the rewrite', () => {
+		expect(getRewriteRuns(CONTENT, REWRITE)).toEqual([
 			{ type: 'equal', html: 'Revenue grew ' },
 			{
 				type: 'change',
 				html: '<em>sharply</em>',
-				removedHtml: '<strong>40%</strong>',
+				removedHtml: '40%',
 			},
 			{ type: 'equal', html: ' last year.' },
 		]);

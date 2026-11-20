@@ -596,7 +596,7 @@ describe('buildRewriteSuggestionContent', () => {
 	it('marks each changed run as an add then a del under one id', () => {
 		expect(
 			buildRewriteSuggestionContent(
-				'We met in order to plan the <em>launch</em>.',
+				'We met in order to plan the launch.',
 				{
 					...rewrite,
 					content: 'We met to plan the <em>launch</em> today.',
@@ -604,7 +604,7 @@ describe('buildRewriteSuggestionContent', () => {
 				{ id: 30 }
 			)
 		).toBe(
-			`We met ${del(30, 'in order ')}to plan the <em>launch</em>${add(30, ' today')}.`
+			`We met ${del(30, 'in order ')}to plan the ${add(30, '<em>launch</em> today')}${del(30, 'launch')}.`
 		);
 	});
 
