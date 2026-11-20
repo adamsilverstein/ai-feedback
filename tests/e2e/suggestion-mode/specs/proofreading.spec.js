@@ -1,6 +1,7 @@
 /**
  * Suggestion Mode: proofreading fixes become suggestions, and Accept all
- * accepts the pending ones together with the rest. Pending suggestions
+ * accepts the pending ones together with the rest; each can also be accepted
+ * or rejected on its own from Gutenberg's Notes sidebar. Pending suggestions
  * whose markers are lost go back to being plain notes.
  *
  * Uses the mock AI from tests/mu-plugins/ai-feedback-e2e.php, which finds
@@ -11,6 +12,7 @@
 const { test, expect } = require('../../fixtures');
 const {
 	blockTexts,
+	decideSuggestion,
 	drainCron,
 	getSuggestionMeta,
 	markerIds,
@@ -42,9 +44,12 @@ async function reviewPost(fixtures) {
 	const response = await aiFeedback.runReview();
 	expect((await response.json()).note_ids).toHaveLength(7);
 
+	// Each suggestion waits on its own note write, one after another.
 	await expect
-		.poll(() =>
-			blockTexts(editor).then((texts) => texts.map(markerIds).flat())
+		.poll(
+			() =>
+				blockTexts(editor).then((texts) => texts.map(markerIds).flat()),
+			{ timeout: 20000 }
 		)
 		.toHaveLength(4);
 	const suggested = (await blockTexts(editor)).map(markerIds).flat();
@@ -100,6 +105,40 @@ test.describe('Proofreading suggestions', () => {
 				)
 			)
 			.toEqual(suggested.map(() => 'applied'));
+	});
+
+	test('Accept and Reject one suggestion each from the Notes sidebar', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const fixtures = { page, editor, admin, requestUtils, aiFeedback };
+		await reviewPost(fixtures);
+		const [, , weird, their] = (await blockTexts(editor)).map(
+			(text) => markerIds(text)[0]
+		);
+
+		await decideSuggestion(page, 'Accept', 'Thier');
+		await decideSuggestion(page, 'Reject', 'wierd');
+
+		await expect
+			.poll(() => blockTexts(editor).then((texts) => texts.slice(2)))
+			.toEqual(['A wierd day.', 'Their plan works.']);
+
+		await editor.saveDraft();
+		await expect
+			.poll(() =>
+				Promise.all(
+					[their, weird].map((id) =>
+						getSuggestionMeta(requestUtils, id).then(
+							(meta) => meta.status
+						)
+					)
+				)
+			)
+			.toEqual(['applied', 'rejected']);
 	});
 
 	test('pending suggestions whose markers are lost become plain notes', async ({
