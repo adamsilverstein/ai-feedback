@@ -66,11 +66,16 @@ function getReviewText(block, rawContent) {
 	if (block.name === 'core/image') {
 		return extractTextContent(rawContent);
 	}
-	// Rich text reads an empty element with attributes, like the wrapper a
-	// group keeps once its inner blocks are left out, as an object (U+FFFC).
-	// Only an <img> is one, as Reply_Service::editor_text() reads it.
+	// Rich text reads the empty wrapper a parent like a group keeps, once
+	// its inner blocks are left out, as an object (U+FFFC). A parent whose
+	// own HTML reads as nothing but that, and holds no image, has no text of
+	// its own, as Reply_Service::editor_text() reads it.
 	const text = extractEditorText(rawContent);
-	return /<img\b/i.test(rawContent) ? text : text.replace(/\uFFFC/g, '');
+	const isEmptyWrapper =
+		block.innerBlocks?.length > 0 &&
+		!/<img\b/i.test(rawContent) &&
+		!text.replace(/[\uFFFC\s]/g, '');
+	return isEmptyWrapper ? '' : text;
 }
 
 /**

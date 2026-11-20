@@ -324,6 +324,24 @@ describe('Custom HTML and blocks that save nothing', () => {
 	);
 });
 
+// Only a parent's empty wrapper is read as no text: U+FFFC in a block's
+// own text is kept, as the server is to read it too (see #311).
+describe('U+FFFC in a block’s own text', () => {
+	it('is kept in a paragraph', () => {
+		const [block] = loadEditor(
+			parse(
+				'<!-- wp:paragraph --><p>Before <span class="marker"></span>after.</p><!-- /wp:paragraph -->'
+			)
+		)
+			.select(blockEditorStore)
+			.getBlocks();
+
+		expect(extractBlockData([block])[0].content).toBe(
+			'Before \uFFFCafter.'
+		);
+	});
+});
+
 // The editor's notion of a block's own text, from its save output without
 // inner blocks, must match the server's, from its `innerContent` strings.
 describe('a block’s own text, shared with the server', () => {
