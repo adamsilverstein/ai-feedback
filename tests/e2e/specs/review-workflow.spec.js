@@ -229,6 +229,59 @@ test.describe('Review Workflow', () => {
 		).toHaveCount(0);
 	});
 
+	test('reviews a Custom HTML block as edited', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Custom HTML only',
+			content:
+				'<!-- wp:html --><p>Custom text as loaded.</p><!-- /wp:html -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const loaded = await aiFeedback.runReview();
+		expect(loaded.request().postDataJSON().blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/html',
+				content: 'Custom text as loaded.',
+			}),
+		]);
+
+		// Save an edit the way the block's own editor does, as its editing
+		// UI differs between WordPress versions.
+		await page.evaluate(() => {
+			const { select, dispatch } = window.wp.data;
+			const [block] = select('core/block-editor').getBlocks();
+			if (Array.isArray(block.innerContent)) {
+				dispatch('core/block-editor').updateBlock(block.clientId, {
+					innerContent: ['<p>Custom text as edited.</p>'],
+				});
+			} else {
+				dispatch('core/block-editor').updateBlockAttributes(
+					block.clientId,
+					{ content: '<p>Custom text as edited.</p>' }
+				);
+			}
+		});
+
+		const edited = await aiFeedback.runReview();
+		expect(edited.request().postDataJSON().blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/html',
+				content: 'Custom text as edited.',
+			}),
+		]);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,

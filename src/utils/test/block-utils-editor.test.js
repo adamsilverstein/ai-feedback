@@ -11,7 +11,15 @@ import { beforeAll, describe, expect, it } from 'vitest';
  * WordPress dependencies
  */
 import { createRegistry } from '@wordpress/data';
-import { createBlock, getBlockTypes, parse } from '@wordpress/blocks';
+import {
+	createBlock,
+	getBlockType,
+	getBlockTypes,
+	parse,
+	registerBlockType,
+	unregisterBlockType,
+} from '@wordpress/blocks';
+import { RawHTML } from '@wordpress/element';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { registerCoreBlocks } from '@wordpress/block-library';
 
@@ -195,5 +203,92 @@ describe('anchors of loaded blocks', () => {
 		// have none, so they are not sent and have no anchor.
 		const group = blockList.find(({ name }) => name === 'core/group');
 		expect(anchors[group.clientId]).toBeUndefined();
+	});
+});
+
+describe('Custom HTML and blocks that save nothing', () => {
+	const htmlText = (registry) =>
+		extractBlockData(registry.select(blockEditorStore).getBlocks()).map(
+			({ content }) => content
+		);
+
+	it('reads a loaded Custom HTML block, and its text once edited', () => {
+		const registry = loadEditor(
+			parse('<!-- wp:html --><p>Custom text</p><!-- /wp:html -->')
+		);
+		expect(htmlText(registry)).toEqual(['Custom text']);
+		expect(
+			hasTextContent(registry.select(blockEditorStore).getBlocks())
+		).toBe(true);
+
+		// As the block's editor saves an edit.
+		const [{ clientId }] = registry.select(blockEditorStore).getBlocks();
+		registry
+			.dispatch(blockEditorStore)
+			.updateBlock(clientId, { innerContent: ['<p>Edited custom</p>'] });
+		expect(htmlText(registry)).toEqual(['Edited custom']);
+
+		registry
+			.dispatch(blockEditorStore)
+			.updateBlock(clientId, { innerContent: [] });
+		expect(
+			hasTextContent(registry.select(blockEditorStore).getBlocks())
+		).toBe(false);
+	});
+
+	it('reads a Custom HTML block made with the content attribute', () => {
+		const registry = loadEditor([
+			createBlock('core/html', { content: '<p>Made with content</p>' }),
+		]);
+		expect(htmlText(registry)).toEqual(['Made with content']);
+	});
+
+	it('reads the older Custom HTML block that saves its content attribute', () => {
+		const current = getBlockType('core/html');
+		unregisterBlockType('core/html');
+		registerBlockType('core/html', {
+			...current,
+			save: ({ attributes }) => <RawHTML>{attributes.content}</RawHTML>,
+		});
+		try {
+			const registry = loadEditor([
+				{
+					...createBlock('core/html', {
+						content: '<p>Older shape</p>',
+					}),
+					originalContent: '<p>Older shape</p>',
+				},
+			]);
+			const [{ clientId }] = registry
+				.select(blockEditorStore)
+				.getBlocks();
+			registry
+				.dispatch(blockEditorStore)
+				.updateBlockAttributes(clientId, {
+					content: '<p>Older shape, edited</p>',
+				});
+			expect(htmlText(registry)).toEqual(['Older shape, edited']);
+		} finally {
+			unregisterBlockType('core/html');
+			registerBlockType('core/html', current);
+		}
+	});
+
+	it('falls back to the loaded markup of a block that saves nothing', () => {
+		registerBlockType('test/saves-nothing', {
+			title: 'Saves nothing',
+			category: 'text',
+			attributes: {},
+			save: () => null,
+		});
+		try {
+			const block = {
+				...createBlock('test/saves-nothing'),
+				originalContent: '<p>Loaded only</p>',
+			};
+			expect(extractBlockData([block])[0].content).toBe('Loaded only');
+		} finally {
+			unregisterBlockType('test/saves-nothing');
+		}
 	});
 });

@@ -1,7 +1,11 @@
 /**
  * Utility functions for block content extraction.
  */
-import { getBlockType, getSaveContent } from '@wordpress/blocks';
+import {
+	getBlockType,
+	getSaveContent,
+	getSaveElement,
+} from '@wordpress/blocks';
 import { debugLog } from './debug';
 
 /**
@@ -81,12 +85,34 @@ export function getFormattingAttributes(block) {
  * @return {string} Block HTML.
  */
 function getOwnHTML(block) {
+	// The Custom HTML block keeps its markup in `innerContent`, which is
+	// updated as it is edited, and saves nothing. Its string fragments are
+	// its own markup, the `null` ones mark inner blocks.
+	if (Array.isArray(block.innerContent)) {
+		return block.innerContent
+			.filter((part) => typeof part === 'string')
+			.join('');
+	}
+
 	const saved = block.originalContent || '';
 	if (block.isValid === false || !getBlockType(block.name)) {
 		return saved;
 	}
+	const attributes = block.attributes ?? {};
 	try {
-		return getSaveContent(block.name, block.attributes ?? {}, []);
+		const html = getSaveContent(block.name, attributes, []);
+		// A save that renders nothing has no current markup to read, so the
+		// loaded markup is all there is. A block emptied in the editor still
+		// renders its wrapper, so it never gets here.
+		if (!html && getSaveElement(block.name, attributes, []) === null) {
+			// A Custom HTML block made with its markup in the deprecated
+			// `content` attribute, not yet moved to `innerContent`.
+			return block.name === 'core/html' &&
+				typeof attributes.content === 'string'
+				? attributes.content
+				: saved;
+		}
+		return html;
 	} catch (error) {
 		debugLog(
 			`Could not save ${block.name}, using its loaded markup.`,
