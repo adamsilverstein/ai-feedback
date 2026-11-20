@@ -1127,40 +1127,12 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
-	 * A new edit is numbered after the thread's earlier ones, counting the
-	 * review's quick fix.
+	 * An edit is saved without a revision number: the thread's order gives
+	 * it when the thread is read.
 	 */
-	public function test_new_edit_is_numbered_after_earlier_edits(): void {
-		$this->seed_parent_and_reply();
-		$GLOBALS['test_comment_meta'][100]['feedback_quick_fix'] = '{"find":"last year","replace":"in 2025"}';
-		$this->seed_ai_edit_reply(
-			500,
-			array(
-				'type'    => 'replace_text',
-				'find'    => 'last year',
-				'replace' => 'in fiscal 2025',
-			)
-		);
-		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', '<p>Revenue grew 40% last year.</p>', 100 ) ) );
-
-		$notes                    = new Reply_Service_Fake_Notes_Manager();
-		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
-		$service->canned_response = '{"reply": "Shorter.", "edit": {"type": "replace_text", "find": "last year", "replace": "2025"}}';
-		$service->handle_reply( 999, 100, 42, 'abc-123' );
-
-		$this->assertSame( 3, $notes->last_reply['feedback_item']['revision'] );
-	}
-
-	/**
-	 * The first edit in a thread without a quick fix is revision 1, and a
-	 * reply without an edit has no revision.
-	 */
-	public function test_first_edit_is_revision_one(): void {
-		$with_edit = $this->reply_with( '{"reply": "Done.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
-		$this->assertSame( 1, $with_edit->last_reply['feedback_item']['revision'] );
-
-		$without_edit = $this->reply_with( '{"reply": "It is the growth figure.", "edit": null}' );
-		$this->assertArrayNotHasKey( 'revision', $without_edit->last_reply['feedback_item'] );
+	public function test_edit_is_saved_without_revision(): void {
+		$notes = $this->reply_with( '{"reply": "Done.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}' );
+		$this->assertArrayNotHasKey( 'revision', $notes->last_reply['feedback_item'] );
 	}
 
 	/**
@@ -1310,7 +1282,6 @@ class ReplyServiceTest extends TestCase {
 			),
 			$item['reply_edit']
 		);
-		$this->assertSame( 1, $item['revision'] );
 	}
 
 	/**
@@ -1329,7 +1300,6 @@ class ReplyServiceTest extends TestCase {
 
 		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nmove this block before the core/paragraph block that starts \"Before 1.\"", $service->captured_prompt );
 		$this->assertSame( array( 'type' => 'remove_block' ), $notes->last_reply['feedback_item']['reply_edit'] );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**
@@ -1350,7 +1320,6 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nchange this heading to level 3", $service->captured_prompt );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**
@@ -1370,7 +1339,6 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
-		$this->assertSame( 2, $notes->last_reply['feedback_item']['revision'] );
 	}
 
 	/**

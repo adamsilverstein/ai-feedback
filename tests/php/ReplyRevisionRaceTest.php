@@ -56,6 +56,13 @@ class Race_Reply_Service extends Reply_Service {
 class Race_Notes_Manager extends Notes_Manager {
 
 	/**
+	 * AI replies saved, oldest first.
+	 *
+	 * @var list<\WP_Comment>
+	 */
+	public array $saved = array();
+
+	/**
 	 * Save the AI reply as a note in the thread.
 	 *
 	 * @param array<string, mixed> $feedback_item Feedback item.
@@ -65,11 +72,11 @@ class Race_Notes_Manager extends Notes_Manager {
 	 * @return int|\WP_Error
 	 */
 	public function add_reply_to_thread( array $feedback_item, int $post_id, int $parent_id, array $review_data = array() ): int|\WP_Error {
-		$id   = 900 + count( $GLOBALS['test_comments'] );
+		$id   = 900 + count( $this->saved );
 		$meta = ( new \ReflectionMethod( Notes_Manager::class, 'build_note_meta' ) )->invoke( $this, $feedback_item, $review_data );
 
-		$GLOBALS['test_comments'][ $id ]     = new \WP_Comment(
-			array(
+		$reply                           = new \WP_Comment(
+			(object) array(
 				'comment_ID'      => (string) $id,
 				'comment_post_ID' => (string) $post_id,
 				'comment_parent'  => (string) $parent_id,
@@ -77,6 +84,8 @@ class Race_Notes_Manager extends Notes_Manager {
 				'comment_content' => 'Done.',
 			)
 		);
+		$this->saved[]                   = $reply;
+		$GLOBALS['test_comments'][ $id ] = $reply;
 		$GLOBALS['test_comment_meta'][ $id ] = array_map(
 			static fn( $value ) => is_scalar( $value ) ? (string) $value : $value,
 			array_filter( is_array( $meta ) ? $meta : array(), static fn( $value ) => null !== $value )
@@ -118,27 +127,27 @@ class ReplyRevisionRaceTest extends TestCase {
 		);
 		$GLOBALS['test_comments'] = array(
 			100 => new \WP_Comment(
-				$base + array(
+				(object) ( $base + array(
 					'comment_ID'      => '100',
 					'comment_author'  => 'Fresh Eyes',
 					'comment_content' => 'Vague claim.',
-				)
+				) )
 			),
 			200 => new \WP_Comment(
-				$base + array(
+				(object) ( $base + array(
 					'comment_ID'      => '200',
 					'comment_parent'  => '100',
 					'comment_author'  => 'Jane',
 					'comment_content' => 'Make that change.',
-				)
+				) )
 			),
 			201 => new \WP_Comment(
-				$base + array(
+				(object) ( $base + array(
 					'comment_ID'      => '201',
 					'comment_parent'  => '100',
 					'comment_author'  => 'Sam',
 					'comment_content' => 'Make it shorter.',
-				)
+				) )
 			),
 		);
 	}
@@ -163,17 +172,16 @@ class ReplyRevisionRaceTest extends TestCase {
 	 *
 	 * Both read the thread before either edit is saved.
 	 *
-	 * @return list<int> IDs of the two AI replies, oldest first.
+	 * @return list<\WP_Comment> The two AI replies, oldest first.
 	 */
 	private function answer_both_at_once(): array {
-		$service                    = new Race_Reply_Service( new Prompt_Builder(), new Race_Notes_Manager() );
+		$notes                      = new Race_Notes_Manager();
+		$service                    = new Race_Reply_Service( new Prompt_Builder(), $notes );
 		$service->overlapping_reply = 201;
 		$service->handle_reply( 200, 100, 42, 'abc-123' );
 
-		$ids = array_values( array_filter( array_map( 'intval', array_keys( $GLOBALS['test_comments'] ) ), static fn( int $id ): bool => $id >= 900 ) );
-		sort( $ids );
-		$this->assertCount( 2, $ids );
-		return $ids;
+		$this->assertCount( 2, $notes->saved );
+		return $notes->saved;
 	}
 
 	/**
@@ -185,9 +193,11 @@ class ReplyRevisionRaceTest extends TestCase {
 		$request = new \WP_REST_Request();
 		$request->set_param( 'post', 42 );
 		$data    = ( new Reply_Status_Controller() )->get_threads( $request )->get_data();
-		$replies = array_values( array_filter( ( (array) $data['threads'] )[100]['replies'], static fn( array $reply ): bool => $reply['is_ai'] ) );
+		$threads = is_array( $data ) ? (array) $data['threads'] : array();
+		$replies = is_array( $threads[100] ?? null ) && is_array( $threads[100]['replies'] ) ? $threads[100]['replies'] : array();
 
-		$this->assertSame( array( 1, 2 ), array_column( $replies, 'revision' ) );
+		// Jane's reply, Sam's, then the two answers.
+		$this->assertSame( array( null, null, 1, 2 ), array_column( $replies, 'revision' ) );
 	}
 
 	/**
@@ -196,7 +206,7 @@ class ReplyRevisionRaceTest extends TestCase {
 	public function test_badges_number_overlapping_edits_in_order(): void {
 		list( $first, $second ) = $this->answer_both_at_once();
 
-		$this->assertStringEndsWith( '>Suggested edit</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $GLOBALS['test_comments'][ $first ] ) );
-		$this->assertStringEndsWith( '>Revised suggestion (2)</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $GLOBALS['test_comments'][ $second ] ) );
+		$this->assertSame( "Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Suggested edit</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $first ) );
+		$this->assertSame( "Done.\n\n" . '<span class="ai-feedback-badge ai-feedback-revision">Revised suggestion (2)</span>', Notes_Manager::add_badges_to_comment_text( 'Done.', $second ) );
 	}
 }
