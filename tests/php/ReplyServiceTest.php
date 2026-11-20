@@ -578,7 +578,8 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year.', $service->captured_prompt );
+		// A newline in the source stays, as the editor reads it.
+		$this->assertStringContainsString( "Block content: Revenue grew 40%\n last year.", $service->captured_prompt );
 		$this->assertStringNotContainsString( 'Block content: Unrelated intro.', $service->captured_prompt );
 		// Other blocks are listed as nearby blocks, for structural edits.
 		$this->assertStringContainsString( '- [b1] core/paragraph: Unrelated intro.', $service->captured_prompt );
@@ -649,7 +650,8 @@ class ReplyServiceTest extends TestCase {
 		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
-		$this->assertStringContainsString( "Block content: Tom & Jerry said \"hi\" \u{2013} it's 5 pm.\n", $service->captured_prompt );
+		// Non-breaking spaces stay, as the editor keeps them.
+		$this->assertStringContainsString( "Block content: Tom & Jerry\u{00A0}said \"hi\" \u{2013} it's 5\u{00A0}\u{00A0}pm.\n", $service->captured_prompt );
 	}
 
 	/**
@@ -852,6 +854,69 @@ class ReplyServiceTest extends TestCase {
 			),
 			$notes->last_reply['feedback_item']['reply_edit']
 		);
+	}
+
+	/**
+	 * Data provider for block whitespace the editor keeps as written.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function editor_whitespace_provider(): array {
+		return array(
+			'break then source newline, as the prompt showed it before' => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n last year", false ),
+			'break then source newline, as the editor reads it'         => array( "<p>Revenue grew 40%<br />\nlast year.</p>", "40%\n\nlast year", true ),
+			'two typed spaces, read as one'                             => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew. Last', false ),
+			'two typed spaces, as the editor reads them'                => array( '<p>Revenue grew.&nbsp; Last year was flat.</p>', 'grew.  Last', true ),
+			'narrow no-break space read as a space'                     => array( "<p>Prix\u{202F}: 5 euros.</p>", 'Prix : 5', false ),
+			'narrow no-break space kept'                                => array( "<p>Prix\u{202F}: 5 euros.</p>", "Prix\u{202F}: 5", true ),
+		);
+	}
+
+	/**
+	 * An edit is kept only when its `find` matches the block text the way
+	 * the editor reads it, so it is never stored and then outdated.
+	 *
+	 * @dataProvider editor_whitespace_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	public function test_text_edit_matches_editor_whitespace( string $html, string $find, bool $kept ): void {
+		$notes = $this->reply_with( (string) wp_json_encode( array( 'reply' => 'Changed it.', 'edit' => array( 'type' => 'replace_text', 'find' => $find, 'replace' => 'x' ) ) ), $html );
+
+		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
+	 * Data provider for the block text cases shared with the editor.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function editor_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['cases'] ?? null ) ? $fixture['cases'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['html'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['html'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * The server reads block text as the editor does (extractEditorText()
+	 * in src/utils/block-utils.js runs the same cases), with the outer ends
+	 * trimmed.
+	 *
+	 * @dataProvider editor_text_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $text Text the editor reads.
+	 */
+	public function test_editor_text_matches_the_editor( string $html, string $text ): void {
+		$this->assertSame( trim( $text ), Reply_Service::editor_text( $html ) );
 	}
 
 	/**

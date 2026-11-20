@@ -4,9 +4,20 @@
 import { describe, expect, it } from 'vitest';
 
 /**
+ * WordPress dependencies
+ */
+import { create } from '@wordpress/rich-text';
+
+/**
  * Internal dependencies
  */
-import { extractBlockData, getBlockAnchor } from '../block-utils';
+import {
+	extractBlockData,
+	extractEditorText,
+	getBlockAnchor,
+} from '../block-utils';
+
+const EDITOR_TEXT = require('../../../tests/fixtures/editor-text.json');
 
 const block = (clientId, content, innerBlocks = []) => ({
 	clientId,
@@ -97,12 +108,12 @@ describe('extractBlockData', () => {
 		expect(data.content).toBe('First line\nsecond line.');
 	});
 
-	it('reads wrapped source text as spaces, as the editor does', () => {
+	it('keeps wrapped source text as written, as the editor does', () => {
 		const [data] = extractBlockData([
-			block('p', '<p>First\n\tline<br>\nsecond line.</p>'),
+			block('p', '<p>First\n\tline<br />\nsecond line.</p>'),
 		]);
 
-		expect(data.content).toBe('First line\n second line.');
+		expect(data.content).toBe('First\n\tline\n\nsecond line.');
 	});
 
 	it('keeps the anchor notes saved before were linked by', () => {
@@ -113,5 +124,25 @@ describe('extractBlockData', () => {
 		expect(data.anchor).toBe(
 			getBlockAnchor('core/paragraph', 'First linesecond line.')
 		);
+	});
+});
+
+// Shared with Reply_Service::editor_text() on the server.
+describe('extractEditorText', () => {
+	it.each(EDITOR_TEXT.cases.map((item) => [item.name, item]))(
+		'reads %s as the editor does',
+		(_name, { html, text }) => {
+			// The fixture is what rich text itself reads, not a guess.
+			expect(create({ html }).text).toBe(text);
+			expect(extractEditorText(html)).toBe(text);
+		}
+	);
+
+	it('drops comments, which are block delimiters here', () => {
+		expect(
+			extractEditorText(
+				'<!-- wp:paragraph -->\n<p>a<br>b</p>\n<!-- /wp:paragraph -->'
+			)
+		).toBe('\na\nb\n');
 	});
 });

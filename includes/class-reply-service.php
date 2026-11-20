@@ -67,11 +67,6 @@ class Reply_Service {
 	public const MOCK_REPLY = 'This is a mock AI reply for testing purposes. The conversation loop is working correctly.';
 
 	/**
-	 * Stands in for a line break while editor_text() strips a block's tags.
-	 */
-	private const LINE_BREAK_MARK = "\u{E000}";
-
-	/**
 	 * Prompt builder instance.
 	 *
 	 * @var Prompt_Builder
@@ -721,7 +716,15 @@ class Reply_Service {
 		// The text as it reads without any pending suggestion, which is how
 		// the editor leaves it once a new edit supersedes that suggestion.
 		$block_html    = null !== $block ? self::strip_suggestion_markers( self::get_block_html( $block ) ) : '';
-		$block_content = null !== $block ? self::editor_text( $block_html ) : '';
+		$block_content = '';
+		if ( null !== $block ) {
+			// Edits apply to a block's own rich text, so a block with inner
+			// blocks, or an image block, whose <img> is the block, keeps the
+			// collapsed reading, which is easier to follow.
+			$block_content = empty( $block['innerBlocks'] ) && 'core/image' !== $block_type
+				? self::editor_text( $block_html )
+				: self::html_text( $block_html );
+		}
 		$nearby        = null !== $located ? self::get_nearby_blocks( $located['siblings'], $located['index'] ) : array();
 
 		return array(
@@ -1231,20 +1234,31 @@ class Reply_Service {
 	}
 
 	/**
-	 * Get block HTML's plain text as the editor reads it, with each line
-	 * break as a newline.
+	 * Get block HTML's plain text as the editor's rich text reads it.
 	 *
-	 * The editor's rich text holds a `<br>` as "\n", so read as a space, a
-	 * `find` running across the break would pass here and never match there.
+	 * An edit's `find` is matched against this text here and against
+	 * `create( { html } ).text` in the editor, so they must agree: a line
+	 * break is "\n", an inline image is U+FFFC, entities are decoded and
+	 * whitespace is kept as written. The outer ends are trimmed. Shares its
+	 * cases with extractEditorText() in src/utils/block-utils.js through
+	 * tests/fixtures/editor-text.json.
+	 *
+	 * Table cells and list items, which the editor never matches across,
+	 * end with a space so their text doesn't run together in the prompt.
+	 * A rich text block's own closing tag ends the text, so it is trimmed.
 	 *
 	 * @param string $html Block HTML.
 	 * @return string Block text.
 	 */
-	private static function editor_text( string $html ): string {
-		// A private use character stands in for each break, so collapsing
-		// whitespace and trimming leave the spaces beside it, as the editor does.
-		$html = (string) preg_replace( '#<br\b[^>]*>#i', self::LINE_BREAK_MARK, $html );
-		return str_replace( self::LINE_BREAK_MARK, "\n", self::html_text( $html ) );
+	public static function editor_text( string $html ): string {
+		$html = str_replace( array( "\r\n", "\r" ), "\n", $html );
+		// Comments are block delimiters here, not text.
+		$html = (string) preg_replace( '#<!--.*?-->#s', '', $html );
+		$html = (string) preg_replace( '#<br\b[^>]*>#i', "\n", $html );
+		$html = (string) preg_replace( '#</(?:p|li|td|th|h[1-6]|div|figcaption|blockquote|pre)\b[^>]*>#i', '$0 ', $html );
+		$html = (string) preg_replace( '#<img\b[^>]*>#i', "\u{FFFC}", $html );
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return trim( str_replace( "\u{FEFF}", '', $text ) );
 	}
 
 	/**

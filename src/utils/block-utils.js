@@ -2,6 +2,7 @@
  * Utility functions for block content extraction.
  */
 import { serialize } from '@wordpress/blocks';
+import { create } from '@wordpress/rich-text';
 
 /**
  * Extract text content from a block's innerHTML.
@@ -20,27 +21,23 @@ export function extractTextContent(innerHTML) {
 }
 
 /**
- * Extract a block's text as the editor's rich text reads it: wrapped
- * source text is a space and a line break is "\n".
+ * Extract a block's text as the editor's rich text reads it.
  *
  * A quick fix's `find` is matched against this text on the server and
- * in the editor, so a `find` across a break never passes on one side only.
+ * against `create( { html } ).text` in the editor, so a line break is "\n",
+ * whitespace is kept as written and an inline image is U+FFFC. Comments
+ * are block delimiters here, not text, so they are dropped. Shares its
+ * cases with Reply_Service::editor_text() through
+ * tests/fixtures/editor-text.json.
  *
- * @param {string} innerHTML The block's innerHTML.
+ * @param {string} innerHTML The block's HTML.
  * @return {string} Plain text content.
  */
 export function extractEditorText(innerHTML) {
 	if (!innerHTML) {
 		return '';
 	}
-	const temp = document.createElement('div');
-	temp.innerHTML = innerHTML;
-	const walker = document.createTreeWalker(temp, window.NodeFilter.SHOW_TEXT);
-	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-		node.nodeValue = node.nodeValue.replace(/[\n\t\r\f]+/g, ' ');
-	}
-	temp.querySelectorAll('br').forEach((br) => br.replaceWith('\n'));
-	return temp.textContent || '';
+	return create({ html: innerHTML.replace(/<!--[\s\S]*?-->/g, '') }).text;
 }
 
 /**
@@ -111,7 +108,11 @@ export function extractBlockData(blocks, parent = '') {
 		// Use originalContent if available (parsed from existing HTML),
 		// otherwise serialize the current block state.
 		const rawContent = block.originalContent || serialize(block);
-		const content = extractEditorText(rawContent);
+		// An image block's <img> is the block, not an inline image in its text.
+		const content =
+			block.name === 'core/image'
+				? extractTextContent(rawContent)
+				: extractEditorText(rawContent);
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
