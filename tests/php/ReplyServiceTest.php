@@ -1110,6 +1110,10 @@ class ReplyServiceTest extends TestCase {
 				'<p>A <mark class="wp-suggestion-del"><mark class="has-inline-color">b</mark></mark><mark class="wp-suggestion-add">x</mark> <mark style="color:red">c</mark></p>',
 				'<p>A <mark class="has-inline-color">b</mark> <mark style="color:red">c</mark></p>',
 			),
+			'unclosed suggestion mark' => array(
+				'<p>A <mark class="wp-suggestion-del">b</p>',
+				'<p>A <mark class="wp-suggestion-del">b</p>',
+			),
 			'no markers'               => array(
 				'<p>A <mark>b</mark></p>',
 				'<p>A <mark>b</mark></p>',

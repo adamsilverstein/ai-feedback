@@ -444,7 +444,7 @@ class Reply_Service {
 	 * @phpstan-param list<array{id: int, edit: array<string, string>}> $edits
 	 * @return array<string, mixed>|WP_Error Context for Prompt_Builder::build_reply_prompt(), or error.
 	 */
-	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits = array() ): array|WP_Error {
+	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits ): array|WP_Error {
 		$reply = get_comment( $comment_id );
 		if ( ! is_object( $reply ) ) {
 			return new WP_Error( 'reply_not_found', 'Reply comment not found.' );
@@ -622,8 +622,12 @@ class Reply_Service {
 			return $html;
 		}
 
+		// Placeholders below use NUL bytes, which block HTML never needs.
+		$html    = str_replace( "\x00", '', $html );
 		$kept    = array();
 		$pattern = '#<mark\b([^>]*)>((?:(?!<mark\b).)*?)</mark>#si';
+		// Each pass unwraps one level of nesting; the cap guards odd markup.
+		$passes = 0;
 		do {
 			$html = (string) preg_replace_callback(
 				$pattern,
@@ -638,7 +642,7 @@ class Reply_Service {
 				-1,
 				$count
 			);
-		} while ( $count > 0 );
+		} while ( $count > 0 && ++$passes < 20 );
 
 		// Put back the other marks, which may hold one another.
 		while ( preg_match( '#\x00(\d+)\x00#', $html ) ) {
