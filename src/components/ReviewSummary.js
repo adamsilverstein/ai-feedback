@@ -310,7 +310,10 @@ export default function ReviewSummary({ review, progress = null }) {
 				</div>
 			)}
 
-			{showProgress && <FeedbackProgressRow progress={progress} />}
+			{/* The done state says the same, so the row gives way to it. */}
+			{showProgress && (!isDone || showAddressed) && (
+				<FeedbackProgressRow progress={progress} />
+			)}
 
 			{isDone && !showAddressed && (
 				<FeedbackDone

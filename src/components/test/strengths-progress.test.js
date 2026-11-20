@@ -153,9 +153,10 @@ describe('ReviewSummary strengths and progress', () => {
 	it('replaces the list with a done state once every note is addressed', () => {
 		renderSummary({ review, progress: { addressed: 2, total: 2 } });
 
+		// Said once, by the done state rather than the progress row.
 		expect(
 			screen.getAllByText('All 2 notes from this review are addressed.')
-		).not.toHaveLength(0);
+		).toHaveLength(1);
 		expect(screen.queryByText('Feedback list')).toBeNull();
 
 		fireEvent.click(screen.getByRole('button', { name: 'Review again' }));
