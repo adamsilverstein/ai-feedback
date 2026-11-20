@@ -126,7 +126,8 @@ class Review_History {
 			$history[] = $entry;
 			$history   = array_slice( $history, -self::MAX_ENTRIES );
 
-			update_post_meta( $post_id, self::META_KEY, $history );
+			// update_post_meta() unslashes, which would strip backslashes from the summary.
+			update_post_meta( $post_id, self::META_KEY, wp_slash( $history ) );
 		} catch ( \Throwable $e ) {
 			Logger::debug( sprintf( 'Could not record review history: %s', $e->getMessage() ) );
 		}

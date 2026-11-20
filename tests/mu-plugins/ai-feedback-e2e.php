@@ -124,6 +124,33 @@ add_filter(
 	2
 );
 
+// A review of a block starting "Backslash fixture" returns feedback holding
+// backslashes, which must reach the saved note unchanged.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		foreach ( $blocks as $block ) {
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( str_starts_with( $content, 'Backslash fixture' ) ) {
+				$response['feedback'] = array(
+					array(
+						'block_id' => $block['clientId'] ?? '',
+						'category' => 'content',
+						'severity' => 'suggestion',
+						'title'    => 'Paths',
+						'feedback' => 'Use C:\\path\\new and match \\d+\\.\\d+ in {"say":"\\"hi\\""}.',
+					),
+				);
+				break;
+			}
+		}
+
+		return $response;
+	},
+	10,
+	2
+);
+
 // A review of a post holding the structural fixture text proposes one of
 // each structural edit: move "The real opening" above "Background", remove
 // "This repeats section two" and add a heading above "Next steps".
