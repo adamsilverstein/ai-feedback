@@ -10,6 +10,7 @@
 
 namespace AI_Feedback;
 
+use WP_Comment;
 use WP_Error;
 use WP_REST_Request;
 use WP_User;
@@ -151,6 +152,61 @@ class Fresh_Eyes_User {
 	 */
 	public static function reset_cache(): void {
 		self::$id = null;
+	}
+
+	/**
+	 * Show Fresh Eyes' avatar, a pair of eyes that blinks now and then,
+	 * for AI notes and for the Fresh Eyes user. Works without Gravatar.
+	 *
+	 * @param array<string, mixed> $args        Avatar data arguments.
+	 * @param mixed                $id_or_email User ID, email, WP_User, WP_Post or WP_Comment.
+	 * @return array<string, mixed> Arguments, with the avatar's URL for Fresh Eyes.
+	 */
+	public static function filter_avatar( array $args, mixed $id_or_email ): array {
+		if ( self::is_fresh_eyes_avatar( $id_or_email ) ) {
+			$args['url']          = plugins_url( 'assets/fresh-eyes-avatar.svg', dirname( __DIR__ ) . '/fresh-eyes.php' );
+			$args['found_avatar'] = true;
+		}
+		return $args;
+	}
+
+	/**
+	 * Whether an avatar request is for Fresh Eyes: an AI note, by its
+	 * meta or its author name (also the plugin's earlier names), or the
+	 * Fresh Eyes user, by ID, as a WP_User or as a note's author.
+	 *
+	 * @param mixed $id_or_email User ID, email, WP_User, WP_Post or WP_Comment.
+	 * @return bool
+	 */
+	private static function is_fresh_eyes_avatar( mixed $id_or_email ): bool {
+		if ( $id_or_email instanceof WP_Comment ) {
+			if ( in_array( $id_or_email->comment_author, array( __( 'Fresh Eyes', 'fresh-eyes' ), 'Copydesk AI', 'AI Feedback' ), true ) ) {
+				return true;
+			}
+			if ( (int) $id_or_email->comment_ID > 0 && '1' === get_comment_meta( (int) $id_or_email->comment_ID, 'ai_feedback', true ) ) {
+				return true;
+			}
+			$id_or_email = $id_or_email->user_id;
+		}
+		if ( $id_or_email instanceof WP_User ) {
+			$id_or_email = $id_or_email->ID;
+		}
+		return is_numeric( $id_or_email ) && self::is_user( (int) $id_or_email );
+	}
+
+	/**
+	 * Get the user ID new AI notes are written as.
+	 *
+	 * Notes are recognised as Fresh Eyes' by their `ai_feedback` meta,
+	 * never by this ID, so a note written as 0 is still an AI note.
+	 *
+	 * @return int The Fresh Eyes user's ID, or 0 when the account does not
+	 *             exist, eg. when the `ai_feedback_create_mention_user`
+	 *             filter turned it off or creating it failed.
+	 */
+	public static function author_id(): int {
+		$id = self::get_id();
+		return self::is_ours( $id ) ? $id : 0;
 	}
 
 	/**

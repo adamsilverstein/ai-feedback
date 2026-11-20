@@ -184,7 +184,9 @@ class Notes_Manager {
 			'comment_content'  => $content,
 			'comment_approved' => '0', // 'hold' status in Gutenberg (unresolved)
 			'comment_parent'   => $parent_id,
-			'user_id'          => 0, // System-generated (AI).
+			// The Fresh Eyes user when it exists, 0 otherwise. Either way the
+			// ai_feedback meta, not the author, marks the note as Fresh Eyes'.
+			'user_id'          => Fresh_Eyes_User::author_id(),
 			'comment_author'   => Plugin::get_ai_feedback_author(),
 			'comment_meta'     => $note_meta,
 		);
