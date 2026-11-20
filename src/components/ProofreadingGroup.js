@@ -81,6 +81,29 @@ function describeShortFix(fix) {
 }
 
 /**
+ * The reply thread to show with a fix.
+ *
+ * A block's second and later notes are replies in its first note's thread,
+ * so the thread is shown only with that first note, without the other
+ * fixes listed in this group.
+ *
+ * @param {Object}      threads Reply threads keyed by root note id.
+ * @param {Object}      item    Proofreading note.
+ * @param {Set<number>} ids     IDs of the notes in the group.
+ * @return {Object|undefined} Thread, if the note has one.
+ */
+export function getOwnThread(threads, item, ids) {
+	const thread = item.parent ? undefined : threads[item.id];
+	if (!thread) {
+		return undefined;
+	}
+	return {
+		...thread,
+		replies: (thread.replies || []).filter((reply) => !ids.has(reply.id)),
+	};
+}
+
+/**
  * Proofreading group.
  *
  * @param {Object}     props                   Component props.
@@ -217,6 +240,7 @@ export default function ProofreadingGroup({
 		await Promise.all(saves);
 	};
 
+	const ids = new Set(items.map((item) => item.id));
 	const openCount = openItems.length;
 	const title =
 		openCount > 0
@@ -270,12 +294,15 @@ export default function ProofreadingGroup({
 				<CardBody>
 					<ul className="ai-feedback-proofreading-preview">
 						{preview.map((item) => (
-							<li key={item.id}>
+							<li
+								key={item.id}
+								className="ai-feedback-proofreading-preview-item"
+							>
 								{describeShortFix(item.quick_fix)}
 							</li>
 						))}
 						{more > 0 && (
-							<li>
+							<li className="ai-feedback-proofreading-preview-item">
 								{sprintf(
 									/* translators: %d: number of further fixes */
 									__('… %d more', 'fresh-eyes'),
@@ -297,7 +324,7 @@ export default function ProofreadingGroup({
 							<div key={item.id} role="listitem">
 								<FeedbackItem
 									item={item}
-									thread={threads[item.parent || item.id]}
+									thread={getOwnThread(threads, item, ids)}
 									onReplyComplete={onReplyComplete}
 								/>
 							</div>

@@ -283,3 +283,48 @@ add_filter(
 	10,
 	2
 );
+
+// A review of a post holding the proofreading fixture finds seven typos
+// across four paragraphs, two or three in some of them, as grammar items.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		$fixes = array(
+			'Teh '       => array( array( 'Teh', 'The' ), array( 'brwon', 'brown' ), array( 'jumpd', 'jumped' ) ),
+			'You '       => array( array( 'recieve', 'receive' ), array( 'alot', 'a lot' ) ),
+			'A wierd'    => array( array( 'wierd', 'weird' ) ),
+			'Thier plan' => array( array( 'Thier', 'Their' ) ),
+		);
+
+		$feedback = array();
+		foreach ( $blocks as $block ) {
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			foreach ( $fixes as $start => $pairs ) {
+				if ( ! str_starts_with( $content, $start ) ) {
+					continue;
+				}
+				foreach ( $pairs as $pair ) {
+					$feedback[] = array(
+						'block_id'  => $block['clientId'] ?? '',
+						'category'  => 'grammar',
+						'severity'  => 'suggestion',
+						'title'     => $pair[0] . ' → ' . $pair[1],
+						'feedback'  => 'Spelling.',
+						'quick_fix' => array(
+							'find'    => $pair[0],
+							'replace' => $pair[1],
+						),
+					);
+				}
+			}
+		}
+		if ( 7 !== count( $feedback ) ) {
+			return $response;
+		}
+
+		$response['feedback'] = $feedback;
+		return $response;
+	},
+	10,
+	2
+);

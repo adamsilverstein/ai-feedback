@@ -137,6 +137,44 @@ class AnalyticsTest extends TestCase {
 	}
 
 	/**
+	 * Grammar & Spelling counts show in the category breakdown, from the
+	 * summary a review with proofreading fixes produces.
+	 */
+	public function test_grammar_category_is_tracked(): void {
+		$summary = ( new \AI_Feedback\Response_Parser() )->get_feedback_summary(
+			array(
+				array(
+					'category' => 'grammar',
+					'severity' => 'suggestion',
+				),
+				array(
+					'category' => 'grammar',
+					'severity' => 'suggestion',
+				),
+				array(
+					'category' => 'content',
+					'severity' => 'important',
+				),
+			)
+		);
+		Analytics::track_review(
+			1,
+			array(
+				'review_id'  => 'abc',
+				'model'      => 'model-a',
+				'note_count' => 3,
+				'summary'    => $summary,
+			)
+		);
+
+		$report = Analytics::get_summary( '7days' );
+		$this->assertSame( 2, $report['by_category']['grammar'] ?? null );
+		$this->assertSame( 1, $report['by_category']['content'] ?? null );
+		$this->assertSame( 0, $report['by_severity']['suggestion'] ?? null );
+		$this->assertSame( 1, $report['by_severity']['important'] ?? null );
+	}
+
+	/**
 	 * Unknown periods fall back to 30 days, and empty data averages to zero.
 	 */
 	public function test_get_summary_defaults(): void {

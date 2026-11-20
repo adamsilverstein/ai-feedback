@@ -1017,6 +1017,7 @@ $ai-feedback-reply-error: #cc1818;
 
 /* Grammar & Spelling: one row for every proofreading fix, with Accept all. */
 .ai-feedback-proofreading {
+
 	.ai-feedback-proofreading-header {
 		display: flex;
 		align-items: center;
@@ -1033,10 +1034,10 @@ $ai-feedback-reply-error: #cc1818;
 		padding: 0;
 		list-style: none;
 		font-size: 12px;
+	}
 
-		li {
-			margin: 0 0 4px;
-		}
+	.ai-feedback-proofreading-preview-item {
+		margin: 0 0 4px;
 	}
 
 	.ai-feedback-proofreading-items [role="listitem"] + [role="listitem"] {

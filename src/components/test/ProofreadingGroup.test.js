@@ -20,7 +20,10 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 /**
  * Internal dependencies
  */
-import ProofreadingGroup, { describeAcceptAll } from '../ProofreadingGroup';
+import ProofreadingGroup, {
+	describeAcceptAll,
+	getOwnThread,
+} from '../ProofreadingGroup';
 
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
 // Each fix's own card is covered by FeedbackItem.test.js.
@@ -117,6 +120,27 @@ describe('describeAcceptAll', () => {
 		expect(describeAcceptAll(0, 2)).toBe(
 			'No fixes could be applied. 2 no longer apply.'
 		);
+	});
+});
+
+describe('getOwnThread', () => {
+	it('shows a thread only with its first note, without the other fixes', () => {
+		const threads = {
+			1: {
+				replies: [{ id: 2 }, { id: 9, is_ai: true }],
+				pending_reply_id: null,
+			},
+		};
+		const ids = new Set([1, 2]);
+
+		expect(getOwnThread(threads, { id: 1 }, ids)).toEqual({
+			replies: [{ id: 9, is_ai: true }],
+			pending_reply_id: null,
+		});
+		expect(getOwnThread(threads, { id: 2, parent: 1 }, ids)).toBe(
+			undefined
+		);
+		expect(getOwnThread(threads, { id: 3 }, ids)).toBe(undefined);
 	});
 });
 
