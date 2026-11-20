@@ -378,15 +378,28 @@ class Review_Service {
 	/**
 	 * Images to show the model so it can propose alt text, when it can see.
 	 *
+	 * Images are only sent to a model that reads them: given an image, core
+	 * would otherwise switch to another model that does, or refuse the prompt.
+	 *
 	 * @param  array<mixed> $blocks Blocks being reviewed.
 	 * @param  string       $model  Model ID.
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
-		if ( ! ( new Settings_Controller() )->model_has_capability( $model, 'vision' ) ) {
+		if ( ! $this->model_supports_vision( $model ) ) {
 			return array();
 		}
 		return ( new Review_Images() )->collect( $blocks );
+	}
+
+	/**
+	 * Whether a model reads images, see Model_Capabilities.
+	 *
+	 * @param  string $model Model ID.
+	 * @return bool
+	 */
+	protected function model_supports_vision( string $model ): bool {
+		return ( new Model_Capabilities() )->supports_vision( $model );
 	}
 
 	/**

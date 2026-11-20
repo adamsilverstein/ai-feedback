@@ -350,14 +350,48 @@ class ReviewImagesTest extends TestCase {
 	}
 
 	/**
+	 * The default model is shown the image too, so a site with the default
+	 * setup gets alt text proposals.
+	 */
+	public function test_default_model_proposes_alt_text(): void {
+		list( $service, $notes ) = $this->review( AI_FEEDBACK_DEFAULT_MODEL, array( self::alt_response() ) );
+
+		$this->assertSame( array( 'img' ), array_column( $service->sent[0], 'block_id' ) );
+		$this->assertSame(
+			array( 'alt' => 'Bar chart of test times before and after' ),
+			$notes->items[0]['block_change']['attributes'] ?? null
+		);
+	}
+
+	/**
 	 * A text-only model gets no image, and alt text it makes up is dropped,
 	 * leaving a plain note.
 	 */
 	public function test_text_model_only_flags_missing_alt_text(): void {
-		list( $service, $notes ) = $this->review( 'claude-sonnet-5-5', array( self::alt_response() ) );
+		$GLOBALS['test_filter_results'] = array(
+			'ai_feedback_available_models' => array(
+				array(
+					'id'           => 'house-model',
+					'provider'     => 'example',
+					'capabilities' => array( 'text' ),
+				),
+			),
+		);
+		list( $service, $notes ) = $this->review( 'house-model', array( self::alt_response() ) );
 
 		$this->assertSame( array( array() ), $service->sent );
 		$this->assertSame( 'Add alt text', $notes->items[0]['title'] );
+		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
+	}
+
+	/**
+	 * A site can turn images off for a model it knows can't read them.
+	 */
+	public function test_filter_turns_images_off(): void {
+		$GLOBALS['test_filter_results'] = array( 'ai_feedback_model_supports_vision' => false );
+		list( $service, $notes ) = $this->review( 'gpt-4o', array( self::alt_response() ) );
+
+		$this->assertSame( array( array() ), $service->sent );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
 	}
 
@@ -374,6 +408,27 @@ class ReviewImagesTest extends TestCase {
 		$this->assertCount( 2, $service->sent );
 		$this->assertNotEmpty( $service->sent[0] );
 		$this->assertSame( array(), $service->sent[1] );
+		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
+	}
+
+	/**
+	 * When core finds no configured model that takes the images, its 400
+	 * error fails fast and the default model's review still succeeds on the
+	 * text alone.
+	 */
+	public function test_default_model_falls_back_when_core_refuses_images(): void {
+		list( $service, $notes ) = $this->review(
+			AI_FEEDBACK_DEFAULT_MODEL,
+			array(
+				new WP_Error( 'prompt_invalid_argument', 'No models found that support text_generation for this prompt.', array( 'status' => 400 ) ),
+				self::alt_response(),
+			)
+		);
+
+		$this->assertCount( 2, $service->sent );
+		$this->assertNotEmpty( $service->sent[0] );
+		$this->assertSame( array(), $service->sent[1] );
+		$this->assertSame( 'Add alt text', $notes->items[0]['title'] );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
 	}
 

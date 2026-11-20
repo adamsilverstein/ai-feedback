@@ -94,7 +94,11 @@ A note can carry a `block_change`: a one-click formatting fix that never adds, d
 
 `Block_Change::validate()` drops any that fail validation and keeps the note: every attribute must be on its block type's allow-list and differ from the current value; a list's items must appear in the paragraph in order with only separators (commas, semicolons, a final "and" or "or") between them, and text before the first item stays as an introduction unless it ends in a comma or semicolon (which would mean items were left out); a split must fall after sentence-ending punctuation that appears once, with text after it. A review gets one change per block, shared with `block_action`, which wins on the same item; either replaces the `quick_fix` of every item on that block, once grouping has kept it. Groups of similar notes have none, and only a thread's root note keeps one. `Block_Change::decode()` checks the allow-lists again when the meta is read.
 
-Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model has the `vision` capability in the model list, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone. Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
+Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone.
+
+Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since core would otherwise run the review on another model that takes images, or refuse it. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
+
+Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
 
 The editor shows each one on its note with a one-line description, such as "Change to a level 3 heading", "Turn into a list" or "Split the paragraph after “…”", with Preview (before and after) and Apply fix. Everything is checked again against the live block: a change whose block changed since the review (another level, image, text or list type) reads as outdated, a transform is only offered when the editor offers it (`getBlockTransformItems()`), and a list split that would drop an inline object is not offered. Text is sliced from the block's rich text, so links and formatting stay, and the note's link (`metadata`) moves to the new list, heading or first half of a split. Apply is one undo step and is only marked applied if the block now reads as the change leaves it. A paragraph's anchor moves to the list's introduction, or the list. The introduction keeps the paragraph's styling, and the list gets what core's own transforms carry over (class name, font size and colors, where the list supports them). A split's second half keeps the paragraph's styling but not its drop cap. Formatting fixes stay with Preview and Apply when Gutenberg's Suggestion Mode is on. A formatting fix is also the thread's first suggested edit: the reply prompt gets it as the pending edit until the saved post shows it, the first reply edit after it is revision 2, and the note gets quick replies ("Try another" and "Why?").
 
@@ -418,14 +422,14 @@ X-WP-Nonce: {nonce}
       "id": "claude-sonnet-5-5",
       "name": "Claude Sonnet 5.5",
       "provider": "anthropic",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 200000
     },
     {
       "id": "claude-opus-4",
       "name": "Claude Opus 4",
       "provider": "anthropic",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 200000
     },
     {
@@ -436,10 +440,10 @@ X-WP-Nonce: {nonce}
       "max_tokens": 128000
     },
     {
-      "id": "gemini-2.5-flash",
-      "name": "Gemini 2.5 Flash",
+      "id": "gemini-2.0-flash",
+      "name": "Gemini 2.0 Flash",
       "provider": "google",
-      "capabilities": ["text"],
+      "capabilities": ["text", "vision"],
       "max_tokens": 1000000
     }
   ],
@@ -1036,6 +1040,16 @@ How many images a review request may show a vision model so it can propose alt t
 add_filter( 'ai_feedback_max_review_images', function(): int {
     return 0;
 } );
+```
+
+#### `ai_feedback_model_supports_vision`
+
+Whether a model is sent images so it can propose alt text. Gets the answer from core's model metadata or the model list, the model ID, and `core` or `catalog` for where the answer came from. Only `true` turns images on.
+
+```php
+add_filter( 'ai_feedback_model_supports_vision', function( bool $supports, string $model_id ): bool {
+    return 'my-text-only-model' === $model_id ? false : $supports;
+}, 10, 2 );
 ```
 
 #### `ai_feedback_use_structural_suggestions`
