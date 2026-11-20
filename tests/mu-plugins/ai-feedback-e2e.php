@@ -63,10 +63,38 @@ add_action(
 );
 
 // Mock replies return an edit when asked to make the change, so tests can
-// cover the reply to edit flow. Everything else gets the prose mock reply.
+// cover the reply to edit flow, and revise a pending edit when asked for a
+// shorter or different one, which they only do when the prompt carries the
+// pending edit. Everything else gets the prose mock reply.
 add_filter(
 	'ai_feedback_mock_reply',
 	static function ( string $reply, string $prompt ): string {
+		$revisions = array(
+			// Quick reply text => [ pending replacement it revises, new replacement ].
+			'Make it shorter.'          => array( 'in 2025', "in '25" ),
+			'Try a different version.' => array( "in '25", 'in fiscal 2025' ),
+		);
+		if (
+			preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			&& isset( $revisions[ trim( $asked[1] ) ] )
+		) {
+			list( $pending, $revised ) = $revisions[ trim( $asked[1] ) ];
+			if ( ! str_contains( $prompt, "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nreplace \"last year\" with \"{$pending}\"" ) ) {
+				return $reply;
+			}
+
+			return (string) wp_json_encode(
+				array(
+					'reply' => "Revised: \"last year\" now reads \"{$revised}\".",
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => 'last year',
+						'replace' => $revised,
+					),
+				)
+			);
+		}
+
 		if (
 			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $user_reply )
 			|| ! preg_match( '/make (?:this|that) change/i', $user_reply[1] )
