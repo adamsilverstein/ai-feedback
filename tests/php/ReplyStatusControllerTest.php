@@ -376,6 +376,45 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * AI replies with an edit carry their stored revision, and edits saved
+	 * without one are numbered in order after the review's quick fix.
+	 */
+	public function test_threads_number_edit_revisions(): void {
+		$this->seed_thread( 'complete' );
+		$edit = (string) json_encode(
+			array(
+				'type'    => 'replace_text',
+				'find'    => '40%',
+				'replace' => '42%',
+			)
+		);
+
+		$GLOBALS['test_comment_meta'][300]['feedback_quick_fix'] = '{"find":"40%","replace":"41%"}';
+		$GLOBALS['test_comment_meta'][302][ \AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY ] = $edit;
+
+		$GLOBALS['test_comments'][304]     = new \WP_Comment(
+			array(
+				'comment_ID'      => '304',
+				'comment_post_ID' => '42',
+				'comment_type'    => 'note',
+				'comment_parent'  => '300',
+				'comment_author'  => 'AI Feedback',
+				'comment_content' => 'Shorter.',
+			)
+		);
+		$GLOBALS['test_comment_meta'][304] = array(
+			'ai_feedback'                                  => '1',
+			\AI_Feedback\Notes_Manager::REPLY_EDIT_META_KEY => $edit,
+			\AI_Feedback\Notes_Manager::REVISION_META_KEY   => '5',
+		);
+
+		$data    = $this->controller->get_threads( $this->threads_request() )->get_data();
+		$replies = ( (array) $data['threads'] )[300]['replies'];
+
+		$this->assertSame( array( null, 2, null, 5 ), array_column( $replies, 'revision' ) );
+	}
+
+	/**
 	 * The newest user reply awaiting an AI response is exposed for polling.
 	 */
 	public function test_threads_expose_pending_reply_id(): void {

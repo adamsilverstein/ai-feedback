@@ -348,4 +348,80 @@ class ResponseParserReplyTest extends TestCase {
 			)
 		);
 	}
+
+	/**
+	 * Data provider for edit_applies().
+	 *
+	 * @return array<string, array{0: array<string, string>, 1: bool}>
+	 */
+	public static function edit_applies_provider(): array {
+		return array(
+			'text found once'                 => array(
+				array(
+					'type'    => 'replace_text',
+					'find'    => 'last year',
+					'replace' => 'in 2025',
+				),
+				true,
+			),
+			'quick fix without a type'        => array(
+				array(
+					'find'    => 'last year',
+					'replace' => 'in 2025',
+				),
+				true,
+			),
+			'text found twice'                => array(
+				array(
+					'type'    => 'replace_text',
+					'find'    => 'Revenue',
+					'replace' => 'Income',
+				),
+				false,
+			),
+			'text gone'                       => array(
+				array(
+					'type'    => 'replace_text',
+					'find'    => 'in 2025',
+					'replace' => 'last year',
+				),
+				false,
+			),
+			'rewrite of the same text'        => array(
+				array(
+					'type'     => 'rewrite_block',
+					'content'  => 'New text.',
+					'original' => "Revenue grew 40%  last year.\nRevenue matters.",
+				),
+				true,
+			),
+			'rewrite of text that changed'    => array(
+				array(
+					'type'     => 'rewrite_block',
+					'content'  => 'New text.',
+					'original' => 'Revenue grew 40% last year.',
+				),
+				false,
+			),
+			'rewrite without its original'    => array(
+				array(
+					'type'    => 'rewrite_block',
+					'content' => 'New text.',
+				),
+				false,
+			),
+		);
+	}
+
+	/**
+	 * A stored edit applies while the block still has the text it targets.
+	 *
+	 * @dataProvider edit_applies_provider
+	 *
+	 * @param array<string, string> $edit     Stored edit.
+	 * @param bool                  $expected Whether it applies.
+	 */
+	public function test_edit_applies( array $edit, bool $expected ): void {
+		$this->assertSame( $expected, $this->parser->edit_applies( $edit, self::BLOCK ) );
+	}
 }

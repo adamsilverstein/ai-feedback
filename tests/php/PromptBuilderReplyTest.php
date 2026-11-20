@@ -261,4 +261,54 @@ class PromptBuilderReplyTest extends TestCase {
 			$this->builder->get_reply_system_instruction()
 		);
 	}
+
+	/**
+	 * A pending edit is described, with instructions to revise it, and each
+	 * AI entry's edit shows in the conversation.
+	 */
+	public function test_reply_prompt_includes_pending_edit(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'thread'        => array(
+					array(
+						'author'  => 'AI',
+						'content' => 'Done.',
+						'is_ai'   => true,
+						'edit'    => array(
+							'type'    => 'replace_text',
+							'find'    => 'last year',
+							'replace' => 'in 2025',
+						),
+					),
+				),
+				'pending_edit'  => array(
+					'type'     => 'rewrite_block',
+					'content'  => 'Revenue grew <strong>40%</strong> in 2025.',
+					'original' => 'Revenue grew 40% last year.',
+				),
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringContainsString( "- AI: Done.\n  (Suggested edit: replace \"last year\" with \"in 2025\")\n", $prompt );
+		$this->assertStringContainsString( "YOUR PENDING SUGGESTED EDIT (not applied, so the block content above does not include it):\nrewrite the block as \"Revenue grew 40% in 2025.\"\n", $prompt );
+		$this->assertStringContainsString( 'return a new edit that replaces it', $prompt );
+		$this->assertStringContainsString( 'that suggestion stays as it is', $prompt );
+	}
+
+	/**
+	 * Without a pending edit there is nothing to revise.
+	 */
+	public function test_reply_prompt_without_pending_edit(): void {
+		$prompt = $this->builder->build_reply_prompt(
+			array(
+				'block_content' => 'Revenue grew 40% last year.',
+				'user_reply'    => 'Shorter.',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $prompt );
+		$this->assertStringNotContainsString( 'return a new edit that replaces it', $prompt );
+	}
 }

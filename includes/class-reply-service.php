@@ -437,10 +437,11 @@ class Reply_Service {
 	/**
 	 * Build the reply context array from a parent note and its thread.
 	 *
-	 * @param  int $comment_id Reply comment ID.
-	 * @param  int $parent_id  Parent (original AI note) comment ID.
-	 * @param  int $post_id    Post ID - used to scope the siblings query.
-	 * @param  list<array{id: int, edit: array<string, string>}> $edits Edits proposed in the thread, oldest first.
+	 * @param  int          $comment_id Reply comment ID.
+	 * @param  int          $parent_id  Parent (original AI note) comment ID.
+	 * @param  int          $post_id    Post ID - used to scope the siblings query.
+	 * @param  array<mixed> $edits      Edits proposed in the thread, oldest first, from get_thread_edits().
+	 * @phpstan-param list<array{id: int, edit: array<string, string>}> $edits
 	 * @return array<string, mixed>|WP_Error Context for Prompt_Builder::build_reply_prompt(), or error.
 	 */
 	private function build_context( int $comment_id, int $parent_id, int $post_id, array $edits = array() ): array|WP_Error {
