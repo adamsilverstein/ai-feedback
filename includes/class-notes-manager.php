@@ -22,6 +22,11 @@ class Notes_Manager {
 	public const REPLY_EDIT_META_KEY = 'feedback_reply_edit';
 
 	/**
+	 * Comment meta marking a note as written by Fresh Eyes.
+	 */
+	public const AI_META_KEY = 'ai_feedback';
+
+	/**
 	 * Comment meta key holding a review note's structural edit, as JSON:
 	 * removing its block, moving it, or inserting a block next to it.
 	 */
@@ -207,6 +212,25 @@ class Notes_Manager {
 		Logger::debug( sprintf( 'Note created successfully with ID: %d', $note_id ) );
 
 		return $note_id;
+	}
+
+	/**
+	 * Register the meta that marks AI notes, so nobody can set it through
+	 * the API: it is left out of REST and any capability check for it fails.
+	 * The plugin writes it with add_comment_meta(), which checks no capability.
+	 */
+	public static function register_meta(): void {
+		register_meta(
+			'comment',
+			self::AI_META_KEY,
+			array(
+				'type'          => 'string',
+				'single'        => true,
+				'description'   => __( 'Marks a note written by Fresh Eyes.', 'fresh-eyes' ),
+				'show_in_rest'  => false,
+				'auth_callback' => '__return_false',
+			)
+		);
 	}
 
 	/**

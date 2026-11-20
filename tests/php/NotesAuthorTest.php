@@ -153,6 +153,27 @@ class NotesAuthorTest extends TestCase {
 		return $note;
 	}
 
+	/**
+	 * Build a comment a visitor left on the public comment form.
+	 *
+	 * @param int    $id     Comment ID.
+	 * @param string $author Name typed in.
+	 * @return \WP_Comment
+	 */
+	private function public_comment( int $id, string $author ): \WP_Comment {
+		$comment               = $this->note( $id, $author, 0 );
+		$comment->comment_type = 'comment';
+		return $comment;
+	}
+
+	public function test_the_ai_meta_cannot_be_set_through_the_api(): void {
+		Notes_Manager::register_meta();
+
+		$args = $GLOBALS['test_registered_meta']['comment']['ai_feedback'] ?? array();
+		$this->assertFalse( $args['show_in_rest'] );
+		$this->assertSame( '__return_false', $args['auth_callback'] );
+	}
+
 	public function test_fresh_eyes_gets_its_avatar_as_a_note_and_as_a_user(): void {
 		$id   = Fresh_Eyes_User::ensure();
 		$url  = 'http://example.test/wp-content/plugins/' . basename( dirname( __DIR__, 2 ) ) . '/assets/fresh-eyes-avatar.svg';
@@ -163,7 +184,6 @@ class NotesAuthorTest extends TestCase {
 		$fresh_eyes                      = array(
 			'old AI note, author 0'      => $this->note( 1, 'Fresh Eyes', 0 ),
 			'new AI note, the user'      => $this->note( 2, 'Fresh Eyes', $id ),
-			'AI note under an old name'  => $this->note( 3, 'Copydesk AI', 0 ),
 			'note by the user, no meta'  => $this->note( 4, 'Someone', $id ),
 			'user ID'                    => $id,
 			'user ID as a string'        => (string) $id,
@@ -180,6 +200,8 @@ class NotesAuthorTest extends TestCase {
 		$someone_else                         = array(
 			'a person\'s note' => $this->note( 5, 'Jane', 7 ),
 			'a person named Fresh Eyes' => $this->note( 6, 'Fresh Eyes', 7 ),
+			'a visitor named Fresh Eyes' => $this->public_comment( 8, 'Fresh Eyes' ),
+			'a visitor under an old name' => $this->public_comment( 9, 'Copydesk AI' ),
 			'a person\'s ID'   => 7,
 			'a person'         => $GLOBALS['test_user_objects'][7],
 			'an email'         => 'jane@example.com',

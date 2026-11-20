@@ -173,8 +173,7 @@ class Fresh_Eyes_User {
 
 	/**
 	 * Whether an avatar request is for Fresh Eyes: an AI note, by its
-	 * meta, or for a note with no user its author name (also the plugin's
-	 * earlier names), or the
+	 * `ai_feedback` meta, which only the plugin writes, or the
 	 * Fresh Eyes user, by ID, as a WP_User or as a note's author.
 	 *
 	 * @param mixed $id_or_email User ID, email, WP_User, WP_Post or WP_Comment.
@@ -182,11 +181,8 @@ class Fresh_Eyes_User {
 	 */
 	private static function is_fresh_eyes_avatar( mixed $id_or_email ): bool {
 		if ( $id_or_email instanceof WP_Comment ) {
-			// By name only for a note with no user, as AI notes were written
-			// before the Fresh Eyes user; a person named so keeps their own.
-			if ( 0 === (int) $id_or_email->user_id && in_array( $id_or_email->comment_author, array( __( 'Fresh Eyes', 'fresh-eyes' ), 'Copydesk AI', 'AI Feedback' ), true ) ) {
-				return true;
-			}
+			// Never by author name, which anyone can type on a comment form.
+			// Every AI note the plugin ever wrote carries the meta.
 			if ( (int) $id_or_email->comment_ID > 0 && '1' === get_comment_meta( (int) $id_or_email->comment_ID, 'ai_feedback', true ) ) {
 				return true;
 			}

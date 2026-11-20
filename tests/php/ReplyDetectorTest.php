@@ -205,6 +205,32 @@ class ReplyDetectorTest extends TestCase {
 	}
 
 	/**
+	 * A note that only carries the name "Fresh Eyes", with no meta, is a
+	 * person's note: a reply to it is not a reply to Fresh Eyes.
+	 */
+	public function test_a_note_named_fresh_eyes_without_the_meta_is_not_an_ai_note(): void {
+		$GLOBALS['test_comment_meta'][100] = array( 'block_id' => 'abc-123' );
+		$GLOBALS['test_comments'][100]     = (object) array(
+			'comment_parent' => 0,
+			'comment_author' => 'Fresh Eyes',
+			'user_id'        => '0',
+		);
+
+		$this->detector->maybe_dispatch_reply(
+			200,
+			(object) array(
+				'comment_type'    => 'note',
+				'comment_parent'  => 100,
+				'comment_post_ID' => 42,
+				'user_id'         => '7',
+				'comment_content' => 'Thanks, but I disagree.',
+			)
+		);
+
+		$this->assertCount( 0, $GLOBALS['test_dispatched_calls'] );
+	}
+
+	/**
 	 * A non-note reply (e.g. a regular post comment) is ignored.
 	 */
 	public function test_non_note_is_ignored(): void {
