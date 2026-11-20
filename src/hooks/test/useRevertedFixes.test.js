@@ -22,17 +22,39 @@ import { registerCoreBlocks } from '@wordpress/block-library';
 import useRevertedFixes from '../useRevertedFixes';
 import {
 	acceptAllFixes,
+	getAppliedState,
 	recordApplied,
 	trackSaves,
+	undoAcceptAll,
 } from '../../utils/proofreading';
+import { registerFormatType } from '@wordpress/rich-text';
 import { applyFixToContent } from '../../utils/quick-fix';
 
 vi.mock('../../store', () => ({ STORE_NAME: 'ai-feedback/store' }));
+
+const saveSuggestionStatuses = vi.hoisted(() => vi.fn(async () => []));
+vi.mock('../../utils/suggestions', async (importOriginal) => ({
+	...(await importOriginal()),
+	saveSuggestionStatuses,
+}));
 
 beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/paragraph')) {
 		registerCoreBlocks();
 	}
+	// Gutenberg's suggestion markers, as Suggestion Mode registers them.
+	['add', 'del'].forEach((type) =>
+		registerFormatType(`core/suggestion-${type}`, {
+			title: 'Suggestion',
+			tagName: 'mark',
+			className: `wp-suggestion-${type}`,
+			attributes: {
+				'data-suggestion-id': 'data-suggestion-id',
+				'data-suggestion-type': 'data-suggestion-type',
+			},
+			edit: () => null,
+		})
+	);
 });
 
 const note = (id, blockId, find, replace) => ({
@@ -188,5 +210,60 @@ describe('useRevertedFixes', () => {
 			['applied', 7, true],
 			['resolved', 7, true],
 		]);
+	});
+
+	it('puts an accepted suggestion back to pending on Undo, without reopening the note', async () => {
+		const marks = (id) =>
+			`<mark class="wp-suggestion-add" data-suggestion-id="${id}" data-suggestion-type="add">The</mark><mark class="wp-suggestion-del" data-suggestion-id="${id}" data-suggestion-type="del">Teh</mark>`;
+		const original = `${marks(7)} cat ate alot.`;
+		const { registry, block, calls } = setUp(original);
+		const items = [
+			note(7, block.clientId, 'Teh', 'The'),
+			note(8, block.clientId, 'alot', 'a lot'),
+		];
+		const plan = acceptAllFixes(registry, items, { 7: 'pending' });
+		expect(plan.accepted).toEqual([7]);
+		expect(plan.applied).toEqual([8]);
+		[7, 8].forEach((id) =>
+			registry.dispatch('ai-feedback/store').setFixApplied(id, true)
+		);
+		calls.length = 0;
+		saveSuggestionStatuses.mockClear();
+
+		render(
+			<RegistryProvider value={registry}>
+				<Probe items={items} />
+			</RegistryProvider>
+		);
+		await act(async () => {
+			registry
+				.dispatch(blockEditorStore)
+				.updateBlockAttributes(block.clientId, {
+					content: plan.previous[block.clientId].content,
+				});
+		});
+
+		expect(saveSuggestionStatuses).toHaveBeenCalledWith([7], 'pending');
+		expect(saveSuggestionStatuses).toHaveBeenCalledTimes(1);
+		expect(calls).toEqual([
+			['applied', 7, false],
+			['applied', 8, false],
+			['resolved', 8, false],
+		]);
+	});
+
+	it('forgets fixes the snackbar’s Undo took back', () => {
+		const { registry, block } = setUp('Teh cat.');
+		const plan = acceptAllFixes(registry, [
+			note(1, block.clientId, 'Teh', 'The'),
+		]);
+		const getValue = ({ clientId, key }) =>
+			registry.select(blockEditorStore).getBlock(clientId).attributes[
+				key
+			];
+		expect(getAppliedState(1, getValue)).toBe('after');
+
+		expect(undoAcceptAll(registry, plan)).toBe(true);
+		expect(getAppliedState(1, getValue)).toBeNull();
 	});
 });
