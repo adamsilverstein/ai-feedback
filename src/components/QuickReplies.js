@@ -10,7 +10,11 @@ import { __ } from '@wordpress/i18n';
 import { Button } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { useState } from '@wordpress/element';
+import { store as blockEditorStore } from '@wordpress/block-editor';
+import { store as blocksStore } from '@wordpress/blocks';
 import { STORE_NAME } from '../store';
+import { getRichTextAttributeKey } from '../utils/quick-fix';
+import { isEditApplied } from '../utils/reply-edit';
 import useRequestReply from '../hooks/useRequestReply';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import {
@@ -36,11 +40,30 @@ export default function QuickReplies({ note, replies }) {
 	const status = useSuggestionStatus(
 		latestOwnerId === note.id ? note : { id: latestOwnerId }
 	);
+	const latestEdit = latest?.edit ?? null;
 	const isApplied = useSelect(
-		(select) =>
-			latestOwnerId !== null &&
-			!!select(STORE_NAME).isFixApplied(latestOwnerId),
-		[latestOwnerId]
+		(select) => {
+			if (latestOwnerId === null) {
+				return false;
+			}
+			if (select(STORE_NAME).isFixApplied(latestOwnerId)) {
+				return true;
+			}
+			// The applied flag only lasts the session; after a reload the
+			// block text tells, as in QuickFix.
+			const block = select(blockEditorStore).getBlock(note.block_id);
+			const key = block
+				? getRichTextAttributeKey(
+						select(blocksStore).getBlockType(block.name)
+					)
+				: null;
+			return (
+				!!key &&
+				latestOwnerId !== note.id &&
+				isEditApplied(block.attributes[key], latestEdit)
+			);
+		},
+		[latestOwnerId, latestEdit, note.id, note.block_id]
 	);
 
 	if (!canRequest || sentAt === replies.length) {

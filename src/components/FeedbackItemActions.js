@@ -12,7 +12,7 @@ import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import useSuggestionStatus from '../hooks/useSuggestionStatus';
 import useRequestReply from '../hooks/useRequestReply';
-import { getSupersededOwnerIds } from '../utils/revisions';
+import { hasReplyEdit } from '../utils/revisions';
 import { getFeedbackContent } from '../utils/feedback-content';
 import QuickFix from './QuickFix';
 
@@ -116,11 +116,9 @@ export default function FeedbackItemActions({
 			{showQuickFix && (
 				<QuickFix
 					item={item}
-					// Any reply edit in the thread revises the review's quick fix.
-					isSuperseded={getSupersededOwnerIds(
-						item,
-						thread?.replies
-					).includes(item.id)}
+					// Any reply edit in the thread revises the review's quick
+					// fix, including a secondary note's.
+					isSuperseded={hasReplyEdit(thread?.replies)}
 				/>
 			)}
 			<div className="ai-feedback-item-actions">

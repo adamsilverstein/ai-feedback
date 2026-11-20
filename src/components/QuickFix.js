@@ -148,13 +148,17 @@ export default function QuickFix({ item, edit, noteId, isSuperseded = false }) {
 		(isReplyEdit && !!attributeKey && isEditApplied(content, fix));
 
 	// A replaced edit keeps its summary so the history reads clearly, but
-	// only the newest revision can be applied or accepted.
-	if (isSuperseded && !wasAccepted && !wasApplied) {
+	// only the newest revision can be applied or accepted. An applied reply
+	// edit says so below; an applied review fix (on a restored note) says so
+	// here, without offering to apply it again.
+	if (isSuperseded && !wasAccepted && !(isReplyEdit && wasApplied)) {
 		return (
 			<div className="ai-feedback-quick-fix is-superseded">
 				{summary}
 				<p className="ai-feedback-quick-fix-superseded description">
-					{__('Replaced by a revised suggestion.', 'fresh-eyes')}
+					{wasApplied
+						? __('You applied this fix.', 'fresh-eyes')
+						: __('Replaced by a revised suggestion.', 'fresh-eyes')}
 				</p>
 			</div>
 		);

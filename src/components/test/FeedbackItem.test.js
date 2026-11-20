@@ -892,6 +892,51 @@ describe('FeedbackItem refinement', () => {
 		}
 	);
 
+	it('offers to make a change once the newest edit is in the block after a reload', () => {
+		renderItem({}, vi.fn(), {
+			blocks: {
+				'block-1': {
+					name: 'core/paragraph',
+					attributes: { content: 'Revenue grew 40% in FY25.' },
+				},
+			},
+			thread,
+		});
+
+		expect(
+			within(screen.getByRole('group', { name: 'Quick replies' }))
+				.getAllByRole('button')
+				.map((button) => button.textContent)
+		).toEqual(['Make that change', 'Show me an example', 'Why?']);
+	});
+
+	it('locks a secondary note’s quick fix once a reply proposes an edit', () => {
+		renderItem({ id: 12, parent: 7, quick_fix: quickFix }, vi.fn(), {
+			blocks,
+			thread,
+		});
+
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
+		expect(
+			screen.getAllByRole('button', { name: 'Apply change' })
+		).toHaveLength(1);
+	});
+
+	it('does not offer to reapply an applied review fix that was superseded', () => {
+		renderItem({ quick_fix: quickFix }, vi.fn(), {
+			blocks,
+			thread,
+			appliedFixes: { 7: true },
+		});
+
+		expect(screen.getByText('You applied this fix.')).toBeInTheDocument();
+		expect(
+			screen.queryByRole('button', { name: 'Apply fix' })
+		).not.toBeInTheDocument();
+	});
+
 	it('keeps the quick replies after a failed send', async () => {
 		renderItem({}, vi.fn(), {
 			blocks,

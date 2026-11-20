@@ -43,6 +43,17 @@ export function getSupersededOwnerIds(note, replies) {
 }
 
 /**
+ * Whether an AI reply in a thread proposed an edit, which supersedes the
+ * quick fix of any review note in the thread.
+ *
+ * @param {Object[]} replies The thread's replies.
+ * @return {boolean} True when a reply edit exists.
+ */
+export function hasReplyEdit(replies) {
+	return getThreadEdits(null, replies).length > 0;
+}
+
+/**
  * Finds the newest edit in a thread.
  *
  * @param {Object|null} note    The thread's note.
