@@ -278,6 +278,21 @@ describe('Custom HTML and blocks that save nothing', () => {
 		}
 	});
 
+	it('keeps the loaded text of a dynamic block saved with markup', () => {
+		// Its save renders nothing, so markup saved inside it fails validation
+		// and is read from the loaded markup, as before.
+		const [block] = loadEditor(
+			parse(
+				'<!-- wp:latest-posts --><p>Saved inside.</p><!-- /wp:latest-posts -->'
+			)
+		)
+			.select(blockEditorStore)
+			.getBlocks();
+
+		expect(block.isValid).toBe(false);
+		expect(extractBlockData([block])[0].content).toBe('Saved inside.');
+	});
+
 	it.each([
 		[
 			'a table with its rows and caption deleted',
