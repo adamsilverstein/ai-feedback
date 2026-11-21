@@ -222,7 +222,7 @@ describe('HouseStyle', () => {
 
 		const button = await screen.findByRole('button', { name: SUGGEST });
 		expect(button).toHaveAccessibleDescription(
-			'Reads your most recent published posts and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
+			'Sends your most recent published posts to your AI provider, which proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
 		);
 	});
 
@@ -393,7 +393,7 @@ describe('HouseStyle', () => {
 		);
 		const button = screen.getByRole('button', { name: SUGGEST });
 		expect(button).toHaveAccessibleDescription(
-			'Reads the most recent published posts on this site and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
+			'Sends the most recent published posts on this site to your AI provider, which proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
 		);
 		await user.click(button);
 

@@ -354,11 +354,11 @@ export default function HouseStyle({ model }) {
 				<p className="description" id={suggestHelpId}>
 					{addScope === SCOPE_SITE
 						? __(
-								'Reads the most recent published posts on this site and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
+								'Sends the most recent published posts on this site to your AI provider, which proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
 								'fresh-eyes'
 							)
 						: __(
-								'Reads your most recent published posts and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
+								'Sends your most recent published posts to your AI provider, which proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
 								'fresh-eyes'
 							)}
 				</p>
