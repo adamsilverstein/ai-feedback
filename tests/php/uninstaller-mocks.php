@@ -24,6 +24,8 @@ const AI_FEEDBACK_TEST_SITE_GLOBALS = array( 'test_options', 'test_transients', 
 class Uninstall_Test_WPDB extends wpdb {
 	public $usermeta = 'wp_usermeta';
 
+	public $commentmeta = 'wp_commentmeta';
+
 	public function esc_like( $text ) {
 		return addcslashes( $text, '_%\\' );
 	}
@@ -61,6 +63,17 @@ class Uninstall_Test_WPDB extends wpdb {
 				$names[] = '_transient_' . $transient;
 			}
 			return array_values( array_filter( $names, fn ( $name ) => self::like( (string) $name, $prepared['args'][1] ) ) );
+		}
+		if ( str_contains( $query, 'DISTINCT comment_id' ) ) {
+			$key    = $prepared['args'][1];
+			$values = array_slice( $prepared['args'], 2 );
+			$ids = array();
+			foreach ( $GLOBALS['test_comment_meta'] ?? array() as $comment_id => $meta ) {
+				if ( in_array( $meta[ $key ] ?? null, $values, true ) ) {
+					$ids[] = (string) $comment_id;
+				}
+			}
+			return $ids;
 		}
 		if ( str_contains( $query, 'DISTINCT meta_key' ) ) {
 			$keys = array();
@@ -154,6 +167,38 @@ if ( ! function_exists( 'restore_current_blog' ) ) {
 		switch_to_blog( $previous );
 		array_pop( $GLOBALS['test_blog_stack'] );
 		array_pop( $GLOBALS['test_switched_to'] );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_networks' ) ) {
+	function get_networks( $args = array() ) {
+		return $GLOBALS['test_network_ids'] ?? array( 1 );
+	}
+}
+
+if ( ! function_exists( 'delete_blog_option' ) ) {
+	function delete_blog_option( $site_id, $name ) {
+		if ( (int) $site_id === (int) ( $GLOBALS['test_blog_id'] ?? 1 ) ) {
+			unset( $GLOBALS['test_options'][ $name ] );
+		} else {
+			unset( $GLOBALS['test_sites'][ $site_id ]['test_options'][ $name ] );
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_blogs_of_user' ) ) {
+	function get_blogs_of_user( $user_id, $all = false ) {
+		return array( 1 => (object) array( 'userblog_id' => 1 ) );
+	}
+}
+
+if ( ! function_exists( 'wpmu_delete_user' ) ) {
+	function wpmu_delete_user( $id ) {
+		$GLOBALS['test_deleted_users'][] = array( $id, null );
+		unset( $GLOBALS['test_user_objects'][ $id ] );
+		\AI_Feedback\Fresh_Eyes_User::on_deleted_user( (int) $id );
 		return true;
 	}
 }

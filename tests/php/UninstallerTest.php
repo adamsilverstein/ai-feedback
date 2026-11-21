@@ -10,6 +10,7 @@ namespace AI_Feedback\Tests;
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Fresh_Eyes_User;
 use AI_Feedback\House_Style;
+use AI_Feedback\Reply_Cron_Dispatcher;
 use AI_Feedback\Uninstaller;
 
 require_once __DIR__ . '/uninstaller-mocks.php';
@@ -62,7 +63,7 @@ class UninstallerTest extends TestCase {
 	protected function tearDown(): void {
 		ai_feedback_test_reset_users();
 		$GLOBALS['wpdb'] = $this->wpdb;
-		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls', 'test_blog_id', 'test_posts', 'test_links' ) as $global ) {
+		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls', 'test_blog_id', 'test_posts', 'test_links', 'test_is_multisite', 'test_network_ids', 'test_network_options' ) as $global ) {
 			unset( $GLOBALS[ $global ] );
 		}
 		parent::tearDown();
@@ -133,7 +134,7 @@ class UninstallerTest extends TestCase {
 			'wp_persisted_preferences'                    => array(
 				'core/edit-post' => array( 'welcomeGuide' => false ),
 				'ai-feedback'    => array( 'welcomed' => true ),
-				'_modified'      => '2026-11-20T00:00:00Z',
+				'_modified'      => '2020-01-01T00:00:00.000Z',
 			),
 			'wp_2_persisted_preferences'                  => array( 'ai-feedback' => array( 'tipsSeen' => array( 'review' ) ) ),
 			'other_persisted_preferences'                 => array( 'ai-feedback' => 'Kept' ),
@@ -152,8 +153,18 @@ class UninstallerTest extends TestCase {
 		$this->assertGreaterThan( 0, $fresh_eyes );
 		$this->seed_site();
 		$this->seed_users();
+		$before = time();
 
 		Uninstaller::uninstall();
+
+		// The cleaned preferences are dated now, so they win over a browser
+		// backup that still holds the removed scope.
+		foreach ( array( 'wp_persisted_preferences', 'wp_2_persisted_preferences' ) as $key ) {
+			$modified = $GLOBALS['test_user_meta'][ self::USER_ID ][ $key ]['_modified'] ?? '';
+			$this->assertIsString( $modified );
+			$this->assertGreaterThanOrEqual( $before, strtotime( $modified ), $key );
+			unset( $GLOBALS['test_user_meta'][ self::USER_ID ][ $key ]['_modified'] );
+		}
 
 		$this->assertSame(
 			array(
@@ -179,7 +190,6 @@ class UninstallerTest extends TestCase {
 				'wp_ai_feedback_personal_house_style_backup' => 'Kept',
 				'wp_persisted_preferences'                   => array(
 					'core/edit-post' => array( 'welcomeGuide' => false ),
-					'_modified'      => '2026-11-20T00:00:00Z',
 				),
 				'wp_2_persisted_preferences'                 => array(),
 				'other_persisted_preferences'                => array( 'ai-feedback' => 'Kept' ),
@@ -240,6 +250,80 @@ class UninstallerTest extends TestCase {
 		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
 		$this->assertArrayHasKey( $fresh_eyes, $users );
 		$this->assertSame( '1', $meta[ $fresh_eyes ][ Fresh_Eyes_User::MARKER_META ] ?? null );
+	}
+
+	/**
+	 * A transient stored before a persistent object cache was enabled
+	 * stays in the database, where delete_transient() no longer looks, so
+	 * its value and timeout rows are deleted directly.
+	 */
+	public function test_uninstall_removes_transient_rows_left_in_the_database(): void {
+		$GLOBALS['test_options'] = array(
+			'_transient_ai_feedback_chunked_review_9'          => array( 'review_id' => 'r9' ),
+			'_transient_timeout_ai_feedback_chunked_review_9'  => time() + 60,
+			'_transient_ai_feedback_user_retry'                => 1,
+			'_transient_timeout_ai_feedback_user_retry'        => time() + 60,
+			'_transient_other_plugin_cache'                    => 'Kept',
+		);
+
+		Uninstaller::clean_site();
+
+		$this->assertSame( array( '_transient_other_plugin_cache' => 'Kept' ), $GLOBALS['test_options'] );
+	}
+
+	/**
+	 * A reply still waiting for its AI answer loses its pending state, so
+	 * the answer never runs after a reinstall. A finished reply is kept.
+	 */
+	public function test_uninstall_clears_replies_waiting_for_an_answer(): void {
+		$in_flight = array_fill_keys( Uninstaller::IN_FLIGHT_REPLY_META, 'stored' );
+		$GLOBALS['test_comment_meta'] = array(
+			301 => array( Reply_Cron_Dispatcher::STATUS_META_KEY => 'pending' ) + $in_flight + array( 'ai_feedback' => 'Kept' ),
+			302 => array( Reply_Cron_Dispatcher::STATUS_META_KEY => 'processing' ) + $in_flight,
+			303 => array(
+				Reply_Cron_Dispatcher::STATUS_META_KEY           => 'complete',
+				Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY => 304,
+			),
+		);
+
+		Uninstaller::clean_site();
+
+		$this->assertSame(
+			array(
+				301 => array( 'ai_feedback' => 'Kept' ),
+				302 => array(),
+				303 => array(
+					Reply_Cron_Dispatcher::STATUS_META_KEY           => 'complete',
+					Reply_Cron_Dispatcher::REPLY_COMMENT_ID_META_KEY => 304,
+				),
+			),
+			$GLOBALS['test_comment_meta']
+		);
+	}
+
+	/**
+	 * Each network stores its own Fresh Eyes user, so every network's is
+	 * removed, including from a network the uninstall did not run on, and
+	 * a network that never had one is left alone.
+	 */
+	public function test_uninstall_removes_the_fresh_eyes_user_of_every_network(): void {
+		$fresh_eyes = Fresh_Eyes_User::ensure();
+		$this->assertGreaterThan( 0, $fresh_eyes );
+		unset( $GLOBALS['test_options'][ Fresh_Eyes_User::OPTION ] );
+		Fresh_Eyes_User::reset_cache();
+
+		$GLOBALS['test_is_multisite']    = true;
+		$GLOBALS['test_site_ids']        = array( 1 );
+		$GLOBALS['test_network_ids']     = array( 1, 2 );
+		$GLOBALS['test_network_options'] = array(
+			1 => array(),
+			2 => array( Fresh_Eyes_User::OPTION => $fresh_eyes ),
+		);
+
+		Uninstaller::uninstall();
+
+		$this->assertSame( array( array( $fresh_eyes, null ) ), $GLOBALS['test_deleted_users'] );
+		$this->assertSame( array( 1 => array(), 2 => array() ), $GLOBALS['test_network_options'] );
 	}
 
 	/**

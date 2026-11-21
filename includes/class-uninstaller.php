@@ -146,6 +146,24 @@ class Uninstaller {
 	);
 
 	/**
+	 * Comment meta of a reply that is still waiting for an AI answer,
+	 * removed so the answer never runs after a reinstall. A finished reply
+	 * keeps its status.
+	 */
+	public const IN_FLIGHT_REPLY_META = array(
+		Reply_Cron_Dispatcher::STATUS_META_KEY,
+		Reply_Cron_Dispatcher::JOB_META_KEY,
+		Reply_Cron_Dispatcher::PENDING_SINCE_META_KEY,
+		Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY,
+		Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY,
+	);
+
+	/**
+	 * Reply statuses that mean the AI answer has not run yet.
+	 */
+	private const IN_FLIGHT_STATUSES = array( 'pending', 'processing' );
+
+	/**
 	 * Cron hooks unscheduled on every site, whatever their arguments.
 	 */
 	public const CRON_HOOKS = array(
@@ -230,13 +248,13 @@ class Uninstaller {
 		}
 
 		foreach ( self::TRANSIENTS as $transient ) {
-			delete_transient( $transient );
+			self::delete_transient( $transient );
 		}
 		// Only transients stored in the database can be found by prefix. With
 		// a persistent object cache they live there instead, and expire.
 		foreach ( self::TRANSIENT_PREFIXES as $prefix ) {
 			foreach ( self::options_starting_with( '_transient_' . $prefix ) as $option ) {
-				delete_transient( substr( $option, strlen( '_transient_' ) ) );
+				self::delete_transient( substr( $option, strlen( '_transient_' ) ) );
 			}
 		}
 
@@ -245,6 +263,11 @@ class Uninstaller {
 		}
 		foreach ( self::COMMENT_META as $key ) {
 			delete_metadata( 'comment', 0, $key, '', true );
+		}
+		foreach ( self::in_flight_reply_ids() as $comment_id ) {
+			foreach ( self::IN_FLIGHT_REPLY_META as $key ) {
+				delete_metadata( 'comment', $comment_id, $key );
+			}
 		}
 
 		foreach ( self::CRON_HOOKS as $hook ) {
@@ -309,11 +332,44 @@ class Uninstaller {
 				$preferences = get_user_meta( $user_id, $key, true );
 				if ( is_array( $preferences ) && array_key_exists( self::PREFERENCES_SCOPE, $preferences ) ) {
 					unset( $preferences[ self::PREFERENCES_SCOPE ] );
+					// Newer than any browser backup, so the editor loads this
+					// copy rather than restoring the removed scope.
+					$preferences['_modified'] = gmdate( 'Y-m-d\\TH:i:s.000\\Z' );
 					update_user_meta( $user_id, $key, wp_slash( $preferences ) );
 				}
 			}
 			$is_full = count( $rows ) === self::USER_BATCH;
 		} while ( $is_full );
+	}
+
+	/**
+	 * Delete a transient from the object cache and from the database.
+	 *
+	 * With a persistent object cache, delete_transient() leaves rows stored
+	 * before the cache was enabled, so those are deleted too.
+	 *
+	 * @param string $transient Transient name.
+	 */
+	private static function delete_transient( string $transient ): void {
+		delete_transient( $transient );
+		delete_option( '_transient_' . $transient );
+		delete_option( '_transient_timeout_' . $transient );
+	}
+
+	/**
+	 * IDs of the current site's replies still waiting for an AI answer.
+	 *
+	 * @return list<int> Comment IDs.
+	 */
+	private static function in_flight_reply_ids(): array {
+		$db = self::db();
+		if ( null === $db ) {
+			return array();
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Runs once, on uninstall.
+		$ids = $db->get_col( $db->prepare( 'SELECT DISTINCT comment_id FROM %i WHERE meta_key = %s AND meta_value IN (%s, %s)', $db->commentmeta, Reply_Cron_Dispatcher::STATUS_META_KEY, ...self::IN_FLIGHT_STATUSES ) );
+		return array_values( array_filter( array_map( 'intval', array_filter( $ids, 'is_numeric' ) ) ) );
 	}
 
 	/**
