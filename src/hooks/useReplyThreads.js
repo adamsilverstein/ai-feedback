@@ -48,6 +48,7 @@ let queue = Promise.resolve();
 function refineThread(threadId, superseded, reply, registry) {
 	queue = queue
 		.then(async () => {
+			// The registry of the editor that queued this, not a later one's.
 			await supersedeSuggestions(threadId, superseded, registry);
 			if (reply) {
 				await suggestReplyEdit(reply, threadId);
