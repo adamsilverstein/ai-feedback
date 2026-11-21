@@ -23,7 +23,15 @@
  *
  * External dependencies
  */
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 /**
@@ -57,6 +65,11 @@ const CURRENT_USER = 7;
  */
 const savedNotes = new Map();
 
+/**
+ * Tells which note meta saves fail, or null when none do.
+ */
+let failSaves = null;
+
 beforeAll(() => {
 	if (!getBlockType('core/paragraph')) {
 		registerBlockType('core/paragraph', {
@@ -75,6 +88,9 @@ beforeAll(() => {
 				saveEntityRecord:
 					(kind, name, { id, meta }) =>
 					async () => {
+						if (failSaves?.(meta)) {
+							throw new Error('Save failed.');
+						}
 						const note = {
 							...(savedNotes.get(id) ?? { id }),
 							author: CURRENT_USER,
@@ -367,6 +383,7 @@ beforeEach(() => {
 	window.__experimentalSuggestionMode = true;
 	window.aiFeedbackData = { suggestions: true, structuralSuggestions: true };
 	savedNotes.clear();
+	failSaves = null;
 	blocks = {
 		intro: createBlock('core/paragraph', { content: 'Intro.' }),
 		bg: createBlock('core/paragraph', { content: 'Background.' }),
@@ -518,6 +535,59 @@ describe('structural suggestions in Suggest intent', () => {
 			fromIndex: 2,
 			fromAnchorClientId: blocks.bg.clientId,
 		});
+	});
+
+	it('records a move once when Gutenberg tags a neighbor that already held a move', async () => {
+		// The author moved the intro down one by hand: Gutenberg holds it.
+		dispatch(blockEditorStore).moveBlocksToPosition(
+			[blocks.intro.clientId],
+			'',
+			'',
+			1
+		);
+		const held = () =>
+			select(blockEditorStore).getBlockAttributes(blocks.intro.clientId)
+				.metadata.suggestion;
+		const before = held();
+
+		expect(await suggestBlockAction(moveNote('intro'))).toBe(false);
+
+		expect(order()).toEqual(['bg', 'open', 'intro', 'rep']);
+		// Gutenberg wrote the marker again with the same fields, so only
+		// its identity tells that this move was recorded.
+		expect(held()).toEqual(before);
+		expect(held()).not.toBe(before);
+		expect(
+			select(blockEditorStore).getBlockAttributes(blocks.open.clientId)
+				.metadata.suggestion
+		).toBeUndefined();
+		expect(pendingSuggestions(interceptor.captures)).toBe(1);
+	});
+
+	it('leaves the move to Gutenberg even when the note cannot be cleared', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		// The payload saves, then the save that takes it back fails.
+		failSaves = (meta) => meta._wp_suggestion === null;
+
+		await expect(suggestBlockAction(moveNote('intro'))).resolves.toBe(
+			false
+		);
+
+		// One marker, Gutenberg's: the plugin adds none for a note that is
+		// left for the orphan cleanup.
+		expect(
+			select(blockEditorStore).getBlockAttributes(blocks.open.clientId)
+				.metadata.suggestion
+		).toEqual(
+			expect.not.objectContaining({ commentId: expect.anything() })
+		);
+		expect(interceptor.captures.size).toBe(1);
+		expect(warn).toHaveBeenCalledWith(
+			'[AI-Feedback] Could not remove suggestion:',
+			13,
+			expect.any(Error)
+		);
+		warn.mockRestore();
 	});
 });
 

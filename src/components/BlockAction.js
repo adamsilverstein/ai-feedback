@@ -126,13 +126,23 @@ export default function BlockAction({
 			(select) => {
 				const selectors = select(blockEditorStore);
 				const id = findNoteBlock(selectors, item.block_id, item.id);
+				const actionState = getBlockActionState(selectors, action, id);
+				const feedback = select(STORE_NAME);
 				return {
 					clientId: id,
-					...getBlockActionState(selectors, action, id),
-					isApplied: select(STORE_NAME).isFixApplied(ownerId),
+					...actionState,
+					isApplied: feedback.isFixApplied(ownerId),
 					isCaptured:
 						action.type === 'move_block' &&
-						hasCapturedMove(selectors, id, item.id),
+						hasCapturedMove(
+							selectors,
+							id,
+							actionState.targetId,
+							item.id,
+							feedback
+								.getLastReview()
+								?.notes?.map((reviewNote) => reviewNote.id)
+						),
 				};
 			},
 			[item.block_id, item.id, action, ownerId]
