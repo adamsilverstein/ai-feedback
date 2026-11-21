@@ -154,16 +154,18 @@ namespace AI_Feedback\Tests {
 		 * @param int    $reply_id  Reply ID.
 		 * @param int    $parent_id Note it replies to.
 		 * @param string $date_gmt  Creation date, GMT.
+		 * @param string $post_id   Post it is on.
 		 */
-		private function add_reply( int $reply_id, int $parent_id, string $date_gmt ): void {
+		private function add_reply( int $reply_id, int $parent_id, string $date_gmt = '2026-01-01 00:00:00', string $post_id = '42' ): void {
 			$reply = new \WP_Comment(
 				(object) array(
 					'comment_ID'       => (string) $reply_id,
-					'comment_post_ID'  => '42',
+					'comment_post_ID'  => $post_id,
 					'comment_parent'   => (string) $parent_id,
 					'comment_date_gmt' => $date_gmt,
 				)
 			);
+			$this->set_meta( $reply_id, 'ai_feedback', '1' );
 			/** @var array<int, \WP_Comment> $comments */
 			$comments                 = $GLOBALS['test_comments'] ?? array();
 			$comments[ $reply_id ]    = $reply;
@@ -452,11 +454,71 @@ namespace AI_Feedback\Tests {
 			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2}' );
 			$this->assertSame( self::NOTE_ID, $suggestions->get_owner_id( self::NOTE_ID ) );
 
+			$this->add_reply( 501, self::NOTE_ID );
 			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
 			$this->assertSame( 501, $suggestions->get_owner_id( self::NOTE_ID ) );
 
+			// A reply to a reply is in the thread too.
+			$this->add_reply( 503, 501 );
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":503}' );
+			$this->assertSame( 503, $suggestions->get_owner_id( self::NOTE_ID ) );
+
 			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":"501"}' );
 			$this->assertSame( self::NOTE_ID, $suggestions->get_owner_id( self::NOTE_ID ) );
+		}
+
+		/**
+		 * The payload is meta an editor can write, so the reply it names has
+		 * to be an AI reply in the note's own thread.
+		 *
+		 * @dataProvider data_owners_outside_the_thread
+		 *
+		 * @param int    $parent_id Note the named reply answers.
+		 * @param string $post_id   Post the named reply is on.
+		 * @param non-empty-string $approved The named reply's comment status.
+		 * @param bool   $is_ai     Whether Fresh Eyes wrote the named reply.
+		 */
+		public function test_owner_outside_the_thread_is_nobody( int $parent_id, string $post_id, string $approved, bool $is_ai ): void {
+			$this->add_reply( 501, $parent_id, '2026-01-01 00:00:00', $post_id );
+			$reply = get_comment( 501 );
+			$this->assertInstanceOf( \WP_Comment::class, $reply );
+			$reply->comment_approved = $approved;
+			if ( ! $is_ai ) {
+				$this->set_meta( 501, 'ai_feedback', '' );
+			}
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+
+			$this->assertSame( 0, ( new Suggestions() )->get_owner_id( self::NOTE_ID ) );
+		}
+
+		/**
+		 * Replies a root note's payload must not be able to name.
+		 *
+		 * @return array<string, array{int, string, non-empty-string, bool}>
+		 */
+		public static function data_owners_outside_the_thread(): array {
+			return array(
+				'in another thread' => array( 999, '42', '0', true ),
+				'on another post'   => array( self::NOTE_ID, '43', '0', true ),
+				'trashed'           => array( self::NOTE_ID, '42', 'trash', true ),
+				'written by a user' => array( self::NOTE_ID, '42', '0', false ),
+			);
+		}
+
+		/**
+		 * A root note whose payload names a reply deleted since still holds a
+		 * suggestion, which the Notes sidebar can accept or reject, but it is
+		 * nobody's edit: neither the note's own fix nor a reply reads it.
+		 */
+		public function test_deleted_owner_leaves_the_suggestion_with_nobody(): void {
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+			$this->set_meta( self::NOTE_ID, Suggestions::STATUS_META, 'pending' );
+
+			$suggestions = new Suggestions();
+			$this->assertSame( 0, $suggestions->get_owner_id( self::NOTE_ID ) );
+			$this->assertSame( 'pending', $suggestions->get_status( self::NOTE_ID ) );
+			$this->assertNull( $suggestions->get_edit_status( self::NOTE_ID, self::NOTE_ID ) );
+			$this->assertNull( $suggestions->get_edit_status( 501, self::NOTE_ID ) );
 		}
 
 		/**
@@ -464,6 +526,7 @@ namespace AI_Feedback\Tests {
 		 * the root's own edit then is not a suggestion.
 		 */
 		public function test_edit_status_follows_the_owner(): void {
+			$this->add_reply( 501, self::NOTE_ID );
 			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
 			$this->set_meta( self::NOTE_ID, Suggestions::STATUS_META, 'rejected-unsaved' );
 			$this->set_meta( 502, Suggestions::PAYLOAD_META, '{"schemaVersion":2}' );
@@ -483,6 +546,7 @@ namespace AI_Feedback\Tests {
 		 * A note holding a reply's edit reports no status for its own fix.
 		 */
 		public function test_note_fields_skip_a_status_owned_by_a_reply(): void {
+			$this->add_reply( 501, self::NOTE_ID );
 			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
 
 			$note = ( new Notes_Manager() )->get_notes_for_post( 42 )[0] ?? null;

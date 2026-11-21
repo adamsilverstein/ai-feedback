@@ -247,7 +247,8 @@ function getBlockContent(clientId) {
  *
  * Gutenberg only links a thread's root note to its block, so a reply's edit
  * is suggested on the root note, and this key says which reply it is.
- * Gutenberg keeps keys it does not know.
+ * Gutenberg keeps keys it does not know. The server reads it: keep in step
+ * with Suggestions::EDIT_OWNER_KEY in includes/class-suggestions.php.
  */
 export const EDIT_OWNER_KEY = 'aiFeedbackEditOwner';
 
