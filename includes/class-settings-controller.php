@@ -168,6 +168,8 @@ class Settings_Controller extends WP_REST_Controller {
 			'available_tones'       => $this->get_available_tones(),
 			'available_locales'     => $this->get_available_locales(),
 			'chunk_size'            => Review_Chunks::get_chunk_size(),
+			'send_images'           => Review_Images::is_enabled(),
+			'can_manage_site'       => current_user_can( 'manage_options' ),
 		);
 
 		return rest_ensure_response( $settings );
@@ -177,7 +179,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 * Update settings.
 	 *
 	 * Saves the current user's preferences, or the site defaults when `scope`
-	 * is `site`.
+	 * is `site`. `send_images` is a setting of the site under either scope.
 	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return WP_REST_Response|WP_Error
@@ -284,6 +286,16 @@ class Settings_Controller extends WP_REST_Controller {
 			$updated['review_audience'] = $audience;
 		}
 
+		// Update whether reviews send the post's images, for the whole site.
+		if ( $request->has_param( 'send_images' ) ) {
+			$value       = $request->get_param( 'send_images' );
+			$send_images = ( is_bool( $value ) || is_int( $value ) || is_string( $value ) ) && rest_sanitize_boolean( $value );
+
+			// Saved as a string: update_option() can't add an option as false.
+			update_option( Review_Images::OPTION, $send_images ? '1' : '0' );
+			$updated['send_images'] = $send_images;
+		}
+
 		// Return updated settings.
 		return $this->get_settings( $request );
 	}
@@ -301,13 +313,15 @@ class Settings_Controller extends WP_REST_Controller {
 	 * Check permissions for updating settings.
 	 *
 	 * Users who can edit posts may save their own preferences. Changing the
-	 * site defaults requires `manage_options`.
+	 * site defaults, or a setting of the site such as `send_images`,
+	 * requires `manage_options`.
 	 *
 	 * @param  WP_REST_Request $request Request object.
 	 * @return bool|WP_Error
 	 */
 	public function update_settings_permissions_check( WP_REST_Request $request ): bool|WP_Error {
-		$capability = 'site' === $request->get_param( 'scope' ) ? 'manage_options' : 'edit_posts';
+		$is_site    = 'site' === $request->get_param( 'scope' ) || $request->has_param( 'send_images' );
+		$capability = $is_site ? 'manage_options' : 'edit_posts';
 
 		if ( ! current_user_can( $capability ) ) {
 			return new WP_Error(
@@ -362,6 +376,11 @@ class Settings_Controller extends WP_REST_Controller {
 				'type'              => 'string',
 				'maxLength'         => Personas::MAX_AUDIENCE_LENGTH,
 				'sanitize_callback' => array( Personas::class, 'sanitize_audience' ),
+			),
+			'send_images'         => array(
+				'description'       => __( 'Whether reviews send the post\'s images to the AI provider for alt text suggestions. A setting of the site, which requires manage_options.', 'fresh-eyes' ),
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
 			),
 		);
 	}

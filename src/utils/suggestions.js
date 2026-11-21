@@ -717,16 +717,24 @@ function getRestoreIndex(selectors, clientId, restoreParent, marker) {
  * Takes a structural suggestion out of the post, as Reject does: a removal
  * keeps its block, and a move goes back to where it came from.
  *
+ * The marker is cleared and the block moved in one store update. In Suggest
+ * intent Gutenberg records a move as the current user's suggestion unless
+ * the block's `pending-move` marker goes in the same update.
+ *
  * @param {string} clientId Client id of the marked block.
+ * @param {Object} registry Data registry, as `useRegistry()` returns it.
  */
-function rejectStructuralMarker(clientId) {
-	const selectors = dataSelect(blockEditorStore);
-	const editor = dataDispatch(blockEditorStore);
+function rejectStructuralMarker(clientId, registry) {
+	const selectors = registry.select(blockEditorStore);
+	const editor = registry.dispatch(blockEditorStore);
 	const { suggestion, ...metadata } =
 		selectors.getBlock(clientId)?.attributes?.metadata || {};
 
-	editor.updateBlockAttributes(clientId, { metadata });
-	if (suggestion?.type === 'pending-move') {
+	registry.batch(() => {
+		editor.updateBlockAttributes(clientId, { metadata });
+		if (suggestion?.type !== 'pending-move') {
+			return;
+		}
 		const liveParent = selectors.getBlockRootClientId(clientId) ?? '';
 		const recorded = suggestion.fromParentClientId ?? '';
 		// A recorded parent only exists in the session that made the move.
@@ -740,7 +748,7 @@ function rejectStructuralMarker(clientId) {
 			restoreParent,
 			getRestoreIndex(selectors, clientId, restoreParent, suggestion)
 		);
-	}
+	});
 }
 
 /**
@@ -874,9 +882,15 @@ const supersedingIds = new Set();
  *
  * @param {number}   threadId Root note of the thread, used to find its block.
  * @param {number[]} noteIds  Notes whose edits the newest edit supersedes.
+ * @param {Object}   registry Data registry, as `useRegistry()` returns it.
  * @return {Promise<number[]>} IDs of the suggestions retired.
  */
-export async function supersedeSuggestions(threadId, noteIds) {
+export async function supersedeSuggestions(threadId, noteIds, registry) {
+	// Checked up front: only a structural retire uses it, and that failure
+	// would be caught and logged below.
+	if (typeof registry?.batch !== 'function') {
+		throw new TypeError('supersedeSuggestions() needs a data registry.');
+	}
 	if (!isSuggestionModeAvailable() || !noteIds?.length) {
 		return [];
 	}
@@ -911,7 +925,7 @@ export async function supersedeSuggestions(threadId, noteIds) {
 				});
 			}
 			if (structural) {
-				rejectStructuralMarker(structural);
+				rejectStructuralMarker(structural, registry);
 			}
 			await saveNoteMeta(noteId, {
 				_wp_suggestion_status: 'rejected-unsaved',
