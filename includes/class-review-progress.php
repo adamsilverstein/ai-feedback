@@ -87,7 +87,8 @@ class Review_Progress {
 			array(
 				'post_id'    => $post_id,
 				'type'       => 'note',
-				'status'     => 'all',
+				// `all` leaves out trash and spam, which compare() still follows.
+				'status'     => 'any',
 				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 				'meta_query' => array(
 					array(

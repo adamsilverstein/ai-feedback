@@ -354,6 +354,21 @@ class ReviewProgressTest extends TestCase {
 	}
 
 	/**
+	 * The fallback follows a trashed note too, so it counts again once it
+	 * is restored.
+	 */
+	public function test_fallback_follows_trashed_notes(): void {
+		$open    = $this->add_note( 'r1' );
+		$trashed = $this->add_note( 'r1' );
+		$this->note( $trashed )->comment_approved = 'trash';
+
+		$result = Review_Progress::compare( self::POST_ID, array( 'review_id' => 'r1' ) );
+
+		$this->assertSame( 1, $result['still_open'] );
+		$this->assertSame( array( $open, $trashed ), $result['open_ids'] );
+	}
+
+	/**
 	 * A post's first review has nothing to compare; a second one reports how
 	 * the first one's notes stand and carries the still open ones forward.
 	 */
