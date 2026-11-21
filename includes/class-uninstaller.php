@@ -64,7 +64,9 @@ class Uninstaller {
 	);
 
 	/**
-	 * Network options, removed with the Fresh Eyes user.
+	 * Network options. Fresh_Eyes_User::uninstall() removes them with the
+	 * user, so nothing here reads this list: it records them for the test
+	 * that every stored key is listed.
 	 */
 	public const NETWORK_OPTIONS = array(
 		Fresh_Eyes_User::OPTION,
