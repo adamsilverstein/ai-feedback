@@ -1155,6 +1155,14 @@ $ai-feedback-reply-error: #cc1818;
 }
 
 /* "Remember this for future reviews" under an AI reply */
+.ai-feedback-house-style-suggest {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	margin-top: 16px;
+}
+
 .ai-feedback-remember {
 	display: flex;
 	flex-direction: column;

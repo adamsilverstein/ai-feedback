@@ -9,6 +9,46 @@ import HouseStyle from '../HouseStyle';
 import { resetHouseStyle } from '../../utils/house-style';
 
 vi.mock('@wordpress/api-fetch', () => ({ default: vi.fn() }));
+vi.mock('@wordpress/a11y', () => ({ speak: vi.fn() }));
+
+const SUGGEST_PATH = '/ai-feedback/v1/house-style/suggestions/posts';
+const SUGGEST = 'Suggest rules from published posts';
+
+/**
+ * Answer the rules request with `rules`, a suggestion request with
+ * `suggestions`, and any other request with the next of `responses`.
+ *
+ * @param {Object}                               rules       Rules returned by GET.
+ * @param {Object|Error|(() => Promise<Object>)} suggestions Suggestion response, an error to reject with, or a function returning a promise.
+ * @param {...Object}                            responses   Responses to later requests.
+ */
+function mockSuggestions(rules, suggestions, ...responses) {
+	apiFetch.mockImplementation(({ path, method }) => {
+		if (!method) {
+			return Promise.resolve(rules);
+		}
+		if (path === SUGGEST_PATH) {
+			if (typeof suggestions === 'function') {
+				return suggestions();
+			}
+			return suggestions instanceof Error
+				? Promise.reject(suggestions)
+				: Promise.resolve(suggestions);
+		}
+		return Promise.resolve(responses.shift() ?? rules);
+	});
+}
+
+/**
+ * Requests that saved or changed a rule.
+ *
+ * @return {Object[]} Request options.
+ */
+function ruleWrites() {
+	return apiFetch.mock.calls
+		.map(([options]) => options)
+		.filter(({ path, method }) => method && path !== SUGGEST_PATH);
+}
 
 /**
  * Rules as the server returns them.
@@ -174,6 +214,209 @@ describe('HouseStyle', () => {
 		expect(
 			within(form.closest('form')).getByText(/This list is full/)
 		).toBeVisible();
+	});
+
+	it('explains what suggesting does and that it uses an AI request', async () => {
+		apiFetch.mockResolvedValue(state());
+		render(<HouseStyle />);
+
+		const button = await screen.findByRole('button', { name: SUGGEST });
+		expect(button).toHaveAccessibleDescription(
+			'Reads your most recent published posts and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
+		);
+	});
+
+	it('suggests rules from the author’s posts without saving any', async () => {
+		const user = userEvent.setup();
+		mockSuggestions(state(), {
+			suggestions: ['Spell out numbers under ten', 'Write WordPress'],
+			scope: 'user',
+			post_count: 5,
+		});
+		render(<HouseStyle model="some-model" />);
+
+		await user.click(await screen.findByRole('button', { name: SUGGEST }));
+
+		expect(apiFetch).toHaveBeenLastCalledWith({
+			path: SUGGEST_PATH,
+			method: 'POST',
+			data: { scope: 'user', model: 'some-model' },
+		});
+		expect(await screen.findByLabelText('Suggested rule 1')).toHaveValue(
+			'Spell out numbers under ten'
+		);
+		expect(screen.getByLabelText('Suggested rule 2')).toHaveValue(
+			'Write WordPress'
+		);
+		expect(ruleWrites()).toEqual([]);
+		// Not in the saved list.
+		expect(
+			screen.queryByRole('button', {
+				name: 'Remove rule: Spell out numbers under ten',
+			})
+		).not.toBeInTheDocument();
+	});
+
+	it('is busy while the suggestions load', async () => {
+		const user = userEvent.setup();
+		let finish;
+		mockSuggestions(
+			state(),
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				})
+		);
+		render(<HouseStyle />);
+
+		const button = await screen.findByRole('button', { name: SUGGEST });
+		await user.click(button);
+
+		expect(button).toHaveAttribute('aria-disabled', 'true');
+		expect(button).toHaveClass('is-busy');
+		// A second click while waiting asks nothing more.
+		await user.click(button);
+		expect(
+			apiFetch.mock.calls.filter(([{ path }]) => path === SUGGEST_PATH)
+		).toHaveLength(1);
+
+		finish({ suggestions: ['Write WordPress'] });
+		expect(await screen.findByLabelText('Suggested rule 1')).toBeVisible();
+		expect(button).not.toHaveAttribute('aria-disabled', 'true');
+	});
+
+	it('shows the error when suggesting fails', async () => {
+		const user = userEvent.setup();
+		const error = new Error(
+			'You have reached the maximum number of reviews per hour (10). Please try again later.'
+		);
+		mockSuggestions(state(), error);
+		render(<HouseStyle />);
+
+		await user.click(await screen.findByRole('button', { name: SUGGEST }));
+
+		const matches = await screen.findAllByText(error.message);
+		expect(
+			matches
+				.map((match) => match.closest('.components-notice'))
+				.find(Boolean)
+		).toBeVisible();
+		expect(screen.queryByLabelText(/Suggested rule/)).toBeNull();
+		expect(
+			screen.getByRole('button', { name: SUGGEST })
+		).not.toHaveAttribute('aria-disabled', 'true');
+	});
+
+	it('says so when there is nothing new to suggest', async () => {
+		const user = userEvent.setup();
+		mockSuggestions(state(), { suggestions: [] });
+		render(<HouseStyle />);
+
+		await user.click(await screen.findByRole('button', { name: SUGGEST }));
+
+		expect(
+			await screen.findByText('No new rules to suggest.')
+		).toBeVisible();
+	});
+
+	it('saves a suggestion as edited, and only that one', async () => {
+		const user = userEvent.setup();
+		const saved = 'Spell out numbers under ten, even in headings';
+		mockSuggestions(
+			state(),
+			{ suggestions: ['Spell out numbers under ten', 'Write WordPress'] },
+			state({
+				user: [
+					{ id: 'u1', text: 'Headings use sentence case' },
+					{ id: 'u2', text: saved },
+				],
+				rule: { id: 'u2', text: saved },
+			})
+		);
+		render(<HouseStyle />);
+
+		await user.click(await screen.findByRole('button', { name: SUGGEST }));
+		await user.type(
+			await screen.findByLabelText('Suggested rule 1'),
+			', even in headings'
+		);
+		await user.click(
+			screen.getAllByRole('button', { name: 'Remember' })[0]
+		);
+
+		expect(ruleWrites()).toEqual([
+			{
+				path: '/ai-feedback/v1/house-style',
+				method: 'POST',
+				data: { text: saved, scope: 'user' },
+			},
+		]);
+		expect(
+			await screen.findByText(`Saved to house style: “${saved}”`)
+		).toBeVisible();
+		// Now in the saved list, and the other suggestion still waits.
+		expect(
+			screen.getByRole('button', { name: `Remove rule: ${saved}` })
+		).toBeVisible();
+		expect(screen.getByLabelText('Suggested rule 2')).toHaveValue(
+			'Write WordPress'
+		);
+	});
+
+	it('skips a suggestion without a request', async () => {
+		const user = userEvent.setup();
+		mockSuggestions(state(), {
+			suggestions: ['Spell out numbers under ten', 'Write WordPress'],
+		});
+		render(<HouseStyle />);
+
+		await user.click(await screen.findByRole('button', { name: SUGGEST }));
+		await screen.findByLabelText('Suggested rule 1');
+		await user.click(screen.getAllByRole('button', { name: 'Not now' })[0]);
+
+		expect(screen.queryByLabelText('Suggested rule 1')).toBeNull();
+		expect(screen.getByLabelText('Suggested rule 2')).toBeVisible();
+		expect(ruleWrites()).toEqual([]);
+	});
+
+	it('suggests site rules from the whole site for an administrator', async () => {
+		const user = userEvent.setup();
+		mockSuggestions(state({ can_manage_site: true }), {
+			suggestions: ['Write WordPress'],
+			scope: 'site',
+		});
+		render(<HouseStyle model="some-model" />);
+
+		await user.selectOptions(
+			await screen.findByLabelText('Applies to'),
+			'Everyone on this site'
+		);
+		const button = screen.getByRole('button', { name: SUGGEST });
+		expect(button).toHaveAccessibleDescription(
+			'Reads the most recent published posts on this site and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.'
+		);
+		await user.click(button);
+
+		expect(apiFetch).toHaveBeenLastCalledWith({
+			path: SUGGEST_PATH,
+			method: 'POST',
+			data: { scope: 'site', model: 'some-model' },
+		});
+		const suggestion = (
+			await screen.findByLabelText('Suggested rule 1')
+		).closest('.ai-feedback-remember');
+		expect(within(suggestion).getByLabelText('Applies to')).toHaveValue(
+			'site'
+		);
+	});
+
+	it('does not offer suggestions for a full list', async () => {
+		apiFetch.mockResolvedValue(state({ max_rules: 1 }));
+		render(<HouseStyle />);
+
+		expect(
+			await screen.findByRole('button', { name: SUGGEST })
+		).toHaveAttribute('aria-disabled', 'true');
 	});
 
 	it('renders nothing when the rules cannot load', async () => {

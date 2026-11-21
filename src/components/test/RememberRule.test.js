@@ -180,6 +180,57 @@ describe('RememberRule', () => {
 		expect(await screen.findByText('Saved to house style.')).toBeVisible();
 	});
 
+	it('saves and skips a rule that no note proposed without naming a note', async () => {
+		const user = userEvent.setup();
+		mockRequests(RULES, RULES);
+		const { container } = render(
+			<>
+				<RememberRule
+					label="Suggested rule 1"
+					help="From your published posts."
+					proposal={PROPOSAL}
+				/>
+				<RememberRule
+					label="Suggested rule 2"
+					proposal={{ text: 'Use the Oxford comma', status: '' }}
+				/>
+			</>
+		);
+
+		expect(screen.getByLabelText('Suggested rule 1')).toHaveValue(
+			'Headings use sentence case'
+		);
+		expect(screen.getByText('From your published posts.')).toBeVisible();
+
+		await user.click(screen.getAllByRole('button', { name: 'Not now' })[1]);
+		expect(
+			screen.queryByLabelText('Suggested rule 2')
+		).not.toBeInTheDocument();
+		expect(apiFetch).not.toHaveBeenCalledWith(
+			expect.objectContaining({ method: 'POST' })
+		);
+
+		await user.click(screen.getByRole('button', { name: 'Remember' }));
+		expect(apiFetch).toHaveBeenLastCalledWith({
+			path: '/ai-feedback/v1/house-style',
+			method: 'POST',
+			data: { text: 'Headings use sentence case', scope: 'user' },
+		});
+		expect(await screen.findByText('Saved to house style.')).toBeVisible();
+		expect(container.querySelectorAll('textarea')).toHaveLength(0);
+	});
+
+	it('starts on the scope it is given for an administrator', async () => {
+		const user = userEvent.setup();
+		mockRequests({ ...RULES, can_manage_site: true }, RULES);
+		render(<RememberRule proposal={PROPOSAL} defaultScope="site" />);
+
+		expect(await screen.findByLabelText('Applies to')).toHaveValue('site');
+		await user.click(screen.getByRole('button', { name: 'Remember' }));
+
+		expect(apiFetch.mock.lastCall[0].data.scope).toBe('site');
+	});
+
 	it('renders nothing for a dismissed proposal', () => {
 		mockRequests(RULES);
 		const { container } = render(

@@ -4,17 +4,24 @@
  * Lists the short style rules every review and reply follows, in Review
  * Settings. Anyone can keep their own rules; site rules are shown to
  * everyone they apply to and can be changed by users who manage options.
+ * Rules can also be suggested from published posts: each suggestion is
+ * offered the way a rule proposed in a thread is, and saved only when the
+ * user picks it.
  */
 import { Button, Notice, SelectControl } from '@wordpress/components';
+import { speak } from '@wordpress/a11y';
+import { useInstanceId } from '@wordpress/compose';
 import { useState } from '@wordpress/element';
-import { __, sprintf } from '@wordpress/i18n';
+import { __, _n, sprintf } from '@wordpress/i18n';
 import useHouseStyle from '../hooks/useHouseStyle';
+import RememberRule from './RememberRule';
 import RuleTextarea from './RuleTextarea';
 import {
 	SCOPE_SITE,
 	SCOPE_USER,
 	addRule,
 	deleteRule,
+	suggestRules,
 	updateRule,
 } from '../utils/house-style';
 
@@ -167,14 +174,23 @@ function RuleList({ title, rules, scope, canEdit, maxLength, onError }) {
 /**
  * House Style component.
  *
+ * @param {Object} props
+ * @param {string} [props.model] AI model rule suggestions ask, as selected for reviews.
  * @return {Element|null} House style settings, or null while loading.
  */
-export default function HouseStyle() {
+export default function HouseStyle({ model }) {
 	const { rules, loadError } = useHouseStyle();
 	const [text, setText] = useState('');
 	const [scope, setScope] = useState(SCOPE_USER);
 	const [isAdding, setIsAdding] = useState(false);
 	const [error, setError] = useState(null);
+	// Latest suggestions: { id, scope, rules }, or null before any request.
+	const [suggestions, setSuggestions] = useState(null);
+	const [isSuggesting, setIsSuggesting] = useState(false);
+	const suggestHelpId = useInstanceId(
+		HouseStyle,
+		'ai-feedback-house-style-suggest-help'
+	);
 
 	if (loadError || !rules) {
 		return null;
@@ -192,6 +208,47 @@ export default function HouseStyle() {
 			.then(() => setText(''))
 			.catch((requestError) => setError(errorMessage(requestError)))
 			.finally(() => setIsAdding(false));
+	};
+
+	const handleSuggest = () => {
+		if (isSuggesting) {
+			return;
+		}
+		setIsSuggesting(true);
+		setError(null);
+		setSuggestions(null);
+		suggestRules({ scope: addScope, model })
+			.then((result) => {
+				const proposed = (
+					Array.isArray(result?.suggestions) ? result.suggestions : []
+				).filter((rule) => typeof rule === 'string' && rule.trim());
+				setSuggestions({
+					id: Date.now(),
+					scope: addScope,
+					rules: proposed,
+				});
+				speak(
+					proposed.length
+						? sprintf(
+								/* translators: %d: number of suggested rules. */
+								_n(
+									'%d rule suggested.',
+									'%d rules suggested.',
+									proposed.length,
+									'fresh-eyes'
+								),
+								proposed.length
+							)
+						: __('No new rules to suggest.', 'fresh-eyes')
+				);
+			})
+			.catch((requestError) =>
+				setError(
+					requestError?.message ||
+						__('Rules could not be suggested.', 'fresh-eyes')
+				)
+			)
+			.finally(() => setIsSuggesting(false));
 	};
 
 	return (
@@ -282,6 +339,51 @@ export default function HouseStyle() {
 					</p>
 				)}
 			</form>
+
+			<div className="ai-feedback-house-style-suggest">
+				<Button
+					variant="secondary"
+					isBusy={isSuggesting}
+					disabled={isSuggesting || isFull}
+					accessibleWhenDisabled
+					aria-describedby={suggestHelpId}
+					onClick={handleSuggest}
+				>
+					{__('Suggest rules from published posts', 'fresh-eyes')}
+				</Button>
+				<p className="description" id={suggestHelpId}>
+					{addScope === SCOPE_SITE
+						? __(
+								'Reads the most recent published posts on this site and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
+								'fresh-eyes'
+							)
+						: __(
+								'Reads your most recent published posts and proposes a few rules. Nothing is saved until you choose to remember one. Uses one AI request.',
+								'fresh-eyes'
+							)}
+				</p>
+				{suggestions?.rules.length === 0 && (
+					<p className="ai-feedback-house-style-empty">
+						{__('No new rules to suggest.', 'fresh-eyes')}
+					</p>
+				)}
+				{suggestions?.rules.map((rule, index) => (
+					<RememberRule
+						key={`${suggestions.id}-${index}`}
+						proposal={{ text: rule, status: '' }}
+						defaultScope={suggestions.scope}
+						label={sprintf(
+							/* translators: %d: position of the rule in the suggestions. */
+							__('Suggested rule %d', 'fresh-eyes'),
+							index + 1
+						)}
+						help={__(
+							'Suggested from published posts. You can edit it before saving.',
+							'fresh-eyes'
+						)}
+					/>
+				))}
+			</div>
 		</fieldset>
 	);
 }
