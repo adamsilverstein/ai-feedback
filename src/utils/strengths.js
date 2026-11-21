@@ -77,7 +77,8 @@ export function mergeStrengths(...lists) {
  *
  * Client IDs change on every editor load, so after a reload the block is
  * found by its name and the fingerprint of its text. A block edited since the
- * review no longer matches, and the strength is shown without a link.
+ * review no longer matches, and neither do blocks with identical text, so
+ * the strength is shown without a link.
  *
  * @param {Object} strength Strength with `block_id`, `block_name` and `block_anchor`.
  * @return {string|null} Client ID of the block in this editor, or null.
@@ -94,10 +95,11 @@ export function findStrengthBlock(strength) {
 		return null;
 	}
 
-	const match = extractBlockData(getBlocks()).find(
+	const matches = extractBlockData(getBlocks()).filter(
 		(block) =>
 			block.name === strength.block_name &&
 			block.anchor === strength.block_anchor
 	);
-	return match?.clientId ?? null;
+	// Blocks with the same text can't be told apart, so link none of them.
+	return matches.length === 1 ? matches[0].clientId : null;
 }

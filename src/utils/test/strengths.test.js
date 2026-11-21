@@ -144,6 +144,20 @@ describe('findStrengthBlock', () => {
 		).toBeNull();
 	});
 
+	it('gives up when blocks share the same text', () => {
+		blocks.push({ ...blocks[0], clientId: 'twin-id' });
+		expect(
+			findStrengthBlock({
+				block_id: 'stale-id',
+				block_name: 'core/paragraph',
+				block_anchor: getBlockAnchor(
+					'core/paragraph',
+					'The opening example.'
+				),
+			})
+		).toBeNull();
+	});
+
 	it('gives up without an anchor', () => {
 		expect(findStrengthBlock({ block_id: 'stale-id' })).toBeNull();
 	});
