@@ -39,7 +39,7 @@ class Settings_Controller extends WP_REST_Controller {
 	 *
 	 * @var string
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v4';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v5';
 
 	/**
 	 * Cache duration for models (1 hour).
@@ -462,8 +462,8 @@ class Settings_Controller extends WP_REST_Controller {
 				'max_tokens'   => 200000,
 			),
 			array(
-				'id'           => 'claude-opus-4',
-				'name'         => 'Claude Opus 4',
+				'id'           => 'claude-opus-5-5',
+				'name'         => 'Claude Opus 5.5',
 				'provider'     => 'anthropic',
 				'capabilities' => array( 'text', 'vision' ),
 				'max_tokens'   => 200000,

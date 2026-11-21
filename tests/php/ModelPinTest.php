@@ -376,16 +376,16 @@ class ModelPinTest extends TestCase {
 	 * one the provider doesn't list.
 	 */
 	public function test_filter_maps_to_a_listed_id_only(): void {
-		$this->providers( array( 'claude-opus-4-0' ) );
+		$this->providers( array( 'claude-opus-5-5-0' ) );
 
-		$GLOBALS['test_filter_results']['ai_feedback_provider_model_id'] = 'claude-opus-4-0';
-		$result = ( new Model_Pin() )->resolve( 'claude-opus-4' );
+		$GLOBALS['test_filter_results']['ai_feedback_provider_model_id'] = 'claude-opus-5-5-0';
+		$result = ( new Model_Pin() )->resolve( 'claude-opus-5-5' );
 		$this->assertIsArray( $result );
-		$this->assertSame( 'claude-opus-4-0', $result['model_id'] );
+		$this->assertSame( 'claude-opus-5-5-0', $result['model_id'] );
 
 		// Listed by the other provider only, so not an ID this one runs.
 		$GLOBALS['test_filter_results']['ai_feedback_provider_model_id'] = 'other-model-1';
-		$result = ( new Model_Pin() )->resolve( 'claude-opus-4' );
+		$result = ( new Model_Pin() )->resolve( 'claude-opus-5-5' );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( Model_Pin::ERROR_MODEL_UNAVAILABLE, $result->get_error_code() );
 	}
@@ -478,17 +478,17 @@ class ModelPinTest extends TestCase {
 	 * and in the review data its notes are saved with.
 	 */
 	public function test_review_records_the_model_that_answered(): void {
-		$this->providers( array( 'claude-opus-4-20250514' ), array( 'claude-opus-4' ) );
+		$this->providers( array( 'claude-opus-5-5-20261101' ), array( 'claude-opus-5-5' ) );
 		$notes = new Pin_Notes_Manager();
 
-		$result = $this->review( 'claude-opus-4', $notes );
+		$result = $this->review( 'claude-opus-5-5', $notes );
 
 		$expected = array(
 			'provider' => 'anthropic',
-			'model'    => 'claude-opus-4-20250514',
+			'model'    => 'claude-opus-5-5-20261101',
 		);
 		$this->assertIsArray( $result );
-		$this->assertSame( 'claude-opus-4', $result['model'] );
+		$this->assertSame( 'claude-opus-5-5', $result['model'] );
 		$this->assertSame( $expected, $result['answered_by'] );
 		$this->assertSame( $expected, $notes->review_data['answered_by'] ?? null );
 	}
