@@ -49,11 +49,39 @@ function selectNotes(select) {
 const indexes = new WeakMap();
 
 /**
+ * Deepest a thread is followed, as Suggestions::MAX_THREAD_DEPTH on the server.
+ */
+const MAX_THREAD_DEPTH = 10;
+
+/**
+ * Whether a loaded note is a reply that descends from a thread's root note.
+ *
+ * @param {Map<number, Object>} byId    Loaded notes by id.
+ * @param {number}              replyId Note to check.
+ * @param {number}              rootId  The thread's root note.
+ * @return {boolean} Whether the reply is in the root note's thread.
+ */
+function isInThread(byId, replyId, rootId) {
+	let note = byId.get(replyId);
+	for (let depth = 0; note && depth < MAX_THREAD_DEPTH; depth++) {
+		const parentId = Number(note.parent);
+		if (parentId === rootId) {
+			return true;
+		}
+		note = parentId > 0 ? byId.get(parentId) : null;
+	}
+	return false;
+}
+
+/**
  * Indexes the loaded notes.
  *
  * A thread's root note may hold an AI reply's edit, named in its payload.
- * The payload is meta an editor can write, so a named owner only counts when
- * it is not itself a thread's root note; the server checks the rest, see
+ * The payload is meta an editor can write, so a loaded owner only counts
+ * when it is a reply in the holder's own thread, which also leaves one
+ * holder per owner. An owner not loaded yet, such as a reply the notes
+ * query has not refetched, still counts. Whether the owner is an AI reply
+ * is not in its REST record, so only the server checks that, see
  * Suggestions::get_owner_id().
  *
  * @param {Object[]} notes Comment records from core-data.
@@ -68,7 +96,9 @@ function getIndex(notes) {
 			const ownerId = getSuggestionOwnerId(note);
 			if (
 				ownerId !== null &&
-				(ownerId === note.id || byId.get(ownerId)?.parent !== 0)
+				(ownerId === note.id ||
+					!byId.has(ownerId) ||
+					isInThread(byId, ownerId, note.id))
 			) {
 				holders.set(ownerId, note);
 			}

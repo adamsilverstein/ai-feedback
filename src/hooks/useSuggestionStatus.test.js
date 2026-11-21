@@ -38,7 +38,7 @@ describe('selectSuggestionStatus', () => {
 	it('reads a reply’s edit from the root note that holds it', () => {
 		const select = selectWith([
 			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
-			{ id: 40, meta: {} },
+			{ id: 40, parent: 39, meta: {} },
 		]);
 
 		expect(selectSuggestionStatus(select, { id: 40 })).toBe('pending');
@@ -73,6 +73,44 @@ describe('selectSuggestionStatus', () => {
 		expect(selectSuggestionStatus(select, { id: 50 })).toBe(null);
 	});
 
+	it('does not let a payload name a reply in another thread', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":51}', 'pending'),
+			{ id: 50, parent: 0, meta: {} },
+			{ id: 51, parent: 50, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 51 })).toBe(null);
+	});
+
+	it('reads a reply nested deeper in the thread', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":41}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+			{ id: 41, parent: 40, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 41 })).toBe('pending');
+	});
+
+	it('takes the holder in the reply’s own thread when two name it', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+			{
+				id: 50,
+				parent: 0,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":40}',
+					_wp_suggestion_status: 'rejected',
+				},
+			},
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 40 })).toBe('pending');
+	});
+
 	it('falls back to the review response until the notes load', () => {
 		expect(
 			selectSuggestionStatus(selectWith(null), {
@@ -87,7 +125,7 @@ describe('selectHeldSuggestionStatus', () => {
 	it('reads the suggestion a note holds, whoever’s edit it is', () => {
 		const select = selectWith([
 			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
-			{ id: 40, meta: {} },
+			{ id: 40, parent: 39, meta: {} },
 		]);
 
 		expect(selectHeldSuggestionStatus(select, { id: 39 })).toBe('pending');
