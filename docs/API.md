@@ -96,7 +96,7 @@ A note can carry a `block_change`: a one-click formatting fix that never adds, d
 
 Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone.
 
-Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since core would otherwise run the review on another model that takes images, or refuse it. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
+Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since a model that can't read them refuses the request. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
 
 Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
 
@@ -111,6 +111,20 @@ The sidebar groups them in one row ("8 proofreading fixes") with **Accept all**,
 A review can be read as a persona: `copy_editor` (the default), `skeptical_expert`, `first_time_visitor` or `busy_skimmer`, plus any added with the `ai_feedback_personas` filter. Each persona adds a `READER PERSONA` section with its guidance to the prompt and asks the AI for a one-sentence `persona_takeaway`; an `audience` adds an `INTENDED AUDIENCE` section. The copy editor without an audience adds nothing, so its prompt is the same as before personas. One persona per review.
 
 Notes from a persona review store the persona ID in `ai_feedback_persona` comment meta, get a persona badge before their category and severity badges, and are returned with `persona` and `persona_label` (both empty for the default). An AI reply in the thread answers as the note's persona and is tagged with it too. The review response, and its history entry, add `persona`, `persona_label` and `persona_takeaway` (at most 200 characters, plain text); the sidebar summary leads with "Skeptical expert: …". Default reviews return none of these fields.
+
+**Model and provider:**
+
+Every AI request (reviews, thread replies and mention answers) runs on the selected model from the provider in its model list entry, or fails. `Model_Pin` looks the model up in that provider's model list through the core AI client and hands core the exact model (`using_model()`), so core never picks another model or another provider. Passing the ID as a preference (`using_model_preference()`) is not enough: when core doesn't find the ID, it runs the request on the first model it finds from any configured provider.
+
+- **Listed IDs:** the exact ID wins. A provider that lists only dated releases runs the newest one of the model's ID (`claude-opus-4` runs as `claude-opus-4-20250514`; `-YYYY-MM-DD` and `-latest` count too, `-latest` wins and dates compare as dates), but never a different model whose ID starts the same way (`claude-opus-4-1-20250805`). Google's `models/` prefix is ignored. The `ai_feedback_provider_model_id` filter maps anything else.
+- **Model not listed:** the request is not sent. The error `ai_feedback_model_unavailable` (400) names the model and provider, for example "Claude Opus 4 (claude-opus-4) is not available from Anthropic, so Fresh Eyes did not send the request. Choose another model in the Fresh Eyes settings, or check the models your Anthropic account offers." It is not retried, and a review with images is not sent again without them.
+- **Provider not set up:** `ai_feedback_provider_unavailable` (400) when the model's provider isn't registered or has no credentials under Settings > Connectors.
+- **Model list unavailable:** when the provider's model list can't be read (network error, provider outage), the request is not sent either, since there is no way to tell the model is there. The error is `ai_feedback_model_check_failed` (503): reviews retry it with backoff and then return `ai_service_unavailable`, which the editor offers to retry. Core keeps a provider's model list in the object cache for a day, so that only holds across requests on a site with a persistent object cache. Without one, each review request (each chunk of a chunked review) or reply reads the chosen provider's list once, which is fewer requests than before this change: a model preference made core read the list of every configured provider.
+- **Models without a provider:** a model added through `ai_feedback_available_models` without `provider` runs on the first configured provider that lists it.
+
+`Model_Capabilities` reads the provider's model list for both: the ID a request is pinned to, and that ID's metadata for the image check, so the two agree on the model.
+
+The review response and its history entry add `answered_by` (`provider` and `model`) with the provider and model core reports for the answer, which is the model ID the provider listed. Notes from a review and AI replies store it as `provider/model` in `ai_answered_by` comment meta, next to `ai_model` (the model that was selected). An answer from any other provider is refused (`ai_feedback_wrong_provider`), which a pinned request should never see.
 
 **Example Request:**
 
@@ -169,6 +183,10 @@ Notes from a persona review store the persona ID in `ai_feedback_persona` commen
     }
   },
   "model_used": "claude-sonnet-5-5",
+  "answered_by": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5"
+  },
   "tokens_used": 1523,
   "created_at": "2025-12-06T14:30:00Z"
 }
@@ -179,6 +197,8 @@ Notes from a persona review store the persona ID in `ai_feedback_persona` commen
 | Status | Error Code | Description |
 |--------|------------|-------------|
 | 400 | `invalid_post_id` | Post ID is missing or invalid |
+| 400 | `ai_feedback_model_unavailable` | The selected model's provider doesn't list it, so nothing was sent. See [Model and provider](#model-and-provider) |
+| 400 | `ai_feedback_provider_unavailable` | The selected model's provider isn't set up under Settings > Connectors |
 | 403 | `forbidden` | User cannot edit this post |
 | 404 | `post_not_found` | Post does not exist |
 | 429 | `rate_limit_exceeded` | Too many review requests |
@@ -714,6 +734,7 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
       "review_id": "550e8400-e29b-41d4-a716-446655440000",
       "timestamp": "2026-11-08T10:00:00+00:00",
       "model": "claude-sonnet-4",
+      "answered_by": { "provider": "anthropic", "model": "claude-sonnet-4" },
       "note_count": 3,
       "user_id": 1,
       "summary_text": "A clear draft with a few flow issues.",
@@ -1021,6 +1042,19 @@ add_filter( 'ai_feedback_parse_response', function( array $notes, string $raw_re
         return $note['severity'] !== 'suggestion';
     } );
 }, 10, 2 );
+```
+
+#### `ai_feedback_provider_model_id`
+
+Map a model to the ID its provider lists it under, when Fresh Eyes doesn't match it on its own (see [Model and provider](#model-and-provider)). Runs only when the exact ID isn't listed. Return one of `$listed`; anything else is ignored and the request fails as unavailable.
+
+```php
+add_filter( 'ai_feedback_provider_model_id', function( ?string $match, string $model_id, string $provider, array $listed ): ?string {
+    if ( 'anthropic' === $provider && 'claude-opus-4' === $model_id && in_array( 'claude-opus-4-0', $listed, true ) ) {
+        return 'claude-opus-4-0';
+    }
+    return $match;
+}, 10, 4 );
 ```
 
 #### `ai_feedback_available_models`
@@ -1342,6 +1376,10 @@ wp_execute_ability( 'ai-feedback/resolve-note', array(
 | `invalid_post_id` | 400 | Post ID is missing or not a valid integer |
 | `invalid_note_id` | 400 | Note ID is missing or not a valid integer |
 | `invalid_model` | 400 | Specified model is not available |
+| `ai_feedback_model_unavailable` | 400 | The selected model's provider doesn't list it; nothing was sent |
+| `ai_feedback_provider_unavailable` | 400 | The selected model's provider isn't set up under Settings > Connectors |
+| `ai_feedback_model_check_failed` | 503 | The provider's model list couldn't be read, so nothing was sent; try again |
+| `ai_feedback_wrong_provider` | 502 | An answer came from a provider other than the selected one and was not used |
 | `invalid_focus_area` | 400 | Focus area is not recognized |
 | `invalid_tone` | 400 | Tone is not recognized |
 | `empty_reply` | 400 | Reply content is empty |

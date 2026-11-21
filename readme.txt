@@ -54,6 +54,10 @@ Before using Fresh Eyes, configure an AI provider:
 
 Any text generation provider connected through the WordPress 7.0 core AI Client. Settings → Connectors lists Anthropic, OpenAI, and Google, and installs each provider's plugin when you set it up. Other providers can be added with their own AI provider plugins.
 
+= Will a review ever run on a different model than the one I picked? =
+
+No. Reviews, replies and answers to mentions run on the model you picked, from its provider. If that provider doesn't offer the model, Fresh Eyes shows an error that names the model and sends nothing, rather than using another model or provider. Pick another model in the Fresh Eyes settings, or check which models your provider account offers.
+
 = Where do I configure my API key? =
 
 Settings → Connectors. The Connectors API also supports environment variables (e.g. `ANTHROPIC_API_KEY`) and PHP constants for credentials, taking precedence over database-stored values.

@@ -537,6 +537,12 @@ class Notes_Manager {
 			$meta['ai_model'] = $review_data['model'];
 		}
 
+		// The provider and model that actually answered, as `provider/model`.
+		$answered_by = $review_data['answered_by'] ?? null;
+		if ( is_array( $answered_by ) && is_string( $answered_by['provider'] ?? null ) && is_string( $answered_by['model'] ?? null ) ) {
+			$meta['ai_answered_by'] = $answered_by['provider'] . '/' . $answered_by['model'];
+		}
+
 		// ISO 8601 UTC, or a MySQL site time datetime on older notes. Note
 		// responses return comment_date (site time) as created_at instead.
 		if ( ! empty( $review_data['timestamp'] ) ) {
