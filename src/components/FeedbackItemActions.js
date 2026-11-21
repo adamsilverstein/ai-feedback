@@ -10,7 +10,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { arrowRight } from '@wordpress/icons';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
-import useSuggestionStatus from '../hooks/useSuggestionStatus';
+import { useHeldSuggestionStatus } from '../hooks/useSuggestionStatus';
 import useRequestReply from '../hooks/useRequestReply';
 import { hasReplyEdit } from '../utils/revisions';
 import { getFeedbackContent } from '../utils/feedback-content';
@@ -69,7 +69,8 @@ export default function FeedbackItemActions({
 	const [isSaving, setIsSaving] = useState(false);
 	const { requestReply, isRequesting, canRequest } = useRequestReply(item);
 
-	const suggestionStatus = useSuggestionStatus(item);
+	// The note's own fix, or an AI reply's edit the note holds.
+	const suggestionStatus = useHeldSuggestionStatus(item);
 
 	const isDismissed = !!item.is_resolved;
 	// Dismissing would leave a pending suggestion live in the text; it has to

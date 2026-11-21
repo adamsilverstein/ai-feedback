@@ -417,6 +417,26 @@ describe('FeedbackItem quick fixes', () => {
 		).not.toBeInTheDocument();
 	});
 
+	it('hides dismiss while the note holds an AI reply’s pending edit', () => {
+		renderItem(fixItem, vi.fn(), {
+			blocks,
+			notes: [
+				{
+					id: 7,
+					meta: {
+						_wp_suggestion:
+							'{"schemaVersion":2,"aiFeedbackEditOwner":8}',
+						_wp_suggestion_status: 'pending',
+					},
+				},
+			],
+		});
+
+		expect(
+			screen.queryByRole('button', { name: /^Dismiss feedback/ })
+		).not.toBeInTheDocument();
+	});
+
 	it('offers dismiss again once the suggestion is decided', () => {
 		renderItem({ ...fixItem, suggestion_status: 'pending' }, vi.fn(), {
 			blocks,
