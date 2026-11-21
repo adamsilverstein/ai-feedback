@@ -6,6 +6,7 @@
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { getFeedbackContent } from './feedback-content';
 import { formatReviewDate } from './review-history';
+import { getStrengths } from './strengths';
 
 export const SEVERITIES = ['critical', 'important', 'suggestion'];
 
@@ -145,6 +146,15 @@ export function generateMarkdownReport(review, postTitle) {
 		md += `## ${__('Summary', 'fresh-eyes')}\n\n${escapeMarkdown(review.summary_text)}\n\n`;
 	}
 
+	const strengths = getStrengths(review.strengths);
+	if (strengths.length > 0) {
+		md += `## ${__('What’s working', 'fresh-eyes')}\n\n`;
+		strengths.forEach((strength) => {
+			md += `- ${escapeMarkdown(strength.text.replace(/\s+/g, ' '))}\n`;
+		});
+		md += '\n';
+	}
+
 	if (items.length === 0) {
 		md += `## ${__('Feedback', 'fresh-eyes')}\n\n_${__(
 			'No issues found.',
@@ -203,6 +213,15 @@ export function generatePlainTextSummary(review, postTitle) {
 		text += `${review.summary_text}\n\n`;
 	}
 
+	const strengths = getStrengths(review.strengths);
+	if (strengths.length > 0) {
+		text += `${__('What’s working:', 'fresh-eyes')}\n`;
+		strengths.forEach((strength) => {
+			text += `- ${strength.text}\n`;
+		});
+		text += '\n';
+	}
+
 	text += `${__('Issues found:', 'fresh-eyes')}\n`;
 	text += `- ${__('Critical', 'fresh-eyes')}: ${grouped.critical.length}\n`;
 	text += `- ${__('Important', 'fresh-eyes')}: ${grouped.important.length}\n`;
@@ -234,6 +253,10 @@ export function generateJSON(review, postTitle) {
 			timestamp: review.timestamp,
 			summary_text: review.summary_text || '',
 			summary: review.summary || {},
+			strengths: getStrengths(review.strengths).map((strength) => ({
+				text: strength.text,
+				block_name: strength.block_name || '',
+			})),
 			feedback: getReviewItems(review).map((item) => ({
 				title: item.title,
 				category: item.category,

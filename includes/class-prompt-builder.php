@@ -147,8 +147,28 @@ class Prompt_Builder {
 		$prompt .= $this->get_quick_fix_instruction();
 		$prompt .= "\n" . $this->get_block_action_instruction();
 		$prompt .= "\n" . $this->get_block_change_instruction( $options );
+		$prompt .= $this->get_strengths_instruction();
 
 		return $prompt;
+	}
+
+	/**
+	 * Get the instruction asking for what the document does well.
+	 *
+	 * @return string Strengths instruction, or an empty string when strengths are turned off.
+	 */
+	private function get_strengths_instruction(): string {
+		$max = Response_Parser::get_max_strengths();
+		if ( 0 === $max ) {
+			return '';
+		}
+
+		$instruction  = "\n\nSTRENGTHS:\n";
+		$instruction .= '- Also return a "strengths" array next to "summary" and "feedback", listing up to ' . $max . ' things the document already does well, so the author knows to keep them.' . "\n";
+		$instruction .= '- Each strength is one sentence (max ' . Response_Parser::STRENGTH_PROMPT_LENGTH . ' chars) about one block, saying what works: { "block_id": "abc123-def456", "text": "The opening example makes the problem concrete." }' . "\n";
+		$instruction .= '- Only list strengths that are specific to this document and true. Return an empty array rather than generic praise, and never repeat a strength as feedback.';
+
+		return $instruction;
 	}
 
 	/**

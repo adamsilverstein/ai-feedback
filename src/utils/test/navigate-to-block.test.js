@@ -7,14 +7,14 @@ const blocks = {};
 
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
 vi.mock('@wordpress/data', () => ({
-	dispatch: () => ({}),
+	dispatch: () => ({ selectBlock: () => {} }),
 	select: () => ({
 		getBlock: (id) => blocks[id],
 		getClientIdsWithDescendants: () => Object.keys(blocks),
 	}),
 }));
 
-import { resolveBlockClientId } from '../navigate-to-block';
+import { navigateToBlock, resolveBlockClientId } from '../navigate-to-block';
 
 describe('resolveBlockClientId', () => {
 	beforeEach(() => {
@@ -51,5 +51,28 @@ describe('resolveBlockClientId', () => {
 	it('returns null when nothing matches', () => {
 		expect(resolveBlockClientId('old-id', 99)).toBeNull();
 		expect(resolveBlockClientId('old-id')).toBeNull();
+	});
+});
+
+describe('navigateToBlock', () => {
+	const scrollWith = (reduce) => {
+		blocks.a = { attributes: {} };
+		const element = document.createElement('div');
+		element.setAttribute('data-block', 'a');
+		element.scrollIntoView = vi.fn();
+		document.body.appendChild(element);
+		window.matchMedia = vi.fn(() => ({ matches: reduce }));
+
+		navigateToBlock('a');
+		element.remove();
+		return element.scrollIntoView.mock.calls[0][0].behavior;
+	};
+
+	it('scrolls smoothly by default', () => {
+		expect(scrollWith(false)).toBe('smooth');
+	});
+
+	it('jumps without animation when motion is reduced', () => {
+		expect(scrollWith(true)).toBe('auto');
 	});
 });

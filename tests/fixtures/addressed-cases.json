@@ -1,0 +1,20 @@
+{
+	"_comment": "Which notes count toward \"N of M addressed\". Shared by tests/php/ReviewProgressTest.php (Review_Progress) and src/utils/test/progress.test.js (getFeedbackProgress), so the server and the editor apply the same rules. status is the note's comment status ('hold', 'approved', 'trash', 'spam', or 'deleted' for a note that no longer exists); parent_status, when set, makes the note a reply in a thread with that status; meta is the note's comment meta. expected is 'addressed', 'open' or 'excluded' (left out of both counts).",
+	"cases": [
+		{ "name": "open note", "status": "hold", "meta": {}, "expected": "open" },
+		{ "name": "dismissed in the sidebar", "status": "hold", "meta": { "ai_feedback_resolved": "1" }, "expected": "addressed" },
+		{ "name": "suggestion accepted", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "applied" }, "expected": "addressed" },
+		{ "name": "suggestion accepted, unsaved", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "applied-unsaved" }, "expected": "addressed" },
+		{ "name": "suggestion rejected", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "rejected" }, "expected": "addressed" },
+		{ "name": "suggestion rejected, unsaved", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "rejected-unsaved" }, "expected": "addressed" },
+		{ "name": "suggestion pending", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "pending" }, "expected": "open" },
+		{ "name": "suggestion outdated", "status": "hold", "meta": { "_wp_suggestion": "{}", "_wp_suggestion_status": "outdated" }, "expected": "open" },
+		{ "name": "thread resolved in the Notes panel", "status": "approved", "meta": {}, "expected": "addressed" },
+		{ "name": "reply in a resolved thread", "status": "hold", "parent_status": "approved", "meta": {}, "expected": "addressed" },
+		{ "name": "reply in an open thread", "status": "hold", "parent_status": "hold", "meta": {}, "expected": "open" },
+		{ "name": "trashed in the Notes panel", "status": "trash", "meta": {}, "expected": "excluded" },
+		{ "name": "dismissed, then trashed", "status": "trash", "meta": { "ai_feedback_resolved": "1" }, "expected": "excluded" },
+		{ "name": "marked as spam", "status": "spam", "meta": {}, "expected": "excluded" },
+		{ "name": "deleted for good", "status": "deleted", "meta": {}, "expected": "excluded" }
+	]
+}

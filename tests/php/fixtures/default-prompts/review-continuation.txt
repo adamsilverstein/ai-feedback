@@ -223,3 +223,8 @@ IMPORTANT:
   - { "type": "transform", "to": "core/heading", "level": 2 } turns a short paragraph that works as a section title into a heading; { "type": "transform", "to": "core/paragraph" } turns a heading that is really body text into a paragraph.
   - { "type": "split", "after": "exact end of a sentence." } splits a long paragraph in two after that sentence. Copy the end of the sentence exactly, including its final punctuation, long enough to appear only once.
   - You cannot see the images. For an image without alt text, give feedback saying alt text is missing, but do not propose any.
+
+STRENGTHS:
+- Also return a "strengths" array next to "summary" and "feedback", listing up to 3 things the document already does well, so the author knows to keep them.
+- Each strength is one sentence (max 150 chars) about one block, saying what works: { "block_id": "abc123-def456", "text": "The opening example makes the problem concrete." }
+- Only list strengths that are specific to this document and true. Return an empty array rather than generic praise, and never repeat a strength as feedback.
