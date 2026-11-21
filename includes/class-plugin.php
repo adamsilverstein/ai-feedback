@@ -129,6 +129,7 @@ class Plugin {
 	 */
 	private function init_hooks(): void {
 		add_action( 'init', array( Review_History::class, 'register_meta' ) );
+		add_action( 'init', array( Notes_Manager::class, 'register_meta' ) );
 		Personas::register();
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 		add_action( 'ai_feedback_after_review', array( Review_History::class, 'record' ), 10, 2 );
@@ -145,8 +146,8 @@ class Plugin {
 		// Show note badges from meta, before wpautop wraps them in a paragraph.
 		add_filter( 'comment_text', array( Notes_Manager::class, 'add_badges_to_comment_text' ), 1, 2 );
 
-		// Add custom avatar for AI Feedback comments/notes.
-		add_filter( 'pre_get_avatar_data', array( $this, 'filter_ai_feedback_avatar' ), 10, 2 );
+		// Fresh Eyes' avatar for AI notes and for its user.
+		add_filter( 'pre_get_avatar_data', array( Fresh_Eyes_User::class, 'filter_avatar' ), 10, 2 );
 
 		Fresh_Eyes_User::register();
 
@@ -269,46 +270,5 @@ class Plugin {
 
 		// Check if the block editor is being used.
 		return $current_screen->is_block_editor();
-	}
-
-	/**
-	 * Filter avatar data to show custom avatar for AI Feedback comments/notes.
-	 *
-	 * @param  array $args        Arguments for getting avatar data.
-	 * @param  mixed $id_or_email The Gravatar to retrieve. Accepts a user ID, Gravatar MD5 hash,
-	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
-	 * @return array Modified avatar args with custom URL for AI Feedback.
-	 */
-	public function filter_ai_feedback_avatar( array $args, $id_or_email ): array {
-		// Check if this is a comment object.
-		if ( ! $id_or_email instanceof \WP_Comment ) {
-			return $args;
-		}
-
-		$comment = $id_or_email;
-
-		// Check if this is an AI Feedback comment.
-		// Method 1: Check the comment author name (current translated, or a name from before a rename).
-		$is_ai_feedback = ( self::get_ai_feedback_author() === $comment->comment_author )
-		|| in_array( $comment->comment_author, array( 'Copydesk AI', 'AI Feedback' ), true );
-
-		// Method 2: Check comment meta for ai_feedback flag.
-		if ( ! $is_ai_feedback && $comment->comment_ID ) {
-			$ai_feedback_meta = get_comment_meta( (int) $comment->comment_ID, 'ai_feedback', true );
-			$is_ai_feedback   = ( '1' === $ai_feedback_meta );
-		}
-
-		// If this is an AI Feedback comment, use our custom avatar.
-		if ( $is_ai_feedback ) {
-			$avatar_path = AI_FEEDBACK_PLUGIN_DIR . 'assets/ai-feedback-avatar.svg';
-			if ( file_exists( $avatar_path ) ) {
-				$avatar_url = AI_FEEDBACK_PLUGIN_URL . 'assets/ai-feedback-avatar.svg';
-
-				$args['url']          = $avatar_url;
-				$args['found_avatar'] = true;
-			}
-		}
-
-		return $args;
 	}
 }
