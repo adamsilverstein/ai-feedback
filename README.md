@@ -199,6 +199,8 @@ When you tell the AI how you always write, for example "we use sentence case for
 
 Manage rules under **House style** in Review Settings. Rules marked **Just me** apply to your own reviews; administrators can also add rules for **Everyone on this site**.
 
+To start from how you already write, click **Suggest rules from published posts**. Fresh Eyes reads your 5 most recent published posts (the whole site's, for an administrator choosing **Everyone on this site**) and proposes up to 5 rules. Each one can be edited, kept with **Remember** or skipped with **Not now**; nothing is saved until you keep it. Only published posts you can read are sent, never drafts, private or password protected posts, and the request counts as one review against the hourly limit.
+
 ### Usage Analytics
 
 **Settings → AI Feedback Analytics** shows how many reviews were run, by which model and user, and how the feedback breaks down by severity and category.

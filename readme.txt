@@ -22,7 +22,7 @@ Fresh Eyes is an AI agent that reviews your posts right in the block editor, lik
 * 🔄 **Multiple AI Providers**: Works with Anthropic, OpenAI, Google, and any other registered AI provider
 * 🎯 **Focus Areas**: Content Quality, Tone & Voice, Flow & Structure, Design & Formatting
 * 👀 **Reader Personas**: Read it as a Copy editor, Skeptical expert, First-time visitor or Busy skimmer, and say who the post is for
-* 📏 **House Style**: Tell it how you write once, in a reply or in Review Settings, and later reviews follow it
+* 📏 **House Style**: Tell it how you write once, in a reply or in Review Settings, and later reviews follow it. Or let it suggest rules from your published posts and keep the ones you want
 
 = Requirements =
 
