@@ -1092,7 +1092,7 @@ function getSupersededHolders(threadId, noteIds) {
  * @param {number[]} noteIds            Notes whose edits the newest edit supersedes.
  * @param {Object}   registry           Data registry, as `useRegistry()` returns it.
  * @param {Object}   [options]          Options.
- * @param {boolean}  [options.keepRoot] Leave the root note's suggestion for the newest edit to replace.
+ * @param {boolean}  [options.keepRoot] Leave the root note's suggestion for the newest edit to replace, unless it is a move, which a text edit can't replace in one update.
  * @return {Promise<number[]>} IDs of the suggestions retired.
  */
 export async function supersedeSuggestions(
@@ -1114,8 +1114,10 @@ export async function supersedeSuggestions(
 		return [];
 	}
 
+	const keptRoot =
+		keepRoot && !findStructuralMarker(threadId) ? Number(threadId) : null;
 	const holders = getSupersededHolders(threadId, noteIds).filter(
-		(id) => !keepRoot || id !== Number(threadId)
+		(id) => id !== keptRoot
 	);
 	const retired = [];
 	for (const noteId of holders) {

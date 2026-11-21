@@ -441,6 +441,16 @@ describe('supersedeSuggestions', () => {
 		);
 	});
 
+	it('retires a root note’s move even when keepRoot asks to keep it', async () => {
+		await suggestBlockAction(moveNote);
+
+		// A reply's text edit can't replace the move in one update.
+		expect(
+			await supersedeSuggestions(13, [13], registry, { keepRoot: true })
+		).toEqual([13]);
+		expect(mocks.order['']).toEqual(['intro', 'bg', 'open', 'rep']);
+	});
+
 	it('moves a superseded move back after the block it followed', async () => {
 		await suggestBlockAction(moveNote);
 		// The author adds a block at the top meanwhile.
