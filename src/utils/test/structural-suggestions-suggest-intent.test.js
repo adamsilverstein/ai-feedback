@@ -24,6 +24,7 @@
  * External dependencies
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { renderHook } from '@testing-library/react';
 
 /**
  * WordPress dependencies
@@ -34,6 +35,7 @@ import {
 	register,
 	select,
 	subscribe,
+	useRegistry,
 } from '@wordpress/data';
 import {
 	createBlock,
@@ -45,7 +47,8 @@ import { store as blockEditorStore } from '@wordpress/block-editor';
 /**
  * Internal dependencies
  */
-import { suggestBlockAction } from '../suggestions';
+import { applyBlockAction } from '../block-action';
+import { suggestBlockAction, supersedeSuggestions } from '../suggestions';
 
 const CURRENT_USER = 7;
 
@@ -510,6 +513,51 @@ describe('structural suggestions in Suggest intent', () => {
 			select(blockEditorStore).getBlockAttributes(blocks.open.clientId)
 				.metadata.suggestion
 		).toMatchObject({ type: 'pending-move', authorId: CURRENT_USER });
+		expect(interceptor.captures.get(blocks.open.clientId)).toMatchObject({
+			type: 'block-move',
+			fromIndex: 2,
+			fromAnchorClientId: blocks.bg.clientId,
+		});
+	});
+});
+
+describe('retiring a move in Suggest intent', () => {
+	// The registry the editor's components get from `useRegistry()`.
+	const registry = () => renderHook(() => useRegistry()).result.current;
+
+	beforeEach(async () => {
+		// The review ran in Edit intent, so the move is the note's own.
+		await suggestBlockAction(moveNote('intro'));
+		interceptor = captureSuggestIntent();
+	});
+
+	it('puts the block back without Gutenberg recording the move back', async () => {
+		expect(await supersedeSuggestions(13, [13], registry())).toEqual([13]);
+
+		expect(order()).toEqual(['intro', 'bg', 'open', 'rep']);
+		expect(
+			select(blockEditorStore).getBlockAttributes(blocks.open.clientId)
+				.metadata
+		).toEqual({ noteId: 13 });
+		expect(interceptor.captures.size).toBe(0);
+		expect(pendingSuggestions(interceptor.captures)).toBe(0);
+	});
+
+	it('leaves a revised move as the only suggestion, from where the block started', async () => {
+		await supersedeSuggestions(13, [13], registry());
+
+		// A reply's revised move, applied from the sidebar.
+		expect(
+			applyBlockAction(
+				select(blockEditorStore),
+				dispatch(blockEditorStore),
+				moveNote('rep', 'after').block_action,
+				blocks.open.clientId
+			)
+		).toBe(true);
+
+		expect(order()).toEqual(['intro', 'bg', 'rep', 'open']);
+		expect(pendingSuggestions(interceptor.captures)).toBe(1);
 		expect(interceptor.captures.get(blocks.open.clientId)).toMatchObject({
 			type: 'block-move',
 			fromIndex: 2,
