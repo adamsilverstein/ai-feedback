@@ -181,4 +181,21 @@ namespace {
 			return $value;
 		}
 	}
+
+	if ( ! class_exists( 'WP_Block_Type_Registry' ) ) {
+		/**
+		 * Block type registry mock. Block types and their attributes come
+		 * from `$GLOBALS['test_block_types']`; none are registered by default.
+		 */
+		final class WP_Block_Type_Registry {
+			public static function get_instance(): self {
+				return new self();
+			}
+
+			public function get_registered( $name ) {
+				$attributes = $GLOBALS['test_block_types'][ $name ] ?? null;
+				return is_array( $attributes ) ? (object) array( 'attributes' => $attributes ) : null;
+			}
+		}
+	}
 }

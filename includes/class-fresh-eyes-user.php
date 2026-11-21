@@ -469,6 +469,14 @@ class Fresh_Eyes_User {
 			return;
 		}
 
+		// Deleting a user deletes their posts and links. The account should
+		// own none, so if it does, keep it rather than lose content silently.
+		$owned = self::count_owned_content( $id );
+		if ( $owned > 0 ) {
+			Logger::debug( 'Fresh_Eyes_User: kept user ' . $id . ', which owns ' . $owned . ' posts or links, instead of deleting it.' );
+			return;
+		}
+
 		if ( is_multisite() ) {
 			if ( ! function_exists( 'wpmu_delete_user' ) ) {
 				require_once ABSPATH . 'wp-admin/includes/ms.php';
@@ -480,6 +488,40 @@ class Fresh_Eyes_User {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
 		}
 		wp_delete_user( $id );
+	}
+
+	/**
+	 * Count the posts and links a user owns, as deleting the user would remove them.
+	 *
+	 * Every post type and status counts, drafts, trash, revisions and
+	 * attachments included, since `wp_delete_user()` and `wpmu_delete_user()`
+	 * delete those too. `count_user_posts()` only counts published posts. On
+	 * multisite every site the user belongs to is counted.
+	 *
+	 * @param int $id User ID.
+	 * @return int Posts and links owned, or 1 when it could not be counted.
+	 */
+	private static function count_owned_content( int $id ): int {
+		$db = self::db();
+		if ( null === $db ) {
+			return 1;
+		}
+
+		$sites = is_multisite() ? array_keys( get_blogs_of_user( $id, true ) ) : array( 0 );
+		$owned = 0;
+		foreach ( $sites as $site_id ) {
+			$prefix = $site_id ? $db->get_blog_prefix( (int) $site_id ) : $db->prefix;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Every status and type, which no API counts; runs only before deleting the account.
+			$posts = $db->get_var( $db->prepare( 'SELECT COUNT(*) FROM %i WHERE post_author = %d', $prefix . 'posts', $id ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- As above, for links.
+			$links = $db->get_var( $db->prepare( 'SELECT COUNT(*) FROM %i WHERE link_owner = %d', $prefix . 'links', $id ) );
+			if ( ! is_numeric( $posts ) || ! is_numeric( $links ) ) {
+				// Unknown is not none.
+				return 1;
+			}
+			$owned += (int) $posts + (int) $links;
+		}
+		return $owned;
 	}
 
 	/**
