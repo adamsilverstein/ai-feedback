@@ -15,13 +15,14 @@ const CONTENT = [
  * Change the post's meta the way the Footnotes format does, save, and
  * return the error notice, if any.
  *
- * @param {import('@playwright/test').Page} page Page.
+ * @param {import('@playwright/test').Page} page      Page.
+ * @param {string}                          footnotes Footnotes meta to save. One equal to the saved value changes no meta.
  * @return {Promise<string>} Save error message, or an empty string.
  */
-async function saveWithMetaEdit(page) {
-	return page.evaluate(async () => {
+async function saveWithMetaEdit(page, footnotes) {
+	return page.evaluate(async (value) => {
 		const { dispatch, select } = window.wp.data;
-		dispatch('core/editor').editPost({ meta: { footnotes: '[]' } });
+		dispatch('core/editor').editPost({ meta: { footnotes: value } });
 		await dispatch('core/editor').savePost();
 		const error = select('core').getLastEntitySaveError(
 			'postType',
@@ -29,7 +30,7 @@ async function saveWithMetaEdit(page) {
 			select('core/editor').getCurrentPostId()
 		);
 		return error ? `${error.code}: ${error.message}` : '';
-	});
+	}, footnotes);
 }
 
 test.describe('Saving a reviewed post', () => {
@@ -53,13 +54,18 @@ test.describe('Saving a reviewed post', () => {
 		await aiFeedback.runReview();
 
 		// In the session that ran the review.
-		expect(await saveWithMetaEdit(page)).toBe('');
+		expect(await saveWithMetaEdit(page, '[]')).toBe('');
 
 		// And after a reload, once the post's history holds the review.
 		await page.reload();
 		await expect
 			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
 			.toBe(2);
-		expect(await saveWithMetaEdit(page)).toBe('');
+		expect(
+			await saveWithMetaEdit(
+				page,
+				'[{"id":"after-reload","content":"Added after the reload."}]'
+			)
+		).toBe('');
 	});
 });
