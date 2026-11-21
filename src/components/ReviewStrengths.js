@@ -7,7 +7,7 @@
  */
 import { Button } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
-import { useMemo } from '@wordpress/element';
+import { useRef } from '@wordpress/element';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { __ } from '@wordpress/i18n';
 import { navigateToBlock } from '../utils/navigate-to-block';
@@ -66,15 +66,33 @@ export default function ReviewStrengths({ strengths }) {
  */
 function StrengthText({ strength }) {
 	// Finding the block after a reload reads every block's text, so it is
-	// checked again only when blocks are added or removed, such as once the
-	// post loads. The click looks again, as the block may have changed.
-	const blockCount = useSelect(
-		(select) => select(blockEditorStore).getGlobalBlockCount(),
-		[]
-	);
-	const hasBlock = useMemo(
-		() => blockCount > 0 && !!findStrengthBlock(strength),
-		[strength, blockCount]
+	// looked for again only when blocks are added or removed, such as once
+	// the post loads, or when the block found is edited. The click looks
+	// again, as a block edited back to its reviewed text is not noticed.
+	const found = useRef({});
+	const hasBlock = useSelect(
+		(select) => {
+			const { getGlobalBlockCount, getBlock } = select(blockEditorStore);
+			const blockCount = getGlobalBlockCount();
+			const last = found.current;
+			const block = last.clientId ? getBlock(last.clientId) : null;
+			if (
+				last.strength !== strength ||
+				last.blockCount !== blockCount ||
+				last.block !== block
+			) {
+				const clientId =
+					blockCount > 0 ? findStrengthBlock(strength) : null;
+				found.current = {
+					strength,
+					blockCount,
+					clientId,
+					block: clientId ? getBlock(clientId) : null,
+				};
+			}
+			return !!found.current.clientId;
+		},
+		[strength]
 	);
 
 	const goToBlock = () => {

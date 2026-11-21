@@ -58,6 +58,8 @@ const review = {
 	progress: { addressed: 3, still_open: 1 },
 };
 
+let registry;
+
 /**
  * Render the summary with the stores its children read.
  *
@@ -65,10 +67,17 @@ const review = {
  * @return {Object} Render result.
  */
 function renderSummary(props) {
-	const registry = createRegistry();
+	registry = createRegistry();
 	registry.registerStore('core/block-editor', {
-		reducer: (state = {}) => state,
-		selectors: { getGlobalBlockCount: () => 2 },
+		reducer: (state = {}, action) =>
+			action.type === 'EDIT'
+				? { ...state, [action.clientId]: {} }
+				: state,
+		actions: { edit: (clientId) => ({ type: 'EDIT', clientId }) },
+		selectors: {
+			getGlobalBlockCount: () => 2,
+			getBlock: (state, clientId) => state[clientId],
+		},
 	});
 
 	return render(<ReviewSummary {...props} />, {
@@ -108,6 +117,32 @@ describe('ReviewSummary strengths and progress', () => {
 		);
 		expect(text.tagName).toBe('SPAN');
 		expect(document.querySelector('img')).toBeNull();
+	});
+
+	it('drops the link once the block it found is edited and no longer matches', () => {
+		renderSummary({ review, progress: { addressed: 0, total: 2 } });
+		const name = 'The opening example makes it concrete.';
+		expect(screen.getByRole('button', { name })).toBeInTheDocument();
+
+		// The same number of blocks, but the text the strength was found by changed.
+		findStrengthBlock.mockReturnValue(null);
+		act(() => {
+			registry.dispatch('core/block-editor').edit('client-b1');
+		});
+
+		expect(screen.queryByRole('button', { name })).toBeNull();
+		expect(screen.getByText(name).tagName).toBe('SPAN');
+	});
+
+	it('does not look for a strength again when another block is edited', () => {
+		renderSummary({ review, progress: { addressed: 0, total: 2 } });
+		const calls = findStrengthBlock.mock.calls.length;
+
+		act(() => {
+			registry.dispatch('core/block-editor').edit('another-block');
+		});
+
+		expect(findStrengthBlock.mock.calls.length).toBe(calls);
 	});
 
 	it('keeps strengths out of the feedback count', () => {
