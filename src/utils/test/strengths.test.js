@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 /**
  * Internal dependencies
@@ -70,6 +70,34 @@ describe('mergeStrengths', () => {
 		expect(merged.map((item) => item.block_id)).toEqual(['a', 'b', 'c']);
 		expect(merged).toHaveLength(MAX_STRENGTHS);
 		expect(merged[1].text).toBe('About b.');
+	});
+});
+
+describe('mergeStrengths with a lower site maximum', () => {
+	afterEach(() => {
+		delete window.aiFeedbackData;
+	});
+
+	it('caps a chunked review at the maximum the site allows', () => {
+		window.aiFeedbackData = { maxStrengths: '1' };
+		expect(
+			mergeStrengths([strength('a')], [strength('b')]).map(
+				(item) => item.block_id
+			)
+		).toEqual(['a']);
+	});
+
+	it('keeps none when strengths are turned off', () => {
+		window.aiFeedbackData = { maxStrengths: '0' };
+		expect(mergeStrengths([strength('a')])).toEqual([]);
+	});
+
+	it('never goes above three or below the default without a valid value', () => {
+		const lists = ['a', 'b', 'c', 'd'].map((id) => [strength(id)]);
+		window.aiFeedbackData = { maxStrengths: '50' };
+		expect(mergeStrengths(...lists)).toHaveLength(MAX_STRENGTHS);
+		window.aiFeedbackData = { maxStrengths: 'many' };
+		expect(mergeStrengths(...lists)).toHaveLength(MAX_STRENGTHS);
 	});
 });
 

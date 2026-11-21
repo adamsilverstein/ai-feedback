@@ -11,6 +11,21 @@ import { extractBlockData } from './block-utils';
 export const MAX_STRENGTHS = 3;
 
 /**
+ * Most strengths this site shows: what the `ai_feedback_max_strengths`
+ * filter allows, sent from PHP as `aiFeedbackData.maxStrengths`.
+ *
+ * @return {number} From 0 to MAX_STRENGTHS.
+ */
+export function getMaxStrengths() {
+	const localized = window.aiFeedbackData?.maxStrengths;
+	const max = Number(localized);
+	if ([undefined, null, ''].includes(localized) || !Number.isInteger(max)) {
+		return MAX_STRENGTHS;
+	}
+	return Math.max(0, Math.min(MAX_STRENGTHS, max));
+}
+
+/**
  * Keep the well-formed strengths of a review.
  *
  * The server validates them already; this guards the sidebar against
@@ -31,8 +46,12 @@ export function getStrengths(strengths) {
  * @return {Array<Object>} Merged strengths.
  */
 export function mergeStrengths(...lists) {
+	const max = getMaxStrengths();
 	const seen = new Set();
 	const merged = [];
+	if (max === 0) {
+		return merged;
+	}
 	for (const strength of lists.flat()) {
 		if (
 			!strength ||
@@ -46,7 +65,7 @@ export function mergeStrengths(...lists) {
 		}
 		seen.add(strength.block_id);
 		merged.push(strength);
-		if (merged.length >= MAX_STRENGTHS) {
+		if (merged.length >= max) {
 			break;
 		}
 	}

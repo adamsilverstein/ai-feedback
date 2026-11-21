@@ -1132,7 +1132,7 @@ add_filter( 'ai_feedback_max_review_images', function(): int {
 
 #### `ai_feedback_max_strengths`
 
-How many strengths a review asks for and keeps, from 0 to 3. Default 3; return 0 to leave strengths out of the prompt and the response.
+How many strengths a review asks for and keeps, from 0 to 3. Default 3; return 0 to leave strengths out of the prompt and the response. The editor gets the same number as `aiFeedbackData.maxStrengths`, so the merged strengths of a chunked review stay within it.
 
 ```php
 add_filter( 'ai_feedback_max_strengths', function(): int {
