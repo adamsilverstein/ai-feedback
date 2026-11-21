@@ -89,6 +89,9 @@ class Review_Progress {
 				'type'       => 'note',
 				// `all` leaves out trash and spam, which compare() still follows.
 				'status'     => 'any',
+				// Oldest first, so merge_ids() drops the oldest when over the cap.
+				'orderby'    => 'comment_ID',
+				'order'      => 'ASC',
 				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 				'meta_query' => array(
 					array(
