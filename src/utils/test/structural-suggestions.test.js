@@ -451,10 +451,31 @@ describe('supersedeSuggestions', () => {
 		expect(mocks.order['']).toEqual(['x', 'intro', 'bg', 'open', 'rep']);
 	});
 
-	it('clears a superseded removal and keeps the block', async () => {
+	it('moves a superseded move back within its parent when the recorded one is gone', async () => {
+		await suggestBlockAction(moveNote);
+		// A marker from an earlier session names a parent by a stale id.
+		mocks.blocks.open.attributes.metadata.suggestion.fromParentClientId =
+			'gone';
+
+		expect(await supersedeSuggestions(13, [13], registry)).toEqual([13]);
+		expect(registry.batch).toHaveBeenCalledTimes(1);
+		expect(mocks.order['']).toEqual(['intro', 'bg', 'open', 'rep']);
+		expect(mocks.blocks.open.attributes.metadata).toEqual({ noteId: 13 });
+	});
+
+	it('clears a superseded removal in the batch and keeps the block', async () => {
 		await suggestBlockAction(removeNote);
+		mocks.updateBlockAttributes.mockClear();
+		mocks.moveBlocksToPosition.mockClear();
+		registry.batch.mockImplementationOnce((callback) => {
+			expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+			callback();
+			expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
+		});
 
 		expect(await supersedeSuggestions(12, [12], registry)).toEqual([12]);
+		expect(registry.batch).toHaveBeenCalledTimes(1);
+		expect(mocks.moveBlocksToPosition).not.toHaveBeenCalled();
 		expect(mocks.blocks.rep.attributes.metadata).toEqual({ noteId: 12 });
 		expect(mocks.order['']).toContain('rep');
 	});
