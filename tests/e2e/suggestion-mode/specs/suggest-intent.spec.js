@@ -8,7 +8,14 @@
  * a heading above "Next steps".
  */
 const { test, expect } = require('../../fixtures');
-const { blockTexts, drainCron, openDraft } = require('../utils');
+const {
+	blockTexts,
+	drainCron,
+	getNotes,
+	openDraft,
+	pendingOperations,
+	switchToSuggesting,
+} = require('../utils');
 
 const HEADING = 'Why this matters';
 const PARAGRAPHS = [
@@ -19,65 +26,6 @@ const PARAGRAPHS = [
 ];
 const MOVE = 'Lead with the real opening';
 const REMOVE = 'Cut the repetition';
-
-/**
- * Switch the editor to Suggest intent from the Options menu.
- *
- * @param {import('@playwright/test').Page} page Page.
- */
-async function switchToSuggesting(page) {
-	await page
-		.getByRole('region', { name: 'Editor top bar' })
-		.getByRole('button', { name: 'Options' })
-		.click();
-	const suggesting = page.getByRole('menuitemradio', {
-		name: /^Suggesting/,
-	});
-	await suggesting.click();
-	await expect(suggesting).toHaveAttribute('aria-checked', 'true');
-	await page.keyboard.press('Escape');
-}
-
-/**
- * The post's notes, with their suggestion meta.
- *
- * @param {Object} requestUtils Request utils fixture.
- * @param {number} postId       Post ID.
- * @return {Promise<Object[]>} Notes.
- */
-function getNotes(requestUtils, postId) {
-	return requestUtils.rest({
-		path: '/wp/v2/comments',
-		params: {
-			post: postId,
-			type: 'note',
-			status: 'all',
-			context: 'edit',
-			per_page: 100,
-		},
-	});
-}
-
-/**
- * Operation types of every pending suggestion on the post, sorted.
- *
- * @param {Object[]} notes Notes.
- * @return {string[]} One entry per pending suggestion operation.
- */
-function pendingOperations(notes) {
-	return notes
-		.filter(
-			(note) =>
-				note.meta?._wp_suggestion &&
-				(note.meta._wp_suggestion_status || 'pending') === 'pending'
-		)
-		.flatMap((note) =>
-			JSON.parse(note.meta._wp_suggestion).operations.map(
-				(operation) => operation.type
-			)
-		)
-		.sort();
-}
 
 test.describe('Structural suggestions in Suggest intent', () => {
 	test.afterEach(drainCron);
