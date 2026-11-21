@@ -209,7 +209,7 @@ class HouseStyleSuggestControllerTest extends TestCase {
 		$this->assertCount( 1, $this->service->requests );
 		$this->assertSame( 'some-model', $this->service->requests[0]['model'] );
 		$this->assertSame( array( 'Post 1' ), array_column( $this->service->requests[0]['posts'], 'title' ) );
-		$this->assertSame( self::USER_ID, $GLOBALS['test_get_posts_args'][0]['author'] );
+		$this->assertSame( array( self::USER_ID ), array_column( (array) $GLOBALS['test_get_posts_args'], 'author' ) );
 	}
 
 	/**
@@ -251,7 +251,7 @@ class HouseStyleSuggestControllerTest extends TestCase {
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'house_style_no_posts', $result->get_error_code() );
-		$this->assertSame( 400, $result->get_error_data()['status'] );
+		$this->assertSame( array( 'status' => 400 ), $result->get_error_data() );
 		$this->assertSame( array(), $this->service->requests );
 		$this->assertSame( array(), $this->slots() );
 	}

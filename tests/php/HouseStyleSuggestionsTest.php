@@ -75,8 +75,14 @@ class HouseStyleSuggestionsTest extends TestCase {
 	 * @return array<string, mixed>
 	 */
 	private function query(): array {
-		$this->assertCount( 1, $GLOBALS['test_get_posts_args'] );
-		return $GLOBALS['test_get_posts_args'][0];
+		$queries = $GLOBALS['test_get_posts_args'] ?? null;
+		$this->assertIsArray( $queries );
+		$this->assertCount( 1, $queries );
+		$query = array();
+		foreach ( is_array( $queries[0] ) ? $queries[0] : array() as $key => $value ) {
+			$query[ (string) $key ] = $value;
+		}
+		return $query;
 	}
 
 	/**
