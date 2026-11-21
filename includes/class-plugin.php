@@ -241,6 +241,7 @@ class Plugin {
 				'structuralSuggestions' => Suggestions::is_structural_available(),
 				'mentionHandles'        => Mentions::get_handles(),
 				'mentionUserId'         => Fresh_Eyes_User::get_id(),
+				'maxStrengths'          => Response_Parser::get_max_strengths(),
 				'priorityThresholds'    => array(
 					'high'   => Response_Parser::PRIORITY_HIGH_THRESHOLD,
 					'medium' => Response_Parser::PRIORITY_MEDIUM_THRESHOLD,

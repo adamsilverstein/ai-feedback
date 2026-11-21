@@ -1,6 +1,7 @@
 /**
  * Helpers for reviewing large documents in several requests.
  */
+import { mergeStrengths } from './strengths';
 
 /**
  * Default blocks per review request, matching the server default.
@@ -123,6 +124,11 @@ export function mergeChunkResponses(responses) {
 		...last,
 		...merged,
 		summary_text: summaryText,
+		strengths: mergeStrengths(
+			...responses.map((response) => response.strengths || [])
+		),
+		// The first part compared the notes the last review left open.
+		progress: responses[0].progress ?? null,
 		...(takeaway ? { persona_takeaway: takeaway } : {}),
 		chunks: responses.length,
 	};

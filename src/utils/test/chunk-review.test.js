@@ -116,6 +116,30 @@ describe('mergeChunkResponses', () => {
 
 		expect(merged.summary_text).toBe('One. Two.');
 	});
+
+	it('merges strengths in part order, one per block, capped', () => {
+		const strength = (id) => ({ block_id: id, text: `About ${id}.` });
+		const merged = mergeChunkResponses([
+			{ strengths: [strength('a'), strength('b')], note_count: 1 },
+			{ strengths: [strength('a'), strength('c'), strength('d')] },
+		]);
+
+		expect(merged.strengths.map((item) => item.block_id)).toEqual([
+			'a',
+			'b',
+			'c',
+		]);
+		// Strengths never add to the feedback count.
+		expect(merged.note_count).toBe(1);
+	});
+
+	it('keeps the comparison the first part made', () => {
+		const progress = { addressed: 2, still_open: 1 };
+		const merged = mergeChunkResponses([{ progress }, { progress }, {}]);
+
+		expect(merged.progress).toEqual(progress);
+		expect(mergeChunkResponses([{}]).progress).toBeNull();
+	});
 });
 
 describe('mergeChunkResponses persona takeaway', () => {

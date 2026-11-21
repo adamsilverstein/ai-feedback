@@ -86,6 +86,10 @@ if ( ! function_exists( 'get_comments' ) ) {
 					if ( isset( $args['type'] ) && $comment->comment_type !== $args['type'] ) {
 						return false;
 					}
+					// Like core, where `all` leaves out trash and spam and `any` does not.
+					if ( 'all' === ( $args['status'] ?? null ) && ! in_array( (string) $comment->comment_approved, array( '0', '1' ), true ) ) {
+						return false;
+					}
 					return ai_feedback_test_matches_meta_query( $comment, $args );
 				}
 			)

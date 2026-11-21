@@ -2,10 +2,13 @@
  * Review Summary Component
  */
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { useEffect } from '@wordpress/element';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import FeedbackList from './FeedbackList';
 import ModelName from './ModelName';
 import { describeSkippedImages } from '../utils/skipped-images';
+import ReviewStrengths from './ReviewStrengths';
+import { FeedbackDone, FeedbackProgressRow } from './FeedbackProgress';
+import { describeComparison } from '../utils/progress';
 
 /**
  * Labels for the feedback categories, built at render time so translations apply.
@@ -23,11 +26,30 @@ const getCategoryLabels = () => ({
 /**
  * Review Summary component.
  *
- * @param {Object} props        Component props.
- * @param {Object} props.review Review object.
+ * @param {Object} props            Component props.
+ * @param {Object} props.review     Review object.
+ * @param {Object} [props.progress] `{ addressed, total }` for the review's notes.
  * @return {Element} Review summary component.
  */
-export default function ReviewSummary({ review }) {
+export default function ReviewSummary({ review, progress = null }) {
+	const [showAddressed, setShowAddressed] = useState(false);
+
+	// The done state and the list replace each other, so focus inside the one
+	// that goes away is moved to the one that appears.
+	const doneRef = useRef(null);
+	const detailsRef = useRef(null);
+	const wasDoneRef = useRef(null);
+	const focusTargetRef = useRef(null);
+	useEffect(() => {
+		const target = focusTargetRef.current;
+		focusTargetRef.current = null;
+		if (target === 'done') {
+			doneRef.current?.querySelector('button')?.focus();
+		} else if (target === 'list') {
+			detailsRef.current?.focus();
+		}
+	});
+
 	// Debug logging when review changes
 	useEffect(() => {
 		if (review) {
@@ -66,6 +88,32 @@ export default function ReviewSummary({ review }) {
 	const skippedImageLines = describeSkippedImages(review.images_skipped);
 
 	const hasNotes = notes && notes.length > 0;
+	const comparison = describeComparison(review.progress, noteCount ?? 0);
+	const showProgress =
+		hasNotes && !review.is_in_progress && progress?.total > 0;
+	const isDone = showProgress && progress.addressed >= progress.total;
+
+	// Once a note is restored, addressing it again shows the done state again.
+	if (!isDone && showAddressed) {
+		setShowAddressed(false);
+	}
+
+	// Addressing the last note from the list removes the button that had focus
+	// (a busy button may already have dropped it to the page). Focus isn't
+	// taken when the done state shows on load, or when the last note was
+	// addressed elsewhere, such as the Notes panel.
+	if (isDone && wasDoneRef.current === false) {
+		const active = detailsRef.current?.ownerDocument?.activeElement;
+		if (
+			!active ||
+			active === active.ownerDocument.body ||
+			detailsRef.current.contains(active)
+		) {
+			focusTargetRef.current = 'done';
+		}
+	}
+	wasDoneRef.current = isDone;
+
 	const mappedBlockCount = blockMapping
 		? Object.keys(blockMapping).length
 		: 0;
@@ -129,6 +177,8 @@ export default function ReviewSummary({ review }) {
 				</div>
 			)}
 
+			<ReviewStrengths strengths={review.strengths} />
+
 			{/* Note count headline */}
 			{noteCount !== undefined && (
 				<div
@@ -151,6 +201,10 @@ export default function ReviewSummary({ review }) {
 								)}
 					</strong>
 				</div>
+			)}
+
+			{comparison && (
+				<p className="ai-feedback-comparison">{comparison}</p>
 			)}
 
 			{/* Screen reader summary stats */}
@@ -313,9 +367,31 @@ export default function ReviewSummary({ review }) {
 				</div>
 			)}
 
+			{/* The done state says the same, so the row gives way to it. */}
+			{showProgress && (!isDone || showAddressed) && (
+				<FeedbackProgressRow progress={progress} />
+			)}
+
+			{isDone && !showAddressed && (
+				<div ref={doneRef}>
+					<FeedbackDone
+						progress={progress}
+						onShowFeedback={() => {
+							focusTargetRef.current = 'list';
+							setShowAddressed(true);
+						}}
+					/>
+				</div>
+			)}
+
 			{/* Detailed feedback list */}
-			{hasNotes && notes && notes.length > 0 && (
-				<div className="feedback-details">
+			{hasNotes && (!isDone || showAddressed) && (
+				<div
+					className="feedback-details"
+					ref={detailsRef}
+					tabIndex={-1}
+					aria-label={__('Feedback Details', 'fresh-eyes')}
+				>
 					<h4>{__('Feedback Details', 'fresh-eyes')}</h4>
 					<FeedbackList feedbackItems={notes} />
 				</div>

@@ -86,8 +86,11 @@ export function navigateToBlock(blockId, noteId) {
 			`[data-block="${window.CSS?.escape?.(clientId) ?? clientId}"]`
 		);
 		if (blockElement) {
+			const reduceMotion = window.matchMedia?.(
+				'(prefers-reduced-motion: reduce)'
+			)?.matches;
 			blockElement.scrollIntoView({
-				behavior: 'smooth',
+				behavior: reduceMotion ? 'auto' : 'smooth',
 				block: 'center',
 			});
 			return;

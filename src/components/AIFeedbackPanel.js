@@ -11,6 +11,7 @@ import { STORE_NAME } from '../store';
 import { hasTextContent, extractBlockData } from '../utils/block-utils';
 import { isPostSaved } from '../utils/post-status';
 import useSettingsOpen from '../hooks/use-settings-open';
+import useFeedbackProgress from '../hooks/useFeedbackProgress';
 
 import ModelSelector from './ModelSelector';
 import LanguageSelector from './LanguageSelector';
@@ -86,6 +87,8 @@ export default function AIFeedbackPanel() {
 	}, []);
 
 	const { clearError, startReview } = useDispatch(STORE_NAME);
+
+	const progress = useFeedbackProgress(lastReview);
 
 	const [isSettingsOpen, setIsSettingsOpen] = useSettingsOpen(
 		lastReview,
@@ -187,6 +190,7 @@ export default function AIFeedbackPanel() {
 				isReviewing={isReviewing}
 				lastReview={lastReview}
 				error={error}
+				progress={progress}
 			/>
 			{error && (
 				<div id={ERROR_ID}>
@@ -253,7 +257,10 @@ export default function AIFeedbackPanel() {
 						<div className="ai-feedback-export-row">
 							<ExportReview review={lastReview} />
 						</div>
-						<ReviewSummary review={lastReview} />
+						<ReviewSummary
+							review={lastReview}
+							progress={progress}
+						/>
 					</div>
 				</PanelBody>
 			)}

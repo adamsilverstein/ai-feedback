@@ -195,6 +195,16 @@ The review response and its history entry add `answered_by` (`provider` and `mod
       "critical": 0
     }
   },
+  "strengths": [
+    {
+      "block_id": "abc123-def456",
+      "block_name": "core/paragraph",
+      "block_index": 0,
+      "block_anchor": "1x2y3z",
+      "text": "The opening example makes the problem concrete."
+    }
+  ],
+  "progress": { "addressed": 3, "still_open": 1 },
   "model_used": "claude-sonnet-5-5",
   "answered_by": {
     "provider": "anthropic",
@@ -204,6 +214,10 @@ The review response and its history entry add `answered_by` (`provider` and `mod
   "created_at": "2025-12-06T14:30:00Z"
 }
 ```
+
+`strengths` lists up to three things the draft already does well, each one line of plain text about one block. They are shown in the sidebar under "What's working", never created as notes, and never counted in `note_count` or `summary`. Strengths that name a block outside the request, or have no text, are dropped; longer ones are cut to 160 characters. The `ai_feedback_max_strengths` filter lowers the cap or turns them off.
+
+`progress` compares this review with the previous one in the post's history: of the notes still open after the previous review, how many are now addressed and how many are still open. It is `null` for a post's first review. See [Progress](#progress) for what counts as addressed.
 
 **Error Responses:**
 
@@ -743,7 +757,7 @@ Both routes answer `403 rest_forbidden` for a review ID with no notes, the same 
 
 ### GET /history/post/{post_id}
 
-Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. `timestamp` is ISO 8601 in UTC; older entries use a MySQL datetime in site time with no offset. Requires `edit_post` on the post.
+Returns the post's recent reviews, newest first. The last 10 reviews are kept in the protected `_ai_feedback_history` post meta, which is not exposed in the post's REST `meta` field; this route is the way to read it. Earlier versions did expose it there, in the `edit` context, which made saving a reviewed post's other meta fail; code that read it from `meta` should call this route instead. `summary_text` is stored as plain text capped at 2000 characters, and `GET /notes/post/{post_id}/latest-review` uses it to restore the summary for a review rebuilt from notes. `timestamp` is ISO 8601 in UTC; older entries use a MySQL datetime in site time with no offset. Requires `edit_post` on the post.
 
 #### Response
 
@@ -761,12 +775,31 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
       "summary": {
         "by_severity": { "critical": 0, "important": 1, "suggestion": 2 },
         "by_category": { "content": 1, "tone": 0, "flow": 2, "design": 0, "grammar": 0 }
-      }
+      },
+      "strengths": [
+        { "block_id": "abc123-def456", "block_name": "core/paragraph", "block_index": 0, "block_anchor": "1x2y3z", "text": "The opening example makes the problem concrete." }
+      ],
+      "progress": { "addressed": 3, "still_open": 1 }
     }
   ],
   "total": 1
 }
 ```
+
+The parts of a chunked review share one entry: their counts add up, their strengths are merged in order (one per block, at most three) and the last part's summary wins. `GET /notes/post/{post_id}/latest-review` adds the latest review's `strengths` and `progress` from here, since notes don't hold them. It also uses the history to pick the latest review, and lists all of that review's notes, including feedback a follow-up review added to an earlier thread. When the latest review flagged nothing, it has no notes and is returned from its history entry with an empty `notes` list.
+
+#### Progress
+
+The notes still open right after the latest review ran, its own and those left over from earlier reviews (at most 500, newest kept), are kept in a separate protected post meta key, `_ai_feedback_open_notes`, as `{ "review_id": "…", "note_ids": [456, 457, 812] }`. It is bookkeeping only: not registered, and not in any REST response. The next review checks those notes, stores the counts in its `progress` and replaces the list. The counts:
+
+| Count | Meaning |
+|-------|---------|
+| `addressed` | Notes left open by the previous review that are now dismissed (or had their quick fix applied), whose suggested edit was accepted or rejected, or whose thread was resolved in the Notes panel. |
+| `still_open` | Notes left open by the previous review that are none of those. |
+
+Deleted, trashed and spam notes are not counted at all, as the editor never loads them; the Notes panel deletes a note by trashing it. A trashed note stays on the list, so it counts again if it is restored. The cases both sides are tested against are in `tests/fixtures/addressed-cases.json`. The new review's own notes are its `note_count`. When no open notes were kept for the previous review, such as for reviews recorded before this, the comparison falls back to the notes the previous review created. The sidebar's "5 of 12 notes addressed" row applies the same rules to the latest review's notes, reading thread and suggestion status live from the editor.
+
+A follow-up review adds feedback to a block's open thread as a reply. When the block's thread is resolved it starts a new thread instead, so the new feedback is not hidden in a resolved thread or counted as addressed.
 
 ### GET /history/post/{post_id}/review/{review_id}
 
@@ -1217,6 +1250,16 @@ How long, in seconds, a model's refusal of images is remembered. Default 15 minu
 #### `ai_feedback_remember_image_refusal`
 
 Whether a refused request with images is remembered. Gets the answer and the `WP_Error`. Only `true` remembers it.
+
+#### `ai_feedback_max_strengths`
+
+How many strengths a review asks for and keeps, from 0 to 3. Default 3; return 0 to leave strengths out of the prompt and the response. The editor gets the same number as `aiFeedbackData.maxStrengths`, so the merged strengths of a chunked review stay within it.
+
+```php
+add_filter( 'ai_feedback_max_strengths', function(): int {
+    return 1;
+} );
+```
 
 #### `ai_feedback_model_supports_vision`
 

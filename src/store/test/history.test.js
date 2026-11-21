@@ -44,7 +44,21 @@ describe('review history store', () => {
 				by_severity: { critical: 1, important: 1, suggestion: 0 },
 				by_category: { content: 2 },
 			},
+			strengths: [],
+			progress: null,
 		});
+	});
+
+	it('keeps strengths and the comparison with the review before', () => {
+		const strengths = [{ block_id: 'b1', text: 'Clear opening.' }];
+		const progress = { addressed: 3, still_open: 1 };
+		const entry = toHistoryEntry(
+			makeReview('a', ts(0), { strengths, progress })
+		);
+		expect(entry.strengths).toEqual(strengths);
+		expect(entry.progress).toEqual(progress);
+		// Strengths are not feedback.
+		expect(entry.note_count).toBe(2);
 	});
 
 	it('flags reviews whose notes failed', () => {
