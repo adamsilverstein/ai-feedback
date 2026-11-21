@@ -29,10 +29,13 @@ class Reply_Service_Stub extends Reply_Service {
 	public string $captured_model              = '';
 	public string $canned_response             = 'OK — replace "40% growth" with "40% growth (Source: Stripe dashboard)".';
 
+	public ?array $canned_answered_by = null;
+
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
 		$this->captured_prompt             = $prompt;
 		$this->captured_system_instruction = $system_instruction;
 		$this->captured_model              = $model;
+		$this->answered_by                 = $this->canned_answered_by;
 		return $this->canned_response;
 	}
 }
@@ -181,6 +184,34 @@ class ReplyServiceTest extends TestCase {
 		$this->assertSame( $service->canned_response, $fake_notes->last_reply['feedback_item']['feedback'] );
 		$this->assertSame( 'abc-123', $fake_notes->last_reply['feedback_item']['block_id'] );
 		$this->assertSame( 'claude-sonnet-4', $fake_notes->last_reply['review_data']['model'] );
+		$this->assertArrayNotHasKey( 'answered_by', $fake_notes->last_reply['review_data'] );
+	}
+
+	/**
+	 * The provider and model that answered are saved with the AI reply.
+	 */
+	public function test_handle_reply_records_the_model_that_answered(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Add a source.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comments'][200] = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'Which one?',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+
+		$fake_notes                  = new Reply_Service_Fake_Notes_Manager();
+		$service                     = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_answered_by = array(
+			'provider' => 'anthropic',
+			'model'    => 'claude-sonnet-5-5',
+		);
+
+		$this->assertSame( 999, $service->handle_reply( 200, 100, 42, 'abc-123' ) );
+		$this->assertSame( $service->canned_answered_by, $fake_notes->last_reply['review_data']['answered_by'] );
 	}
 
 	/**
@@ -981,6 +1012,36 @@ class ReplyServiceTest extends TestCase {
 	 */
 	public function test_editor_text_matches_the_editor( string $html, string $text ): void {
 		$this->assertSame( trim( $text ), Reply_Service::editor_text( $html ) );
+	}
+
+	/**
+	 * Data provider for the shared parent blocks whose own HTML is a wrapper.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function wrapper_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['wrappers'] ?? null ) ? $fixture['wrappers'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['own'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['own'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * A parent block's own text, from its HTML without the inner blocks, is
+	 * the text the editor sends for it (block-utils-editor.test.js runs the
+	 * same cases), so an empty wrapper has none.
+	 *
+	 * @dataProvider wrapper_text_provider
+	 *
+	 * @param string $own  The block's own HTML.
+	 * @param string $text Its own text.
+	 */
+	public function test_editor_text_reads_a_wrapper_as_the_editor_does( string $own, string $text ): void {
+		$this->assertSame( $text, Reply_Service::editor_text( $own ) );
 	}
 
 	/**

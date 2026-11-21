@@ -86,6 +86,14 @@ class Review_History {
 				'review_id'        => array( 'type' => 'string' ),
 				'timestamp'        => array( 'type' => 'string' ),
 				'model'            => array( 'type' => 'string' ),
+				'answered_by'      => array(
+					'type'                 => 'object',
+					'additionalProperties' => false,
+					'properties'           => array(
+						'provider' => array( 'type' => 'string' ),
+						'model'    => array( 'type' => 'string' ),
+					),
+				),
 				'note_count'       => array( 'type' => 'integer' ),
 				'notes_failed'     => array( 'type' => 'boolean' ),
 				'user_id'          => array( 'type' => 'integer' ),
@@ -314,12 +322,12 @@ class Review_History {
 	 * Reduce a full review result to the fields kept in history.
 	 *
 	 * @param  array<string, mixed> $review Review result.
-	 * @return array{review_id: string, timestamp: string, model: string, note_count: int, notes_failed: bool, user_id: int, summary_text: string, persona?: string, persona_label?: string, persona_takeaway?: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}, strengths: list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>}
+	 * @return array{review_id: string, timestamp: string, model: string, answered_by?: array{provider: string, model: string}, note_count: int, notes_failed: bool, user_id: int, summary_text: string, persona?: string, persona_label?: string, persona_takeaway?: string, summary: array{by_severity: array<string, int>, by_category: array<string, int>}, strengths: list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>}
 	 */
 	public static function build_entry( array $review ): array {
 		$summary = is_array( $review['summary'] ?? null ) ? $review['summary'] : array();
 
-		return self::build_persona_fields( $review ) + array(
+		return self::build_persona_fields( $review ) + self::build_answered_by( $review ) + array(
 			'review_id'    => is_string( $review['review_id'] ?? null ) ? $review['review_id'] : '',
 			'timestamp'    => is_string( $review['timestamp'] ?? null ) ? $review['timestamp'] : '',
 			'model'        => is_string( $review['model'] ?? null ) ? $review['model'] : '',
@@ -461,6 +469,26 @@ class Review_History {
 			'persona'          => $persona,
 			'persona_label'    => Personas::get_label( $persona ),
 			'persona_takeaway' => Personas::sanitize_takeaway( $review['persona_takeaway'] ?? '' ),
+		);
+	}
+
+	/**
+	 * The provider and model that answered a review, for a history entry.
+	 *
+	 * @param  array<mixed> $review Review result.
+	 * @return array{answered_by?: array{provider: string, model: string}} Empty when not known.
+	 */
+	private static function build_answered_by( array $review ): array {
+		$answered = $review['answered_by'] ?? null;
+		if ( ! is_array( $answered ) || ! is_string( $answered['provider'] ?? null ) || ! is_string( $answered['model'] ?? null ) ) {
+			return array();
+		}
+
+		return array(
+			'answered_by' => array(
+				'provider' => sanitize_text_field( $answered['provider'] ),
+				'model'    => sanitize_text_field( $answered['model'] ),
+			),
 		);
 	}
 

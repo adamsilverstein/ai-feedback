@@ -280,6 +280,34 @@ add_filter(
 	2
 );
 
+// A reply asking to reword the block's opening proposes a text edit, which
+// supersedes the review's move on that block.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/reword it/i', $asked[1] )
+			|| ! str_contains( $prompt, 'The real opening' )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply' => 'Reworded: "real opening" now reads "true opening".',
+				'edit'  => array(
+					'type'    => 'replace_text',
+					'find'    => 'real opening',
+					'replace' => 'true opening',
+				),
+			)
+		);
+	},
+	20,
+	2
+);
+
 // A reply asking to move the block moves it above the first nearby block.
 add_filter(
 	'ai_feedback_mock_reply',

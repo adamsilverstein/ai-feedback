@@ -8,6 +8,19 @@
  * @package AI_Feedback\Tests
  */
 
+if ( ! function_exists( 'register_meta' ) ) {
+	function register_meta( $object_type, $meta_key, $args ) {
+		$GLOBALS['test_registered_meta'][ $object_type ][ $meta_key ] = $args;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'plugins_url' ) ) {
+	function plugins_url( $path = '', $plugin = '' ) {
+		return 'http://example.test/wp-content/plugins/' . basename( dirname( $plugin ) ) . '/' . ltrim( $path, '/' );
+	}
+}
+
 if ( ! defined( 'AI_FEEDBACK_VERSION' ) ) {
 	define( 'AI_FEEDBACK_VERSION', '1.0.3' );
 }

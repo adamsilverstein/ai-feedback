@@ -129,6 +129,12 @@ The plugin sets these defaults on activation:
 
 You can change these in the plugin sidebar within the block editor.
 
+### Images
+
+When the selected model reads images, a review sends up to four Media Library images that have no alt text to the AI provider, so it can suggest some. Administrators can turn this off for the whole site under **Review Settings** in the sidebar: uncheck **Send images to the AI provider**. It is on by default. With it off, no image leaves the site and reviews only point out missing alt text.
+
+Developers can force it either way with the `ai_feedback_max_review_images` filter, which wins over the setting: return 0 to never send images, or a number to send up to that many even when the setting is off.
+
 ## Usage
 
 ### Basic Review

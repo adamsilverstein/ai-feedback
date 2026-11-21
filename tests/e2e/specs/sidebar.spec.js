@@ -158,6 +158,28 @@ test.describe('AI Feedback Sidebar', () => {
 			);
 		});
 
+		test('saves the image setting for the site', async ({
+			page,
+			aiFeedback,
+		}) => {
+			await aiFeedback.expandReviewSettings();
+			const sendImages = page.getByLabel(
+				'Send images to the AI provider'
+			);
+			await expect(sendImages).toBeChecked();
+
+			await aiFeedback.saveSetting(() => sendImages.uncheck());
+
+			await page.reload();
+			await aiFeedback.openSidebar();
+			await aiFeedback.expandReviewSettings();
+			await expect(sendImages).not.toBeChecked();
+
+			// The setting is the site's, so later tests get it back on.
+			await aiFeedback.saveSetting(() => sendImages.check());
+			await expect(sendImages).toBeChecked();
+		});
+
 		test('collapses and expands the Review Settings panel', async ({
 			page,
 		}) => {

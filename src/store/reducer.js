@@ -16,12 +16,14 @@ export const initialState = {
 		defaultPersona: 'copy_editor',
 		reviewAudience: '',
 		chunkSize: 20,
+		sendImages: true,
 	},
 	availableModels: [],
 	availableFocusAreas: [],
 	availableTones: [],
 	availableLocales: [],
 	availablePersonas: [],
+	canManageSite: false,
 	isReviewing: false,
 	reviewStage: null,
 	unavailableRetries: 0,
@@ -200,6 +202,7 @@ export default function reducer(state = initialState, action) {
 						action.settings.default_persona || 'copy_editor',
 					reviewAudience: action.settings.review_audience || '',
 					chunkSize: action.settings.chunk_size || 20,
+					sendImages: action.settings.send_images !== false,
 				},
 				availableModels: action.settings.available_models || [],
 				availableFocusAreas:
@@ -207,6 +210,7 @@ export default function reducer(state = initialState, action) {
 				availableTones: action.settings.available_tones || [],
 				availableLocales: action.settings.available_locales || [],
 				availablePersonas: action.settings.available_personas || [],
+				canManageSite: !!action.settings.can_manage_site,
 				isLoadingSettings: false,
 			};
 

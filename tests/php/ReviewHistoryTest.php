@@ -115,6 +115,28 @@ class ReviewHistoryTest extends TestCase {
 	}
 
 	/**
+	 * The provider and model that answered are kept when the review has them.
+	 */
+	public function test_build_entry_keeps_the_model_that_answered(): void {
+		$review                = $this->review( 'aaa-1' );
+		$review['answered_by'] = array(
+			'provider' => 'anthropic',
+			'model'    => '<b>claude-opus-4-20250514</b>',
+		);
+
+		$this->assertSame(
+			array(
+				'provider' => 'anthropic',
+				'model'    => 'claude-opus-4-20250514',
+			),
+			Review_History::build_entry( $review )['answered_by']
+		);
+
+		$review['answered_by'] = array( 'provider' => 'anthropic' );
+		$this->assertArrayNotHasKey( 'answered_by', Review_History::build_entry( $review ) );
+	}
+
+	/**
 	 * Reviews whose notes could not be created are flagged.
 	 */
 	public function test_build_entry_flags_notes_error(): void {

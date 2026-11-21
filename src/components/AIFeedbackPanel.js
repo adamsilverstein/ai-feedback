@@ -18,6 +18,7 @@ import LanguageSelector from './LanguageSelector';
 import FocusAreaSelector from './FocusAreaSelector';
 import ToneSelector from './ToneSelector';
 import HouseStyle from './HouseStyle';
+import ImageSharing from './ImageSharing';
 import PersonaSelector from './PersonaSelector';
 import ReviewButton from './ReviewButton';
 import ReviewSummary from './ReviewSummary';
@@ -228,6 +229,7 @@ export default function AIFeedbackPanel() {
 					<PersonaSelector />
 					<FocusAreaSelector />
 					<HouseStyle />
+					<ImageSharing />
 				</PanelBody>
 			</div>
 
