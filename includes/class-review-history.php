@@ -156,8 +156,12 @@ class Review_History {
 
 			$note_ids = self::int_list( $review['note_ids'] ?? array() );
 
-			// Read-modify-write: two reviews finishing at the same instant on one
-			// post could drop an entry. Acceptable for a short display history.
+			// Read-modify-write, with no lock: two reviews finishing at the same
+			// instant on one post could drop an entry, or note IDs from the open
+			// notes kept below, so the next review's comparison would leave those
+			// notes out. The parts of one review run one after another, so this
+			// takes two people reviewing the same post at once. Acceptable for a
+			// short display history and a count.
 			$history = self::get( $post_id );
 
 			// Each part of a chunked review reports separately under one ID.
