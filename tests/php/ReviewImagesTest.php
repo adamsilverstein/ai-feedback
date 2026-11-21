@@ -638,6 +638,7 @@ class ReviewImagesTest extends TestCase {
 					),
 					self::image( 'alt', 12, 'http://example.com/wp-content/uploads/2026/11/chart.png', 'A chart' ),
 					self::image( 'external', 0, 'http://example.com/chart.png' ),
+					self::image( 'no-url', 12, '' ),
 				)
 			)
 		);

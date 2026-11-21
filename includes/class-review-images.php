@@ -117,16 +117,12 @@ class Review_Images {
 			if ( count( $images ) >= $max ) {
 				break;
 			}
-			if ( ! is_array( $block ) || 'core/image' !== ( $block['name'] ?? '' ) || ! is_string( $block['clientId'] ?? null ) ) {
+			if ( ! is_array( $block ) || ! self::is_candidate( $block ) || ! is_string( $block['clientId'] ?? null ) ) {
 				continue;
 			}
 			$attrs = Block_Change::get_block_attributes( $block );
-			$alt   = is_string( $attrs['alt'] ?? null ) ? $attrs['alt'] : '';
 			$id    = is_int( $attrs['id'] ?? null ) ? $attrs['id'] : 0;
 			$url   = is_string( $attrs['url'] ?? null ) ? $attrs['url'] : '';
-			if ( '' !== trim( $alt ) || 0 === $id || '' === $url ) {
-				continue;
-			}
 
 			$file = $this->get_image_file( $id, $url, $types, $max_side );
 			if ( is_string( $file ) ) {
@@ -198,15 +194,29 @@ class Review_Images {
 	 */
 	public static function has_candidates( array $blocks ): bool {
 		foreach ( $blocks as $block ) {
-			if ( ! is_array( $block ) || 'core/image' !== ( $block['name'] ?? '' ) ) {
-				continue;
-			}
-			$attrs = Block_Change::get_block_attributes( $block );
-			if ( '' === trim( is_string( $attrs['alt'] ?? null ) ? $attrs['alt'] : '' ) && is_int( $attrs['id'] ?? null ) && 0 !== $attrs['id'] ) {
+			if ( is_array( $block ) && self::is_candidate( $block ) ) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Whether a block is an image collect() might send: a Media Library
+	 * image, with a URL, and without alt text.
+	 *
+	 * @param  array<mixed> $block Block from the review request.
+	 * @return bool
+	 */
+	private static function is_candidate( array $block ): bool {
+		if ( 'core/image' !== ( $block['name'] ?? '' ) ) {
+			return false;
+		}
+		$attrs = Block_Change::get_block_attributes( $block );
+		$alt   = is_string( $attrs['alt'] ?? null ) ? $attrs['alt'] : '';
+		$id    = is_int( $attrs['id'] ?? null ) ? $attrs['id'] : 0;
+		$url   = is_string( $attrs['url'] ?? null ) ? $attrs['url'] : '';
+		return '' === trim( $alt ) && 0 !== $id && '' !== $url;
 	}
 
 	/**
