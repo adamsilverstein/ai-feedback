@@ -300,6 +300,57 @@ export function findMoveTarget(selectors, action, clientId) {
 }
 
 /**
+ * Whether a suggestion marker is a move recorded for someone other than a
+ * note: Gutenberg's own, in Suggest intent. Gutenberg adds its note's id as
+ * `commentId` once its auto-save has created the note.
+ *
+ * @param {Object|undefined} marker `metadata.suggestion` marker.
+ * @param {number}           noteId The note the move belongs to.
+ * @return {boolean} True for a `pending-move` that does not carry the note's id.
+ */
+export function isCapturedMoveMarker(marker, noteId) {
+	return (
+		marker?.type === 'pending-move' &&
+		Number(marker.commentId ?? 0) !== Number(noteId)
+	);
+}
+
+/**
+ * Whether Gutenberg holds a note's move as its own pending suggestion.
+ *
+ * Gutenberg marks the moved block, or for a swap of two neighbors the block
+ * it moved past, which is the move's target. Other blocks in the parent may
+ * hold moves that have nothing to do with this one, and a marker carrying
+ * another AI note's id is that note's own suggestion.
+ *
+ * @param {Object}      selectors   Block editor selectors.
+ * @param {string|null} clientId    Client ID of the note's block.
+ * @param {string|null} targetId    Client ID of the block it moves next to.
+ * @param {number}      noteId      The note the move belongs to.
+ * @param {number[]}    [aiNoteIds] IDs of the review's AI notes.
+ * @return {boolean} True when the move is pending in Gutenberg.
+ */
+export function hasCapturedMove(
+	selectors,
+	clientId,
+	targetId,
+	noteId,
+	aiNoteIds = []
+) {
+	return [clientId, targetId].some((id) => {
+		const marker = id
+			? selectors.getBlockAttributes(id)?.metadata?.suggestion
+			: null;
+		return (
+			isCapturedMoveMarker(marker, noteId) &&
+			!aiNoteIds.some(
+				(aiNoteId) => Number(aiNoteId) === Number(marker.commentId)
+			)
+		);
+	});
+}
+
+/**
  * Where a move would put the block, as `moveBlocksToPosition()` needs it.
  *
  * The index counts the parent's blocks once the moved block has left it.

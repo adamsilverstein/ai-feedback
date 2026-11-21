@@ -12,7 +12,9 @@ vi.mock('@wordpress/api-fetch', () => ({
 // Stand-in for the notes the editor's Notes UI has loaded.
 let mockEditorNotes = [];
 const mockInvalidateResolution = vi.fn();
+const mockRegistry = { batch: (callback) => callback() };
 vi.mock('@wordpress/data', () => ({
+	useRegistry: () => mockRegistry,
 	useSelect: (mapSelect) =>
 		mapSelect(() => ({
 			getEntityRecords: () => mockEditorNotes,
@@ -209,7 +211,8 @@ describe('suggestNewReplyEdits', () => {
 		);
 		suggestNewReplyEdits(
 			{ 600: { replies: [first, user, revised] } },
-			seen
+			seen,
+			mockRegistry
 		);
 
 		await waitFor(() =>
@@ -218,7 +221,8 @@ describe('suggestNewReplyEdits', () => {
 		// The review's quick fix on the root note, then the first revision.
 		expect(mockSupersedeSuggestions).toHaveBeenLastCalledWith(
 			600,
-			[600, 601]
+			[600, 601],
+			mockRegistry
 		);
 		expect(order).toEqual(['supersede', 'suggest', 'supersede', 'suggest']);
 	});
@@ -234,13 +238,15 @@ describe('suggestNewReplyEdits', () => {
 					],
 				},
 			},
-			null
+			null,
+			mockRegistry
 		);
 
 		await waitFor(() =>
 			expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
 				700,
-				[700, 701]
+				[700, 701],
+				mockRegistry
 			)
 		);
 		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();
