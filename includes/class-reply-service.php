@@ -934,6 +934,8 @@ class Reply_Service {
 			$neighbor = $siblings[ $index + $step ] ?? null;
 			$text     = is_string( $edit['target_text'] ?? null ) ? $edit['target_text'] : '';
 			// Moves saved before kept a parent's text with its inner blocks'.
+			// Only one known neighbor is checked, so unlike the editor's
+			// findMoveTarget() either reading can match without ambiguity.
 			return is_array( $neighbor ) && '' !== $text
 				&& ( $edit['target_name'] ?? null ) === ( $neighbor['blockName'] ?? null )
 				&& ( Response_Parser::matches_target_text( self::target_text( $neighbor ), $text )
