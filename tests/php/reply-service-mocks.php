@@ -103,6 +103,10 @@ namespace {
 				if ( null !== $type && ( $comment->comment_type ?? 'note' ) !== $type ) {
 					continue;
 				}
+				// Like core, where `all` leaves out trash and spam and `any` does not.
+				if ( 'all' === ( $args['status'] ?? null ) && ! in_array( (string) ( $comment->comment_approved ?? '0' ), array( '0', '1' ), true ) ) {
+					continue;
+				}
 				if ( ! ai_feedback_test_matches_meta_query( $comment, $args ) ) {
 					continue;
 				}

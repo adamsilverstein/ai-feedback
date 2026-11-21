@@ -428,10 +428,13 @@ class Notes_Controller extends WP_REST_Controller {
 			$review['summary_text'] = Review_History::get_summary_text( $post->ID, $review['review_id'] );
 		}
 
-		// The persona's takeaway is kept with the summary in review history.
-		if ( is_string( $review['review_id'] ?? null ) ) {
-			$entry   = Review_History::find( $post->ID, $review['review_id'] );
+		// The persona's takeaway is kept with the summary in review history,
+		// as are the strengths and the comparison with the review before.
+		$review_id = is_string( $review['review_id'] ?? null ) ? $review['review_id'] : '';
+		if ( '' !== $review_id ) {
+			$entry   = Review_History::find( $post->ID, $review_id );
 			$review += null === $entry ? array() : Review_History::build_persona_fields( $entry );
+			$review += Review_History::get_review_extras( $post->ID, $review_id );
 		}
 
 		return rest_ensure_response(
