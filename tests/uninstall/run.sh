@@ -29,9 +29,17 @@ urls=("")
 if [ "$(cli wp eval 'echo is_multisite() ? 1 : 0;' | tail -1)" = "1" ]; then
 	network=(--network)
 	urls=()
+	# Captured first, so a failed lookup stops the script under set -e.
+	site_list=$(cli wp site list --field=url)
 	while IFS= read -r url; do
-		urls+=("$url")
-	done < <(cli wp site list --field=url | grep '^http')
+		if [[ $url == http* ]]; then
+			urls+=("$url")
+		fi
+	done <<< "$site_list"
+	if [ ${#urls[@]} -eq 0 ]; then
+		echo "No sites found in the network." >&2
+		exit 1
+	fi
 fi
 
 cli wp plugin activate "$slug" ${network[@]+"${network[@]}"} >/dev/null || true
