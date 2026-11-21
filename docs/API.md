@@ -745,7 +745,7 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
 }
 ```
 
-The parts of a chunked review share one entry: their counts add up, their strengths are merged in order (one per block, at most three) and the last part's summary wins. `GET /notes/post/{post_id}/latest-review` adds the latest review's `strengths` and `progress` from here, since notes don't hold them. It also uses the history to pick the latest review, and lists all of that review's notes, including feedback a follow-up review added to an earlier thread.
+The parts of a chunked review share one entry: their counts add up, their strengths are merged in order (one per block, at most three) and the last part's summary wins. `GET /notes/post/{post_id}/latest-review` adds the latest review's `strengths` and `progress` from here, since notes don't hold them. It also uses the history to pick the latest review, and lists all of that review's notes, including feedback a follow-up review added to an earlier thread. When the latest review flagged nothing, it has no notes and is returned from its history entry with an empty `notes` list.
 
 #### Progress
 

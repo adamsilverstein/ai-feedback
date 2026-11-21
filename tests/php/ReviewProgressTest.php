@@ -579,6 +579,62 @@ class ReviewProgressTest extends TestCase {
 	}
 
 	/**
+	 * A review that flagged nothing left no notes, but it is still the latest
+	 * review after a reload, not the one before it.
+	 */
+	public function test_latest_review_can_be_one_without_notes(): void {
+		$this->add_note( 'r1', 0, array( 'block_id' => 'b1' ) );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( 1 ) ) );
+
+		$clean              = $this->review( 'r2', array() );
+		$clean['timestamp'] = '2026-11-20T11:00:00+00:00';
+		Review_History::record( self::POST_ID, $clean );
+
+		$review = ( new Notes_Manager() )->get_latest_review_for_post( self::POST_ID );
+
+		$this->assertIsArray( $review );
+		$this->assertSame( 'r2', $review['review_id'] );
+		$this->assertSame( array(), $review['notes'] );
+		$this->assertSame( array(), $review['note_ids'] );
+		$this->assertSame( 0, $review['note_count'] );
+		$this->assertSame( 'test-model', $review['model'] );
+		$this->assertSame( '2026-11-20T11:00:00+00:00', $review['timestamp'] );
+		$this->assertTrue( $review['is_persisted'] );
+	}
+
+	/**
+	 * A post whose only review flagged nothing still has a latest review.
+	 */
+	public function test_latest_review_on_a_post_without_notes(): void {
+		Review_History::record( self::POST_ID, $this->review( 'r1', array() ) );
+
+		$review = ( new Notes_Manager() )->get_latest_review_for_post( self::POST_ID );
+
+		$this->assertIsArray( $review );
+		$this->assertSame( 'r1', $review['review_id'] );
+		$this->assertSame( 0, $review['note_count'] );
+	}
+
+	/**
+	 * A review whose notes were all deleted is still passed over for the
+	 * newest review that has notes.
+	 */
+	public function test_latest_review_skips_a_review_whose_notes_were_deleted(): void {
+		$kept = $this->add_note( 'r1', 0, array( 'block_id' => 'b1' ) );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( $kept ) ) );
+
+		$deleted = $this->add_note( 'r2', 0, array( 'block_id' => 'b2' ) );
+		Review_History::record( self::POST_ID, $this->review( 'r2', array( $deleted ) ) );
+		wp_delete_comment( $deleted, true );
+
+		$review = ( new Notes_Manager() )->get_latest_review_for_post( self::POST_ID );
+
+		$this->assertIsArray( $review );
+		$this->assertSame( 'r1', $review['review_id'] );
+		$this->assertSame( array( $kept ), $review['note_ids'] );
+	}
+
+	/**
 	 * Build a review result.
 	 *
 	 * @param  string    $review_id Review ID.

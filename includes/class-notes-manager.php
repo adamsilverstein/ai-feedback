@@ -1326,6 +1326,12 @@ class Notes_Manager {
 	 * @return array|null Review data or null if no reviews exist.
 	 */
 	public function get_latest_review_for_post( int $post_id ): ?array {
+		// A review that flagged nothing has no notes to rebuild it from.
+		$without_notes = $this->get_latest_review_without_notes( $post_id );
+		if ( null !== $without_notes ) {
+			return $without_notes;
+		}
+
 		// Get all AI feedback notes for this post.
 		$notes = $this->get_notes_with_replies( $post_id, false );
 
@@ -1411,6 +1417,41 @@ class Notes_Manager {
 			'summary'       => $summary,
 			'note_count'    => count( $review_notes ),
 			'timestamp'     => $latest_date,
+			'is_persisted'  => true,
+		);
+	}
+
+	/**
+	 * The post's newest review, when it flagged nothing and so left no notes.
+	 *
+	 * A review whose notes were created and later deleted is not one of
+	 * these: its history entry still counts them.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return array<string, mixed>|null Review data, or null when the newest review has notes or there is none.
+	 */
+	private function get_latest_review_without_notes( int $post_id ): ?array {
+		$history = Review_History::get( $post_id );
+		$entry   = end( $history );
+		if ( ! is_array( $entry ) || ! empty( $entry['note_count'] ) ) {
+			return null;
+		}
+
+		$review_id = is_string( $entry['review_id'] ?? null ) ? $entry['review_id'] : '';
+		if ( '' === $review_id || array() !== $this->get_review_notes_on_post( $post_id, $review_id ) ) {
+			return null;
+		}
+
+		return array(
+			'review_id'     => $review_id,
+			'post_id'       => $post_id,
+			'model'         => is_string( $entry['model'] ?? null ) ? $entry['model'] : '',
+			'notes'         => array(),
+			'note_ids'      => array(),
+			'block_mapping' => array(),
+			'summary'       => $this->calculate_summary( array() ),
+			'note_count'    => 0,
+			'timestamp'     => is_string( $entry['timestamp'] ?? null ) ? $entry['timestamp'] : '',
 			'is_persisted'  => true,
 		);
 	}
