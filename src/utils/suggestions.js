@@ -345,7 +345,12 @@ function withoutOwnMarkers(content, id) {
  * `removeOrphanedSuggestions()` later turns back into a plain note.
  *
  * With `replace`, the note's pending suggestion gives way to this one in a
- * single block update: its markers come out as the new ones go in.
+ * single block update: its markers come out as the new ones go in. The new
+ * payload overwrites the old one before that, so if the server dropped it or
+ * the block changed meanwhile, the earlier suggestion is lost as well: its
+ * markers are taken out and the note goes back to a plain note, rather than
+ * leave markers the stored payload no longer describes. Both edits stay
+ * available with Preview and Apply.
  *
  * @param {Object}      options               Suggestion options.
  * @param {number}      options.noteId        Note that holds the suggestion.
