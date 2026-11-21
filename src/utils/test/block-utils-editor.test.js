@@ -163,6 +163,47 @@ describe('extractBlockData on editor blocks', () => {
 	});
 });
 
+describe('hasTextContent when block types change', () => {
+	it('can keep what it read while the block types stay the same', () => {
+		// The cache is dropped when this array is another one.
+		expect(getBlockTypes()).toBe(getBlockTypes());
+	});
+
+	it('reads a block again once its type is registered', () => {
+		const settings = {
+			apiVersion: 3,
+			title: 'Late',
+			category: 'text',
+			attributes: { content: { type: 'string' } },
+			save: ({ attributes }) => <p>{attributes.content}</p>,
+		};
+		registerBlockType('fresh-eyes-test/late', settings);
+		let blocks;
+		try {
+			blocks = loadEditor([
+				createBlock('core/group', {}, [
+					createBlock('fresh-eyes-test/late', {
+						content: 'Made here.',
+					}),
+				]),
+			])
+				.select(blockEditorStore)
+				.getBlocks();
+		} finally {
+			unregisterBlockType('fresh-eyes-test/late');
+		}
+		// Without its type the block can't be saved, and it was never loaded.
+		expect(hasTextContent(blocks)).toBe(false);
+
+		registerBlockType('fresh-eyes-test/late', settings);
+		try {
+			expect(hasTextContent(blocks)).toBe(true);
+		} finally {
+			unregisterBlockType('fresh-eyes-test/late');
+		}
+	});
+});
+
 describe('anchors of loaded blocks', () => {
 	/**
 	 * Anchors as reviews made them before blocks were read as edited: from

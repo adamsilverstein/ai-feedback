@@ -3,6 +3,7 @@
  */
 import {
 	getBlockType,
+	getBlockTypes,
 	getSaveContent,
 	getSaveElement,
 } from '@wordpress/blocks';
@@ -222,10 +223,15 @@ export function extractBlockData(blocks, parent = '') {
  *
  * The editor replaces a block's object, and its parents', only when it
  * changes, so typing in one block re-reads just that block and its parents.
- * Block types register before editing starts, so a result read before a
- * type was registered is not expected to go stale.
+ * A block is read by its type's save, so the results are dropped when the
+ * registered block types change.
  */
-const hasTextCache = new WeakMap();
+let hasTextCache = new WeakMap();
+
+/**
+ * The registered block types `hasTextCache` was filled under.
+ */
+let hasTextCacheTypes;
 
 /**
  * Check if blocks array contains any text content.
@@ -234,6 +240,22 @@ const hasTextCache = new WeakMap();
  * @return {boolean} True if blocks contain text content.
  */
 export function hasTextContent(blocks) {
+	// The same array until a type is registered or unregistered.
+	const types = getBlockTypes();
+	if (types !== hasTextCacheTypes) {
+		hasTextCache = new WeakMap();
+		hasTextCacheTypes = types;
+	}
+	return someHaveText(blocks);
+}
+
+/**
+ * Whether any of the blocks, inner blocks included, has text.
+ *
+ * @param {Array} blocks Array of blocks from the editor.
+ * @return {boolean} True if blocks contain text content.
+ */
+function someHaveText(blocks) {
 	return blocks.some((block) => {
 		if (!block.name) {
 			return false;
@@ -242,8 +264,7 @@ export function hasTextContent(blocks) {
 			const text = extractTextContent(getBlockOwnHTML(block));
 			hasTextCache.set(
 				block,
-				text.trim().length > 0 ||
-					hasTextContent(block.innerBlocks ?? [])
+				text.trim().length > 0 || someHaveText(block.innerBlocks ?? [])
 			);
 		}
 		return hasTextCache.get(block);
