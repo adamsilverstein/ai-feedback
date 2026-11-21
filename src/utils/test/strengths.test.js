@@ -11,7 +11,11 @@ import { getBlockAnchor } from '../block-utils';
 const blocks = [];
 
 vi.mock('@wordpress/block-editor', () => ({ store: 'core/block-editor' }));
-vi.mock('@wordpress/blocks', () => ({ serialize: () => '' }));
+// No registered block types, so block text is read from the saved markup.
+vi.mock('@wordpress/blocks', () => ({
+	serialize: () => '',
+	getBlockType: () => undefined,
+}));
 // Only the block editor is faked; rich-text, used to read block text,
 // keeps the real registry.
 vi.mock('@wordpress/data', async (importOriginal) => {
