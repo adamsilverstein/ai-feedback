@@ -78,9 +78,9 @@ The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_i
 
 The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”" or "Remove this block and the 2 blocks inside it". Apply is a single undo step. An edit whose block or move target is gone shows as outdated, a move next to one of the block's own inner blocks is never offered, and a removal that would take a block linked to another note with it is not offered.
 
-With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
+With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. In Gutenberg's Suggest intent, Gutenberg records the move itself as the current user's suggestion, so the note goes back to a plain note and the move is suggested once. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
 
-Known limitation: the plugin can't tell whether the editor is in Gutenberg's Edit or Suggest intent. Gutenberg only exposes that through a private selector (`getEditorIntent()`) and nothing in the page reflects it. In Suggest intent, Gutenberg's own capture may record a suggested move a second time, as a pending move by the current user. Run reviews in Edit intent when Suggestion Mode is on.
+Known limitation: the plugin can't read whether the editor is in Gutenberg's Edit or Suggest intent, since Gutenberg only exposes it through a private selector (`getEditorIntent()`). It goes by what Gutenberg does instead: in Suggest intent Gutenberg marks a move with a `pending-move` marker as it lands, one that does not carry the AI note's ID, and seeing one is what sends the move to Gutenberg. That suggestion is credited to the current user rather than the AI note, and the note's sidebar card says the move is suggested in the post.
 
 **Formatting fixes:**
 
@@ -96,7 +96,7 @@ A note can carry a `block_change`: a one-click formatting fix that never adds, d
 
 Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone.
 
-Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since core would otherwise run the review on another model that takes images, or refuse it. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
+Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since a model that can't read them refuses the request. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 4, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
 
 Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
 
@@ -111,6 +111,20 @@ The sidebar groups them in one row ("8 proofreading fixes") with **Accept all**,
 A review can be read as a persona: `copy_editor` (the default), `skeptical_expert`, `first_time_visitor` or `busy_skimmer`, plus any added with the `ai_feedback_personas` filter. Each persona adds a `READER PERSONA` section with its guidance to the prompt and asks the AI for a one-sentence `persona_takeaway`; an `audience` adds an `INTENDED AUDIENCE` section. The copy editor without an audience adds nothing, so its prompt is the same as before personas. One persona per review.
 
 Notes from a persona review store the persona ID in `ai_feedback_persona` comment meta, get a persona badge before their category and severity badges, and are returned with `persona` and `persona_label` (both empty for the default). An AI reply in the thread answers as the note's persona and is tagged with it too. The review response, and its history entry, add `persona`, `persona_label` and `persona_takeaway` (at most 200 characters, plain text); the sidebar summary leads with "Skeptical expert: …". Default reviews return none of these fields.
+
+**Model and provider:**
+
+Every AI request (reviews, thread replies and mention answers) runs on the selected model from the provider in its model list entry, or fails. `Model_Pin` looks the model up in that provider's model list through the core AI client and hands core the exact model (`using_model()`), so core never picks another model or another provider. Passing the ID as a preference (`using_model_preference()`) is not enough: when core doesn't find the ID, it runs the request on the first model it finds from any configured provider.
+
+- **Listed IDs:** the exact ID wins. A provider that lists only dated releases runs the newest one of the model's ID (`claude-opus-4` runs as `claude-opus-4-20250514`; `-YYYY-MM-DD` and `-latest` count too, `-latest` wins and dates compare as dates), but never a different model whose ID starts the same way (`claude-opus-4-1-20250805`). Google's `models/` prefix is ignored. The `ai_feedback_provider_model_id` filter maps anything else.
+- **Model not listed:** the request is not sent. The error `ai_feedback_model_unavailable` (400) names the model and provider, for example "Claude Opus 4 (claude-opus-4) is not available from Anthropic, so Fresh Eyes did not send the request. Choose another model in the Fresh Eyes settings, or check the models your Anthropic account offers." It is not retried, and a review with images is not sent again without them.
+- **Provider not set up:** `ai_feedback_provider_unavailable` (400) when the model's provider isn't registered or has no credentials under Settings > Connectors.
+- **Model list unavailable:** when the provider's model list can't be read (network error, provider outage), the request is not sent either, since there is no way to tell the model is there. The error is `ai_feedback_model_check_failed` (503): reviews retry it with backoff and then return `ai_service_unavailable`, which the editor offers to retry. Core keeps a provider's model list in the object cache for a day, so that only holds across requests on a site with a persistent object cache. Without one, each review request (each chunk of a chunked review) or reply reads the chosen provider's list once, which is fewer requests than before this change: a model preference made core read the list of every configured provider.
+- **Models without a provider:** a model added through `ai_feedback_available_models` without `provider` runs on the first configured provider that lists it.
+
+`Model_Capabilities` reads the provider's model list for both: the ID a request is pinned to, and that ID's metadata for the image check, so the two agree on the model.
+
+The review response and its history entry add `answered_by` (`provider` and `model`) with the provider and model core reports for the answer, which is the model ID the provider listed. Notes from a review and AI replies store it as `provider/model` in `ai_answered_by` comment meta, next to `ai_model` (the model that was selected). An answer from any other provider is refused (`ai_feedback_wrong_provider`), which a pinned request should never see.
 
 **Example Request:**
 
@@ -169,6 +183,10 @@ Notes from a persona review store the persona ID in `ai_feedback_persona` commen
     }
   },
   "model_used": "claude-sonnet-5-5",
+  "answered_by": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5-5"
+  },
   "tokens_used": 1523,
   "created_at": "2025-12-06T14:30:00Z"
 }
@@ -179,6 +197,8 @@ Notes from a persona review store the persona ID in `ai_feedback_persona` commen
 | Status | Error Code | Description |
 |--------|------------|-------------|
 | 400 | `invalid_post_id` | Post ID is missing or invalid |
+| 400 | `ai_feedback_model_unavailable` | The selected model's provider doesn't list it, so nothing was sent. See [Model and provider](#model-and-provider) |
+| 400 | `ai_feedback_provider_unavailable` | The selected model's provider isn't set up under Settings > Connectors |
 | 403 | `forbidden` | User cannot edit this post |
 | 404 | `post_not_found` | Post does not exist |
 | 429 | `rate_limit_exceeded` | Too many review requests |
@@ -486,9 +506,13 @@ X-WP-Nonce: {nonce}
     { "id": "skeptical_expert", "label": "Skeptical expert", "description": "Questions claims and asks for sources." },
     { "id": "first_time_visitor", "label": "First-time visitor", "description": "Flags jargon and assumed knowledge." },
     { "id": "busy_skimmer", "label": "Busy skimmer", "description": "Reads headings and first sentences only, and reports what they took away." }
-  ]
+  ],
+  "send_images": true,
+  "can_manage_site": false
 }
 ```
+
+`send_images` is the site's image setting: whether reviews may send the post's images to the AI provider for alt text suggestions. `can_manage_site` is true when the current user has `manage_options` and so may change it.
 
 ---
 
@@ -499,6 +523,8 @@ Save the current user's review preferences. Each user has their own model, focus
 Send `scope: "site"` to change the site defaults instead, which apply to users who have not picked a value. This requires `manage_options`.
 
 `GET /settings` returns the user's own value for each setting, falling back to the site default and then the plugin default.
+
+`send_images` is different: it is a setting of the site, not a preference, so it is saved for the site under either scope and always requires `manage_options`. It is stored in the `ai_feedback_send_images` option as `'1'` or `'0'`, and is on when never saved. With it off, `Review_Images` collects nothing, so a review sends no image, proposes no alt text from image content and reports no skipped images. The `ai_feedback_max_review_images` filter wins over it: the filter is passed 0 when the setting is off, so returning a number above 0 sends images anyway, and returning 0 keeps them on the site when the setting is on.
 
 #### Request
 
@@ -519,6 +545,7 @@ X-WP-Nonce: {nonce}
 | `feedback_locale` | string | No | Feedback language, or `auto` |
 | `default_persona` | string | No | Reader persona ID ("Read it as"). Unknown IDs return 400 `invalid_persona` |
 | `review_audience` | string | No | "Who is this for?" text, at most 100 characters. An empty string clears it |
+| `send_images` | boolean | No | Whether reviews send the post's images to the AI provider. A setting of the site: requires `manage_options` under either scope |
 
 **Example Request:**
 
@@ -543,7 +570,7 @@ Returns the updated settings object (same format as GET /settings).
 | 400 | `invalid_model` | Model ID is not valid |
 | 400 | `invalid_focus_area` | Focus area is not valid |
 | 400 | `invalid_tone` | Tone is not valid |
-| 403 | `rest_forbidden` | User cannot edit posts, or sent `scope: "site"` without `manage_options` |
+| 403 | `rest_forbidden` | User cannot edit posts, or sent `scope: "site"` or `send_images` without `manage_options` |
 
 ---
 
@@ -714,6 +741,7 @@ Returns the post's recent reviews, newest first. The last 10 reviews are kept in
       "review_id": "550e8400-e29b-41d4-a716-446655440000",
       "timestamp": "2026-11-08T10:00:00+00:00",
       "model": "claude-sonnet-4",
+      "answered_by": { "provider": "anthropic", "model": "claude-sonnet-4" },
       "note_count": 3,
       "user_id": 1,
       "summary_text": "A clear draft with a few flow issues.",
@@ -1046,6 +1074,19 @@ add_filter( 'ai_feedback_parse_response', function( array $notes, string $raw_re
         return $note['severity'] !== 'suggestion';
     } );
 }, 10, 2 );
+```
+
+#### `ai_feedback_provider_model_id`
+
+Map a model to the ID its provider lists it under, when Fresh Eyes doesn't match it on its own (see [Model and provider](#model-and-provider)). Runs only when the exact ID isn't listed. Return one of `$listed`; anything else is ignored and the request fails as unavailable.
+
+```php
+add_filter( 'ai_feedback_provider_model_id', function( ?string $match, string $model_id, string $provider, array $listed ): ?string {
+    if ( 'anthropic' === $provider && 'claude-opus-4' === $model_id && in_array( 'claude-opus-4-0', $listed, true ) ) {
+        return 'claude-opus-4-0';
+    }
+    return $match;
+}, 10, 4 );
 ```
 
 #### `ai_feedback_available_models`
@@ -1398,6 +1439,10 @@ wp_execute_ability( 'ai-feedback/resolve-note', array(
 | `invalid_post_id` | 400 | Post ID is missing or not a valid integer |
 | `invalid_note_id` | 400 | Note ID is missing or not a valid integer |
 | `invalid_model` | 400 | Specified model is not available |
+| `ai_feedback_model_unavailable` | 400 | The selected model's provider doesn't list it; nothing was sent |
+| `ai_feedback_provider_unavailable` | 400 | The selected model's provider isn't set up under Settings > Connectors |
+| `ai_feedback_model_check_failed` | 503 | The provider's model list couldn't be read, so nothing was sent; try again |
+| `ai_feedback_wrong_provider` | 502 | An answer came from a provider other than the selected one and was not used |
 | `invalid_focus_area` | 400 | Focus area is not recognized |
 | `invalid_tone` | 400 | Tone is not recognized |
 | `empty_reply` | 400 | Reply content is empty |
@@ -1461,7 +1506,8 @@ Typing `@fresh-eyes` in a note asks Fresh Eyes about the text or blocks the note
 The Notes `@` completer (WordPress 7.1+) lists site users, so the plugin creates a hidden user named Fresh Eyes for it to offer. Typing `@fr` in a note lists it; picking it saves a `<span class="wp-note-mention user-N">@Fresh Eyes</span>` chip, which asks Fresh Eyes like the typed handle.
 
 - **Created** on activation, and on the first admin page load after an update, unless the [`ai_feedback_create_mention_user`](#ai_feedback_create_mention_user-filter) filter returns `false`, which also removes an existing account. Its ID is kept in the `ai_feedback_user_id` network option (a site option on single sites) and the account carries the `ai_feedback_user` user meta. The ID is only trusted while that account still carries the meta, and the login is never used to find it: when `fresh-eyes` is taken, the plugin picks `fresh-eyes-2` and so on, and leaves the other account alone. If the account is deleted while the plugin is active, it is created again, with a new ID; chips for the old ID are in notes that were already answered, since a note is only read when it is added. Creation runs under a lock (in the main site's options on multisite), and an account carrying the meta is adopted rather than made twice. When creation can't run, the next try waits five minutes.
-- **Inert:** no role or capabilities, no email address, and a random 64-character password nobody is given. It cannot log in (`authenticate`), never becomes the current user, whatever authenticated the request (`determine_current_user`), and gets no application passwords or password resets. Nobody can edit, delete, promote or remove it (`map_meta_cap`), and a role, capability, super admin grant or email address given to it through code or WP-CLI is taken back. Anything it picked up while the plugin was inactive is taken back at the next activation or update check. AI notes are still saved with `user_id` 0, not as this user.
+- **Inert:** no role or capabilities, no email address, and a random 64-character password nobody is given. It cannot log in (`authenticate`), never becomes the current user, whatever authenticated the request (`determine_current_user`), and gets no application passwords or password resets. Nobody can edit, delete, promote or remove it (`map_meta_cap`), and a role, capability, super admin grant or email address given to it through code or WP-CLI is taken back. Anything it picked up while the plugin was inactive is taken back at the next activation or update check.
+- **Author of AI notes:** new AI notes and replies are written as this user, so the Notes UI shows Fresh Eyes with its avatar (`assets/fresh-eyes-avatar.svg`, a pair of eyes that blinks about every 15 seconds, still with reduced motion), which needs no Gravatar. When the account doesn't exist (the filter turned it off, or creating it failed), notes are written with `user_id` 0 as before. Notes written before this change keep `user_id` 0; nothing is migrated. Either way a note is Fresh Eyes' by its `ai_feedback` meta, never by its author, so old and new notes are answered alike and an AI note never asks for an answer. A note by this user has no `author` link in the REST response, since `/wp/v2/users/<id>` answers 404 for it; its name and avatar come with the note. Writing a note this way sends no email: AI notes are saved with `wp_insert_comment()`, not through the REST API, so core's note notifications never run, and the account has no email address. Removing the account (uninstall, or the filter) leaves its notes in place, as comments are not deleted with their author. They keep the name stored with them; with the filter, the plugin still gives them the avatar, and after uninstall they show the default one.
 - **Code that sets the current user directly:** `wp_set_current_user( N )`, as some single sign-on or "switch to user" tools call, does not go through `determine_current_user`, so it can make the account the current user. It then has no role or capabilities, not even `read`, so it can't edit or publish anything, or ask Fresh Eyes (`edit_posts`). A note written over REST in that state would be saved under its name. Such tools should leave this account out of their user pickers; it is already missing from every user list.
 - **A look-alike account:** anyone who can create users can name another account "Fresh Eyes", and the completer would list both. Picking the look-alike still asks Fresh Eyes, since its chip reads `@Fresh Eyes` and the typed handle matches, but WordPress also emails that account about the mention like any other user.
 - **Hidden:** every `WP_User_Query` leaves it out (`pre_user_query`), which covers the Users screen, author dropdowns, `wp_list_authors()`, sitemaps, WP-CLI's `wp user list` and `/wp/v2/users`. The Users screen counts leave it out (`pre_count_users`). `/wp/v2/users/<id>` and its application password routes answer 404, and its author archive, also reached through `?author=<id>`, is a 404.
