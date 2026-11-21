@@ -33,7 +33,10 @@ vi.mock('../../hooks/useRequestReply', () => ({
 		canRequest: true,
 	}),
 }));
-vi.mock('../../hooks/useSuggestionStatus', () => ({ default: () => null }));
+vi.mock('../../hooks/useSuggestionStatus', () => ({
+	default: () => null,
+	useHeldSuggestionStatus: () => null,
+}));
 
 beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/heading')) {

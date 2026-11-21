@@ -1,0 +1,154 @@
+/**
+ * Tests for reading suggestion statuses, including a reply's edit held by
+ * its thread's root note.
+ */
+import { describe, expect, it, vi } from 'vitest';
+import {
+	selectHeldSuggestionStatus,
+	selectSuggestionStatus,
+} from './useSuggestionStatus';
+
+vi.mock('./useReplyThreads', () => ({
+	getNotesQuery: (postId) => ({ post: postId }),
+}));
+
+/**
+ * A registry `select` serving loaded note records.
+ *
+ * @param {Object[]|null} notes Note records, or null before they load.
+ * @return {(store: string) => Object} Select.
+ */
+const selectWith = (notes) => (store) =>
+	store === 'core/editor'
+		? { getCurrentPostId: () => 42 }
+		: { getEntityRecords: () => notes };
+
+const root = (payload, status = '') => ({
+	id: 39,
+	meta: { _wp_suggestion: payload, _wp_suggestion_status: status },
+});
+
+describe('selectSuggestionStatus', () => {
+	it('reads a note’s own suggestion', () => {
+		const select = selectWith([root('{"schemaVersion":2}', 'applied')]);
+
+		expect(selectSuggestionStatus(select, { id: 39 })).toBe('applied');
+	});
+
+	it('reads a reply’s edit from the root note that holds it', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 40 })).toBe('pending');
+		// The root note's own fix is not the suggestion.
+		expect(
+			selectSuggestionStatus(select, {
+				id: 39,
+				suggestion_status: 'pending',
+			})
+		).toBe(null);
+		expect(selectSuggestionStatus(select, { id: 41 })).toBe(null);
+	});
+
+	it('does not read a suggestion as the root note’s own when its reply is gone', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+		]);
+
+		// Not the root note's own fix. The reply is no longer listed, so
+		// nothing asks for its status; a reply not loaded yet still reads it.
+		expect(selectSuggestionStatus(select, { id: 39 })).toBe(null);
+		// The note still holds it, so it can't be dismissed.
+		expect(selectHeldSuggestionStatus(select, { id: 39 })).toBe('pending');
+	});
+
+	it('does not let a payload name another thread’s root note', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":50}', 'applied'),
+			{ id: 50, parent: 0, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 50 })).toBe(null);
+	});
+
+	it('does not let a payload name a reply in another thread', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":51}', 'pending'),
+			{ id: 50, parent: 0, meta: {} },
+			{ id: 51, parent: 50, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 51 })).toBe(null);
+	});
+
+	it('reads a reply nested deeper in the thread', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":41}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+			{ id: 41, parent: 40, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 41 })).toBe('pending');
+	});
+
+	it('takes the holder in the reply’s own thread when two name it', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+			{
+				id: 50,
+				parent: 0,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":40}',
+					_wp_suggestion_status: 'rejected',
+				},
+			},
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 40 })).toBe('pending');
+	});
+
+	it('falls back to the review response until the notes load', () => {
+		expect(
+			selectSuggestionStatus(selectWith(null), {
+				id: 39,
+				suggestion_status: 'pending',
+			})
+		).toBe('pending');
+	});
+});
+
+describe('selectHeldSuggestionStatus', () => {
+	it('reads the notes response’s held status until the notes load', () => {
+		// A root note holding a reply's pending edit reads null for its own.
+		expect(
+			selectHeldSuggestionStatus(selectWith(null), {
+				id: 39,
+				suggestion_status: null,
+				held_suggestion_status: 'pending',
+			})
+		).toBe('pending');
+	});
+
+	it('reads the suggestion a note holds, whoever’s edit it is', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+			{ id: 40, parent: 39, meta: {} },
+		]);
+
+		expect(selectHeldSuggestionStatus(select, { id: 39 })).toBe('pending');
+		expect(selectHeldSuggestionStatus(select, { id: 40 })).toBe(null);
+	});
+
+	it('falls back to the review response until the notes load', () => {
+		expect(
+			selectHeldSuggestionStatus(selectWith(null), {
+				id: 39,
+				suggestion_status: 'pending',
+			})
+		).toBe('pending');
+	});
+});

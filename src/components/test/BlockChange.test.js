@@ -30,7 +30,10 @@ vi.mock('../../utils/navigate-to-block', () => ({ navigateToBlock: vi.fn() }));
 vi.mock('../../hooks/useRequestReply', () => ({
 	default: () => ({ requestReply: vi.fn(), canRequest: false }),
 }));
-vi.mock('../../hooks/useSuggestionStatus', () => ({ default: () => null }));
+vi.mock('../../hooks/useSuggestionStatus', () => ({
+	default: () => null,
+	useHeldSuggestionStatus: () => null,
+}));
 
 beforeAll(() => {
 	if (!getBlockTypes().some((type) => type.name === 'core/heading')) {

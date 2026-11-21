@@ -53,9 +53,10 @@ const note = (id, blockId, find, replace, extra = {}) => ({
  *
  * @param {string[]}                       paragraphs HTML of each paragraph.
  * @param {(blocks: Object[]) => Object[]} makeItems  Builds the notes from the blocks.
+ * @param {Object[]|null}                  [records]  Note records the editor has loaded.
  * @return {Object} Registry, blocks, recorded calls and render result.
  */
-function renderGroup(paragraphs, makeItems) {
+function renderGroup(paragraphs, makeItems, records = null) {
 	const registry = createRegistry();
 	registry.register(blocksStore);
 	registry.register(blockEditorStore);
@@ -97,7 +98,11 @@ function renderGroup(paragraphs, makeItems) {
 	});
 	registry.registerStore('core/editor', {
 		reducer: (state = {}) => state,
-		selectors: { getCurrentPostId: () => null },
+		selectors: { getCurrentPostId: () => (records ? 42 : null) },
+	});
+	registry.registerStore('core', {
+		reducer: (state = {}) => state,
+		selectors: { getEntityRecords: () => records },
 	});
 
 	const items = makeItems(blocks);
@@ -244,6 +249,30 @@ describe('ProofreadingGroup', () => {
 			['start', 1, false],
 			['end', 1, false],
 		]);
+	});
+
+	it('leaves out a fix whose note holds an AI reply’s edit', () => {
+		renderGroup(
+			['Teh cat ate alot.'],
+			(b) => [
+				note(1, b[0].clientId, 'Teh', 'The'),
+				note(2, b[0].clientId, 'alot', 'a lot'),
+			],
+			[
+				{
+					id: 1,
+					meta: {
+						_wp_suggestion:
+							'{"schemaVersion":2,"aiFeedbackEditOwner":9}',
+						_wp_suggestion_status: 'pending',
+					},
+				},
+				{ id: 2, meta: {} },
+			]
+		);
+
+		expect(screen.getByText('1 proofreading fix')).toBeInTheDocument();
+		expect(screen.queryByText('Teh → The')).not.toBeInTheDocument();
 	});
 
 	it('disables Accept all once nothing is left', () => {

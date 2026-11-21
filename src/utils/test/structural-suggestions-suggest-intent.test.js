@@ -102,6 +102,13 @@ beforeAll(() => {
 			},
 		})
 	);
+	// No post, so the suggestion code reads no loaded notes.
+	register(
+		createReduxStore('core/editor', {
+			reducer: (state = {}) => state,
+			selectors: { getCurrentPostId: () => null },
+		})
+	);
 	register(
 		createReduxStore('ai-feedback/store', {
 			reducer: (state = {}) => state,

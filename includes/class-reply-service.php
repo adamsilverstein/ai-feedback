@@ -798,7 +798,7 @@ class Reply_Service {
 			'thread'            => $thread,
 			'nearby_blocks'     => $nearby,
 			'block_targets'     => self::get_block_targets( $nearby ),
-			'pending_edit'      => $this->find_pending_edit( $edits, $block_text, $located ),
+			'pending_edit'      => $this->find_pending_edit( $edits, $block_text, $located, $parent_id ),
 			'user_reply'        => $reply->comment_content,
 			'target_tone'       => self::preference_string( 'ai_feedback_default_tone', 'professional', $user_id ),
 			'locale'            => self::preference_string( 'ai_feedback_feedback_locale', get_locale(), $user_id ),
@@ -885,15 +885,16 @@ class Reply_Service {
 	 * @param list<array{id: int, edit: array<string, mixed>}> $edits         Edits in the thread, oldest first.
 	 * @param string                                           $block_content Block text without pending suggestions.
 	 * @param array<string, mixed>|null                        $located       Note's block and its siblings, from locate_note_block().
+	 * @param int                                              $root_id       The thread's root note, which may hold a reply's suggestion.
 	 * @return array<string, mixed>|null Pending edit, or null.
 	 */
-	private function find_pending_edit( array $edits, string $block_content, ?array $located = null ): ?array {
+	private function find_pending_edit( array $edits, string $block_content, ?array $located = null, int $root_id = 0 ): ?array {
 		$latest = end( $edits );
 		if ( false === $latest ) {
 			return null;
 		}
 
-		$status = ( new Suggestions() )->get_status( $latest['id'] );
+		$status = ( new Suggestions() )->get_edit_status( $latest['id'], $root_id > 0 ? $root_id : $latest['id'] );
 		if ( null !== $status && 'pending' !== $status ) {
 			return null;
 		}

@@ -146,7 +146,14 @@ describe('useReplyThreads', () => {
 		});
 
 		await waitFor(() =>
-			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(fresh, 300)
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				fresh,
+				300,
+				null,
+				{
+					isMention: false,
+				}
+			)
 		);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 	});
@@ -160,6 +167,27 @@ describe('suggestNewReplyEdits', () => {
 		mockSuggestionMode = true;
 	});
 
+	it('says when a person started the thread, so its edit stays in the sidebar', async () => {
+		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
+		const threads = {
+			450: {
+				is_mention: true,
+				replies: [{ id: 451, is_ai: true, edit }],
+			},
+		};
+
+		suggestNewReplyEdits(threads, new Set());
+
+		await waitFor(() =>
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				threads[450].replies[0],
+				450,
+				null,
+				{ isMention: true }
+			)
+		);
+	});
+
 	it('suggests each new edit once, across hook instances', async () => {
 		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
 		const threads = {
@@ -169,13 +197,16 @@ describe('suggestNewReplyEdits', () => {
 		suggestNewReplyEdits(threads, new Set());
 		suggestNewReplyEdits(threads, new Set());
 
+		// Twice for the instance that suggests, once for the other.
 		await waitFor(() =>
-			expect(mockSupersedeSuggestions).toHaveBeenCalledTimes(2)
+			expect(mockSupersedeSuggestions).toHaveBeenCalledTimes(3)
 		);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
 			threads[400].replies[0],
-			400
+			400,
+			null,
+			{ isMention: false }
 		);
 	});
 
@@ -216,15 +247,36 @@ describe('suggestNewReplyEdits', () => {
 		);
 
 		await waitFor(() =>
-			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(revised, 600)
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				revised,
+				600,
+				null,
+				{
+					isMention: false,
+				}
+			)
 		);
-		// The review's quick fix on the root note, then the first revision.
+		// The root note's suggestion is left for the revision to replace,
+		// then retired only if the revision could not be suggested.
+		expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
+			600,
+			[600, 601],
+			mockRegistry,
+			{ keepRoot: true }
+		);
 		expect(mockSupersedeSuggestions).toHaveBeenLastCalledWith(
 			600,
 			[600, 601],
 			mockRegistry
 		);
-		expect(order).toEqual(['supersede', 'suggest', 'supersede', 'suggest']);
+		expect(order).toEqual([
+			'supersede',
+			'suggest',
+			'supersede',
+			'supersede',
+			'suggest',
+			'supersede',
+		]);
 	});
 
 	it('retires stale suggestions on the first load without suggesting', async () => {
@@ -246,7 +298,8 @@ describe('suggestNewReplyEdits', () => {
 			expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
 				700,
 				[700, 701],
-				mockRegistry
+				mockRegistry,
+				{ keepRoot: false }
 			)
 		);
 		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();

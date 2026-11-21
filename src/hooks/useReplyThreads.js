@@ -37,21 +37,30 @@ let queue = Promise.resolve();
 /**
  * Retire superseded suggestions in a thread, then suggest its newest edit.
  *
+ * The newest edit is suggested on the thread's root note, replacing the
+ * root's pending suggestion in one step, so that one is left in place until
+ * then. If the newest edit can't be suggested, it is retired like the rest.
+ *
  * Runs one thread at a time, so each step sees the block as the last left it.
  *
  * @param {number}      threadId   Root note of the thread.
  * @param {number[]}    superseded Notes whose edits the newest edit replaces.
  * @param {Object|null} reply      AI reply whose edit to suggest, or null.
  * @param {Object}      registry   Data registry.
+ * @param {boolean}     isMention  Whether a person started the thread, whose root note can't hold the edit.
  * @return {Promise<void>} Resolves once the thread is done.
  */
-function refineThread(threadId, superseded, reply, registry) {
+function refineThread(threadId, superseded, reply, registry, isMention) {
 	queue = queue
 		.then(async () => {
 			// The registry of the editor that queued this, not a later one's.
-			await supersedeSuggestions(threadId, superseded, registry);
+			await supersedeSuggestions(threadId, superseded, registry, {
+				keepRoot: !!reply,
+			});
 			if (reply) {
-				await suggestReplyEdit(reply, threadId);
+				await suggestReplyEdit(reply, threadId, null, { isMention });
+				// A no-op when the root note now holds the newest edit.
+				await supersedeSuggestions(threadId, superseded, registry);
 			}
 		})
 		.catch(() => {
@@ -101,7 +110,8 @@ export function suggestNewReplyEdits(threads, known, registry) {
 			threadId,
 			[threadId, ...edits.slice(0, -1).map(({ ownerId }) => ownerId)],
 			reply,
-			registry
+			registry,
+			!!thread.is_mention
 		);
 	}
 	return seen;

@@ -11,6 +11,7 @@
 import apiFetch from '@wordpress/api-fetch';
 import {
 	dispatch as dataDispatch,
+	resolveSelect,
 	select as dataSelect,
 } from '@wordpress/data';
 import { store as blockEditorStore } from '@wordpress/block-editor';
@@ -243,18 +244,34 @@ function getBlockContent(clientId) {
 }
 
 /**
+ * Payload key naming the AI reply whose edit a thread's root note holds.
+ *
+ * Gutenberg only links a thread's root note to its block, so a reply's edit
+ * is suggested on the root note, and this key says which reply it is.
+ * Gutenberg keeps keys it does not know. The server reads it: keep in step
+ * with Suggestions::EDIT_OWNER_KEY in includes/class-suggestions.php.
+ */
+export const EDIT_OWNER_KEY = 'aiFeedbackEditOwner';
+
+/**
  * Builds the `_wp_suggestion` payload for a quick fix.
  *
  * An empty replacement is a deletion; anything else is a replacement, which
  * Gutenberg stores as an `add` run followed by a `del` run under one id. A
  * rewrite is a replacement made of several such pairs.
  *
- * @param {string} blockName Block name, eg. `core/paragraph`.
- * @param {string} attribute Rich text attribute holding the markers.
- * @param {Object} fix       Quick fix or reply edit.
+ * @param {string}      blockName     Block name, eg. `core/paragraph`.
+ * @param {string}      attribute     Rich text attribute holding the markers.
+ * @param {Object}      fix           Quick fix or reply edit.
+ * @param {number|null} [editOwnerId] AI reply whose edit this is, when the root note holds it.
  * @return {Object} Suggestion payload.
  */
-export function buildSuggestionPayload(blockName, attribute, fix) {
+export function buildSuggestionPayload(
+	blockName,
+	attribute,
+	fix,
+	editOwnerId = null
+) {
 	return {
 		schemaVersion: SCHEMA_VERSION,
 		blockName,
@@ -269,7 +286,29 @@ export function buildSuggestionPayload(blockName, attribute, fix) {
 						: 'del',
 			},
 		],
+		...(editOwnerId ? { [EDIT_OWNER_KEY]: Number(editOwnerId) } : {}),
 	};
+}
+
+/**
+ * Finds the note whose edit a note's suggestion is.
+ *
+ * @param {Object} record Comment record from core-data.
+ * @return {number|null} The reply named in the payload, the note itself when none is named, or null when it is not a suggestion.
+ */
+export function getSuggestionOwnerId(record) {
+	const raw = record?.meta?._wp_suggestion;
+	if (!raw) {
+		return null;
+	}
+	let payload;
+	try {
+		payload = JSON.parse(raw);
+	} catch {
+		payload = null;
+	}
+	const owner = payload?.[EDIT_OWNER_KEY];
+	return Number.isInteger(owner) && owner > 0 ? owner : record.id;
 }
 
 /**
@@ -289,50 +328,97 @@ function saveNoteMeta(noteId, meta) {
 }
 
 /**
- * Turns an edit into a suggestion on the note that proposed it.
+ * A block's rich text without one note's suggestion markers.
+ *
+ * @param {string|RichTextData} content Attribute value.
+ * @param {number}              id      Suggestion (note) id.
+ * @return {string|RichTextData} The content as it reads without that suggestion.
+ */
+function withoutOwnMarkers(content, id) {
+	return removeSuggestionMarkers(content, id) ?? content;
+}
+
+/**
+ * Turns an edit into a suggestion on a note.
  *
  * The payload is stored first; if the server dropped it, or the block
  * changed while the request ran, it is removed again. A reload between the
  * two steps leaves a pending suggestion without markers, which
  * `removeOrphanedSuggestions()` later turns back into a plain note.
  *
- * @param {Object} options         Suggestion options.
- * @param {number} options.noteId  Note that owns the suggestion.
- * @param {string} options.blockId Client id of the block to edit.
- * @param {Object} options.edit    Quick fix or reply edit.
+ * With `replace`, the note's pending suggestion gives way to this one in a
+ * single block update: its markers come out as the new ones go in. The new
+ * payload overwrites the old one before that, so if the server dropped it or
+ * the block changed meanwhile, the earlier suggestion is lost as well: its
+ * markers are taken out and the note goes back to a plain note, rather than
+ * leave markers the stored payload no longer describes. Both edits stay
+ * available with Preview and Apply.
+ *
+ * @param {Object}      options               Suggestion options.
+ * @param {number}      options.noteId        Note that holds the suggestion.
+ * @param {string}      options.blockId       Client id of the block to edit.
+ * @param {Object}      options.edit          Quick fix or reply edit.
+ * @param {number|null} [options.editOwnerId] AI reply whose edit this is, when another note holds it.
+ * @param {boolean}     [options.replace]     Whether to replace the note's pending suggestion.
  * @return {Promise<boolean>} Whether the suggestion was added.
  */
-export async function suggestEdit({ noteId, blockId, edit }) {
+export async function suggestEdit({
+	noteId,
+	blockId,
+	edit,
+	editOwnerId = null,
+	replace = false,
+}) {
+	const base = (content) =>
+		replace ? withoutOwnMarkers(content, noteId) : content;
+
 	const target = getBlockContent(blockId);
 	if (
 		!target ||
-		!buildEditSuggestionContent(target.content, edit, { id: noteId })
+		!buildEditSuggestionContent(base(target.content), edit, {
+			id: noteId,
+		})
 	) {
 		return false;
 	}
 
 	const saved = await saveNoteMeta(noteId, {
 		_wp_suggestion: JSON.stringify(
-			buildSuggestionPayload(target.block.name, target.key, edit)
+			buildSuggestionPayload(
+				target.block.name,
+				target.key,
+				edit,
+				editOwnerId
+			)
 		),
 		_wp_suggestion_status: 'pending',
 	});
 
 	const current = getBlockContent(blockId);
 	// Gutenberg's sanitize callback stores '' for a payload it rejects.
-	// Markers carry the note's author (0 for AI notes): Gutenberg tints and
-	// names markers by matching it, and lets a user grow or remove markers
-	// carrying their own id, so the reviewer's id would let their edits
-	// rewrite the AI's suggestion.
+	// Markers carry the note's author (the Fresh Eyes user, or 0): Gutenberg
+	// tints and names markers by matching it, and lets a user grow or remove
+	// markers carrying their own id, so the reviewer's id would let their
+	// edits rewrite the AI's suggestion.
 	const updated =
 		!!saved?.meta?._wp_suggestion &&
 		current &&
-		buildEditSuggestionContent(current.content, edit, {
+		buildEditSuggestionContent(base(current.content), edit, {
 			id: noteId,
 			authorId: saved.author ?? null,
 		});
 
 	if (!updated) {
+		// The stored payload no longer matches the markers it replaced, so
+		// those go too.
+		if (replace && current) {
+			const cleared = removeSuggestionMarkers(current.content, noteId);
+			if (cleared !== null) {
+				dataDispatch(blockEditorStore).updateBlockAttributes(blockId, {
+					[current.key]: cleared,
+				});
+			}
+		}
 		await removeSuggestion(noteId);
 		return false;
 	}
@@ -340,7 +426,11 @@ export async function suggestEdit({ noteId, blockId, edit }) {
 	dataDispatch(blockEditorStore).updateBlockAttributes(blockId, {
 		[current.key]: updated,
 	});
-	dataDispatch(STORE_NAME).setSuggestionStatus(noteId, 'pending');
+	// The note's own fix is not the suggestion when it holds a reply's edit.
+	dataDispatch(STORE_NAME).setSuggestionStatus(
+		noteId,
+		editOwnerId ? null : 'pending'
+	);
 	return true;
 }
 
@@ -359,31 +449,119 @@ export function suggestQuickFix(note) {
 }
 
 /**
- * Turns the edit an AI reply proposed into a suggestion on the reply.
+ * The query the Notes UI loads a post's notes with, as in getNotesQuery(),
+ * so records already fetched are read rather than each note fetched.
  *
- * The block is the one the thread's note is attached to, found by the note
- * id in its metadata when the stored client id is stale.
+ * @return {Array|null} Arguments for `getEntityRecords`, or null without a post.
+ */
+function getNotesQueryArgs() {
+	const postId = dataSelect(EDITOR_STORE).getCurrentPostId?.();
+	return postId
+		? [
+				'root',
+				'comment',
+				{ post: postId, type: 'note', status: 'all', per_page: -1 },
+			]
+		: null;
+}
+
+/**
+ * Reads a loaded note record.
  *
- * @param {Object}      reply     AI reply with `id` and `edit`.
- * @param {number}      threadId  Root note of the reply's thread.
- * @param {string|null} [blockId] Client id stored with the root note, if known.
+ * @param {number} noteId Note ID.
+ * @return {Object|null} Comment record, or null when not loaded.
+ */
+function getLoadedNote(noteId) {
+	const args = getNotesQueryArgs();
+	const notes = args
+		? dataSelect(CORE_STORE).getEntityRecords?.(...args)
+		: null;
+	return notes?.find((note) => note.id === Number(noteId)) ?? null;
+}
+
+/**
+ * Reads a note record once the post's notes have loaded.
+ *
+ * A new AI reply refetches the notes, so this waits for that rather than
+ * read a record the refetch is about to replace.
+ *
+ * @param {number} noteId Note ID.
+ * @return {Promise<Object|null>} Comment record, or null when the post has no such note.
+ */
+async function loadNote(noteId) {
+	const args = getNotesQueryArgs();
+	if (args) {
+		try {
+			await resolveSelect(CORE_STORE).getEntityRecords(...args);
+		} catch {
+			// The records already loaded, if any, will do.
+		}
+	}
+	return getLoadedNote(noteId);
+}
+
+/**
+ * Turns the edit an AI reply proposed into a suggestion on its thread's
+ * root note.
+ *
+ * Gutenberg's Notes UI links only a thread's root note to its block, so a
+ * suggestion on the reply itself could not be accepted, rejected or saved.
+ * The root note holds the thread's one suggestion, and the payload names
+ * the reply whose edit it is. A pending suggestion the root holds, its own
+ * quick fix or an earlier reply's edit, gives way to the new one.
+ *
+ * The edit stays with Preview and Apply in the sidebar instead when the root
+ * note is not an AI note (a mention thread a person started), or when the
+ * author already accepted or rejected the root's suggestion.
+ *
+ * Whether the root is an AI note comes from the caller, which has it from
+ * the server: only the note's `ai_feedback` meta says so, and that is not in
+ * the note's REST record. Its author does not: an AI note is written as the
+ * Fresh Eyes user, or as user 0 without one and in older notes.
+ *
+ * @param {Object}      reply               AI reply with `id` and `edit`.
+ * @param {number}      threadId            Root note of the reply's thread.
+ * @param {string|null} [blockId]           Client id stored with the root note, if known.
+ * @param {Object}      [options]           Options.
+ * @param {boolean}     [options.isMention] Whether a person started the thread, as its `is_mention` says.
  * @return {Promise<boolean>} Whether the suggestion was added.
  */
-export async function suggestReplyEdit(reply, threadId, blockId = null) {
-	if (!isSuggestionModeAvailable() || !reply?.id || !reply.edit) {
+export async function suggestReplyEdit(
+	reply,
+	threadId,
+	blockId = null,
+	{ isMention = false } = {}
+) {
+	if (
+		!isSuggestionModeAvailable() ||
+		!reply?.id ||
+		!reply.edit ||
+		isMention
+	) {
 		return false;
 	}
+	const root = await loadNote(threadId);
 	const clientId = resolveBlockClientId(blockId, threadId);
-	if (!clientId) {
+	if (!clientId || !root) {
 		return false;
+	}
+
+	const status = getRecordStatus(root);
+	if (status !== null && status !== 'pending') {
+		return false;
+	}
+	if (status === 'pending' && getSuggestionOwnerId(root) === reply.id) {
+		return true;
 	}
 
 	try {
 		if (
 			!(await suggestEdit({
-				noteId: reply.id,
+				noteId: threadId,
 				blockId: clientId,
 				edit: reply.edit,
+				editOwnerId: reply.id,
+				replace: status === 'pending',
 			}))
 		) {
 			return false;
@@ -842,28 +1020,26 @@ export async function saveSuggestionStatuses(noteIds, status) {
 }
 
 /**
+ * Reads a note's suggestion status from its comment record.
+ *
+ * @param {Object|null} record Comment record from core-data.
+ * @return {string|null} Status, or null when not a suggestion.
+ */
+function getRecordStatus(record) {
+	if (!record?.meta?._wp_suggestion) {
+		return null;
+	}
+	return record.meta._wp_suggestion_status || 'pending';
+}
+
+/**
  * Reads a note's suggestion status from the record core-data has loaded.
  *
  * @param {number} noteId Note ID.
  * @return {string|null} Status, or null when unknown or not a suggestion.
  */
 function getLoadedSuggestionStatus(noteId) {
-	const postId = dataSelect(EDITOR_STORE).getCurrentPostId?.();
-	// The query the Notes UI loads, as in getNotesQuery(), so this reads
-	// records already fetched rather than fetching each note.
-	const notes = postId
-		? dataSelect(CORE_STORE).getEntityRecords?.('root', 'comment', {
-				post: postId,
-				type: 'note',
-				status: 'all',
-				per_page: -1,
-			})
-		: null;
-	const record = notes?.find((note) => note.id === Number(noteId));
-	if (!record?.meta?._wp_suggestion) {
-		return null;
-	}
-	return record.meta._wp_suggestion_status || 'pending';
+	return getRecordStatus(getLoadedNote(noteId));
 }
 
 /**
@@ -873,6 +1049,38 @@ function getLoadedSuggestionStatus(noteId) {
 const supersedingIds = new Set();
 
 /**
+ * The notes holding the suggestions of superseded edits.
+ *
+ * A thread's root note may hold an AI reply's edit, named in its payload.
+ * It is retired when that reply's edit is superseded, not when the root
+ * note's own edit is. A reply holds its own edit only in suggestions made
+ * before reply edits moved to the root note.
+ *
+ * @param {number}   threadId Root note of the thread.
+ * @param {number[]} noteIds  Notes whose edits are superseded.
+ * @return {number[]} Notes whose suggestions to retire.
+ */
+function getSupersededHolders(threadId, noteIds) {
+	const rootId = Number(threadId);
+	const rootOwner = getSuggestionOwnerId(getLoadedNote(rootId));
+	const superseded = new Set(noteIds.map(Number));
+	const holders = new Set();
+	for (const id of superseded) {
+		if (id === rootId) {
+			// An unloaded root is taken to hold its own edit.
+			if (rootOwner === null || rootOwner === rootId) {
+				holders.add(rootId);
+			}
+		} else if (rootOwner === id) {
+			holders.add(rootId);
+		} else {
+			holders.add(id);
+		}
+	}
+	return [...holders];
+}
+
+/**
  * Retires the suggestions a newer edit in the same thread replaces.
  *
  * Each pending suggestion's markers are taken out of the block and it is
@@ -880,12 +1088,19 @@ const supersedingIds = new Set();
  * the post is saved: its status list has no `superseded`. Suggestions the
  * author already accepted or rejected are left alone.
  *
- * @param {number}   threadId Root note of the thread, used to find its block.
- * @param {number[]} noteIds  Notes whose edits the newest edit supersedes.
- * @param {Object}   registry Data registry, as `useRegistry()` returns it.
+ * @param {number}   threadId           Root note of the thread, used to find its block.
+ * @param {number[]} noteIds            Notes whose edits the newest edit supersedes.
+ * @param {Object}   registry           Data registry, as `useRegistry()` returns it.
+ * @param {Object}   [options]          Options.
+ * @param {boolean}  [options.keepRoot] Leave the root note's suggestion for the newest edit to replace, unless it is a move, which a text edit can't replace in one update.
  * @return {Promise<number[]>} IDs of the suggestions retired.
  */
-export async function supersedeSuggestions(threadId, noteIds, registry) {
+export async function supersedeSuggestions(
+	threadId,
+	noteIds,
+	registry,
+	{ keepRoot = false } = {}
+) {
 	// Checked up front: only a structural retire uses it, and that failure
 	// would be caught and logged below.
 	if (typeof registry?.batch !== 'function') {
@@ -899,8 +1114,13 @@ export async function supersedeSuggestions(threadId, noteIds, registry) {
 		return [];
 	}
 
+	const keptRoot =
+		keepRoot && !findStructuralMarker(threadId) ? Number(threadId) : null;
+	const holders = getSupersededHolders(threadId, noteIds).filter(
+		(id) => id !== keptRoot
+	);
 	const retired = [];
-	for (const noteId of noteIds) {
+	for (const noteId of holders) {
 		const target = getBlockContent(clientId);
 		const withoutMarkers = target
 			? removeSuggestionMarkers(target.content, noteId)

@@ -13,7 +13,10 @@ import { useDispatch, useRegistry, useSelect } from '@wordpress/data';
 import { store as noticesStore } from '@wordpress/notices';
 import { STORE_NAME } from '../store';
 import FeedbackItem from './FeedbackItem';
-import { selectSuggestionStatus } from '../hooks/useSuggestionStatus';
+import {
+	selectHeldSuggestionStatus,
+	selectSuggestionStatus,
+} from '../hooks/useSuggestionStatus';
 import { saveSuggestionStatuses } from '../utils/suggestions';
 import {
 	acceptAllFixes,
@@ -126,12 +129,16 @@ export default function ProofreadingGroup({
 	const stateKey = useSelect(
 		(select) =>
 			items
-				.map(
-					(item) =>
-						`${selectSuggestionStatus(select, item) ?? ''}:${
-							select(STORE_NAME).isFixApplied(item.id) ? 1 : 0
-						}`
-				)
+				.map((item) => {
+					const status = selectSuggestionStatus(select, item);
+					// A note holding an AI reply's edit: that edit replaced
+					// its own fix.
+					const isReplaced =
+						!status && !!selectHeldSuggestionStatus(select, item);
+					return `${status ?? ''}:${
+						select(STORE_NAME).isFixApplied(item.id) ? 1 : 0
+					}:${isReplaced ? 1 : 0}`;
+				})
 				.join(','),
 		[items]
 	);
@@ -140,12 +147,15 @@ export default function ProofreadingGroup({
 		const states = stateKey.split(',');
 		const found = {};
 		const open = items.filter((item, index) => {
-			const [status, applied] = states[index].split(':');
+			const [status, applied, replaced] = states[index].split(':');
 			found[item.id] = status || null;
-			return isOpenFix(item, {
-				isApplied: applied === '1',
-				suggestionStatus: status || null,
-			});
+			return (
+				replaced !== '1' &&
+				isOpenFix(item, {
+					isApplied: applied === '1',
+					suggestionStatus: status || null,
+				})
+			);
 		});
 		return { openItems: open, statuses: found };
 	}, [items, stateKey]);
