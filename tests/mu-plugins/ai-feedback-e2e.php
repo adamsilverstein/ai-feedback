@@ -268,7 +268,7 @@ add_filter(
 				$ids['paragraph'] = $block['clientId'] ?? '';
 			}
 		}
-		if ( 2 !== count( $ids ) ) {
+		if ( ! is_string( $ids['paragraph'] ?? null ) || ! is_string( $ids['quote'] ?? null ) ) {
 			return $response;
 		}
 
