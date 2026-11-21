@@ -44,6 +44,9 @@ class Review_Service {
 		'prompt_invalid_argument',
 		'prompt_token_limit_reached',
 		'prompt_prevented',
+		Model_Pin::ERROR_MODEL_UNAVAILABLE,
+		Model_Pin::ERROR_PROVIDER_UNAVAILABLE,
+		Model_Pin::ERROR_WRONG_PROVIDER,
 	);
 
 	/**
@@ -127,6 +130,13 @@ class Review_Service {
 	 * @var list<array{block_id: string, reason: string}>
 	 */
 	private array $skipped_images = array();
+
+	/**
+	 * Provider and model that answered the last AI call, when core said.
+	 *
+	 * @var array{provider: string, model: string}|null
+	 */
+	protected ?array $answered_by = null;
 
 	/**
 	 * Constructor.
@@ -285,6 +295,10 @@ class Review_Service {
 			'timestamp' => current_time( 'c', true ),
 			'persona'   => $options['persona'],
 		);
+		$answered_by = $is_mock ? array() : $this->answered_by_result();
+		if ( isset( $answered_by['answered_by'] ) ) {
+			$review_data['answered_by'] = $answered_by['answered_by'];
+		}
 
 		// Create WordPress Notes from feedback.
 		// For continuation reviews, append to existing threads where possible.
@@ -311,7 +325,7 @@ class Review_Service {
 				'block_mapping' => array(),
 				'note_count'    => count( $feedback_items ),
 				'notes_error'   => $note_result->get_error_message(),
-			) + $persona + $this->build_skipped_images_result();
+			) + $persona + $answered_by + $this->build_skipped_images_result();
 
 			$this->fire_review_completed( $post_id, $result );
 
@@ -340,7 +354,7 @@ class Review_Service {
 			'summary_text'  => $ai_summary,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
-		) + $persona + $this->build_skipped_images_result();
+		) + $persona + $answered_by + $this->build_skipped_images_result();
 
 		$this->fire_review_completed( $post_id, $result );
 
@@ -392,6 +406,15 @@ class Review_Service {
 	}
 
 	/**
+	 * The provider and model that answered, for the review result.
+	 *
+	 * @return array{answered_by?: array{provider: string, model: string}} Empty when core didn't say.
+	 */
+	private function answered_by_result(): array {
+		return null === $this->answered_by ? array() : array( 'answered_by' => $this->answered_by );
+	}
+
+	/**
 	 * Whether an error looks like the provider refusing the request's input,
 	 * such as images a model can't take, rather than an auth, billing, rate
 	 * or availability failure, which a request without images would hit too.
@@ -400,8 +423,7 @@ class Review_Service {
 	 * @return bool
 	 */
 	private static function is_refused_input( WP_Error $error ): bool {
-		// The plugin's own errors, eg. the selected model being unavailable,
-		// would fail the same way without images.
+		// The model wasn't found, so nothing was refused; a retry would fail the same way.
 		if ( str_starts_with( (string) $error->get_error_code(), 'ai_feedback_' ) ) {
 			return false;
 		}
@@ -429,14 +451,13 @@ class Review_Service {
 	 *
 	 * Images are only sent to a model that reads them: given an image, core
 	 * would otherwise switch to another model that does, or refuse the prompt.
-	 * The model's provider is only looked up when a block may be an image to
-	 * send, and the model is only asked about once there are images to send
-	 * or report as left out, since either can need a request to the
-	 * provider for its model list. A model that refused images recently
-	 * gets none. That
-	 * request uses the WordPress HTTP timeout (`http_request_timeout`, 5
-	 * seconds by default), as core's `wp_ai_client_default_request_timeout`
-	 * only applies to prompt requests.
+	 * The model's provider is only looked up when the site sends images and
+	 * a block may be one, and the model is only asked about once there are
+	 * images to send or report as left out, since either can need a request
+	 * to the provider for its model list. A model that refused images
+	 * recently gets none. That request uses the WordPress HTTP timeout
+	 * (`http_request_timeout`, 5 seconds by default), as core's
+	 * `wp_ai_client_default_request_timeout` only applies to prompt requests.
 	 *
 	 * @param  array<mixed> $blocks Blocks being reviewed.
 	 * @param  string       $model  Model ID.
@@ -567,6 +588,8 @@ class Review_Service {
 	 * @return string|WP_Error AI response or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model, array $images = array() ): string|WP_Error {
+		$this->answered_by = null;
+
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'ai_client_missing',
@@ -588,17 +611,29 @@ class Review_Service {
 		try {
 			// Lower temperature keeps feedback consistent. Max tokens covers large
 			// documents while staying within all supported models' limits.
-			$builder = wp_ai_client_prompt( $prompt );
+			// Pinned to the chosen provider and model: core never picks another.
+			$pinned = ( new Model_Pin() )->pin( wp_ai_client_prompt( $prompt ), $model );
+			if ( is_wp_error( $pinned ) ) {
+				return $pinned;
+			}
+			$builder = $pinned['builder'];
 			// Inline data built here from local files, never a URL or path.
 			foreach ( $images as $image ) {
 				$builder = $builder->with_file( 'data:' . $image['mime'] . ';base64,' . $image['data'], $image['mime'] );
 			}
-			return $builder
-				->using_system_instruction( $system_instruction )
-				->using_model_preference( $model )
-				->using_temperature( 0.3 )
-				->using_max_tokens( 8000 )
-				->generate_text();
+			$result = Model_Pin::read_result(
+				$builder
+					->using_system_instruction( $system_instruction )
+					->using_temperature( 0.3 )
+					->using_max_tokens( 8000 )
+					->generate_text_result(),
+				$pinned
+			);
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			$this->answered_by = $result['answered_by'];
+			return $result['text'];
 		} catch ( \Throwable $e ) {
 			// Core converts SDK exceptions to WP_Error; this catches anything
 			// else so the REST response is not a bare 500.

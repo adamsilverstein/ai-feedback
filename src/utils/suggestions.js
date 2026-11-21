@@ -35,6 +35,7 @@ import {
 	findNoteBlock,
 	getBlockActionState,
 	getMovePosition,
+	isCapturedMoveMarker,
 } from './block-action';
 
 const STORE_NAME = 'ai-feedback/store';
@@ -557,9 +558,9 @@ function getMoveOrigin(selectors, clientId) {
  * or moves it back. The marker carries the note's id, so the suggestion is
  * found again after a reload.
  *
- * Meant for Gutenberg's Edit intent. Its Suggest intent can only be read
- * through a private selector, so it is not checked; there, Gutenberg's own
- * capture may record the move a second time.
+ * In Gutenberg's Suggest intent, which only a private selector reports, a
+ * move is recorded by Gutenberg as the current user's suggestion. The note
+ * then goes back to being a plain note, so the move is suggested once.
  *
  * If the server did not store the payload as
  * sent, the note goes back to being a plain note and the edit stays with
@@ -630,12 +631,35 @@ export async function suggestBlockAction(note) {
 			clientId,
 			targetId
 		);
+		// A move here stays in its parent, so only these blocks can be tagged.
+		const siblings = current.getBlockOrder(fromRootClientId);
+		const markersBefore = siblings.map(
+			(id) => current.getBlockAttributes(id)?.metadata?.suggestion
+		);
 		editor.moveBlocksToPosition(
 			[clientId],
 			fromRootClientId,
 			toRootClientId,
 			index
 		);
+
+		// In Suggest intent Gutenberg tags the move as it lands, on this
+		// block or a neighbor, and saves its own suggestion for it.
+		// Compared by identity: a neighbor that already held a move gets
+		// the same fields written again.
+		const moved = dataSelect(blockEditorStore);
+		if (
+			siblings.some((id, i) => {
+				const tag = moved.getBlockAttributes(id)?.metadata?.suggestion;
+				return (
+					tag !== markersBefore[i] &&
+					isCapturedMoveMarker(tag, note.id)
+				);
+			})
+		) {
+			await removeSuggestion(note.id);
+			return false;
+		}
 	}
 
 	const metadata =
@@ -693,16 +717,24 @@ function getRestoreIndex(selectors, clientId, restoreParent, marker) {
  * Takes a structural suggestion out of the post, as Reject does: a removal
  * keeps its block, and a move goes back to where it came from.
  *
+ * The marker is cleared and the block moved in one store update. In Suggest
+ * intent Gutenberg records a move as the current user's suggestion unless
+ * the block's `pending-move` marker goes in the same update.
+ *
  * @param {string} clientId Client id of the marked block.
+ * @param {Object} registry Data registry, as `useRegistry()` returns it.
  */
-function rejectStructuralMarker(clientId) {
-	const selectors = dataSelect(blockEditorStore);
-	const editor = dataDispatch(blockEditorStore);
+function rejectStructuralMarker(clientId, registry) {
+	const selectors = registry.select(blockEditorStore);
+	const editor = registry.dispatch(blockEditorStore);
 	const { suggestion, ...metadata } =
 		selectors.getBlock(clientId)?.attributes?.metadata || {};
 
-	editor.updateBlockAttributes(clientId, { metadata });
-	if (suggestion?.type === 'pending-move') {
+	registry.batch(() => {
+		editor.updateBlockAttributes(clientId, { metadata });
+		if (suggestion?.type !== 'pending-move') {
+			return;
+		}
 		const liveParent = selectors.getBlockRootClientId(clientId) ?? '';
 		const recorded = suggestion.fromParentClientId ?? '';
 		// A recorded parent only exists in the session that made the move.
@@ -716,7 +748,7 @@ function rejectStructuralMarker(clientId) {
 			restoreParent,
 			getRestoreIndex(selectors, clientId, restoreParent, suggestion)
 		);
-	}
+	});
 }
 
 /**
@@ -850,9 +882,15 @@ const supersedingIds = new Set();
  *
  * @param {number}   threadId Root note of the thread, used to find its block.
  * @param {number[]} noteIds  Notes whose edits the newest edit supersedes.
+ * @param {Object}   registry Data registry, as `useRegistry()` returns it.
  * @return {Promise<number[]>} IDs of the suggestions retired.
  */
-export async function supersedeSuggestions(threadId, noteIds) {
+export async function supersedeSuggestions(threadId, noteIds, registry) {
+	// Checked up front: only a structural retire uses it, and that failure
+	// would be caught and logged below.
+	if (typeof registry?.batch !== 'function') {
+		throw new TypeError('supersedeSuggestions() needs a data registry.');
+	}
 	if (!isSuggestionModeAvailable() || !noteIds?.length) {
 		return [];
 	}
@@ -887,7 +925,7 @@ export async function supersedeSuggestions(threadId, noteIds) {
 				});
 			}
 			if (structural) {
-				rejectStructuralMarker(structural);
+				rejectStructuralMarker(structural, registry);
 			}
 			await saveNoteMeta(noteId, {
 				_wp_suggestion_status: 'rejected-unsaved',

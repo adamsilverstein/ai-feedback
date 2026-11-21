@@ -13,7 +13,7 @@
  * reopening a post never adds markers by itself.
  */
 import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
-import { useDispatch, useSelect } from '@wordpress/data';
+import { useDispatch, useRegistry, useSelect } from '@wordpress/data';
 import apiFetch from '@wordpress/api-fetch';
 import {
 	isSuggestionModeAvailable,
@@ -42,12 +42,14 @@ let queue = Promise.resolve();
  * @param {number}      threadId   Root note of the thread.
  * @param {number[]}    superseded Notes whose edits the newest edit replaces.
  * @param {Object|null} reply      AI reply whose edit to suggest, or null.
+ * @param {Object}      registry   Data registry.
  * @return {Promise<void>} Resolves once the thread is done.
  */
-function refineThread(threadId, superseded, reply) {
+function refineThread(threadId, superseded, reply, registry) {
 	queue = queue
 		.then(async () => {
-			await supersedeSuggestions(threadId, superseded);
+			// The registry of the editor that queued this, not a later one's.
+			await supersedeSuggestions(threadId, superseded, registry);
 			if (reply) {
 				await suggestReplyEdit(reply, threadId);
 			}
@@ -67,11 +69,12 @@ function refineThread(threadId, superseded, reply) {
  * never be accepted, but edits already there on the first load are never
  * suggested.
  *
- * @param {Object<string, ReplyThread>} threads Latest threads.
- * @param {Set<number>|null}            known   Reply IDs seen so far, or null before the first load.
+ * @param {Object<string, ReplyThread>} threads  Latest threads.
+ * @param {Set<number>|null}            known    Reply IDs seen so far, or null before the first load.
+ * @param {Object}                      registry Data registry, as `useRegistry()` returns it.
  * @return {Set<number>} Reply IDs seen, including these threads.
  */
-export function suggestNewReplyEdits(threads, known) {
+export function suggestNewReplyEdits(threads, known, registry) {
 	const seen = new Set(known || []);
 	for (const [key, thread] of Object.entries(threads || {})) {
 		const threadId = Number(key);
@@ -97,7 +100,8 @@ export function suggestNewReplyEdits(threads, known) {
 		refineThread(
 			threadId,
 			[threadId, ...edits.slice(0, -1).map(({ ownerId }) => ownerId)],
-			reply
+			reply,
+			registry
 		);
 	}
 	return seen;
@@ -135,6 +139,7 @@ export default function useReplyThreads(postId) {
 	const [version, setVersion] = useState(0);
 	const knownRepliesRef = useRef(null);
 	const { invalidateResolution } = useDispatch('core');
+	const registry = useRegistry();
 
 	// IDs of the note replies and mentions the editor knows about. This
 	// changes when the user replies or asks Fresh Eyes in the Notes UI, which
@@ -170,7 +175,8 @@ export default function useReplyThreads(postId) {
 					const latest = response?.threads || {};
 					knownRepliesRef.current = suggestNewReplyEdits(
 						latest,
-						knownRepliesRef.current
+						knownRepliesRef.current,
+						registry
 					);
 					setThreads(latest);
 				}
@@ -182,7 +188,7 @@ export default function useReplyThreads(postId) {
 		return () => {
 			cancelled = true;
 		};
-	}, [postId, replySignature, version]);
+	}, [postId, replySignature, version, registry]);
 
 	const onReplyComplete = useCallback(() => {
 		setVersion((current) => current + 1);

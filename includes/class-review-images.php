@@ -22,6 +22,12 @@ namespace AI_Feedback;
 class Review_Images {
 
 	/**
+	 * Site option for whether a review may send the post's images to the AI
+	 * provider: '1' or '0', on when it was never saved.
+	 */
+	public const OPTION = 'ai_feedback_send_images';
+
+	/**
 	 * Most images sent with one review request.
 	 */
 	public const MAX_IMAGES = 4;
@@ -100,16 +106,7 @@ class Review_Images {
 	 * @return list<array{block_id: string, mime: string, data: string}> Images, in block order, with base64 data.
 	 */
 	public function collect( array $blocks, string $provider = '' ): array {
-		/**
-		 * Filters how many images a review may send to a vision model.
-		 *
-		 * Return 0 to never send images; the AI then only flags missing alt text.
-		 * Raising it raises memory use and request size: each image is held
-		 * in memory, base64 encoded, up to MAX_TOTAL_BYTES in all.
-		 *
-		 * @param int $max Maximum images per review request.
-		 */
-		$max           = max( 0, (int) apply_filters( 'ai_feedback_max_review_images', self::MAX_IMAGES ) );
+		$max           = self::get_max();
 		$images        = array();
 		$total         = 0;
 		$this->skipped = array();
@@ -167,6 +164,28 @@ class Review_Images {
 		}
 
 		return $images;
+	}
+
+	/**
+	 * How many images a review may send: 0 when the site's image setting
+	 * is off, unless a filter says otherwise.
+	 *
+	 * @return int
+	 */
+	public static function get_max(): int {
+		/**
+		 * Filters how many images a review may send to a vision model.
+		 *
+		 * Return 0 to never send images; the AI then only flags missing alt text.
+		 * Raising it raises memory use and request size: each image is held
+		 * in memory, base64 encoded, up to MAX_TOTAL_BYTES in all.
+		 *
+		 * The filter wins over the site's image setting: with the setting
+		 * off it is passed 0, and returning more sends images anyway.
+		 *
+		 * @param int $max Maximum images per review request. 0 when the site's image setting is off.
+		 */
+		return max( 0, (int) apply_filters( 'ai_feedback_max_review_images', self::is_enabled() ? self::MAX_IMAGES : 0 ) );
 	}
 
 	/**
@@ -409,6 +428,16 @@ class Review_Images {
 		}
 		$port = $parts['port'] ?? ( 'https' === $scheme ? 443 : 80 );
 		return $scheme . '://' . $host . ':' . $port;
+	}
+
+	/**
+	 * Whether the site lets reviews send the post's images to the AI
+	 * provider. On unless an administrator turned it off.
+	 *
+	 * @return bool
+	 */
+	public static function is_enabled(): bool {
+		return (bool) get_option( self::OPTION, '1' );
 	}
 
 	/**

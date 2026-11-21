@@ -57,6 +57,34 @@ class NotesManagerMetaTest extends TestCase {
 	}
 
 	/**
+	 * The provider and model that answered are stored as `provider/model`,
+	 * and left out when not known.
+	 */
+	public function test_stores_the_model_that_answered(): void {
+		$method = new ReflectionMethod( Notes_Manager::class, 'build_note_meta' );
+		$item   = array(
+			'block_id' => 'block-1',
+			'feedback' => 'Shorter.',
+		);
+
+		$meta = $method->invoke(
+			new Notes_Manager(),
+			$item,
+			array(
+				'model'       => 'claude-opus-4',
+				'answered_by' => array(
+					'provider' => 'anthropic',
+					'model'    => 'claude-opus-4-20250514',
+				),
+			)
+		);
+		$this->assertSame( 'claude-opus-4', $meta['ai_model'] );
+		$this->assertSame( 'anthropic/claude-opus-4-20250514', $meta['ai_answered_by'] );
+
+		$this->assertArrayNotHasKey( 'ai_answered_by', $this->build_note_meta( $item ) );
+	}
+
+	/**
 	 * Empty fields are not stored.
 	 */
 	public function test_skips_missing_feedback_fields(): void {
