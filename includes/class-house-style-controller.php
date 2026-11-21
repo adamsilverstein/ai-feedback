@@ -14,11 +14,13 @@ use WP_REST_Response;
 use WP_Error;
 
 /**
- * Lists, adds, edits and removes house style rules, and records what the
- * author did with a rule an AI reply proposed.
+ * Lists, adds, edits and removes house style rules, records what the
+ * author did with a rule an AI reply proposed, and suggests rules from
+ * published posts.
  *
  * Anyone who can edit posts can read the site rules, which shape their
- * reviews, and manage their own. Changing site rules needs `manage_options`.
+ * reviews, and manage their own. Changing site rules needs `manage_options`,
+ * and so does asking for suggested site rules.
  */
 class House_Style_Controller extends WP_REST_Controller {
 
@@ -40,6 +42,23 @@ class House_Style_Controller extends WP_REST_Controller {
 	 * @var string
 	 */
 	protected $rest_base = 'house-style';
+
+	/**
+	 * Review service, for the AI call and hourly limit suggestions share
+	 * with reviews.
+	 *
+	 * @var Review_Service|null
+	 */
+	private ?Review_Service $review_service;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param Review_Service|null $review_service Review service. Created when needed by default.
+	 */
+	public function __construct( ?Review_Service $review_service = null ) {
+		$this->review_service = $review_service;
+	}
 
 	/**
 	 * Register routes.
@@ -102,6 +121,27 @@ class House_Style_Controller extends WP_REST_Controller {
 					'permission_callback' => array( $this, 'edit_rules_permissions_check' ),
 					'args'                => array(
 						'scope' => $scope,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::ROUTE_NAMESPACE,
+			'/' . $this->rest_base . '/suggestions/posts',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'suggest_rules' ),
+					'permission_callback' => array( $this, 'edit_rules_permissions_check' ),
+					'args'                => array(
+						'scope' => $scope,
+						'model' => array(
+							'description'       => __( 'AI model to ask, as for a review.', 'fresh-eyes' ),
+							'type'              => 'string',
+							'default'           => AI_FEEDBACK_DEFAULT_MODEL,
+							'sanitize_callback' => 'sanitize_text_field',
+						),
 					),
 				),
 			)
@@ -269,6 +309,71 @@ class House_Style_Controller extends WP_REST_Controller {
 			),
 			200
 		);
+	}
+
+	/**
+	 * POST /house-style/suggestions/posts
+	 *
+	 * Proposes rules from recent published posts without saving any. Uses
+	 * one request of the hourly limit, like a review, given back when the
+	 * AI service is unavailable.
+	 *
+	 * @param  WP_REST_Request $request Request.
+	 * @phpstan-param WP_REST_Request<array<string, mixed>> $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function suggest_rules( WP_REST_Request $request ): WP_REST_Response|WP_Error {
+		$scope   = self::scope( $request );
+		$user_id = get_current_user_id();
+		$service = $this->get_review_service();
+
+		// Before the limit, so a site with nothing to read doesn't use a request.
+		$posts = House_Style_Suggestions::get_sample_posts( $scope, $user_id );
+		if ( array() === $posts ) {
+			return new WP_Error(
+				'house_style_no_posts',
+				House_Style::SCOPE_SITE === $scope
+					? __( 'This site has no published posts to suggest rules from yet.', 'fresh-eyes' )
+					: __( 'You have no published posts to suggest rules from yet.', 'fresh-eyes' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$allowed = $service->check_rate_limit( $user_id );
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
+		$model = self::string_param( $request, 'model' );
+		$rules = $service->suggest_house_rules( $posts, '' !== $model ? $model : AI_FEEDBACK_DEFAULT_MODEL );
+		if ( is_wp_error( $rules ) ) {
+			// An outage is not the user's fault, so a retry should not cost them.
+			if ( 'ai_service_unavailable' === $rules->get_error_code() ) {
+				$service->refund_rate_limit( $user_id );
+			}
+			return $rules;
+		}
+
+		return new WP_REST_Response(
+			array(
+				'suggestions' => $rules,
+				'scope'       => $scope,
+				'post_count'  => count( $posts ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Get the review service.
+	 *
+	 * @return Review_Service
+	 */
+	private function get_review_service(): Review_Service {
+		if ( null === $this->review_service ) {
+			$this->review_service = new Review_Service();
+		}
+		return $this->review_service;
 	}
 
 	/**

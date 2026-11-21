@@ -4,7 +4,9 @@
  * Runs with the mock AI provider from tests/mu-plugins/ai-feedback-e2e.php:
  * a reply that mentions sentence case offers to remember a long rule that
  * starts "Headings use sentence case", and a review whose prompt carries
- * that rule adds a "Follow the house style" note.
+ * that rule adds a "Follow the house style" note. Rule suggestions use the
+ * plugin's built-in mock, which proposes "Headings use sentence case" and
+ * "Use the Oxford comma" whatever the posts say.
  */
 const { test, expect } = require('../fixtures');
 
@@ -265,5 +267,72 @@ test.describe('House style', () => {
 		expect(
 			(await requestUtils.rest({ path: HOUSE_STYLE })).site
 		).toHaveLength(0);
+	});
+
+	test('rules suggested from published posts are saved one at a time', async ({
+		page,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'How we ship',
+			content:
+				'<!-- wp:paragraph --><p>We ship every week, on Tuesdays.</p><!-- /wp:paragraph -->',
+			status: 'publish',
+		});
+		await admin.editPost(post.id);
+		await aiFeedback.openSidebar();
+		await aiFeedback.expandReviewSettings();
+
+		const settings = page.locator('.ai-feedback-house-style');
+		const suggested = page.waitForResponse((response) =>
+			response.url().includes('suggestions')
+		);
+		await settings
+			.getByRole('button', { name: 'Suggest rules from published posts' })
+			.click();
+		expect((await suggested).status()).toBe(200);
+
+		const first = settings.getByLabel('Suggested rule 1');
+		await expect(first).toHaveValue('Headings use sentence case');
+		await expect(settings.getByLabel('Suggested rule 2')).toHaveValue(
+			'Use the Oxford comma'
+		);
+
+		// Nothing is saved until the author picks a rule.
+		let rules = await requestUtils.rest({ path: HOUSE_STYLE });
+		expect([...rules.site, ...rules.user]).toHaveLength(0);
+
+		// Skip the second, then edit and keep the first.
+		await settings.getByRole('button', { name: 'Not now' }).nth(1).click();
+		await expect(settings.getByLabel('Suggested rule 2')).toHaveCount(0);
+
+		await first.fill('Headings use sentence case, always');
+		const saved = page.waitForResponse(
+			(response) =>
+				response.url().includes('house-style') &&
+				!response.url().includes('suggestions') &&
+				response.request().method() === 'POST'
+		);
+		await settings.getByRole('button', { name: 'Remember' }).click();
+		expect((await saved).status()).toBe(201);
+		await expect(
+			settings.getByRole('button', {
+				name: 'Remove rule: Headings use sentence case, always',
+			})
+		).toBeVisible();
+
+		rules = await requestUtils.rest({ path: HOUSE_STYLE });
+		expect(rules.site).toHaveLength(0);
+		expect(rules.user.map((rule) => rule.text)).toEqual([
+			'Headings use sentence case, always',
+		]);
+
+		await requestUtils.rest({
+			method: 'DELETE',
+			path: `/wp/v2/posts/${post.id}`,
+			params: { force: true },
+		});
 	});
 });

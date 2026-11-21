@@ -13,6 +13,7 @@ import {
 	resetHouseStyle,
 	ruleKey,
 	subscribeHouseStyle,
+	suggestRules,
 	updateRule,
 } from '../house-style';
 
@@ -134,5 +135,32 @@ describe('changes', () => {
 		await addRule({ text: 'Rule' });
 
 		expect(listener).not.toHaveBeenCalled();
+	});
+});
+
+describe('suggestRules', () => {
+	it('asks for suggestions without changing the shared rules', async () => {
+		const listener = vi.fn();
+		subscribeHouseStyle(listener);
+		apiFetch.mockResolvedValue({ suggestions: ['Write WordPress'] });
+
+		await expect(
+			suggestRules({ scope: 'site', model: 'some-model' })
+		).resolves.toEqual({ suggestions: ['Write WordPress'] });
+
+		expect(apiFetch).toHaveBeenCalledWith({
+			path: '/ai-feedback/v1/house-style/suggestions/posts',
+			method: 'POST',
+			data: { scope: 'site', model: 'some-model' },
+		});
+		expect(listener).not.toHaveBeenCalled();
+	});
+
+	it('defaults to the user’s own posts and the default model', async () => {
+		apiFetch.mockResolvedValue({ suggestions: [] });
+
+		await suggestRules();
+
+		expect(apiFetch.mock.lastCall[0].data).toEqual({ scope: 'user' });
 	});
 });

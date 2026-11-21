@@ -362,6 +362,81 @@ class Review_Service {
 	}
 
 	/**
+	 * Suggest house style rules from published posts.
+	 *
+	 * One AI request, made the way a review's is. Nothing is saved: the
+	 * rules come back for the user to save or skip.
+	 *
+	 * @param  array<mixed> $posts Posts, each with a `title` and plain `text`, from House_Style_Suggestions.
+	 * @param  string       $model Model ID.
+	 * @return list<string>|WP_Error Proposed rules the user doesn't already have, or an error.
+	 */
+	public function suggest_house_rules( array $posts, string $model ): array|WP_Error {
+		if ( array() === $posts ) {
+			return new WP_Error(
+				'house_style_no_posts',
+				__( 'There are no published posts to suggest rules from yet.', 'fresh-eyes' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$existing           = House_Style::get_prompt_rules( get_current_user_id() );
+		$prompt             = $this->prompt_builder->build_rule_suggestion_prompt( $posts, $existing );
+		$system_instruction = $this->prompt_builder->get_rule_suggestion_system_instruction();
+
+		if ( self::is_mock_mode() ) {
+			Logger::debug( 'Using mock rule suggestions' );
+			$ai_response = $this->get_mock_rule_suggestions( $posts, $prompt );
+		} else {
+			Logger::debug( sprintf( 'Calling AI model for rule suggestions: %s', $model ) );
+			$ai_response = $this->call_ai_with_retry( $prompt, $system_instruction, $model );
+
+			if ( is_wp_error( $ai_response ) ) {
+				Logger::debug( sprintf( 'Rule suggestion request failed: %s', $ai_response->get_error_message() ) );
+				return $this->is_service_unavailable_error( $ai_response )
+					? $this->service_unavailable_error( $ai_response )
+					: $ai_response;
+			}
+		}
+
+		$rules = $this->response_parser->parse_rule_suggestions( $ai_response, $existing );
+		if ( null === $rules ) {
+			Logger::debug( 'Rule suggestions could not be read from the AI response' );
+			return new WP_Error(
+				'invalid_rule_suggestions',
+				__( 'The AI response could not be read. Please try again.', 'fresh-eyes' ),
+				array( 'status' => 502 )
+			);
+		}
+
+		return $rules;
+	}
+
+	/**
+	 * Get mock rule suggestions for testing.
+	 *
+	 * @param  array<mixed> $posts  Posts the rules are suggested from.
+	 * @param  string       $prompt Prompt, for filters that answer from it.
+	 * @return string Mock JSON response.
+	 */
+	private function get_mock_rule_suggestions( array $posts, string $prompt ): string {
+		$response = array(
+			'rules' => array( 'Headings use sentence case', 'Use the Oxford comma' ),
+		);
+
+		/**
+		 * Filters the mock rule suggestions used when AI_FEEDBACK_MOCK_MODE is on.
+		 *
+		 * @param array<string, mixed> $response Mock response, with `rules`.
+		 * @param array<mixed>         $posts    Posts the rules are suggested from.
+		 * @param string               $prompt   Prompt.
+		 */
+		$response = apply_filters( 'ai_feedback_mock_rule_suggestions', $response, $posts, $prompt );
+
+		return (string) wp_json_encode( $response );
+	}
+
+	/**
 	 * Build the persona fields of a review result.
 	 *
 	 * @param  string $persona  Persona ID the review ran as.

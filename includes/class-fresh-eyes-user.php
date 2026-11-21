@@ -482,8 +482,10 @@ class Fresh_Eyes_User {
 	 * nothing, so nothing is reassigned.
 	 */
 	public static function uninstall(): void {
-		$id = self::get_id();
-		delete_network_option( null, self::OPTION );
+		$ids = array();
+		foreach ( self::network_ids() as $network_id ) {
+			$ids[] = self::forget_network( $network_id );
+		}
 		delete_option( self::CHECKED_OPTION );
 		delete_option( self::LOCK_OPTION );
 		delete_transient( self::RETRY_TRANSIENT );
@@ -500,7 +502,50 @@ class Fresh_Eyes_User {
 		}
 		self::$id = null;
 
-		self::delete_account( $id );
+		foreach ( array_unique( $ids ) as $id ) {
+			self::delete_account( $id );
+		}
+	}
+
+	/**
+	 * Delete a network's stored account ID.
+	 *
+	 * @param  int|null $network_id Network ID, or null for the current network.
+	 * @return int The ID that was stored, or 0.
+	 */
+	private static function forget_network( ?int $network_id ): int {
+		if ( null === $network_id ) {
+			$id = self::get_id();
+		} else {
+			$value = get_network_option( $network_id, self::OPTION, 0 );
+			$id    = is_numeric( $value ) ? max( 0, (int) $value ) : 0;
+		}
+		delete_network_option( $network_id, self::OPTION );
+		return $id;
+	}
+
+	/**
+	 * Every network's ID, since each network stores its own account.
+	 *
+	 * @return list<int|null> Network IDs, or null for the only network.
+	 */
+	private static function network_ids(): array {
+		if ( ! is_multisite() || ! function_exists( 'get_networks' ) ) {
+			return array( null );
+		}
+		$networks = get_networks(
+			array(
+				'fields' => 'ids',
+				'number' => 0,
+			)
+		);
+		$ids      = array();
+		foreach ( is_array( $networks ) ? $networks : array() as $network_id ) {
+			if ( is_numeric( $network_id ) ) {
+				$ids[] = (int) $network_id;
+			}
+		}
+		return array() === $ids ? array( null ) : $ids;
 	}
 
 	/**

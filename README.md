@@ -205,11 +205,30 @@ When you tell the AI how you always write, for example "we use sentence case for
 
 Manage rules under **House style** in Review Settings. Rules marked **Just me** apply to your own reviews; administrators can also add rules for **Everyone on this site**.
 
+To start from how you already write, click **Suggest rules from published posts**. Fresh Eyes reads your 5 most recent published posts (the whole site's, for an administrator choosing **Everyone on this site**) and proposes up to 5 rules. Each one can be edited, kept with **Remember** or skipped with **Not now**; nothing is saved until you keep it. Only published posts you can read are sent, never drafts, private or password protected posts, and the request counts as one review against the hourly limit.
+
 ### Usage Analytics
 
 **Settings → AI Feedback Analytics** shows how many reviews were run, by which model and user, and how the feedback breaks down by severity and category.
 
 ![The AI Feedback Analytics screen](docs/images/analytics.png)
+
+### Uninstalling
+
+Deactivating the plugin keeps everything. Deleting it removes its settings and personal data and keeps your notes:
+
+| Removed | Kept |
+|---------|------|
+| Review settings, site and per-user | Notes (comments of type `note`) |
+| House style rules, site and personal, on every site | The notes' meta: feedback details, suggested edits, personas, mentions, house style proposals, reply status |
+| Review history (`_ai_feedback_history` and `_ai_feedback_open_notes` post meta) | |
+| Usage analytics and rate limit records | |
+| The plugin's editor preferences (tips, welcome guide) | |
+| Cached model lists, remembered image refusals, chunked review sessions and locks | |
+| Scheduled AI replies | |
+| The hidden Fresh Eyes user, unless it somehow owns posts | |
+
+On multisite every site of the network is cleaned, a batch of sites at a time, including sites where the plugin was never activated (the plugin's files are shared, so deleting it removes it everywhere), then the network-wide data once. The full list of keys lives in `includes/class-uninstaller.php`, and a test fails when the plugin stores a key that isn't on it.
 
 ## Development
 
