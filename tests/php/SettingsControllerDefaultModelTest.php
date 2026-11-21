@@ -20,7 +20,7 @@ class SettingsControllerDefaultModelTest extends TestCase {
 	/**
 	 * Transient key holding the cached model list.
 	 */
-	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v4';
+	private const MODELS_CACHE_KEY = 'ai_feedback_available_models_v5';
 
 	/**
 	 * Reset stored options and the model cache between tests.
