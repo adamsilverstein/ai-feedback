@@ -120,6 +120,22 @@ class Response_Parser {
 	public const MAX_TARGET_TEXT_LENGTH = 80;
 
 	/**
+	 * Most strengths a review returns.
+	 */
+	public const MAX_STRENGTHS = 3;
+
+	/**
+	 * Maximum length of a strength, in characters.
+	 */
+	public const MAX_STRENGTH_LENGTH = 160;
+
+	/**
+	 * Length the prompt asks strengths to stay under, leaving the model some
+	 * room before MAX_STRENGTH_LENGTH cuts them.
+	 */
+	public const STRENGTH_PROMPT_LENGTH = 150;
+
+	/**
 	 * Maximum character lengths for feedback fields.
 	 */
 	public const FIELD_MAX_LENGTHS = array(
@@ -350,10 +366,97 @@ class Response_Parser {
 		$grouped = $this->sort_by_priority( $grouped );
 
 		return array(
-			'summary'          => $this->sanitize_summary( $summary ),
+			'summary'          => $this->sanitize_summary( is_string( $summary ) ? $summary : '' ),
 			'feedback'         => $grouped,
 			'persona_takeaway' => Personas::sanitize_takeaway( $data['persona_takeaway'] ?? '' ),
+			'strengths'        => $this->parse_strengths( $data['strengths'] ?? null, $block_info ),
 		);
+	}
+
+	/**
+	 * Most strengths a review may return, from 0 (none) to MAX_STRENGTHS.
+	 *
+	 * @return int
+	 */
+	public static function get_max_strengths(): int {
+		/**
+		 * Filters how many strengths a review asks for and keeps.
+		 *
+		 * Return 0 to leave strengths out of reviews.
+		 *
+		 * @param int $max Most strengths, at most Response_Parser::MAX_STRENGTHS.
+		 */
+		$max = (int) apply_filters( 'ai_feedback_max_strengths', self::MAX_STRENGTHS );
+
+		return max( 0, min( self::MAX_STRENGTHS, $max ) );
+	}
+
+	/**
+	 * Validate the strengths the AI returned.
+	 *
+	 * Each strength must name a block in this review and carry one short line
+	 * of plain text. Invalid ones are dropped rather than failing the review,
+	 * one strength is kept per block, and the list is capped.
+	 *
+	 * @param  mixed        $strengths  Raw `strengths` value from the AI response.
+	 * @param  array<mixed> $block_info Map of block IDs to their info, from parse_feedback().
+	 * @return list<array{block_id: string, block_name: string, block_index: int|null, block_anchor: string, text: string}>
+	 */
+	public function parse_strengths( mixed $strengths, array $block_info ): array {
+		$max = self::get_max_strengths();
+		if ( ! is_array( $strengths ) || 0 === $max ) {
+			return array();
+		}
+
+		$parsed = array();
+		foreach ( $strengths as $strength ) {
+			if ( ! is_array( $strength ) ) {
+				continue;
+			}
+			$block_id = is_string( $strength['block_id'] ?? null ) ? $strength['block_id'] : '';
+			$info     = $block_info[ $block_id ] ?? null;
+			if ( ! is_array( $info ) || isset( $parsed[ $block_id ] ) ) {
+				continue;
+			}
+
+			$text = self::sanitize_strength_text( $strength['text'] ?? null );
+			if ( '' === $text ) {
+				continue;
+			}
+
+			$parsed[ $block_id ] = array(
+				'block_id'     => $block_id,
+				'block_name'   => is_string( $info['name'] ?? null ) ? $info['name'] : '',
+				'block_index'  => is_int( $info['index'] ?? null ) ? $info['index'] : null,
+				'block_anchor' => is_string( $info['anchor'] ?? null ) ? $info['anchor'] : '',
+				'text'         => $text,
+			);
+
+			if ( count( $parsed ) >= $max ) {
+				break;
+			}
+		}
+
+		return array_values( $parsed );
+	}
+
+	/**
+	 * Sanitize a strength as one line of plain text and cap its length.
+	 *
+	 * @param  mixed $text Raw text.
+	 * @return string Text, or an empty string when there is none.
+	 */
+	public static function sanitize_strength_text( mixed $text ): string {
+		if ( ! is_string( $text ) ) {
+			return '';
+		}
+
+		$text = trim( sanitize_text_field( $text ) );
+		if ( mb_strlen( $text, 'UTF-8' ) > self::MAX_STRENGTH_LENGTH ) {
+			$text = rtrim( mb_substr( $text, 0, self::MAX_STRENGTH_LENGTH - 1, 'UTF-8' ) ) . '…';
+		}
+
+		return $text;
 	}
 
 	/**

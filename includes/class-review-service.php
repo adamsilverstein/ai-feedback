@@ -255,6 +255,7 @@ class Review_Service {
 
 		$ai_summary     = $parsed_response['summary'] ?? '';
 		$feedback_items = $parsed_response['feedback'] ?? array();
+		$strengths      = is_array( $parsed_response ) ? $parsed_response['strengths'] ?? array() : array();
 		$persona        = $this->build_persona_result( $options['persona'], is_array( $parsed_response ) ? ( $parsed_response['persona_takeaway'] ?? '' ) : '' );
 
 		if ( empty( $feedback_items ) ) {
@@ -302,6 +303,7 @@ class Review_Service {
 				'notes'         => $feedback_items,
 				'summary'       => $stats_summary,
 				'summary_text'  => $ai_summary,
+				'strengths'     => $strengths,
 				'timestamp'     => $review_data['timestamp'],
 				'note_ids'      => array(),
 				'block_mapping' => array(),
@@ -311,7 +313,7 @@ class Review_Service {
 
 			$this->fire_review_completed( $post_id, $result );
 
-			return $result;
+			return $this->with_progress( $post_id, $result );
 		}
 
 		// Extract note_ids and block_mapping from result.
@@ -334,11 +336,27 @@ class Review_Service {
 			'block_mapping' => $block_mapping,
 			'summary'       => $stats_summary,
 			'summary_text'  => $ai_summary,
+			'strengths'     => $strengths,
 			'note_count'    => count( $note_ids ),
 			'timestamp'     => $review_data['timestamp'],
 		) + $persona + $answered_by;
 
 		$this->fire_review_completed( $post_id, $result );
+
+		return $this->with_progress( $post_id, $result );
+	}
+
+	/**
+	 * Add how the previous review's open notes stand, from the history entry
+	 * the completed review was just recorded in.
+	 *
+	 * @param  int                  $post_id Post ID.
+	 * @param  array<string, mixed> $result  Review result.
+	 * @return array<string, mixed> Result with `progress`, null for a post's first review.
+	 */
+	private function with_progress( int $post_id, array $result ): array {
+		$review_id          = is_string( $result['review_id'] ?? null ) ? $result['review_id'] : '';
+		$result['progress'] = Review_History::get_review_extras( $post_id, $review_id )['progress'];
 
 		return $result;
 	}
@@ -953,6 +971,12 @@ class Review_Service {
 					$block_name,
 					$block_index
 				);
+
+				// New feedback in a resolved thread would stay hidden and count
+				// as addressed, so it starts a thread of its own.
+				if ( null !== $existing_note_id && $this->notes_manager->is_thread_resolved( $existing_note_id ) ) {
+					$existing_note_id = null;
+				}
 			}
 
 			if ( null !== $existing_note_id ) {
@@ -985,7 +1009,12 @@ class Review_Service {
 				// Map block to the existing parent note.
 				$block_mapping[ $block_id ] = $existing_note_id;
 			} else {
-				// Create new thread for this block.
+				// Create new thread for this block. Only its root note keeps a
+				// structural edit or formatting fix, so that item goes first.
+				usort(
+					$items,
+					static fn ( mixed $a, mixed $b ): int => (int) Notes_Manager::has_block_edit( $b ) <=> (int) Notes_Manager::has_block_edit( $a )
+				);
 				$parent_id = 0;
 				foreach ( $items as $index => $item ) {
 					$note_id = $this->notes_manager->add_reply_to_thread(

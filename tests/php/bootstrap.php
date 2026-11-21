@@ -749,6 +749,7 @@ if ( ! function_exists( 'rest_authorization_required_code' ) ) {
 	}
 }
 
+require_once $includes_dir . 'class-review-progress.php';
 require_once $includes_dir . 'class-review-history.php';
 require_once $includes_dir . 'class-history-controller.php';
 

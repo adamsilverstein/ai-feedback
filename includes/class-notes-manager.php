@@ -139,7 +139,7 @@ class Notes_Manager {
 	 * @param  mixed $item Feedback item.
 	 * @return bool
 	 */
-	private static function has_block_edit( mixed $item ): bool {
+	public static function has_block_edit( mixed $item ): bool {
 		return is_array( $item ) && (
 			( ! empty( $item['block_action'] ) && is_array( $item['block_action'] ) )
 			|| ( ! empty( $item['block_change'] ) && is_array( $item['block_change'] ) )
@@ -1359,6 +1359,12 @@ class Notes_Manager {
 	 * @return array|null Review data or null if no reviews exist.
 	 */
 	public function get_latest_review_for_post( int $post_id ): ?array {
+		// A review that flagged nothing has no notes to rebuild it from.
+		$without_notes = $this->get_latest_review_without_notes( $post_id );
+		if ( null !== $without_notes ) {
+			return $without_notes;
+		}
+
 		// Get all AI feedback notes for this post.
 		$notes = $this->get_notes_with_replies( $post_id, false );
 
@@ -1396,14 +1402,29 @@ class Notes_Manager {
 			return null;
 		}
 
-		$review_notes = $review_ids[ $latest_review_id ]['notes'];
+		// A follow-up review adds its feedback to existing threads as replies,
+		// so the review history, not the top-level notes, says which review
+		// ran last. Every note of that review is listed, replies included,
+		// as in the response to the review itself.
+		$latest_review_id = $this->get_latest_recorded_review( $post_id ) ?? ( is_string( $latest_review_id ) ? $latest_review_id : '' );
+		$review_notes     = $this->get_review_notes_on_post( $post_id, $latest_review_id );
+		$latest_date      = null;
+		foreach ( $review_notes as $note ) {
+			if ( null === $latest_date || $note['date'] > $latest_date ) {
+				$latest_date = $note['date'];
+			}
+		}
+		if ( null === $latest_date ) {
+			return null;
+		}
 
-		// Build block mapping from notes.
+		// Build block mapping from notes. Feedback added to an earlier
+		// thread maps the block to that thread.
 		$block_mapping = array();
 		foreach ( $review_notes as $note ) {
-			$block_id = $note['block_id'] ?? '';
-			if ( ! empty( $block_id ) && 0 === $note['parent'] ) {
-				$block_mapping[ $block_id ] = $note['id'];
+			$block_id = is_string( $note['block_id'] ?? null ) ? $note['block_id'] : '';
+			if ( '' !== $block_id && ( 0 === $note['parent'] || ! isset( $block_mapping[ $block_id ] ) ) ) {
+				$block_mapping[ $block_id ] = 0 === $note['parent'] ? $note['id'] : $note['parent'];
 			}
 		}
 
@@ -1434,6 +1455,74 @@ class Notes_Manager {
 	}
 
 	/**
+	 * The post's newest review, when it flagged nothing and so left no notes.
+	 *
+	 * A review whose notes were created and later deleted is not one of
+	 * these: its history entry still counts them.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return array<string, mixed>|null Review data, or null when the newest review has notes or there is none.
+	 */
+	private function get_latest_review_without_notes( int $post_id ): ?array {
+		$history = Review_History::get( $post_id );
+		$entry   = end( $history );
+		if ( ! is_array( $entry ) || ! empty( $entry['note_count'] ) ) {
+			return null;
+		}
+
+		$review_id = is_string( $entry['review_id'] ?? null ) ? $entry['review_id'] : '';
+		if ( '' === $review_id || array() !== $this->get_review_notes_on_post( $post_id, $review_id ) ) {
+			return null;
+		}
+
+		return array(
+			'review_id'     => $review_id,
+			'post_id'       => $post_id,
+			'model'         => is_string( $entry['model'] ?? null ) ? $entry['model'] : '',
+			'notes'         => array(),
+			'note_ids'      => array(),
+			'block_mapping' => array(),
+			'summary'       => $this->calculate_summary( array() ),
+			'note_count'    => 0,
+			'timestamp'     => is_string( $entry['timestamp'] ?? null ) ? $entry['timestamp'] : '',
+			'is_persisted'  => true,
+		);
+	}
+
+	/**
+	 * The newest review in the post's history that still has notes.
+	 *
+	 * @param  int $post_id Post ID.
+	 * @return string|null Review ID, or null when no recorded review has notes left.
+	 */
+	private function get_latest_recorded_review( int $post_id ): ?string {
+		foreach ( array_reverse( Review_History::get( $post_id ) ) as $entry ) {
+			$review_id = is_string( $entry['review_id'] ?? null ) ? $entry['review_id'] : '';
+			if ( '' !== $review_id && array() !== $this->get_review_notes_on_post( $post_id, $review_id ) ) {
+				return $review_id;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * A review's notes on one post.
+	 *
+	 * @param  int    $post_id   Post ID.
+	 * @param  string $review_id Review ID.
+	 * @return list<array<mixed>>
+	 */
+	private function get_review_notes_on_post( int $post_id, string $review_id ): array {
+		return array_values(
+			array_filter(
+				$this->get_notes_by_review( $review_id ),
+				static fn ( mixed $note ): bool => is_array( $note ) && is_numeric( $note['post'] ?? null ) && (int) $note['post'] === $post_id
+			)
+		);
+	}
+
+	/**
 	 * Calculate summary statistics from notes.
 	 *
 	 * @param  array $notes Array of notes.
@@ -1454,12 +1543,8 @@ class Notes_Manager {
 			'grammar' => 0,
 		);
 
+		// Every note passed is a feedback item of the review, replies included.
 		foreach ( $notes as $note ) {
-			// Only count top-level notes (not replies).
-			if ( $note['parent'] > 0 ) {
-				continue;
-			}
-
 			$severity = $note['severity'] ?? '';
 			$category = $note['category'] ?? '';
 
