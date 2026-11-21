@@ -389,10 +389,10 @@ export async function suggestEdit({
 
 	const current = getBlockContent(blockId);
 	// Gutenberg's sanitize callback stores '' for a payload it rejects.
-	// Markers carry the note's author (0 for AI notes): Gutenberg tints and
-	// names markers by matching it, and lets a user grow or remove markers
-	// carrying their own id, so the reviewer's id would let their edits
-	// rewrite the AI's suggestion.
+	// Markers carry the note's author (the Fresh Eyes user, or 0): Gutenberg
+	// tints and names markers by matching it, and lets a user grow or remove
+	// markers carrying their own id, so the reviewer's id would let their
+	// edits rewrite the AI's suggestion.
 	const updated =
 		!!saved?.meta?._wp_suggestion &&
 		current &&
@@ -507,19 +507,35 @@ async function loadNote(noteId) {
  * note is not an AI note (a mention thread a person started), or when the
  * author already accepted or rejected the root's suggestion.
  *
- * @param {Object}      reply     AI reply with `id` and `edit`.
- * @param {number}      threadId  Root note of the reply's thread.
- * @param {string|null} [blockId] Client id stored with the root note, if known.
+ * Whether the root is an AI note comes from the caller, which has it from
+ * the server: only the note's `ai_feedback` meta says so, and that is not in
+ * the note's REST record. Its author does not: an AI note is written as the
+ * Fresh Eyes user, or as user 0 without one and in older notes.
+ *
+ * @param {Object}      reply               AI reply with `id` and `edit`.
+ * @param {number}      threadId            Root note of the reply's thread.
+ * @param {string|null} [blockId]           Client id stored with the root note, if known.
+ * @param {Object}      [options]           Options.
+ * @param {boolean}     [options.isMention] Whether a person started the thread, as its `is_mention` says.
  * @return {Promise<boolean>} Whether the suggestion was added.
  */
-export async function suggestReplyEdit(reply, threadId, blockId = null) {
-	if (!isSuggestionModeAvailable() || !reply?.id || !reply.edit) {
+export async function suggestReplyEdit(
+	reply,
+	threadId,
+	blockId = null,
+	{ isMention = false } = {}
+) {
+	if (
+		!isSuggestionModeAvailable() ||
+		!reply?.id ||
+		!reply.edit ||
+		isMention
+	) {
 		return false;
 	}
 	const root = await loadNote(threadId);
 	const clientId = resolveBlockClientId(blockId, threadId);
-	// AI notes have no user author.
-	if (!clientId || !root || root.author !== 0) {
+	if (!clientId || !root) {
 		return false;
 	}
 

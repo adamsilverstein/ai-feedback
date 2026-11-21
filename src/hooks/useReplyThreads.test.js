@@ -144,7 +144,14 @@ describe('useReplyThreads', () => {
 		});
 
 		await waitFor(() =>
-			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(fresh, 300)
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				fresh,
+				300,
+				null,
+				{
+					isMention: false,
+				}
+			)
 		);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 	});
@@ -156,6 +163,27 @@ describe('suggestNewReplyEdits', () => {
 		mockSupersedeSuggestions.mockReset();
 		mockSupersedeSuggestions.mockResolvedValue([]);
 		mockSuggestionMode = true;
+	});
+
+	it('says when a person started the thread, so its edit stays in the sidebar', async () => {
+		const edit = { type: 'replace_text', find: 'a', replace: 'b' };
+		const threads = {
+			450: {
+				is_mention: true,
+				replies: [{ id: 451, is_ai: true, edit }],
+			},
+		};
+
+		suggestNewReplyEdits(threads, new Set());
+
+		await waitFor(() =>
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				threads[450].replies[0],
+				450,
+				null,
+				{ isMention: true }
+			)
+		);
 	});
 
 	it('suggests each new edit once, across hook instances', async () => {
@@ -174,7 +202,9 @@ describe('suggestNewReplyEdits', () => {
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
 			threads[400].replies[0],
-			400
+			400,
+			null,
+			{ isMention: false }
 		);
 	});
 
@@ -214,7 +244,14 @@ describe('suggestNewReplyEdits', () => {
 		);
 
 		await waitFor(() =>
-			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(revised, 600)
+			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
+				revised,
+				600,
+				null,
+				{
+					isMention: false,
+				}
+			)
 		);
 		// The root note's suggestion is left for the revision to replace,
 		// then retired only if the revision could not be suggested.

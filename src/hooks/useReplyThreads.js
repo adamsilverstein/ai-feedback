@@ -46,16 +46,17 @@ let queue = Promise.resolve();
  * @param {number}      threadId   Root note of the thread.
  * @param {number[]}    superseded Notes whose edits the newest edit replaces.
  * @param {Object|null} reply      AI reply whose edit to suggest, or null.
+ * @param {boolean}     isMention  Whether a person started the thread, whose root note can't hold the edit.
  * @return {Promise<void>} Resolves once the thread is done.
  */
-function refineThread(threadId, superseded, reply) {
+function refineThread(threadId, superseded, reply, isMention) {
 	queue = queue
 		.then(async () => {
 			await supersedeSuggestions(threadId, superseded, {
 				keepRoot: !!reply,
 			});
 			if (reply) {
-				await suggestReplyEdit(reply, threadId);
+				await suggestReplyEdit(reply, threadId, null, { isMention });
 				// A no-op when the root note now holds the newest edit.
 				await supersedeSuggestions(threadId, superseded);
 			}
@@ -105,7 +106,8 @@ export function suggestNewReplyEdits(threads, known) {
 		refineThread(
 			threadId,
 			[threadId, ...edits.slice(0, -1).map(({ ownerId }) => ownerId)],
-			reply
+			reply,
+			!!thread.is_mention
 		);
 	}
 	return seen;

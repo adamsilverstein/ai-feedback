@@ -882,10 +882,30 @@ describe('suggestReplyEdit', () => {
 	it('leaves the edit to the sidebar in a thread a person started', async () => {
 		mocks.notes = [{ ...ROOT, author: 3 }];
 
-		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
-			false
-		);
+		await expect(
+			suggestReplyEdit(reply, 39, 'block-1', { isMention: true })
+		).resolves.toBe(false);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('suggests on an AI note written as the Fresh Eyes user', async () => {
+		// Its author is that user's id, not 0, and the markers carry it.
+		mocks.notes = [{ ...ROOT, author: 41 }];
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, record) => ({
+				...(await savedRecord(record)),
+				author: 41,
+			})
+		);
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			true
+		);
+		expect(mocks.saveEntityRecord.mock.calls[0][2].id).toBe(39);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content:
+				'We met <mark class="wp-suggestion-add" data-suggestion-id="39" data-suggestion-type="add" data-author="41">to</mark><mark class="wp-suggestion-del" data-suggestion-id="39" data-suggestion-type="del" data-author="41">in order to</mark> plan.',
+		});
 	});
 
 	it('waits for the notes to load before reading the root note', async () => {
