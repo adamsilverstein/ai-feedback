@@ -84,7 +84,7 @@ So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden
 
 = What happens to my data when I delete the plugin? =
 
-Deactivating keeps everything. Deleting the plugin from the Plugins screen removes its settings and personal data: the review settings, house style rules (site and personal, on every site of a network), review history, usage analytics, rate limit records, its editor preferences, cached data, pending AI replies and the hidden Fresh Eyes user. Notes are kept, with their feedback details, since they are your editorial record: reinstalling picks up where you left off.
+Deactivating keeps everything. Deleting the plugin from the Plugins screen removes its settings and personal data: the review settings, house style rules (site and personal, on every site of a network), review history, usage analytics, rate limit records, its editor preferences, cached data, pending AI replies and the hidden Fresh Eyes user. On a site with a persistent object cache, cached review sessions and model lists can't be looked up by name, so they stay in the cache until they expire, within an hour. Notes are kept, with their feedback details, since they are your editorial record: reinstalling picks up where you left off.
 
 == Screenshots ==
 
