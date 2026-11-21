@@ -1125,8 +1125,21 @@ describe('supersedeSuggestions', () => {
 		delete window.aiFeedbackData;
 	});
 
+	// Stand-in for the registry `useRegistry()` gives the caller.
+	const registry = { batch: (callback) => callback() };
+
+	it('refuses to run without a registry, whatever it is asked to retire', async () => {
+		delete window.__experimentalSuggestionMode;
+
+		await expect(supersedeSuggestions(39, [])).rejects.toThrow(
+			'needs a data registry'
+		);
+	});
+
 	it('takes out the markers and marks the suggestion rejected', async () => {
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([40]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([40]);
 
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content: 'We met in order to plan.',
@@ -1156,7 +1169,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39])).resolves.toEqual([39]);
+		await expect(supersedeSuggestions(39, [39], registry)).resolves.toEqual(
+			[39]
+		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
@@ -1174,7 +1189,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([39]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([39]);
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content: 'We met in order to plan.',
 		});
@@ -1194,7 +1211,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([]);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
@@ -1203,7 +1222,7 @@ describe('supersedeSuggestions', () => {
 			`We met ${ADD_40.replaceAll('"40"', '"39"')}${DEL_40.replaceAll('"40"', '"39"')} plan.`;
 
 		await expect(
-			supersedeSuggestions(39, [39], { keepRoot: true })
+			supersedeSuggestions(39, [39], registry, { keepRoot: true })
 		).resolves.toEqual([]);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
@@ -1220,7 +1239,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([]);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
@@ -1228,14 +1249,18 @@ describe('supersedeSuggestions', () => {
 	it('does nothing without Suggestion Mode', async () => {
 		delete window.__experimentalSuggestionMode;
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
 	it('does nothing when the thread’s block is not loaded', async () => {
 		mocks.blocks = {};
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
@@ -1243,7 +1268,9 @@ describe('supersedeSuggestions', () => {
 		mocks.saveEntityRecord.mockRejectedValue(new Error('offline'));
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
 		warn.mockRestore();
 	});

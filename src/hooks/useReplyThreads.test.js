@@ -12,7 +12,9 @@ vi.mock('@wordpress/api-fetch', () => ({
 // Stand-in for the notes the editor's Notes UI has loaded.
 let mockEditorNotes = [];
 const mockInvalidateResolution = vi.fn();
+const mockRegistry = { batch: (callback) => callback() };
 vi.mock('@wordpress/data', () => ({
+	useRegistry: () => mockRegistry,
 	useSelect: (mapSelect) =>
 		mapSelect(() => ({
 			getEntityRecords: () => mockEditorNotes,
@@ -240,7 +242,8 @@ describe('suggestNewReplyEdits', () => {
 		);
 		suggestNewReplyEdits(
 			{ 600: { replies: [first, user, revised] } },
-			seen
+			seen,
+			mockRegistry
 		);
 
 		await waitFor(() =>
@@ -255,12 +258,16 @@ describe('suggestNewReplyEdits', () => {
 		);
 		// The root note's suggestion is left for the revision to replace,
 		// then retired only if the revision could not be suggested.
-		expect(mockSupersedeSuggestions).toHaveBeenCalledWith(600, [600, 601], {
-			keepRoot: true,
-		});
+		expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
+			600,
+			[600, 601],
+			mockRegistry,
+			{ keepRoot: true }
+		);
 		expect(mockSupersedeSuggestions).toHaveBeenLastCalledWith(
 			600,
-			[600, 601]
+			[600, 601],
+			mockRegistry
 		);
 		expect(order).toEqual([
 			'supersede',
@@ -283,13 +290,15 @@ describe('suggestNewReplyEdits', () => {
 					],
 				},
 			},
-			null
+			null,
+			mockRegistry
 		);
 
 		await waitFor(() =>
 			expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
 				700,
 				[700, 701],
+				mockRegistry,
 				{ keepRoot: false }
 			)
 		);
