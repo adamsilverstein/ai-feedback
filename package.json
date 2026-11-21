@@ -86,6 +86,7 @@
 		"test:unit:watch": "wp-scripts test-unit-js --watch",
 		"test:php": "composer run test",
 		"test:e2e": "npx playwright test --config=playwright.config.js",
+		"test:uninstall": "tests/uninstall/run.sh",
 		"test:e2e:debug": "npx playwright test --config=playwright.config.js --debug",
 		"test:e2e:suggestion-mode": "npx playwright test --config=playwright.suggestion-mode.config.js",
 		"test:visual": "playwright test --config=tests/visual/playwright.config.js",

@@ -115,6 +115,21 @@ describe('RememberRule', () => {
 		).toBeVisible();
 	});
 
+	it('does not save when Enter is pressed in the rule field', async () => {
+		const user = userEvent.setup();
+		mockRequests(RULES);
+		render(<RememberRule noteId={12} proposal={PROPOSAL} />);
+
+		const field = screen.getByLabelText('Remember this for future reviews');
+		await user.type(field, '{Enter}');
+
+		expect(apiFetch).not.toHaveBeenCalledWith(
+			expect.objectContaining({ method: 'POST' })
+		);
+		expect(field).toHaveValue(PROPOSAL.text);
+		expect(screen.getByRole('button', { name: 'Remember' })).toBeVisible();
+	});
+
 	it('lets an administrator save it for the whole site', async () => {
 		const user = userEvent.setup();
 		mockRequests({ ...RULES, can_manage_site: true }, RULES);

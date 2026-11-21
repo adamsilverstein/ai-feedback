@@ -82,6 +82,10 @@ An administrator can turn this off for the whole site: open Review Settings in t
 
 So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter (network-wide on multisite); typing `@fresh-eyes` still works. Tools that switch the current user directly, such as single sign-on or "log in as" plugins, can still make it the current user, but it has no role or capabilities, so it can't edit anything. Another account named "Fresh Eyes" would show next to it in the `@` menu; WordPress emails that account about the mention like any other user.
 
+= What happens to my data when I delete the plugin? =
+
+Deactivating keeps everything. Deleting the plugin from the Plugins screen removes its settings and personal data: the review settings, house style rules (site and personal, on every site of a network), review history, usage analytics, rate limit records, its editor preferences, cached data, pending AI replies and the hidden Fresh Eyes user. On a site with a persistent object cache, cached review sessions and model lists can't be looked up by name, so they stay in the cache until they expire, within an hour. Notes are kept, with their feedback details, since they are your editorial record: reinstalling picks up where you left off.
+
 == Screenshots ==
 
 1. A reviewed draft with suggested edits in the text, notes beside the blocks and the review summary in the sidebar

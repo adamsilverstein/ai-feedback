@@ -100,7 +100,6 @@ export default function RememberRule({ noteId, proposal }) {
 				)}
 				value={text}
 				onChange={setText}
-				onSubmit={() => !isBusy && text.trim() && save()}
 				maxLength={rules?.max_length || DEFAULT_MAX_LENGTH}
 			/>
 			{canManageSite && (
