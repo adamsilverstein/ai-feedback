@@ -506,6 +506,32 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * A named reply whose parents loop, or run deeper than the thread
+		 * depth cap, is not trusted as the owner.
+		 */
+		public function test_owner_in_a_parent_cycle_or_too_deep_is_nobody(): void {
+			$this->add_reply( 501, 502 );
+			$this->add_reply( 502, 501 );
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+
+			$suggestions = new Suggestions();
+			$this->assertSame( 0, $suggestions->get_owner_id( self::NOTE_ID ) );
+
+			// Eleven replies deep, one past the cap.
+			$parent_id = self::NOTE_ID;
+			for ( $reply_id = 601; $reply_id <= 611; $reply_id++ ) {
+				$this->add_reply( $reply_id, $parent_id );
+				$parent_id = $reply_id;
+			}
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":611}' );
+			$this->assertSame( 0, $suggestions->get_owner_id( self::NOTE_ID ) );
+
+			// Ten deep is still in the thread.
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":610}' );
+			$this->assertSame( 610, $suggestions->get_owner_id( self::NOTE_ID ) );
+		}
+
+		/**
 		 * A root note whose payload names a reply deleted since still holds a
 		 * suggestion, which the Notes sidebar can accept or reject, but it is
 		 * nobody's edit: neither the note's own fix nor a reply reads it.
