@@ -126,7 +126,7 @@ test.describe('AI Feedback Sidebar', () => {
 
 			expect(optionLabels).toEqual([
 				'Anthropic - Claude Sonnet 5.5',
-				'Anthropic - Claude Opus 4',
+				'Anthropic - Claude Opus 5.5',
 				'Openai - GPT-4o',
 				'Google - Gemini 2.0 Flash',
 			]);
