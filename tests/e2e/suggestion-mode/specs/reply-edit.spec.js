@@ -1,7 +1,8 @@
 /**
- * Suggestion Mode: an AI reply's edit becomes a Gutenberg suggestion, which
- * the author accepts or rejects from the Notes sidebar. A revised edit in the
- * same thread retires the earlier suggestion.
+ * Suggestion Mode: an AI reply's edit becomes a Gutenberg suggestion on its
+ * thread's root note, the only note Gutenberg links to the block, so the
+ * author can accept or reject it from the Notes sidebar. A revised edit in
+ * the same thread replaces it.
  *
  * Uses the mock AI from tests/mu-plugins/ai-feedback-e2e.php: "make this
  * change" proposes replacing "last year" with "in 2025", and the Shorter
@@ -22,6 +23,7 @@ const CONTENT = 'Revenue grew 40% last year.';
  * Open a one-paragraph draft, review it and save the note link.
  *
  * @param {Object} fixtures Playwright fixtures.
+ * @return {Promise<number>} ID of the review's note, the thread's root.
  */
 async function reviewPost(fixtures) {
 	const { editor, aiFeedback } = fixtures;
@@ -33,9 +35,11 @@ async function reviewPost(fixtures) {
 	);
 	await aiFeedback.openSidebar();
 	const response = await aiFeedback.runReview();
-	expect((await response.json()).note_ids[0]).toBeGreaterThan(0);
+	const [rootId] = (await response.json()).note_ids;
+	expect(rootId).toBeGreaterThan(0);
 	// The reply reads the block from the saved post, found by its note link.
 	await editor.saveDraft();
+	return rootId;
 }
 
 /**
@@ -50,40 +54,106 @@ async function paragraph(editor) {
 }
 
 /**
- * Ask for the change and wait for the reply's edit to become a suggestion.
+ * The AI reply whose edit a root note's suggestion is.
  *
- * @param {Object} fixtures        Playwright fixtures.
- * @param {Object} fixtures.page   Page.
- * @param {Object} fixtures.editor Editor fixture.
- * @return {Promise<number>} ID of the AI reply holding the suggestion.
+ * @param {Object} requestUtils Request utils fixture.
+ * @param {number} rootId       Root note.
+ * @return {Promise<number|null>} Reply ID named in the payload, or null.
  */
-async function suggestChange({ page, editor }) {
+async function getEditOwner(requestUtils, rootId) {
+	const { payload } = await getSuggestionMeta(requestUtils, rootId);
+	return payload ? (JSON.parse(payload).aiFeedbackEditOwner ?? null) : null;
+}
+
+/**
+ * Wait for an AI reply's edit to be the root note's pending suggestion.
+ *
+ * @param {Object} fixtures              Playwright fixtures.
+ * @param {Object} fixtures.page         Page.
+ * @param {Object} fixtures.editor       Editor fixture.
+ * @param {Object} fixtures.requestUtils Request utils fixture.
+ * @param {number} rootId                Root note.
+ * @param {string} replacement           Text the edit puts in.
+ * @return {Promise<number>} ID of the AI reply whose edit it is.
+ */
+async function expectSuggested(
+	{ page, editor, requestUtils },
+	rootId,
+	replacement
+) {
+	const add = replacement.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	await expect
+		.poll(() => paragraph(editor))
+		.toMatch(
+			new RegExp(
+				`^Revenue grew 40% <mark [^>]*wp-suggestion-add[^>]*>${add}</mark><mark [^>]*wp-suggestion-del[^>]*>last year</mark>\\.$`
+			)
+		);
+	// The markers carry the root note's id, not the reply's.
+	expect(markerIds(await paragraph(editor))).toEqual([rootId]);
+
+	await expect
+		.poll(() => getSuggestionMeta(requestUtils, rootId))
+		.toMatchObject({ status: 'pending' });
+	const ownerId = await getEditOwner(requestUtils, rootId);
+	const owner = await requestUtils.rest({
+		path: `/wp/v2/comments/${ownerId}`,
+		params: { context: 'edit' },
+	});
+	expect(owner.parent).toBe(rootId);
+	// Nothing is stored on the reply itself.
+	expect(await getSuggestionMeta(requestUtils, ownerId)).toMatchObject({
+		payload: '',
+	});
+
+	await expect(
+		page
+			.getByTestId('snackbar')
+			.filter({
+				hasText: 'The AI reply’s edit was added as a suggestion.',
+			})
+			.last()
+	).toBeVisible();
+	return ownerId;
+}
+
+/**
+ * Ask for the change and wait for it to become the root note's suggestion.
+ *
+ * @param {Object} fixtures Playwright fixtures.
+ * @param {number} rootId   Root note.
+ * @return {Promise<number>} ID of the AI reply whose edit it is.
+ */
+async function suggestChange(fixtures, rootId) {
+	const { page } = fixtures;
 	await page.getByRole('button', { name: 'Make this change' }).click();
 	await expect(
 		page
 			.getByRole('list', { name: 'Conversation replies' })
 			.locator('.ai-feedback-reply-ai')
 	).toContainText('now reads "in 2025"', { timeout: 30000 });
+	return expectSuggested(fixtures, rootId, 'in 2025');
+}
 
-	await expect.poll(() => paragraph(editor).then(markerIds)).toHaveLength(1);
-	const html = await paragraph(editor);
-	const [id] = markerIds(html);
-	// An add run with the new text, then a del run over the old.
-	expect(html).toMatch(
-		/^Revenue grew 40% <mark [^>]*wp-suggestion-add[^>]*>in 2025<\/mark><mark [^>]*wp-suggestion-del[^>]*>last year<\/mark>\.$/
-	);
-	await expect(
-		page.getByTestId('snackbar').filter({
-			hasText: 'The AI reply’s edit was added as a suggestion.',
-		})
-	).toBeVisible();
-	return id;
+/**
+ * Wait for a root note's saved suggestion status.
+ *
+ * @param {Object} requestUtils Request utils fixture.
+ * @param {number} rootId       Root note.
+ * @param {string} status       Expected status.
+ */
+async function expectStatus(requestUtils, rootId, status) {
+	await expect
+		.poll(() =>
+			getSuggestionMeta(requestUtils, rootId).then((meta) => meta.status)
+		)
+		.toBe(status);
 }
 
 test.describe('Reply edits as suggestions', () => {
 	test.afterEach(drainCron);
 
-	test('a reply edit becomes a pending suggestion', async ({
+	test('a reply edit becomes a pending suggestion on the thread’s note', async ({
 		page,
 		editor,
 		admin,
@@ -91,22 +161,23 @@ test.describe('Reply edits as suggestions', () => {
 		aiFeedback,
 	}) => {
 		const fixtures = { page, editor, admin, requestUtils, aiFeedback };
-		await reviewPost(fixtures);
-		const id = await suggestChange(fixtures);
-		expect(await getSuggestionMeta(requestUtils, id)).toMatchObject({
-			status: 'pending',
-		});
+		const rootId = await reviewPost(fixtures);
+		await suggestChange(fixtures, rootId);
+
+		// The Fresh Eyes sidebar shows it on the reply that proposed it.
+		await expect(
+			page
+				.getByRole('list', { name: 'Conversation replies' })
+				.locator('.ai-feedback-reply-ai')
+		).toContainText(
+			'Suggested in the text. Accept or reject it from the Notes sidebar.'
+		);
 
 		await editor.saveDraft();
-		expect(await getSuggestionMeta(requestUtils, id)).toMatchObject({
-			status: 'pending',
-		});
+		await expectStatus(requestUtils, rootId, 'pending');
 	});
 
-	// FIXME (#328): the suggestion sits on the AI reply, and Gutenberg's Notes
-	// sidebar only links a thread's root note to its block. The reply's
-	// Accept button is disabled ("Target block has been deleted.").
-	test.fixme('Accept applies a reply edit suggestion', async ({
+	test('Accept applies a reply edit suggestion', async ({
 		page,
 		editor,
 		admin,
@@ -114,26 +185,27 @@ test.describe('Reply edits as suggestions', () => {
 		aiFeedback,
 	}) => {
 		const fixtures = { page, editor, admin, requestUtils, aiFeedback };
-		await reviewPost(fixtures);
-		const id = await suggestChange(fixtures);
+		const rootId = await reviewPost(fixtures);
+		const ownerId = await suggestChange(fixtures, rootId);
 
 		await decideSuggestion(page, 'Accept');
 		await expect
 			.poll(() => paragraph(editor))
 			.toBe('Revenue grew 40% in 2025.');
+		// Accept opened Gutenberg's Notes sidebar in its place.
+		await aiFeedback.openSidebar();
+		await expect(
+			page
+				.getByRole('list', { name: 'Conversation replies' })
+				.locator('.ai-feedback-reply-ai')
+		).toContainText('You accepted this suggested edit.');
 
 		await editor.saveDraft();
-		await expect
-			.poll(() =>
-				getSuggestionMeta(requestUtils, id).then((meta) => meta.status)
-			)
-			.toBe('applied');
+		await expectStatus(requestUtils, rootId, 'applied');
+		expect(await getEditOwner(requestUtils, rootId)).toBe(ownerId);
 	});
 
-	// FIXME (#328): same cause as Accept above. Reject saves `rejected-unsaved` on
-	// the reply but has no block to take the markers out of, so the
-	// suggested text stays in the post.
-	test.fixme('Reject leaves the text as it was', async ({
+	test('Reject leaves the text as it was', async ({
 		page,
 		editor,
 		admin,
@@ -141,31 +213,27 @@ test.describe('Reply edits as suggestions', () => {
 		aiFeedback,
 	}) => {
 		const fixtures = { page, editor, admin, requestUtils, aiFeedback };
-		await reviewPost(fixtures);
-		const id = await suggestChange(fixtures);
+		const rootId = await reviewPost(fixtures);
+		await suggestChange(fixtures, rootId);
 
 		await decideSuggestion(page, 'Reject');
 		await expect.poll(() => paragraph(editor)).toBe(CONTENT);
 
 		await editor.saveDraft();
-		await expect
-			.poll(() =>
-				getSuggestionMeta(requestUtils, id).then((meta) => meta.status)
-			)
-			.toBe('rejected');
+		await expectStatus(requestUtils, rootId, 'rejected');
 	});
 
 	/**
 	 * Ask for the change, then a shorter version, and wait for the revision
-	 * to replace the first suggestion in the text.
+	 * to replace the first suggestion.
 	 *
 	 * @param {Object} fixtures Playwright fixtures.
-	 * @return {Promise<{first: number, second: number}>} IDs of the retired and the new suggestion.
+	 * @return {Promise<{rootId: number, first: number, second: number}>} The root note and the two replies.
 	 */
 	async function reviseChange(fixtures) {
-		const { page, editor, requestUtils } = fixtures;
-		await reviewPost(fixtures);
-		const first = await suggestChange(fixtures);
+		const { page } = fixtures;
+		const rootId = await reviewPost(fixtures);
+		const first = await suggestChange(fixtures, rootId);
 
 		await page
 			.getByRole('group', { name: 'Quick replies' })
@@ -178,27 +246,15 @@ test.describe('Reply edits as suggestions', () => {
 				.nth(1)
 		).toContainText('Revised suggestion (2)', { timeout: 30000 });
 
-		// Only the revision is in the text; the first suggestion is retired.
 		await expect
-			.poll(async () => {
-				const ids = markerIds(await paragraph(editor));
-				return ids.length === 1 && ids[0] !== first;
-			})
-			.toBe(true);
-		const [second] = markerIds(await paragraph(editor));
-		expect(await paragraph(editor)).toMatch(
-			/^Revenue grew 40% <mark [^>]*wp-suggestion-add[^>]*>in '25<\/mark><mark [^>]*wp-suggestion-del[^>]*>last year<\/mark>\.$/
-		);
-		expect(await getSuggestionMeta(requestUtils, first)).toMatchObject({
-			status: 'rejected-unsaved',
-		});
-		expect(await getSuggestionMeta(requestUtils, second)).toMatchObject({
-			status: 'pending',
-		});
-		return { first, second };
+			.poll(() => getEditOwner(fixtures.requestUtils, rootId))
+			.not.toBe(first);
+		const second = await expectSuggested(fixtures, rootId, "in '25");
+		expect(second).not.toBe(first);
+		return { rootId, first, second };
 	}
 
-	test('a revised edit retires the earlier suggestion', async ({
+	test('a revised edit replaces the earlier suggestion', async ({
 		page,
 		editor,
 		admin,
@@ -206,19 +262,23 @@ test.describe('Reply edits as suggestions', () => {
 		aiFeedback,
 	}) => {
 		await reviseChange({ page, editor, admin, requestUtils, aiFeedback });
+
+		const replies = page
+			.getByRole('list', { name: 'Conversation replies' })
+			.locator('.ai-feedback-reply-ai');
+		await expect(replies.nth(0)).toContainText(
+			'Replaced by a revised suggestion.'
+		);
 	});
 
-	// FIXME (#328): Gutenberg finalizes `rejected-unsaved` on save only for root
-	// notes (its reconciler queries `parent => 0`), and the retired
-	// suggestion is on a reply, so it stays `rejected-unsaved` for good.
-	test.fixme('saving makes the retirement final', async ({
+	test('saving keeps only the revision, which Accept then applies', async ({
 		page,
 		editor,
 		admin,
 		requestUtils,
 		aiFeedback,
 	}) => {
-		const { first, second } = await reviseChange({
+		const { rootId, second } = await reviseChange({
 			page,
 			editor,
 			admin,
@@ -227,16 +287,14 @@ test.describe('Reply edits as suggestions', () => {
 		});
 
 		await editor.saveDraft();
+		await expectStatus(requestUtils, rootId, 'pending');
+		expect(await getEditOwner(requestUtils, rootId)).toBe(second);
+
+		await decideSuggestion(page, 'Accept');
 		await expect
-			.poll(() =>
-				Promise.all(
-					[first, second].map((id) =>
-						getSuggestionMeta(requestUtils, id).then(
-							(meta) => meta.status
-						)
-					)
-				)
-			)
-			.toEqual(['rejected', 'pending']);
+			.poll(() => paragraph(editor))
+			.toBe("Revenue grew 40% in '25.");
+		await editor.saveDraft();
+		await expectStatus(requestUtils, rootId, 'applied');
 	});
 });
