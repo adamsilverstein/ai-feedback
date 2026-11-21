@@ -886,6 +886,11 @@ const supersedingIds = new Set();
  * @return {Promise<number[]>} IDs of the suggestions retired.
  */
 export async function supersedeSuggestions(threadId, noteIds, registry) {
+	// Checked up front: only a structural retire uses it, and that failure
+	// would be caught and logged below.
+	if (typeof registry?.batch !== 'function') {
+		throw new TypeError('supersedeSuggestions() needs a data registry.');
+	}
 	if (!isSuggestionModeAvailable() || !noteIds?.length) {
 		return [];
 	}
