@@ -66,7 +66,7 @@ class House_Style_Suggestions {
 
 		$posts = array();
 		foreach ( get_posts( $query ) as $post ) {
-			// Checked again here, since a plugin can change what the query returns.
+			// Checked again here, since a pre_get_posts callback can change the query.
 			if (
 				'publish' !== $post->post_status
 				|| '' !== (string) $post->post_password
