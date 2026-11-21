@@ -33,6 +33,8 @@ class Uninstaller {
 		Analytics::OPTION_KEY,
 		Fresh_Eyes_User::CHECKED_OPTION,
 		'ai_feedback_user_lock',
+		// Whether reviews send post images to the AI provider, from #342.
+		Review_Images::OPTION,
 		// A network option is a plain option on a single site, so a site
 		// converted to multisite can still hold one. Removed after the user.
 		Fresh_Eyes_User::OPTION,
