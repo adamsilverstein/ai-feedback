@@ -49,8 +49,12 @@ if ( ! function_exists( 'did_action' ) ) {
 // Loaded after ABSPATH, which it requires.
 require_once $includes_dir . 'class-suggestions.php';
 if ( ! function_exists( 'get_network_option' ) ) {
-	// Network options share the site option store, as on a single site.
+	// Network options share the site option store, as on a single site,
+	// unless a test gives each network its own in test_network_options.
 	function get_network_option( $network_id, $name, $default = false ) {
+		if ( null !== $network_id && isset( $GLOBALS['test_network_options'] ) ) {
+			return $GLOBALS['test_network_options'][ $network_id ][ $name ] ?? $default;
+		}
 		return $GLOBALS['test_options'][ $name ] ?? $default;
 	}
 }

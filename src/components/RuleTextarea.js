@@ -3,7 +3,8 @@
  *
  * A text area for a house style rule that grows to fit the whole rule, so
  * nothing is saved that the author can't see. Rules are one line, so line
- * breaks become spaces, as the server would make them, and Enter submits.
+ * breaks become spaces, as the server would make them. Enter never adds a
+ * line break; it submits only when the caller passes `onSubmit`.
  */
 import { TextareaControl } from '@wordpress/components';
 

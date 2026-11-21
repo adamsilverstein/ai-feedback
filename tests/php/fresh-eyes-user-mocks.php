@@ -125,6 +125,10 @@ if ( ! function_exists( 'update_network_option' ) ) {
 
 if ( ! function_exists( 'delete_network_option' ) ) {
 	function delete_network_option( $network_id, $name ) {
+		if ( null !== $network_id && isset( $GLOBALS['test_network_options'] ) ) {
+			unset( $GLOBALS['test_network_options'][ $network_id ][ $name ] );
+			return true;
+		}
 		unset( $GLOBALS['test_options'][ $name ] );
 		return true;
 	}
@@ -202,7 +206,7 @@ if ( ! function_exists( 'get_post_types' ) ) {
 
 if ( ! function_exists( 'is_multisite' ) ) {
 	function is_multisite() {
-		return false;
+		return ! empty( $GLOBALS['test_is_multisite'] );
 	}
 }
 

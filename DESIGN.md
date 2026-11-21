@@ -468,6 +468,10 @@ The plugin primarily uses WordPress's existing comment system for Notes, with cu
 | `ai_feedback_model_preference` | string | User's preferred model |
 | `ai_feedback_dismissed_tips` | array | Onboarding tips user has dismissed |
 
+#### Uninstall
+
+`uninstall.php` runs `Uninstaller::uninstall()`, which lists every key the plugin stores as removed or kept. Settings, personal data, caches, scheduled events and the hidden Fresh Eyes user are removed; notes and their comment meta stay as the editorial record. `UninstallerTest` reads every storage call in the plugin and fails when a key is on neither list.
+
 ### Data Flow
 
 ```

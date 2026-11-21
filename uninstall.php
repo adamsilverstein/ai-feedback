@@ -1,9 +1,8 @@
 <?php
 /**
- * Uninstall Fresh Eyes.
+ * Removes the plugin's settings and personal data when the plugin is deleted.
  *
- * Removes the hidden Fresh Eyes user. It authors nothing, so nothing is
- * reassigned. On multisite the user is shared by the network and removed once.
+ * Notes and their meta are kept. See AI_Feedback\Uninstaller.
  *
  * @package AI_Feedback
  */
@@ -14,7 +13,17 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-require_once __DIR__ . '/includes/class-logger.php';
-require_once __DIR__ . '/includes/class-fresh-eyes-user.php';
+// The plugin itself is not loaded on uninstall, so load its classes here.
+spl_autoload_register(
+	static function ( string $class_name ): void {
+		if ( ! str_starts_with( $class_name, __NAMESPACE__ . '\\' ) ) {
+			return;
+		}
+		$file = __DIR__ . '/includes/class-' . strtolower( str_replace( '_', '-', substr( $class_name, strlen( __NAMESPACE__ ) + 1 ) ) ) . '.php';
+		if ( file_exists( $file ) ) {
+			require_once $file;
+		}
+	}
+);
 
-Fresh_Eyes_User::uninstall();
+Uninstaller::uninstall();
