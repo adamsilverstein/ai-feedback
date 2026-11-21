@@ -934,9 +934,13 @@ class Reply_Service {
 			// Moving before a block leaves that block right after this one.
 			$neighbor = $siblings[ $index + $step ] ?? null;
 			$text     = is_string( $edit['target_text'] ?? null ) ? $edit['target_text'] : '';
+			// Moves saved before kept a parent's text with its inner blocks'.
+			// Only one known neighbor is checked, so unlike the editor's
+			// findMoveTarget() either reading can match without ambiguity.
 			return is_array( $neighbor ) && '' !== $text
 				&& ( $edit['target_name'] ?? null ) === ( $neighbor['blockName'] ?? null )
-				&& Response_Parser::matches_target_text( self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) ), $text );
+				&& ( Response_Parser::matches_target_text( self::target_text( $neighbor ), $text )
+					|| Response_Parser::matches_target_text( self::html_text( self::strip_suggestion_markers( self::get_block_html( $neighbor ) ) ), $text ) );
 		}
 
 		if ( 'insert_block' === $type ) {
@@ -1033,7 +1037,7 @@ class Reply_Service {
 	 *
 	 * @param list<array<mixed>> $siblings Blocks at the note's block's level.
 	 * @param int                $index    Position of the note's block in `$siblings`.
-	 * @return list<array{ref: string, name: string, text: string, index: int}> Nearby blocks.
+	 * @return list<array{ref: string, name: string, text: string, target: string, index: int}> Nearby blocks. `text` is shown to the AI; `target` is kept as a move's target text.
 	 */
 	private static function get_nearby_blocks( array $siblings, int $index ): array {
 		$nearby = array();
@@ -1046,10 +1050,11 @@ class Reply_Service {
 				continue;
 			}
 			$nearby[] = array(
-				'ref'   => $position === $index ? Response_Parser::REPLY_SELF_REF : 'b' . ( ++$number ),
-				'name'  => is_string( $block['blockName'] ?? null ) ? $block['blockName'] : '',
-				'text'  => self::html_text( self::strip_suggestion_markers( self::get_block_html( $block ) ) ),
-				'index' => $position,
+				'ref'    => $position === $index ? Response_Parser::REPLY_SELF_REF : 'b' . ( ++$number ),
+				'name'   => is_string( $block['blockName'] ?? null ) ? $block['blockName'] : '',
+				'text'   => self::html_text( self::strip_suggestion_markers( self::get_block_html( $block ) ) ),
+				'target' => self::target_text( $block ),
+				'index'  => $position,
 			);
 		}
 
@@ -1058,22 +1063,44 @@ class Reply_Service {
 
 	/**
 	 * Key nearby blocks by reference, as Response_Parser::parse_reply()
-	 * expects. Their client IDs are not known on the server.
+	 * expects. Their client IDs are not known on the server, so a move
+	 * finds its target by the target's own text. A block with no text of
+	 * its own, like a group, can't be found that way and is left out, but
+	 * the note's own block always stays.
 	 *
-	 * @param list<array{ref: string, name: string, text: string, index: int}> $nearby Nearby blocks.
+	 * @param list<array{ref: string, name: string, text: string, target: string, index: int}> $nearby Nearby blocks.
 	 * @return array<string, array{client_id: string, name: string, text: string, index: int}> Targets keyed by reference.
 	 */
 	private static function get_block_targets( array $nearby ): array {
 		$targets = array();
 		foreach ( $nearby as $entry ) {
+			if ( '' === $entry['target'] && Response_Parser::REPLY_SELF_REF !== $entry['ref'] ) {
+				continue;
+			}
 			$targets[ $entry['ref'] ] = array(
 				'client_id' => '',
 				'name'      => $entry['name'],
-				'text'      => $entry['text'],
+				'text'      => $entry['target'],
 				'index'     => $entry['index'],
 			);
 		}
 		return $targets;
+	}
+
+	/**
+	 * A block's text as a move target: its own text without its inner
+	 * blocks, as findMoveTarget() in src/utils/block-action.js reads it
+	 * and as a review sends it. A quote's citation, a details block's
+	 * summary, a list item's text without its nested list. Inline images
+	 * are left out. Shares its cases with the editor through the `targets`
+	 * in tests/fixtures/editor-text.json.
+	 *
+	 * @param array<mixed> $block Parsed block.
+	 * @return string Whitespace-collapsed text.
+	 */
+	public static function target_text( array $block ): string {
+		$text = str_replace( "\u{FFFC}", '', self::editor_text( self::strip_suggestion_markers( self::get_own_html( $block ) ) ) );
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/**
