@@ -17,6 +17,7 @@ import {
 	getBlockTypes,
 	parse,
 	registerBlockType,
+	serialize,
 	unregisterBlockType,
 } from '@wordpress/blocks';
 import { RawHTML } from '@wordpress/element';
@@ -247,6 +248,42 @@ describe('Custom HTML and blocks that save nothing', () => {
 		expect(
 			hasTextContent(registry.select(blockEditorStore).getBlocks())
 		).toBe(false);
+	});
+
+	it('reads another block from its attributes, even if it carries `innerContent`', () => {
+		// The parser keeps `innerContent` for the Custom HTML block only.
+		const withInnerContent = (blocks) =>
+			blocks.flatMap((block) => [
+				...(block.innerContent ? [block.name] : []),
+				...withInnerContent(block.innerBlocks),
+			]);
+		expect(
+			withInnerContent(
+				parse(
+					'<!-- wp:group --><div class="wp-block-group"><!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>Quoted.</p><!-- /wp:paragraph --><cite>Ada</cite></blockquote><!-- /wp:quote --><!-- wp:html --><p>Custom</p><!-- /wp:html --></div><!-- /wp:group -->'
+				)
+			)
+		).toEqual(['core/html']);
+
+		// The serializer ignores one set on any other block, so it is not
+		// read here either.
+		const registry = loadEditor(
+			parse(
+				'<!-- wp:paragraph --><p>Text as loaded.</p><!-- /wp:paragraph -->'
+			)
+		);
+		const [{ clientId }] = registry.select(blockEditorStore).getBlocks();
+		registry.dispatch(blockEditorStore).updateBlock(clientId, {
+			innerContent: ['<p>Text as loaded.</p>'],
+		});
+		registry
+			.dispatch(blockEditorStore)
+			.updateBlockAttributes(clientId, { content: 'Text as edited.' });
+
+		const [block] = registry.select(blockEditorStore).getBlocks();
+		expect(block.innerContent).toEqual(['<p>Text as loaded.</p>']);
+		expect(serialize(block)).toContain('Text as edited.');
+		expect(extractBlockData([block])[0].content).toBe('Text as edited.');
 	});
 
 	it('reads a Custom HTML block made with the content attribute', () => {

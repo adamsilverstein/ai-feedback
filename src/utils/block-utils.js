@@ -132,8 +132,9 @@ export function getFormattingAttributes(block) {
 export function getBlockOwnHTML(block) {
 	// The Custom HTML block keeps its markup in `innerContent`, which is
 	// updated as it is edited, and saves nothing. Its string fragments are
-	// its own markup, the `null` ones mark inner blocks.
-	if (Array.isArray(block.innerContent)) {
+	// its own markup, the `null` ones mark inner blocks. Only that block:
+	// the serializer ignores `innerContent` on any other.
+	if (block.name === 'core/html' && Array.isArray(block.innerContent)) {
 		return block.innerContent
 			.filter((part) => typeof part === 'string')
 			.join('');
