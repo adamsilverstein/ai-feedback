@@ -69,13 +69,14 @@ class ReplyServiceCallAiTest extends TestCase {
 	public function test_returns_generated_text_and_applies_options(): void {
 		$this->fake_ai_client( 'Reply text' );
 
-		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( 'Reply text', $result );
 		$calls = $GLOBALS['fake_ai_builder']->calls;
 		$this->assertSame( 'Prompt', $calls['prompt'] );
 		$this->assertSame( 'System', $calls['using_system_instruction'] );
-		$this->assertSame( array( 'model-a' ), $calls['using_model_preference'] );
+		$this->assertSame( array( 'anthropic', 'claude-sonnet-5-5' ), array( $calls['using_model']->provider_id, $calls['using_model']->model_id ) );
+		$this->assertArrayNotHasKey( 'using_model_preference', $calls );
 		$this->assertSame( Reply_Service::AI_MAX_TOKENS, $calls['using_max_tokens'] );
 		$this->assertSame( Reply_Service::AI_TEMPERATURE, $calls['using_temperature'] );
 	}
@@ -87,7 +88,7 @@ class ReplyServiceCallAiTest extends TestCase {
 		$error = new WP_Error( 'rate_limit_exceeded', 'Slow down.' );
 		$this->fake_ai_client( $error );
 
-		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( $error, $result );
 	}
@@ -99,7 +100,7 @@ class ReplyServiceCallAiTest extends TestCase {
 	public function test_converts_throwable_and_scopes_timeout(): void {
 		$this->fake_ai_client( new \RuntimeException( 'Connection reset' ) );
 
-		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'ai_request_failed', $result->get_error_code() );
@@ -115,7 +116,7 @@ class ReplyServiceCallAiTest extends TestCase {
 		$this->fake_ai_client( 'Real reply' );
 		define( 'AI_FEEDBACK_MOCK_MODE', true );
 
-		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( Reply_Service::MOCK_REPLY, $result );
 		$this->assertNull( $GLOBALS['fake_ai_builder'] );
@@ -129,7 +130,7 @@ class ReplyServiceCallAiTest extends TestCase {
 		$this->fake_ai_client( 'Real reply' );
 		define( 'AI_FEEDBACK_MOCK_MODE', false );
 
-		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReplyService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( 'Real reply', $result );
 		$this->assertNotNull( $GLOBALS['fake_ai_builder'] );

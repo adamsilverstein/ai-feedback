@@ -95,6 +95,13 @@ class Reply_Service {
 	private ?string $claim_token = null;
 
 	/**
+	 * Provider and model that answered the last AI call, when core said.
+	 *
+	 * @var array{provider: string, model: string}|null
+	 */
+	protected ?array $answered_by = null;
+
+	/**
 	 * Review service, for the hourly limit a mention shares with reviews.
 	 *
 	 * @var Review_Service|null
@@ -489,7 +496,7 @@ class Reply_Service {
 	 * @param array<string, mixed> $context            Reply context.
 	 * @param string               $prompt             Prompt.
 	 * @param string               $system_instruction System instruction.
-	 * @param string               $model              Model preference.
+	 * @param string               $model              Model ID.
 	 * @param bool                 $is_mention         Whether the reply asks Fresh Eyes through a mention.
 	 * @return int|WP_Error New AI reply comment ID, or error.
 	 */
@@ -542,6 +549,9 @@ class Reply_Service {
 			// The answer speaks as the same reader as the note it answers.
 			'persona'   => is_string( $context['persona'] ?? null ) ? $context['persona'] : '',
 		);
+		if ( null !== $this->answered_by ) {
+			$review_data['answered_by'] = $this->answered_by;
+		}
 
 		return $this->notes_manager->add_reply_to_thread( $feedback_item, $post_id, $parent_id, $review_data );
 	}
@@ -1396,10 +1406,12 @@ class Reply_Service {
 	 *
 	 * @param  string $prompt             User prompt.
 	 * @param  string $system_instruction System instruction.
-	 * @param  string $model              Model preference.
+	 * @param  string $model              Model ID.
 	 * @return string|WP_Error AI reply text or error.
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|WP_Error {
+		$this->answered_by = null;
+
 		if ( defined( 'AI_FEEDBACK_MOCK_MODE' ) && AI_FEEDBACK_MOCK_MODE ) {
 			Logger::debug( 'Reply_Service: using mock reply' );
 
@@ -1425,12 +1437,24 @@ class Reply_Service {
 		add_filter( 'wp_ai_client_default_request_timeout', $timeout_filter, PHP_INT_MAX );
 
 		try {
-			return wp_ai_client_prompt( $prompt )
-				->using_system_instruction( $system_instruction )
-				->using_model_preference( $model )
-				->using_temperature( self::AI_TEMPERATURE )
-				->using_max_tokens( self::AI_MAX_TOKENS )
-				->generate_text();
+			// Pinned to the chosen provider and model: core never picks another.
+			$pinned = ( new Model_Pin() )->pin( wp_ai_client_prompt( $prompt ), $model );
+			if ( is_wp_error( $pinned ) ) {
+				return $pinned;
+			}
+			$result = Model_Pin::read_result(
+				$pinned['builder']
+					->using_system_instruction( $system_instruction )
+					->using_temperature( self::AI_TEMPERATURE )
+					->using_max_tokens( self::AI_MAX_TOKENS )
+					->generate_text_result(),
+				$pinned
+			);
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			$this->answered_by = $result['answered_by'];
+			return $result['text'];
 		} catch ( \Throwable $e ) {
 			// Core converts SDK exceptions to WP_Error; this catches anything else.
 			Logger::debug( sprintf( 'Reply_Service: AI request threw %s: %s', get_class( $e ), $e->getMessage() ) );

@@ -2,7 +2,7 @@
 Contributors: adamsilverstein
 Tags: ai, editorial, block-editor, notes, writing
 Requires at least: 7.0
-Tested up to: 7.1
+Tested up to: 7.2
 Requires PHP: 8.1
 Stable tag: 1.0.3
 License: GPLv2 or later
@@ -53,6 +53,10 @@ Before using Fresh Eyes, configure an AI provider:
 = What AI providers are supported? =
 
 Any text generation provider connected through the WordPress 7.0 core AI Client. Settings → Connectors lists Anthropic, OpenAI, and Google, and installs each provider's plugin when you set it up. Other providers can be added with their own AI provider plugins.
+
+= Will a review ever run on a different model than the one I picked? =
+
+No. Reviews, replies and answers to mentions run on the model you picked, from its provider. If that provider doesn't offer the model, Fresh Eyes shows an error that names the model and sends nothing, rather than using another model or provider. Pick another model in the Fresh Eyes settings, or check which models your provider account offers.
 
 = Where do I configure my API key? =
 
