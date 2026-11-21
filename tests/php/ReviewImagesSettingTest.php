@@ -47,6 +47,24 @@ class ImageSettingReviewService extends Review_Service {
 	public array $vision_checks = array();
 
 	/**
+	 * Models whose provider was looked up, in order.
+	 *
+	 * @var list<string>
+	 */
+	public array $provider_lookups = array();
+
+	/**
+	 * Record the model, then look up its provider as usual.
+	 *
+	 * @param  string $model Model ID.
+	 * @return string
+	 */
+	protected function get_model_provider( string $model ): string {
+		$this->provider_lookups[] = $model;
+		return parent::get_model_provider( $model );
+	}
+
+	/**
 	 * Record the model, then ask as usual.
 	 *
 	 * @param  string $model Model ID.
@@ -294,8 +312,8 @@ class ReviewImagesSettingTest extends TestCase {
 	}
 
 	/**
-	 * With the setting off, a review sends no image, never asks whether the
-	 * model reads images, drops alt text the model made up, and says
+	 * With the setting off, a review sends no image, never looks up the
+	 * model's provider or asks whether it reads images, drops alt text the model made up, and says
 	 * nothing about images left out.
 	 */
 	public function test_review_sends_no_image_with_setting_off(): void {
@@ -305,6 +323,7 @@ class ReviewImagesSettingTest extends TestCase {
 
 		$this->assertSame( array( array() ), $service->sent );
 		$this->assertSame( array(), $service->vision_checks );
+		$this->assertSame( array(), $service->provider_lookups );
 		$this->assertStringNotContainsString( 'image attached', $service->prompts[0] );
 		$this->assertSame( 'Add alt text', $notes->items[0]['title'] );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );

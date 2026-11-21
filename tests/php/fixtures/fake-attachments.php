@@ -58,6 +58,7 @@ function wp_check_filetype( string $filename ): array {
 	$types = array(
 		'png' => 'image/png',
 		'jpg' => 'image/jpeg',
+		'gif' => 'image/gif',
 		'svg' => 'image/svg+xml',
 	);
 	$ext   = strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) );
@@ -65,6 +66,30 @@ function wp_check_filetype( string $filename ): array {
 		'ext'  => $ext,
 		'type' => $types[ $ext ] ?? false,
 	);
+}
+
+// Core's wp_getimagesize() wraps getimagesize(), quietly.
+function wp_getimagesize( string $filename ): array|false {
+	return @getimagesize( $filename );
+}
+
+function wp_get_image_mime( string $file ): string|false {
+	$info = @getimagesize( $file );
+	return is_array( $info ) && is_string( $info['mime'] ?? null ) ? $info['mime'] : false;
+}
+
+/**
+ * The start of a PNG file, enough for getimagesize() to read its size.
+ */
+function ai_feedback_test_png( int $width, int $height, string $padding = '' ): string {
+	return "\x89PNG\r\n\x1a\n" . pack( 'N', 13 ) . 'IHDR' . pack( 'NN', $width, $height ) . "\x08\x02\x00\x00\x00" . pack( 'N', 0 ) . $padding;
+}
+
+/**
+ * The start of a GIF file, enough for getimagesize() to read its size.
+ */
+function ai_feedback_test_gif( int $width, int $height ): string {
+	return 'GIF89a' . pack( 'vv', $width, $height ) . "\x00\x00\x00";
 }
 
 if ( ! function_exists( 'wp_parse_url' ) ) {

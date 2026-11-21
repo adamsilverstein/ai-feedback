@@ -18,6 +18,7 @@ require_once $includes_dir . 'class-prompt-builder.php';
 require_once $includes_dir . 'class-block-change.php';
 require_once $includes_dir . 'class-response-parser.php';
 require_once $includes_dir . 'class-review-images.php';
+require_once $includes_dir . 'class-image-refusals.php';
 require_once $includes_dir . 'class-notes-manager.php';
 require_once $includes_dir . 'class-review-service.php';
 require_once $includes_dir . 'class-review-chunks.php';
@@ -449,6 +450,10 @@ if ( ! function_exists( 'get_transient' ) ) {
 
 if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
 	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
+if ( ! defined( 'DAY_IN_SECONDS' ) ) {
+	define( 'DAY_IN_SECONDS', 86400 );
 }
 
 if ( ! function_exists( 'wp_list_pluck' ) ) {

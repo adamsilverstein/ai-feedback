@@ -233,4 +233,51 @@ test.describe('Formatting fixes', () => {
 			headingItem.getByRole('button', { name: 'Apply fix' })
 		).toHaveAttribute('aria-disabled', 'true');
 	});
+
+	test('the summary says which images the AI was not shown, and why', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Skipped images',
+			content: CONTENT,
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(5);
+		await aiFeedback.openSidebar();
+
+		// Mock reviews never collect images, so the server's list of images
+		// left out (covered by ReviewImagesTest) is added to the real
+		// response here.
+		const imageId = await page.evaluate(
+			() =>
+				window.wp.data
+					.select('core/block-editor')
+					.getBlocks()
+					.find((block) => block.name === 'core/image').clientId
+		);
+		await aiFeedback.routeREST('/review', async (route) => {
+			const response = await route.fetch();
+			const json = await response.json();
+			await route.fulfill({
+				response,
+				json: {
+					...json,
+					images_skipped: [{ block_id: imageId, reason: 'type' }],
+				},
+			});
+		});
+		await aiFeedback.runReview();
+
+		await expect(page.locator('.ai-feedback-images-skipped')).toHaveText(
+			'1 image was not shown to the AI: the AI provider does not take its file type, so it has no alt text proposal.'
+		);
+		await aiFeedback.unrouteREST('/review');
+	});
 });

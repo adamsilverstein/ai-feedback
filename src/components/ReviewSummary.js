@@ -5,6 +5,7 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import { useEffect, useRef, useState } from '@wordpress/element';
 import FeedbackList from './FeedbackList';
 import ModelName from './ModelName';
+import { describeSkippedImages } from '../utils/skipped-images';
 import ReviewStrengths from './ReviewStrengths';
 import { FeedbackDone, FeedbackProgressRow } from './FeedbackProgress';
 import { describeComparison } from '../utils/progress';
@@ -84,6 +85,7 @@ export default function ReviewSummary({ review, progress = null }) {
 		persona_label: personaLabel,
 	} = review;
 	const personaTakeaway = personaLabel ? review.persona_takeaway : '';
+	const skippedImageLines = describeSkippedImages(review.images_skipped);
 
 	const hasNotes = notes && notes.length > 0;
 	const comparison = describeComparison(review.progress, noteCount ?? 0);
@@ -146,6 +148,15 @@ export default function ReviewSummary({ review, progress = null }) {
 					)}
 				</p>
 			)}
+
+			{skippedImageLines.map((line) => (
+				<p
+					key={line}
+					className="ai-feedback-review-status ai-feedback-images-skipped description"
+				>
+					{line}
+				</p>
+			))}
 
 			{/* AI-generated summary text */}
 			{(summaryText || personaTakeaway) && (

@@ -94,11 +94,24 @@ A note can carry a `block_change`: a one-click formatting fix that never adds, d
 
 `Block_Change::validate()` drops any that fail validation and keeps the note: every attribute must be on its block type's allow-list and differ from the current value; a list's items must appear in the paragraph in order with only separators (commas, semicolons, a final "and" or "or") between them, and text before the first item stays as an introduction unless it ends in a comma or semicolon (which would mean items were left out); a split must fall after sentence-ending punctuation that appears once, with text after it. A review gets one change per block, shared with `block_action`, which wins on the same item; either replaces the `quick_fix` of every item on that block, once grouping has kept it. Groups of similar notes have none, and only a thread's root note keeps one. `Block_Change::decode()` checks the allow-lists again when the meta is read.
 
-Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images (`ai_feedback_max_review_images`) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB, JPEG, PNG, GIF or WebP. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped. If the model refuses the request with images, the review runs again on the text alone.
+Alt text and captions are only proposed for an image the AI was shown, and only where the image has none. When the selected model reads images, `Review_Images` attaches up to four images per request (`ai_feedback_max_review_images`; a review sent in chunks can attach four with each chunk) from image blocks without alt text, as inline base64 data through the core AI client's `with_file()`. Only Media Library images are sent: the block must have an attachment ID whose URL (scheme, host, port and file) matches its own, the current user must be able to read the attachment, and the file is read from the uploads directory (a `medium_large`, `large` or `medium` size first), at most 1.5 MB. External images are never fetched, so the AI only flags their missing alt text, as it does for every image with a text-only model. Images also stop once their total passes 3 MB. Images served from a CDN or offloaded media host, or a block still showing an image's file from before it was edited in the Media Library (`-e{timestamp}`), don't match their attachment's URL and are skipped.
+
+An image the provider would refuse is left out on its own, before anything is sent, so the other images still get proposals:
+
+- **Type.** The type is read from the file's contents (`wp_getimagesize()`), not its name, so a PNG named `.jpg` is sent as a PNG and a file that isn't really an image is left out. By default JPEG, PNG and WebP are sent to every provider. Core's model metadata lists no input file types, and no provider's limits could be checked in its source, so GIF, which not every provider takes (Gemini, for one, doesn't list it), is left out unless `ai_feedback_review_image_types` adds it.
+- **Pixels.** The longest side, not only the width, must be at most 2000 px (`ai_feedback_review_image_max_side`), well under the limits providers document. `medium_large` has no height limit, so a long infographic is sent from `large` or `medium` instead, or left out when no size fits.
+
+If the provider still refuses the request with images, the review runs once more on the text alone. A 413 or 415 is not retried first, and the plugin's own `ai_feedback_*` errors (such as an unavailable model) never drop the images. When the text alone works and the error means the model takes no images at all, the refusal is remembered for that provider and model for 15 minutes (`ai_feedback_image_refusal_ttl`, at most an hour), so the next reviews send no images instead of paying for the failed call again. The memory is site-wide, so only one error counts: core finding no configured model for the prompt (`prompt_invalid_argument`, "No models found ..."), which means the model's metadata takes no images. A 400, 415 or 422 is never remembered, even one naming images, because at some providers each can be about one author's file (corrupt, too large, an unsupported format, too many); it costs only that review's proposals. A 413, auth, billing, rate limit, network and server errors are never remembered either (`ai_feedback_remember_image_refusal` can veto one). Saving the model setting, for the site or a user, or a connector's API key (`connectors_ai_*_api_key`) forgets every refusal. The memory is a transient with an expiry, so it is never autoloaded. While it holds, each review says so in `images_skipped` (`refused_recently`) and the sidebar summary, so images are never left out silently. The retry doesn't count against the hourly review limit again.
+
+The response lists what was left out in `images_skipped`, with each image block's `clientId` and a `reason`: `type`, `dimensions` or `file_size` for images left out before sending, `refused` when the provider refused the request with them, or `refused_recently` when the model refused images in an earlier review (listed for every Media Library image without alt text, before any file is checked). It is only present when an image was left out, and not for a text-only model, which is never sent images. The sidebar summary turns it into one line per reason, such as "1 image was not shown to the AI: the AI provider does not take its file type, so it has no alt text proposal."
+
+```json
+"images_skipped": [ { "block_id": "a1b2c3", "reason": "type" } ]
+```
 
 Whether a model reads images is decided by `Model_Capabilities`. It asks the core AI client first: the provider's model metadata must list text generation from text and image input together, the same check core makes when it picks a model for a prompt with images. Images are only sent to a model that passes it, since a model that can't read them refuses the request. When core has no metadata for the model (no AI client, the provider isn't set up under Settings > Connectors, its model list can't be fetched, or it doesn't list the model), the `vision` capability in the model list decides. Every model in the built-in list has it: Claude Sonnet 5.5, Claude Opus 5.5, GPT-4o and Gemini 2.0 Flash. A model added through `ai_feedback_available_models` without `vision` gets no images. The `ai_feedback_model_supports_vision` filter has the last word. With `WP_DEBUG` on, `Logger::debug()` notes the answer and where it came from.
 
-Note that this sends the post's images to the AI provider, as reviews already send its text; return 0 from `ai_feedback_max_review_images` to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
+Note that this sends the post's images to the AI provider, as reviews already send its text; an administrator can turn off "Send images to the AI provider" in the Review Settings panel, or return 0 from `ai_feedback_max_review_images`, to keep images on the site. Proposed alt text is treated as untrusted plain text: markup drops it, and it is capped at 250 characters. An image can hold text written to steer the model; the prompt tells it to treat such text as part of the image, and the strict validation plus Preview before Apply means nothing reaches the post without the author choosing it. With `WP_DEBUG` on, `Logger::debug()` notes each image block that was not sent and why.
 
 The editor shows each one on its note with a one-line description, such as "Change to a level 3 heading", "Turn into a list" or "Split the paragraph after “…”", with Preview (before and after) and Apply fix. Everything is checked again against the live block: a change whose block changed since the review (another level, image, text or list type) reads as outdated, a transform is only offered when the editor offers it (`getBlockTransformItems()`), and a list split that would drop an inline object is not offered. Text is sliced from the block's rich text, so links and formatting stay, and the note's link (`metadata`) moves to the new list, heading or first half of a split. Apply is one undo step and is only marked applied if the block now reads as the change leaves it. A paragraph's anchor moves to the list's introduction, or the list. The introduction keeps the paragraph's styling, and the list gets what core's own transforms carry over (class name, font size and colors, where the list supports them). A split's second half keeps the paragraph's styling but not its drop cap. Formatting fixes stay with Preview and Apply when Gutenberg's Suggestion Mode is on. A formatting fix is also the thread's first suggested edit: the reply prompt gets it as the pending edit until the saved post shows it, the first reply edit after it is revision 2, and the note gets quick replies ("Try another" and "Why?").
 
@@ -1212,13 +1225,35 @@ add_filter( 'ai_feedback_house_style_sample_post_types', function( array $post_t
 
 #### `ai_feedback_max_review_images`
 
-How many images a review request may show a vision model so it can propose alt text. Default 4; return 0 to never send images.
+How many images a review request may show a vision model so it can propose alt text. Default 4 per request, so a review sent in chunks can send four with each chunk; return 0 to never send images. A visible setting for this is tracked in https://github.com/adamsilverstein/fresh-eyes/issues/334.
 
 ```php
 add_filter( 'ai_feedback_max_review_images', function(): int {
     return 0;
 } );
 ```
+
+#### `ai_feedback_review_image_types`
+
+The image types a provider is sent for alt text. Gets the types (default `image/jpeg`, `image/png`, `image/webp`) and the provider ID (`''` for a model not in the model list). Only JPEG, PNG, GIF and WebP can be sent.
+
+```php
+add_filter( 'ai_feedback_review_image_types', function( array $types, string $provider ): array {
+    return 'anthropic' === $provider ? array_merge( $types, array( 'image/gif' ) ) : $types;
+}, 10, 2 );
+```
+
+#### `ai_feedback_review_image_max_side`
+
+The longest side, in pixels, of an image a provider is sent. Default 2000. Gets the provider ID too.
+
+#### `ai_feedback_image_refusal_ttl`
+
+How long, in seconds, a model's refusal of images is remembered. Default 15 minutes, at most an hour; return 0 to never remember one. Gets the provider and model IDs too.
+
+#### `ai_feedback_remember_image_refusal`
+
+Whether a refused request with images is remembered. Gets the answer and the `WP_Error`. Only `true` remembers it.
 
 #### `ai_feedback_max_strengths`
 
