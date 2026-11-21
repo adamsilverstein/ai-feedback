@@ -33,7 +33,10 @@ const PARAGRAPHS = [
 const MOVE = 'Lead with the real opening';
 
 /**
- * How long to give Gutenberg's auto-save to post a captured move as a note.
+ * How long to give Gutenberg's auto-save to post a captured move as a note:
+ * twice its debounce (`AUTOSAVE_DEBOUNCE_MS`, 1500 ms). A capture marks the
+ * block as the move lands, so the marker checks need no wait; only a note
+ * that must not appear has nothing to poll for.
  */
 const CAPTURE_WAIT = 3000;
 
@@ -174,8 +177,8 @@ test.describe('Retiring a move in Suggest intent', () => {
 		await expect
 			.poll(() => blockTexts(editor))
 			.toEqual([HEADING, ...PARAGRAPHS]);
-		await page.waitForTimeout(CAPTURE_WAIT);
 		expect(await pendingMoveMarkers(editor)).toEqual([]);
+		await page.waitForTimeout(CAPTURE_WAIT);
 		// Only the review's removal is still pending.
 		expect(
 			pendingOperations(await getNotes(requestUtils, post.id))
@@ -205,8 +208,8 @@ test.describe('Retiring a move in Suggest intent', () => {
 			.toEqual([HEADING, ...PARAGRAPHS]);
 		await expectRetired(requestUtils, post.id, moveNote.id);
 
-		await page.waitForTimeout(CAPTURE_WAIT);
 		expect(await pendingMoveMarkers(editor)).toEqual([]);
+		await page.waitForTimeout(CAPTURE_WAIT);
 		expect(await pendingMoves(requestUtils, post.id)).toEqual([]);
 	});
 
