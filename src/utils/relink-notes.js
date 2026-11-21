@@ -6,7 +6,11 @@
  * notes orphaned, so they are matched back to blocks by the anchor and block
  * name saved with each note.
  */
-import { extractBlockData } from './block-utils';
+import {
+	extractBlockData,
+	extractTextContent,
+	getBlockAnchor,
+} from './block-utils';
 
 /**
  * Collect the note IDs already stored on blocks.
@@ -58,12 +62,28 @@ export function getNoteRelinks(blocks, notes) {
 	const free = [];
 	collectLinks(blocks, linked, free);
 
-	const keys = new Map(
-		extractBlockData(blocks).map((block) => [
-			block.clientId,
-			matchKey(block.name, block.anchor),
-		])
-	);
+	// Each block's key from its current text, plus one from the markup it
+	// was loaded with, which differs for a block migrated from a deprecated
+	// format: notes from before the migration were anchored to that text.
+	const keys = new Map();
+	const addKey = (clientId, key) => {
+		if (!keys.has(clientId)) {
+			keys.set(clientId, new Set());
+		}
+		keys.get(clientId).add(key);
+	};
+	for (const block of extractBlockData(blocks)) {
+		addKey(block.clientId, matchKey(block.name, block.anchor));
+	}
+	for (const block of free) {
+		const loaded = extractTextContent(block.originalContent).trim();
+		if (loaded) {
+			addKey(
+				block.clientId,
+				matchKey(block.name, getBlockAnchor(block.name, loaded))
+			);
+		}
+	}
 
 	const anchored = notes
 		.filter((note) => !note.parent && note.block_anchor && note.block_name)
@@ -93,7 +113,8 @@ export function getNoteRelinks(blocks, notes) {
 	const relinks = {};
 	for (const [key, orphans] of orphansByKey) {
 		const candidates = free.filter(
-			({ clientId }) => keys.get(clientId) === key
+			({ clientId }) =>
+				keys.get(clientId)?.has(key) && !(clientId in relinks)
 		);
 		if (candidates.length > orphans.length) {
 			continue;

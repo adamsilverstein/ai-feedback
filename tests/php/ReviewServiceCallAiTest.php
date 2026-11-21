@@ -70,7 +70,7 @@ class ReviewServiceCallAiTest extends TestCase {
 		$error = new WP_Error( 'rate_limit_exceeded', 'Slow down.' );
 		$this->fake_ai_client( $error );
 
-		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( $error, $result );
 	}
@@ -81,13 +81,14 @@ class ReviewServiceCallAiTest extends TestCase {
 	public function test_returns_generated_text_and_applies_options(): void {
 		$this->fake_ai_client( 'Feedback JSON' );
 
-		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( 'Feedback JSON', $result );
 		$calls = $GLOBALS['fake_ai_builder']->calls;
 		$this->assertSame( 'Prompt', $calls['prompt'] );
 		$this->assertSame( 'System', $calls['using_system_instruction'] );
-		$this->assertSame( array( 'model-a' ), $calls['using_model_preference'] );
+		$this->assertSame( array( 'anthropic', 'claude-sonnet-5-5' ), array( $calls['using_model']->provider_id, $calls['using_model']->model_id ) );
+		$this->assertArrayNotHasKey( 'using_model_preference', $calls );
 		$this->assertSame( 8000, $calls['using_max_tokens'] );
 	}
 
@@ -97,7 +98,7 @@ class ReviewServiceCallAiTest extends TestCase {
 	public function test_converts_throwable_to_wp_error(): void {
 		$this->fake_ai_client( new \RuntimeException( 'Connection reset' ) );
 
-		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		$result = ( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'ai_request_failed', $result->get_error_code() );
@@ -110,7 +111,7 @@ class ReviewServiceCallAiTest extends TestCase {
 	public function test_timeout_filter_is_scoped_to_the_call(): void {
 		$this->fake_ai_client( new \RuntimeException( 'Timed out' ) );
 
-		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertSame( Review_Service::AI_HTTP_TIMEOUT, $GLOBALS['fake_ai_builder']->timeout_during_call );
 		$this->assertEmpty( $GLOBALS['fake_filters']['wp_ai_client_default_request_timeout'] ?? array() );
@@ -125,7 +126,7 @@ class ReviewServiceCallAiTest extends TestCase {
 		( new CallAiReviewService() )->public_call_ai(
 			'Prompt',
 			'System',
-			'gpt-4o',
+			'claude-sonnet-5-5',
 			array(
 				array(
 					'block_id' => 'img-1',
@@ -155,7 +156,7 @@ class ReviewServiceCallAiTest extends TestCase {
 	public function test_attaches_nothing_without_images(): void {
 		$this->fake_ai_client( 'Feedback JSON' );
 
-		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'model-a' );
+		( new CallAiReviewService() )->public_call_ai( 'Prompt', 'System', 'claude-sonnet-5-5' );
 
 		$this->assertArrayNotHasKey( 'with_file', $GLOBALS['fake_ai_builder']->calls );
 	}

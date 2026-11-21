@@ -1,8 +1,14 @@
 /**
  * Utility functions for block content extraction.
  */
-import { serialize } from '@wordpress/blocks';
+import {
+	getBlockType,
+	getBlockTypes,
+	getSaveContent,
+	getSaveElement,
+} from '@wordpress/blocks';
 import { create } from '@wordpress/rich-text';
+import { debugLog } from './debug';
 
 /**
  * Extract text content from a block's innerHTML.
@@ -48,7 +54,7 @@ export function extractEditorText(innerHTML) {
  * a nested list, is edited in its `content` alone, so that is its text.
  *
  * @param {Object} block      Block.
- * @param {string} rawContent The block's saved HTML.
+ * @param {string} rawContent The block's own HTML, without its inner blocks.
  * @return {string} Text.
  */
 function getReviewText(block, rawContent) {
@@ -115,6 +121,55 @@ export function getFormattingAttributes(block) {
 }
 
 /**
+ * Get a block's own HTML as it is now, without its inner blocks.
+ *
+ * `originalContent` is the markup the block was parsed from and is not
+ * updated when the block is edited, so it is only used for blocks that
+ * failed validation, as core's serializer does, or cannot be saved here.
+ *
+ * @param {Object} block Block from the editor.
+ * @return {string} Block HTML.
+ */
+export function getBlockOwnHTML(block) {
+	// The Custom HTML block keeps its markup in `innerContent`, which is
+	// updated as it is edited, and saves nothing. Its string fragments are
+	// its own markup, the `null` ones mark inner blocks. Only that block:
+	// the serializer ignores `innerContent` on any other.
+	if (block.name === 'core/html' && Array.isArray(block.innerContent)) {
+		return block.innerContent
+			.filter((part) => typeof part === 'string')
+			.join('');
+	}
+
+	const saved = block.originalContent || '';
+	if (block.isValid === false || !getBlockType(block.name)) {
+		return saved;
+	}
+	const attributes = block.attributes ?? {};
+	try {
+		const html = getSaveContent(block.name, attributes, []);
+		// A save that renders nothing, like a table with its rows deleted or
+		// an embed without a URL, has no text now. Its loaded markup would
+		// bring deleted text back. A Custom HTML block made with its markup
+		// in the deprecated `content` attribute, not yet moved to
+		// `innerContent`, saves nothing but still has that markup.
+		if (!html && getSaveElement(block.name, attributes, []) === null) {
+			return block.name === 'core/html' &&
+				typeof attributes.content === 'string'
+				? attributes.content
+				: '';
+		}
+		return html;
+	} catch (error) {
+		debugLog(
+			`Could not save ${block.name}, using its loaded markup.`,
+			error
+		);
+		return saved;
+	}
+}
+
+/**
  * Recursively extract blocks with their clientIds and content.
  *
  * Inner blocks carry their parent's client ID, so the server can tell a
@@ -128,17 +183,16 @@ export function extractBlockData(blocks, parent = '') {
 	const result = [];
 
 	for (const block of blocks) {
-		// Get the serialized content for this block.
-		// Use originalContent if available (parsed from existing HTML),
-		// otherwise serialize the current block state.
-		const rawContent = block.originalContent || serialize(block);
+		const rawContent = getBlockOwnHTML(block);
 		const content = getReviewText(block, rawContent);
+		// Objects alone, like a cover's image (U+FFFC), are no text to review.
+		const hasText = content.replace(/[\uFFFC\s]/g, '') !== '';
 
 		// Only include blocks with actual content, and images, whose alt
 		// text is reviewed even without a caption.
 		const attributes = getFormattingAttributes(block);
 		const isImage = block.name === 'core/image' && !!attributes?.url;
-		if (content.trim() || isImage) {
+		if (hasText || isImage) {
 			result.push({
 				clientId: block.clientId,
 				name: block.name,
@@ -165,19 +219,54 @@ export function extractBlockData(blocks, parent = '') {
 }
 
 /**
+ * Whether each block, inner blocks included, has text, by block object.
+ *
+ * The editor replaces a block's object, and its parents', only when it
+ * changes, so typing in one block re-reads just that block and its parents.
+ * A block is read by its type's save, so the results are dropped when the
+ * registered block types change.
+ */
+let hasTextCache = new WeakMap();
+
+/**
+ * The registered block types `hasTextCache` was filled under.
+ */
+let hasTextCacheTypes;
+
+/**
  * Check if blocks array contains any text content.
  *
  * @param {Array} blocks Array of blocks from the editor.
  * @return {boolean} True if blocks contain text content.
  */
 export function hasTextContent(blocks) {
+	// The same array until a type is registered or unregistered.
+	const types = getBlockTypes();
+	if (types !== hasTextCacheTypes) {
+		hasTextCache = new WeakMap();
+		hasTextCacheTypes = types;
+	}
+	return someHaveText(blocks);
+}
+
+/**
+ * Whether any of the blocks, inner blocks included, has text.
+ *
+ * @param {Array} blocks Array of blocks from the editor.
+ * @return {boolean} True if blocks contain text content.
+ */
+function someHaveText(blocks) {
 	return blocks.some((block) => {
 		if (!block.name) {
 			return false;
 		}
-		// Get text content from the block
-		const content = block.originalContent || serialize(block);
-		const text = extractTextContent(content);
-		return text.trim().length > 0;
+		if (!hasTextCache.has(block)) {
+			const text = extractTextContent(getBlockOwnHTML(block));
+			hasTextCache.set(
+				block,
+				text.trim().length > 0 || someHaveText(block.innerBlocks ?? [])
+			);
+		}
+		return hasTextCache.get(block);
 	});
 }
