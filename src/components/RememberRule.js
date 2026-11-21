@@ -2,10 +2,11 @@
  * RememberRule component.
  *
  * Shown under an AI reply that offers to remember a stated preference as a
- * house style rule. The whole rule is shown, since the AI wrote it and it
- * may say more than the author did. The author can edit it before saving;
- * nothing is saved until they click Remember, and the confirmation shows
- * the rule as saved.
+ * house style rule, and for each rule suggested from published posts in
+ * the House style settings. The whole rule is shown, since the AI wrote it
+ * and it may say more than the author did. The author can edit it before
+ * saving; nothing is saved until they click Remember, and the confirmation
+ * shows the rule as saved.
  */
 import { Button, SelectControl } from '@wordpress/components';
 import { speak } from '@wordpress/a11y';
@@ -28,14 +29,23 @@ const DEFAULT_MAX_LENGTH = 150;
 
 /**
  * @param {Object} props
- * @param {number} props.noteId   AI reply that proposed the rule.
- * @param {Object} props.proposal Proposal: { text, status }, status '', 'saved' or 'dismissed'.
+ * @param {number} [props.noteId]       AI reply that proposed the rule, when one did.
+ * @param {Object} props.proposal       Proposal: { text, status }, status '', 'saved' or 'dismissed'.
+ * @param {string} [props.label]        Field label. Defaults to the offer shown in a thread.
+ * @param {string} [props.help]         Help text under the field.
+ * @param {string} [props.defaultScope] Scope first selected for a user who manages site rules.
  * @return {Element|null} The offer, a saved confirmation, or null once dismissed.
  */
-export default function RememberRule({ noteId, proposal }) {
+export default function RememberRule({
+	noteId,
+	proposal,
+	label,
+	help,
+	defaultScope = SCOPE_USER,
+}) {
 	const { rules } = useHouseStyle();
 	const [text, setText] = useState(proposal?.text || '');
-	const [scope, setScope] = useState(SCOPE_USER);
+	const [scope, setScope] = useState(defaultScope);
 	const [status, setStatus] = useState(proposal?.status || '');
 	const [savedText, setSavedText] = useState(null);
 	const [isBusy, setIsBusy] = useState(false);
@@ -86,18 +96,26 @@ export default function RememberRule({ noteId, proposal }) {
 
 	const dismiss = () => {
 		setStatus('dismissed');
-		// Hidden either way; the server only keeps it from coming back.
-		dismissProposal(noteId).catch(() => {});
+		// Hidden either way; the server only keeps a note's from coming back.
+		if (noteId) {
+			dismissProposal(noteId).catch(() => {});
+		}
 	};
 
 	return (
 		<div className="ai-feedback-remember">
 			<RuleTextarea
-				label={__('Remember this for future reviews', 'fresh-eyes')}
-				help={__(
-					'Saved as a house style rule. You can edit it first.',
-					'fresh-eyes'
-				)}
+				label={
+					label ||
+					__('Remember this for future reviews', 'fresh-eyes')
+				}
+				help={
+					help ||
+					__(
+						'Saved as a house style rule. You can edit it first.',
+						'fresh-eyes'
+					)
+				}
 				value={text}
 				onChange={setText}
 				maxLength={rules?.max_length || DEFAULT_MAX_LENGTH}
