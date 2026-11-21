@@ -408,6 +408,15 @@ if ( ! function_exists( 'register_rest_route' ) ) {
 	}
 }
 
+if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
+	function rest_sanitize_boolean( $value ) {
+		if ( is_string( $value ) ) {
+			return ! in_array( strtolower( $value ), array( 'false', '0', '' ), true );
+		}
+		return (bool) $value;
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $name, $default = false ) {
 		return $GLOBALS['test_options'][ $name ] ?? $default;

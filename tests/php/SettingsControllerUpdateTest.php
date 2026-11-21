@@ -8,6 +8,7 @@
 namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Review_Images;
 use AI_Feedback\Settings_Controller;
 use WP_REST_Request;
 use WP_REST_Response;
@@ -223,5 +224,89 @@ class SettingsControllerUpdateTest extends TestCase {
 		$GLOBALS['test_user_meta'] = array( self::USER_ID => array( 'ai_feedback_default_model' => 'claude-sonnet-4' ) );
 
 		$this->assertSame( 'gpt-4o', $this->get_settings()['default_model'] );
+	}
+
+	/**
+	 * A site that never saved the image setting reports it as on.
+	 */
+	public function test_send_images_is_on_by_default(): void {
+		$this->assertTrue( $this->get_settings()['send_images'] );
+	}
+
+	/**
+	 * Settings say whether the user may change the site's settings.
+	 */
+	public function test_settings_report_who_can_manage_the_site(): void {
+		$this->act_as( array( 'edit_posts' ) );
+		$this->assertFalse( $this->get_settings()['can_manage_site'] );
+
+		$this->act_as( array( 'edit_posts', 'manage_options' ) );
+		$this->assertTrue( $this->get_settings()['can_manage_site'] );
+	}
+
+	/**
+	 * An author may not change the image setting, with or without a scope.
+	 */
+	public function test_non_admin_may_not_update_send_images(): void {
+		$this->act_as( array( 'edit_posts' ) );
+
+		$result = ( new Settings_Controller() )->update_settings_permissions_check( $this->request( array( 'send_images' => false ) ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'rest_forbidden', $result->get_error_code() );
+	}
+
+	/**
+	 * An administrator may change the image setting.
+	 */
+	public function test_admin_may_update_send_images(): void {
+		$this->act_as( array( 'edit_posts', 'manage_options' ) );
+
+		$result = ( new Settings_Controller() )->update_settings_permissions_check( $this->request( array( 'send_images' => false ) ) );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * The image setting is saved for the site, never as a user preference,
+	 * and reads back as saved.
+	 */
+	public function test_send_images_round_trip(): void {
+		$response = ( new Settings_Controller() )->update_settings( $this->request( array( 'send_images' => false ) ) );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertFalse( $data['send_images'] );
+		$this->assertSame( array( Review_Images::OPTION => '0' ), $GLOBALS['test_options'] );
+		$this->assertSame( array(), $GLOBALS['test_user_meta'] );
+		$this->assertFalse( Review_Images::is_enabled() );
+		$this->assertFalse( $this->get_settings()['send_images'] );
+
+		( new Settings_Controller() )->update_settings( $this->request( array( 'send_images' => true ) ) );
+
+		$this->assertSame( array( Review_Images::OPTION => '1' ), $GLOBALS['test_options'] );
+		$this->assertTrue( Review_Images::is_enabled() );
+		$this->assertTrue( $this->get_settings()['send_images'] );
+	}
+
+	/**
+	 * A value from a form or query string is read as a boolean.
+	 */
+	public function test_send_images_reads_string_values(): void {
+		( new Settings_Controller() )->update_settings( $this->request( array( 'send_images' => 'false' ) ) );
+
+		$this->assertSame( array( Review_Images::OPTION => '0' ), $GLOBALS['test_options'] );
+	}
+
+	/**
+	 * An update without the image setting leaves it alone.
+	 */
+	public function test_other_updates_leave_send_images_alone(): void {
+		$GLOBALS['test_options'] = array( Review_Images::OPTION => '0' );
+
+		( new Settings_Controller() )->update_settings( $this->request( array( 'default_tone' => 'casual' ) ) );
+
+		$this->assertSame( array( Review_Images::OPTION => '0' ), $GLOBALS['test_options'] );
 	}
 }
