@@ -52,6 +52,9 @@ class Image_Refusals {
 	/**
 	 * Remember that a model refused images.
 	 *
+	 * Not atomic: two reviews remembering at once can lose one entry, which
+	 * costs that model one more failed call.
+	 *
 	 * @param string $provider Provider ID, or '' when unknown.
 	 * @param string $model    Model ID.
 	 */
