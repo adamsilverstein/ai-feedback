@@ -1015,6 +1015,74 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Parse serialized blocks the way parse_blocks() does, for the shapes
+	 * the fixtures use: block comments without attributes, nested.
+	 *
+	 * @param string $markup Serialized blocks.
+	 * @return list<array<string, mixed>> Parsed blocks.
+	 */
+	private static function parse_markup( string $markup ): array {
+		$parts = preg_split( '#(<!-- /?wp:[a-z0-9/-]+ -->)#', $markup, -1, PREG_SPLIT_DELIM_CAPTURE );
+		$root  = array(
+			'innerBlocks'  => array(),
+			'innerHTML'    => '',
+			'innerContent' => array(),
+		);
+		$stack = array( $root );
+		foreach ( is_array( $parts ) ? $parts : array() as $part ) {
+			if ( 1 === preg_match( '#^<!-- wp:([a-z0-9/-]+) -->$#', $part, $open ) ) {
+				$name    = str_contains( $open[1], '/' ) ? $open[1] : 'core/' . $open[1];
+				$stack[] = array(
+					'blockName'    => $name,
+					'attrs'        => array(),
+					'innerBlocks'  => array(),
+					'innerHTML'    => '',
+					'innerContent' => array(),
+				);
+			} elseif ( str_starts_with( $part, '<!-- /wp:' ) ) {
+				$block                    = array_pop( $stack );
+				$parent                   = array_pop( $stack );
+				$parent['innerBlocks'][]  = $block;
+				$parent['innerContent'][] = null;
+				$stack[]                  = $parent;
+			} elseif ( '' !== $part ) {
+				$block                   = array_pop( $stack );
+				$block['innerContent'][] = $part;
+				$block['innerHTML']      = ( $block['innerHTML'] ?? '' ) . $part;
+				$stack[]                 = $block;
+			}
+		}
+		return $stack[0]['innerBlocks'];
+	}
+
+	/**
+	 * The edit a reply saved, if any.
+	 *
+	 * @param Reply_Service_Fake_Notes_Manager $notes Notes manager the reply went to.
+	 * @return mixed Saved edit, or null.
+	 */
+	private static function saved_edit( Reply_Service_Fake_Notes_Manager $notes ): mixed {
+		$item = $notes->last_reply['feedback_item'] ?? null;
+		return is_array( $item ) ? ( $item['reply_edit'] ?? null ) : null;
+	}
+
+	/**
+	 * Data provider for the shared move targets.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function target_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['targets'] ?? null ) ? $fixture['targets'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['markup'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['markup'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
 	 * Data provider for the shared parent blocks whose own HTML is a wrapper.
 	 *
 	 * @return array<string, array{0: string, 1: string}>
@@ -1028,6 +1096,114 @@ class ReplyServiceTest extends TestCase {
 			}
 		}
 		return $cases;
+	}
+
+	/**
+	 * A move keeps its target's own text, without its inner blocks, as the
+	 * editor's findMoveTarget() reads it (getOwnBlockTexts() runs the same
+	 * cases).
+	 *
+	 * @dataProvider target_text_provider
+	 *
+	 * @param string $markup Serialized block.
+	 * @param string $text   Text a move keeps for it.
+	 */
+	public function test_target_text_matches_the_editor( string $markup, string $text ): void {
+		$blocks = self::parse_markup( $markup );
+		$this->assertCount( 1, $blocks );
+		$this->assertSame( $text, Reply_Service::target_text( $blocks[0] ) );
+	}
+
+	/**
+	 * Seed a post holding the note's paragraph followed by other blocks.
+	 *
+	 * @param string $markup Serialized blocks after the note's paragraph.
+	 */
+	private function seed_note_then( string $markup ): void {
+		$this->seed_post_blocks(
+			array_merge(
+				array( self::leaf_block( 'core/paragraph', '<p>Move me.</p>', 100 ) ),
+				self::parse_markup( $markup )
+			)
+		);
+	}
+
+	/**
+	 * A reply that moves its block next to a quote keeps the quote's own
+	 * text, its citation, not the text of the paragraphs inside it.
+	 */
+	public function test_reply_move_keeps_a_container_targets_own_text(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_note_then( '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>Inner words.</p><!-- /wp:paragraph --><cite>Ada Lovelace</cite></blockquote><!-- /wp:quote -->' );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Moved it.", "edit": {"type": "move_block", "target_block_id": "b1", "position": "after"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$edit = self::saved_edit( $notes );
+		$this->assertIsArray( $edit );
+		$this->assertSame( 'core/quote', $edit['target_name'] );
+		$this->assertSame( 'Ada Lovelace', $edit['target_text'] );
+		// The AI still reads the whole quote.
+		$this->assertStringContainsString( 'Inner words. Ada Lovelace', $service->captured_prompt );
+	}
+
+	/**
+	 * A block with no text of its own, like a group, can't be found again
+	 * by its text, so a move next to it is not kept.
+	 */
+	public function test_reply_move_next_to_a_block_without_own_text_is_dropped(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_note_then( '<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Grouped words.</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Moved it.", "edit": {"type": "move_block", "target_block_id": "b1", "position": "after"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertNull( self::saved_edit( $notes ) );
+	}
+
+	/**
+	 * Data provider for a move already made next to a quote.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function applied_container_move_provider(): array {
+		return array(
+			'own text'                 => array( 'Ada Lovelace' ),
+			'text kept by older moves' => array( 'Inner words. Ada Lovelace' ),
+		);
+	}
+
+	/**
+	 * A move the saved post already shows is not pending, whether its
+	 * target text is the quote's own text or, as older moves kept it, the
+	 * text with its inner blocks'.
+	 *
+	 * @dataProvider applied_container_move_provider
+	 *
+	 * @param string $target_text Kept target text.
+	 */
+	public function test_applied_move_next_to_a_container_is_not_pending( string $target_text ): void {
+		$this->seed_parent_and_reply();
+		$this->seed_note_then( '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>Inner words.</p><!-- /wp:paragraph --><cite>Ada Lovelace</cite></blockquote><!-- /wp:quote -->' );
+		$this->seed_ai_edit_reply(
+			500,
+			array(
+				'type'            => 'move_block',
+				'position'        => 'before',
+				'target_block_id' => '',
+				'target_name'     => 'core/quote',
+				'target_text'     => $target_text,
+			)
+		);
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringNotContainsString( 'PENDING SUGGESTED EDIT', $service->captured_prompt );
 	}
 
 	/**

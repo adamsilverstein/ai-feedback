@@ -280,6 +280,46 @@ add_filter(
 	2
 );
 
+// A review of a paragraph starting "Move me below the quote" next to a
+// quote cited "Ada Lovelace" moves the paragraph below the quote, a move
+// whose target has inner blocks.
+add_filter(
+	'ai_feedback_mock_review',
+	static function ( array $response, array $blocks ): array {
+		$ids = array();
+		foreach ( $blocks as $block ) {
+			$name    = is_array( $block ) && is_string( $block['name'] ?? null ) ? $block['name'] : '';
+			$content = is_array( $block ) && is_string( $block['content'] ?? null ) ? $block['content'] : '';
+			if ( 'core/quote' === $name && 'Ada Lovelace' === $content ) {
+				$ids['quote'] = $block['clientId'] ?? '';
+			} elseif ( str_starts_with( $content, 'Move me below the quote' ) ) {
+				$ids['paragraph'] = $block['clientId'] ?? '';
+			}
+		}
+		if ( ! is_string( $ids['paragraph'] ?? null ) || ! is_string( $ids['quote'] ?? null ) ) {
+			return $response;
+		}
+
+		$response['feedback'] = array(
+			array(
+				'block_id'     => $ids['paragraph'],
+				'category'     => 'flow',
+				'severity'     => 'important',
+				'title'        => 'Follow the quote',
+				'feedback'     => 'This reads better after the quote.',
+				'block_action' => array(
+					'type'            => 'move',
+					'target_block_id' => $ids['quote'],
+					'position'        => 'after',
+				),
+			),
+		);
+		return $response;
+	},
+	10,
+	2
+);
+
 // A reply asking to reword the block's opening proposes a text edit, which
 // supersedes the review's move on that block.
 add_filter(
