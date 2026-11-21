@@ -52,6 +52,27 @@ describe('selectSuggestionStatus', () => {
 		expect(selectSuggestionStatus(select, { id: 41 })).toBe(null);
 	});
 
+	it('does not read a suggestion as the root note’s own when its reply is gone', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
+		]);
+
+		// Not the root note's own fix. The reply is no longer listed, so
+		// nothing asks for its status; a reply not loaded yet still reads it.
+		expect(selectSuggestionStatus(select, { id: 39 })).toBe(null);
+		// The note still holds it, so it can't be dismissed.
+		expect(selectHeldSuggestionStatus(select, { id: 39 })).toBe('pending');
+	});
+
+	it('does not let a payload name another thread’s root note', () => {
+		const select = selectWith([
+			root('{"schemaVersion":2,"aiFeedbackEditOwner":50}', 'applied'),
+			{ id: 50, parent: 0, meta: {} },
+		]);
+
+		expect(selectSuggestionStatus(select, { id: 50 })).toBe(null);
+	});
+
 	it('falls back to the review response until the notes load', () => {
 		expect(
 			selectSuggestionStatus(selectWith(null), {

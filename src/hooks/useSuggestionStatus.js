@@ -42,6 +42,44 @@ function selectNotes(select) {
 }
 
 /**
+ * Notes by id, and the note holding each edit's suggestion, by the id of the
+ * note that proposed the edit. Built once for each list of notes core-data
+ * returns, since every feedback item reads it on every store change.
+ */
+const indexes = new WeakMap();
+
+/**
+ * Indexes the loaded notes.
+ *
+ * A thread's root note may hold an AI reply's edit, named in its payload.
+ * The payload is meta an editor can write, so a named owner only counts when
+ * it is not itself a thread's root note; the server checks the rest, see
+ * Suggestions::get_owner_id().
+ *
+ * @param {Object[]} notes Comment records from core-data.
+ * @return {{byId: Map<number, Object>, holders: Map<number, Object>}} The index.
+ */
+function getIndex(notes) {
+	let index = indexes.get(notes);
+	if (!index) {
+		const byId = new Map(notes.map((note) => [note.id, note]));
+		const holders = new Map();
+		for (const note of notes) {
+			const ownerId = getSuggestionOwnerId(note);
+			if (
+				ownerId !== null &&
+				(ownerId === note.id || byId.get(ownerId)?.parent !== 0)
+			) {
+				holders.set(ownerId, note);
+			}
+		}
+		index = { byId, holders };
+		indexes.set(notes, index);
+	}
+	return index;
+}
+
+/**
  * Reads the suggestion status of a note's own edit with a registry's `select`.
  *
  * @param {(store: string) => Object} select Registry select.
@@ -53,16 +91,13 @@ export function selectSuggestionStatus(select, item) {
 	if (!notes) {
 		return item.suggestion_status ?? null;
 	}
-	// A thread's root note may hold an AI reply's edit, named in its payload.
-	const holder = notes.find(
-		(note) => getSuggestionOwnerId(note) === Number(item.id)
-	);
+	const { byId, holders } = getIndex(notes);
+	const holder = holders.get(Number(item.id));
 	if (holder) {
 		return getRecordSuggestionStatus(holder);
 	}
-	const record = notes.find((note) => note.id === item.id);
 	// The record says the note is not a suggestion for its own edit.
-	return record ? null : (item.suggestion_status ?? null);
+	return byId.has(Number(item.id)) ? null : (item.suggestion_status ?? null);
 }
 
 /**
@@ -74,7 +109,8 @@ export function selectSuggestionStatus(select, item) {
  * @return {string|null} Suggestion status, or null when the note holds no suggestion.
  */
 export function selectHeldSuggestionStatus(select, item) {
-	const record = selectNotes(select)?.find((note) => note.id === item.id);
+	const notes = selectNotes(select);
+	const record = notes ? getIndex(notes).byId.get(Number(item.id)) : null;
 	return record
 		? getRecordSuggestionStatus(record)
 		: (item.suggestion_status ?? null);
