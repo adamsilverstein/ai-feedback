@@ -300,6 +300,46 @@ export function findMoveTarget(selectors, action, clientId) {
 }
 
 /**
+ * Whether a suggestion marker is a move recorded for someone other than a
+ * note: Gutenberg's own, in Suggest intent. Gutenberg adds its note's id as
+ * `commentId` once its auto-save has created the note.
+ *
+ * @param {Object|undefined} marker `metadata.suggestion` marker.
+ * @param {number}           noteId The note the move belongs to.
+ * @return {boolean} True for a `pending-move` that does not carry the note's id.
+ */
+export function isCapturedMoveMarker(marker, noteId) {
+	return (
+		marker?.type === 'pending-move' &&
+		Number(marker.commentId ?? 0) !== Number(noteId)
+	);
+}
+
+/**
+ * Whether a block or one of its siblings holds a move recorded for someone
+ * other than a note. For a swap of two neighbors Gutenberg may mark either
+ * block.
+ *
+ * @param {Object}      selectors Block editor selectors.
+ * @param {string|null} clientId  Client ID.
+ * @param {number}      noteId    The note the move belongs to.
+ * @return {boolean} True when the move is pending in Gutenberg.
+ */
+export function hasCapturedMove(selectors, clientId, noteId) {
+	if (!clientId) {
+		return false;
+	}
+	return selectors
+		.getBlockOrder(selectors.getBlockRootClientId(clientId) ?? '')
+		.some((id) =>
+			isCapturedMoveMarker(
+				selectors.getBlockAttributes(id)?.metadata?.suggestion,
+				noteId
+			)
+		);
+}
+
+/**
  * Where a move would put the block, as `moveBlocksToPosition()` needs it.
  *
  * The index counts the parent's blocks once the moved block has left it.
