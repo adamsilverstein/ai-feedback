@@ -121,6 +121,206 @@ test.describe('Review Workflow', () => {
 		);
 	});
 
+	test('reviews a loaded block as edited, before it is saved', async ({
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		// Loaded from the database, so the block is parsed from saved markup.
+		const post = await requestUtils.createPost({
+			title: 'Edited before review',
+			content:
+				'<!-- wp:paragraph --><p>Text as loaded.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+
+		const [{ clientId }] = await editor.getBlocks({ full: true });
+		await editor.canvas
+			.getByRole('document', { name: 'Block: Paragraph' })
+			.fill('Text as edited.');
+		await expect
+			.poll(() =>
+				editor.getBlocks().then(([block]) => block.attributes.content)
+			)
+			.toBe('Text as edited.');
+
+		await aiFeedback.openSidebar();
+		const response = await aiFeedback.runReview();
+		const { blocks } = response.request().postDataJSON();
+
+		expect(blocks).toEqual([
+			expect.objectContaining({ clientId, content: 'Text as edited.' }),
+		]);
+	});
+
+	test('offers a review when the only text is inside a loaded group', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Text in a group',
+			content:
+				'<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Only text, in a group.</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const response = await aiFeedback.runReview();
+		const { blocks } = response.request().postDataJSON();
+		const [group] = await editor.getBlocks({ full: true });
+
+		// The group has no text of its own, so only its paragraph is sent.
+		expect(blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/paragraph',
+				parent: group.clientId,
+				content: 'Only text, in a group.',
+			}),
+		]);
+		await expect(
+			page
+				.locator('.ai-feedback-panel')
+				.getByText('Add some content to your post')
+		).toHaveCount(0);
+	});
+
+	test('stops offering a review once a loaded block is emptied', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Emptied in the editor',
+			content:
+				'<!-- wp:paragraph --><p>Soon to be cleared.</p><!-- /wp:paragraph -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(aiFeedback.getReviewButton()).toBeVisible();
+
+		await editor.canvas
+			.getByRole('document', { name: 'Block: Paragraph' })
+			.fill('');
+
+		await expect(
+			panel.getByText('Add some content to your post')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Review Document' })
+		).toHaveCount(0);
+	});
+
+	test('reviews a Custom HTML block as edited', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Custom HTML only',
+			content:
+				'<!-- wp:html --><p>Custom text as loaded.</p><!-- /wp:html -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+
+		const loaded = await aiFeedback.runReview();
+		expect(loaded.request().postDataJSON().blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/html',
+				content: 'Custom text as loaded.',
+			}),
+		]);
+
+		// Save an edit the way the block's own editor does, as its editing
+		// UI differs between WordPress versions.
+		await page.evaluate(() => {
+			const { select, dispatch } = window.wp.data;
+			const [block] = select('core/block-editor').getBlocks();
+			if (Array.isArray(block.innerContent)) {
+				dispatch('core/block-editor').updateBlock(block.clientId, {
+					innerContent: ['<p>Custom text as edited.</p>'],
+				});
+			} else {
+				dispatch('core/block-editor').updateBlockAttributes(
+					block.clientId,
+					{ content: '<p>Custom text as edited.</p>' }
+				);
+			}
+		});
+
+		const edited = await aiFeedback.runReview();
+		expect(edited.request().postDataJSON().blocks).toEqual([
+			expect.objectContaining({
+				name: 'core/html',
+				content: 'Custom text as edited.',
+			}),
+		]);
+	});
+
+	test('stops offering a review once a loaded table is emptied', async ({
+		page,
+		editor,
+		admin,
+		aiFeedback,
+		requestUtils,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Emptied table',
+			content:
+				'<!-- wp:table --><figure class="wp-block-table"><table class="has-fixed-layout"><tbody><tr><td>Old cell</td></tr></tbody></table><figcaption class="wp-element-caption">Old caption</figcaption></figure><!-- /wp:table -->',
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(1);
+		await aiFeedback.openSidebar();
+		const panel = page.locator('.ai-feedback-panel');
+		await expect(aiFeedback.getReviewButton()).toBeVisible();
+
+		// Delete every row and the caption. A table with none saves nothing.
+		await page.evaluate(() => {
+			const { select, dispatch } = window.wp.data;
+			const [table] = select('core/block-editor').getBlocks();
+			dispatch('core/block-editor').updateBlockAttributes(
+				table.clientId,
+				{ head: [], body: [], foot: [], caption: '' }
+			);
+		});
+
+		await expect(
+			panel.getByText('Add some content to your post')
+		).toBeVisible();
+		await expect(
+			panel.getByRole('button', { name: 'Review Document' })
+		).toHaveCount(0);
+	});
+
 	test('reviews documents with several blocks', async ({
 		page,
 		editor,

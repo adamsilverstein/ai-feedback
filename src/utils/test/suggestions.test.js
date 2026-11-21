@@ -1,7 +1,16 @@
 /**
  * External dependencies
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from 'vitest';
 
 /**
  * WordPress dependencies
@@ -9,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	create,
 	RichTextData,
+	toHTMLString,
 	registerFormatType,
 	unregisterFormatType,
 } from '@wordpress/rich-text';
@@ -34,6 +44,10 @@ import {
 	suggestReplyEdit,
 	supersedeSuggestions,
 } from '../suggestions';
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
 
 const mocks = vi.hoisted(() => ({
 	apiFetch: vi.fn(),
@@ -926,8 +940,21 @@ describe('supersedeSuggestions', () => {
 		delete window.aiFeedbackData;
 	});
 
+	// Stand-in for the registry `useRegistry()` gives the caller.
+	const registry = { batch: (callback) => callback() };
+
+	it('refuses to run without a registry, whatever it is asked to retire', async () => {
+		delete window.__experimentalSuggestionMode;
+
+		await expect(supersedeSuggestions(39, [])).rejects.toThrow(
+			'needs a data registry'
+		);
+	});
+
 	it('takes out the markers and marks the suggestion rejected', async () => {
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([40]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([40]);
 
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content: 'We met in order to plan.',
@@ -957,7 +984,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39])).resolves.toEqual([39]);
+		await expect(supersedeSuggestions(39, [39], registry)).resolves.toEqual(
+			[39]
+		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
@@ -973,7 +1002,9 @@ describe('supersedeSuggestions', () => {
 			},
 		];
 
-		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([]);
+		await expect(
+			supersedeSuggestions(39, [39, 40], registry)
+		).resolves.toEqual([]);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
@@ -981,14 +1012,18 @@ describe('supersedeSuggestions', () => {
 	it('does nothing without Suggestion Mode', async () => {
 		delete window.__experimentalSuggestionMode;
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
 	});
 
 	it('does nothing when the thread’s block is not loaded', async () => {
 		mocks.blocks = {};
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
@@ -996,7 +1031,9 @@ describe('supersedeSuggestions', () => {
 		mocks.saveEntityRecord.mockRejectedValue(new Error('offline'));
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-		await expect(supersedeSuggestions(39, [40])).resolves.toEqual([]);
+		await expect(supersedeSuggestions(39, [40], registry)).resolves.toEqual(
+			[]
+		);
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
 		warn.mockRestore();
 	});
@@ -1067,5 +1104,44 @@ describe('saveSuggestionStatuses', () => {
 			1,
 			'applied-unsaved'
 		);
+	});
+});
+
+describe('suggestions beside a footnote', () => {
+	// With core's formats, as in the editor, a footnote is one object.
+	beforeAll(registerEditorFormats);
+	afterAll(unregisterEditorFormats);
+
+	const FOOTNOTE =
+		'<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+	const content = `Revenue growth${FOOTNOTE} was strong last year.`;
+	const normalize = (html) => toHTMLString({ value: create({ html }) });
+	const footnotes = (html) => html.split('data-fn="f1"').length - 1;
+
+	it('marks the change and keeps the footnote once, through Accept and Reject', () => {
+		const suggested = buildSuggestionContent(
+			content,
+			{ find: 'strong', replace: 'steady' },
+			{ id: 30 }
+		);
+
+		expect(suggested).not.toBeNull();
+		expect(footnotes(suggested)).toBe(1);
+		expect(acceptSuggestionMarkers(suggested, 30)).toBe(
+			normalize(`Revenue growth${FOOTNOTE} was steady last year.`)
+		);
+		expect(removeSuggestionMarkers(suggested, 30)).toBe(normalize(content));
+	});
+
+	it('suggests nothing across the footnote', () => {
+		for (const find of ['growth1 was', 'growth\ufffc was']) {
+			expect(
+				buildSuggestionContent(
+					content,
+					{ find, replace: 'growth was' },
+					{ id: 31 }
+				)
+			).toBeNull();
+		}
 	});
 });

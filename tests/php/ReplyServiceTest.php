@@ -9,6 +9,7 @@ namespace AI_Feedback\Tests;
 
 use PHPUnit\Framework\TestCase;
 use AI_Feedback\Reply_Service;
+use AI_Feedback\Editor_Text;
 use AI_Feedback\Prompt_Builder;
 use AI_Feedback\Notes_Manager;
 
@@ -28,10 +29,13 @@ class Reply_Service_Stub extends Reply_Service {
 	public string $captured_model              = '';
 	public string $canned_response             = 'OK — replace "40% growth" with "40% growth (Source: Stripe dashboard)".';
 
+	public ?array $canned_answered_by = null;
+
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
 		$this->captured_prompt             = $prompt;
 		$this->captured_system_instruction = $system_instruction;
 		$this->captured_model              = $model;
+		$this->answered_by                 = $this->canned_answered_by;
 		return $this->canned_response;
 	}
 }
@@ -85,7 +89,8 @@ class ReplyServiceTest extends TestCase {
 			$GLOBALS['test_post_content'],
 			$GLOBALS['test_parsed_blocks'],
 			$GLOBALS['test_parse_blocks_calls'],
-			$GLOBALS['test_missing_posts']
+			$GLOBALS['test_missing_posts'],
+			$GLOBALS['test_block_types']
 		);
 		parent::tearDown();
 	}
@@ -179,6 +184,34 @@ class ReplyServiceTest extends TestCase {
 		$this->assertSame( $service->canned_response, $fake_notes->last_reply['feedback_item']['feedback'] );
 		$this->assertSame( 'abc-123', $fake_notes->last_reply['feedback_item']['block_id'] );
 		$this->assertSame( 'claude-sonnet-4', $fake_notes->last_reply['review_data']['model'] );
+		$this->assertArrayNotHasKey( 'answered_by', $fake_notes->last_reply['review_data'] );
+	}
+
+	/**
+	 * The provider and model that answered are saved with the AI reply.
+	 */
+	public function test_handle_reply_records_the_model_that_answered(): void {
+		$GLOBALS['test_comments'][100] = (object) array(
+			'comment_ID'      => 100,
+			'comment_content' => 'Add a source.',
+			'comment_author'  => 'AI Feedback',
+		);
+		$GLOBALS['test_comments'][200] = (object) array(
+			'comment_ID'      => 200,
+			'comment_content' => 'Which one?',
+			'comment_author'  => 'Jane',
+			'comment_parent'  => 100,
+		);
+
+		$fake_notes                  = new Reply_Service_Fake_Notes_Manager();
+		$service                     = new Reply_Service_Stub( new Prompt_Builder(), $fake_notes );
+		$service->canned_answered_by = array(
+			'provider' => 'anthropic',
+			'model'    => 'claude-sonnet-5-5',
+		);
+
+		$this->assertSame( 999, $service->handle_reply( 200, 100, 42, 'abc-123' ) );
+		$this->assertSame( $service->canned_answered_by, $fake_notes->last_reply['review_data']['answered_by'] );
 	}
 
 	/**
@@ -902,6 +935,56 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * Data provider for edits beside and across a footnote, which the editor
+	 * reads as one object character.
+	 *
+	 * @return array<string, array{0: string, 1: string, 2: bool}>
+	 */
+	public static function footnote_provider(): array {
+		$footnote = '<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup>';
+		$html     = "<p>Revenue growth{$footnote} was strong last year.</p>";
+		return array(
+			'find across the footnote number'   => array( $html, 'growth1 was', false ),
+			'find holding the object character' => array( $html, "growth\u{FFFC} was", false ),
+			'find skipping the footnote'        => array( $html, 'growth was', false ),
+			'find beside the footnote'          => array( $html, 'was strong', true ),
+			'find ending at the footnote'       => array( $html, 'Revenue growth', true ),
+			'find across an inline comment'     => array( '<p>Revenue grew<!-- check -->fast.</p>', 'grewfast', false ),
+			'find beside an empty anchor'       => array( '<p>Revenue<a id="q3"></a> grew fast.</p>', 'grew fast', true ),
+		);
+	}
+
+	/**
+	 * An edit is kept only when the editor can match it: a footnote is one
+	 * object character there, not its number, and a text edit can't write
+	 * the footnote back, so a `find` across it is dropped.
+	 *
+	 * @dataProvider footnote_provider
+	 *
+	 * @param string $html Block HTML.
+	 * @param string $find Edit's find text.
+	 * @param bool   $kept Whether the edit is kept.
+	 */
+	public function test_text_edit_beside_a_footnote( string $html, string $find, bool $kept ): void {
+		$notes = $this->reply_with(
+			(string) wp_json_encode(
+				array(
+					'reply' => 'Changed it.',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => $find,
+						'replace' => 'x',
+					),
+				)
+			),
+			$html
+		);
+
+		$edit = $notes->last_reply['feedback_item']['reply_edit'] ?? null;
+		$this->assertSame( $kept ? $find : null, is_array( $edit ) ? ( $edit['find'] ?? null ) : null );
+	}
+
+	/**
 	 * Data provider for the block text cases shared with the editor.
 	 *
 	 * @return array<string, array{0: string, 1: string}>
@@ -994,6 +1077,22 @@ class ReplyServiceTest extends TestCase {
 		foreach ( is_array( $fixture ) && is_array( $fixture['targets'] ?? null ) ? $fixture['targets'] : array() as $case ) {
 			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['markup'] ?? null ) && is_string( $case['text'] ?? null ) ) {
 				$cases[ $case['name'] ] = array( $case['markup'], $case['text'] );
+			}
+		}
+		return $cases;
+	}
+
+	/**
+	 * Data provider for the shared parent blocks whose own HTML is a wrapper.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function wrapper_text_provider(): array {
+		$fixture = json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/editor-text.json' ), true );
+		$cases   = array();
+		foreach ( is_array( $fixture ) && is_array( $fixture['wrappers'] ?? null ) ? $fixture['wrappers'] : array() as $case ) {
+			if ( is_array( $case ) && is_string( $case['name'] ?? null ) && is_string( $case['own'] ?? null ) && is_string( $case['text'] ?? null ) ) {
+				$cases[ $case['name'] ] = array( $case['own'], $case['text'] );
 			}
 		}
 		return $cases;
@@ -1108,6 +1207,20 @@ class ReplyServiceTest extends TestCase {
 	}
 
 	/**
+	 * A parent block's own text, from its HTML without the inner blocks, is
+	 * the text the editor sends for it (block-utils-editor.test.js runs the
+	 * same cases), so an empty wrapper has none.
+	 *
+	 * @dataProvider wrapper_text_provider
+	 *
+	 * @param string $own  The block's own HTML.
+	 * @param string $text Its own text.
+	 */
+	public function test_editor_text_reads_a_wrapper_as_the_editor_does( string $own, string $text ): void {
+		$this->assertSame( $text, Reply_Service::editor_text( $own ) );
+	}
+
+	/**
 	 * Data provider for the shared blocks with inner blocks.
 	 *
 	 * @return array<string, array{0: string, 1: string, 2: string, 3: string, 4: string}>
@@ -1202,6 +1315,84 @@ class ReplyServiceTest extends TestCase {
 		$service->handle_reply( 999, 100, 42, 'abc-123' );
 
 		$this->assertStringContainsString( "Block content: Revenue grew 40% \nlast year.\n", $service->captured_prompt );
+	}
+
+	/**
+	 * Seed a list item with a nested list and a line break.
+	 */
+	private function seed_list_item_with_nested_list(): void {
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks(
+			array(
+				array(
+					'blockName'    => 'core/list-item',
+					'attrs'        => array( 'metadata' => array( 'noteId' => 100 ) ),
+					'innerBlocks'  => array( self::leaf_block( 'core/list', '<ul class="wp-block-list"><li>Nested item</li></ul>' ) ),
+					'innerHTML'    => '<li>Revenue grew 40%<br>last year.</li>',
+					'innerContent' => array( '<li>Revenue grew 40%<br>last year.', null, '</li>' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * For a block whose own rich text an edit applies to, like a list item
+	 * with a nested list, the prompt shows that text as the editor reads
+	 * it, with the nested blocks as context.
+	 */
+	public function test_prompt_shows_own_text_of_a_list_item_with_a_nested_list(): void {
+		$GLOBALS['test_block_types'] = array(
+			'core/list-item' => array(
+				'content' => array(
+					'type'     => 'rich-text',
+					'source'   => 'rich-text',
+					'selector' => 'li',
+				),
+			),
+		);
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString(
+			"Block content: Revenue grew 40%\nlast year.\nBlocks inside it (context only; an edit changes the block content above, not these): Nested item\n\n",
+			$service->captured_prompt
+		);
+	}
+
+	/**
+	 * A block with inner blocks whose type keeps no rich text `content`, like
+	 * a quote, keeps the collapsed reading of all its text.
+	 */
+	public function test_prompt_keeps_the_full_text_of_a_block_without_own_rich_text(): void {
+		$this->seed_list_item_with_nested_list();
+
+		$service = new Reply_Service_Stub( new Prompt_Builder(), new Reply_Service_Fake_Notes_Manager() );
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( "Block content: Revenue grew 40% last year. Nested item\n\n", $service->captured_prompt );
+		$this->assertStringNotContainsString( 'Blocks inside it', $service->captured_prompt );
+	}
+
+	/**
+	 * A block over Editor_Text::MAX_BYTES, like a large data table, still
+	 * shows in the reply prompt as context, but a text edit on it is
+	 * dropped, since the server can't read it as the editor does.
+	 */
+	public function test_block_over_the_size_cap_is_context_only(): void {
+		$html = '<p>Revenue grew 40% last year. ' . str_repeat( 'Row of data. ', intdiv( Editor_Text::MAX_BYTES, 13 ) + 1 ) . '</p>';
+		$this->seed_parent_and_reply();
+		$this->seed_post_blocks( array( self::leaf_block( 'core/paragraph', $html, 100 ) ) );
+
+		$notes                    = new Reply_Service_Fake_Notes_Manager();
+		$service                  = new Reply_Service_Stub( new Prompt_Builder(), $notes );
+		$service->canned_response = '{"reply": "Changed it.", "edit": {"type": "replace_text", "find": "last year", "replace": "in 2025"}}';
+		$service->handle_reply( 999, 100, 42, 'abc-123' );
+
+		$this->assertStringContainsString( 'Block content: Revenue grew 40% last year. Row of data.', $service->captured_prompt );
+		$this->assertSame( 'Changed it.', $notes->last_reply['feedback_item']['feedback'] );
+		$this->assertArrayNotHasKey( 'reply_edit', $notes->last_reply['feedback_item'] );
 	}
 
 	/**

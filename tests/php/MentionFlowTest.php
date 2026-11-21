@@ -57,7 +57,11 @@ class Mention_Reply_Service extends Reply_Service {
 	 * @return string|\WP_Error
 	 */
 	protected function call_ai( string $prompt, string $system_instruction, string $model ): string|\WP_Error {
-		$this->prompts[] = $prompt;
+		$this->prompts[]   = $prompt;
+		$this->answered_by = array(
+			'provider' => 'anthropic',
+			'model'    => $model,
+		);
 		return $this->response;
 	}
 }
@@ -75,6 +79,13 @@ class Mention_Fake_Notes_Manager extends Notes_Manager {
 	public array $saved = array();
 
 	/**
+	 * Review data each note was saved with, keyed by note ID.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	public array $review_data = array();
+
+	/**
 	 * Save the AI reply as a note in the thread.
 	 *
 	 * @param array<string, mixed> $feedback_item Feedback item.
@@ -87,6 +98,7 @@ class Mention_Fake_Notes_Manager extends Notes_Manager {
 		$id = 900 + count( $this->saved );
 
 		$this->saved[ $id ]               = $feedback_item;
+		$this->review_data[ $id ]         = $review_data;
 		$GLOBALS['test_comments'][ $id ]  = new \WP_Comment(
 			array(
 				'comment_ID'      => (string) $id,
@@ -449,6 +461,18 @@ class MentionFlowTest extends TestCase {
 		$this->process( 300, '' );
 
 		$this->assertStringContainsString( '"edit" must always be null: the block content is not available.', $this->service->prompts[0] ?? '' );
+	}
+
+	/**
+	 * A mention answer is saved with the provider and model that answered.
+	 */
+	public function test_mention_answer_records_the_model_that_answered(): void {
+		$this->insert_note( 300, '@fresh-eyes simplify this' );
+
+		$this->assertSame( 'complete', $this->process( 300 )['status'] );
+		$review_data = $this->notes->review_data[900] ?? array();
+		$this->assertSame( 'anthropic', $review_data['answered_by']['provider'] ?? null );
+		$this->assertSame( $review_data['model'] ?? null, $review_data['answered_by']['model'] ?? null );
 	}
 
 	/**

@@ -119,6 +119,21 @@ add_filter(
 			return $reply;
 		}
 
+		// Asked to change text across a footnote, the edit's find reads the
+		// footnote's number, which the editor never matches.
+		if ( str_contains( $user_reply[1], 'footnote number' ) ) {
+			return (string) wp_json_encode(
+				array(
+					'reply' => 'Done: "growth1 was" now reads "growth is".',
+					'edit'  => array(
+						'type'    => 'replace_text',
+						'find'    => 'growth1 was',
+						'replace' => 'growth is',
+					),
+				)
+			);
+		}
+
 		// Asked to change both lines of a block split by a line break, the
 		// edit's find runs across the break, copying it as a newline.
 		if ( str_contains( $user_reply[1], 'both lines' ) ) {
@@ -274,6 +289,34 @@ add_filter(
 		return $response;
 	},
 	10,
+	2
+);
+
+// A reply asking to reword the block's opening proposes a text edit, which
+// supersedes the review's move on that block.
+add_filter(
+	'ai_feedback_mock_reply',
+	static function ( string $reply, string $prompt ): string {
+		if (
+			! preg_match( '/NEW USER REPLY:\n(.*?)\n\n/s', $prompt, $asked )
+			|| ! preg_match( '/reword it/i', $asked[1] )
+			|| ! str_contains( $prompt, 'The real opening' )
+		) {
+			return $reply;
+		}
+
+		return (string) wp_json_encode(
+			array(
+				'reply' => 'Reworded: "real opening" now reads "true opening".',
+				'edit'  => array(
+					'type'    => 'replace_text',
+					'find'    => 'real opening',
+					'replace' => 'true opening',
+				),
+			)
+		);
+	},
+	20,
 	2
 );
 

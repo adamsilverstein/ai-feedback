@@ -63,9 +63,13 @@ function renderAction(props, options = {}) {
 					attributes: {
 						content: blocks[id].content,
 						level: blocks[id].level,
-						metadata: options.noteIds?.[id]
-							? { noteId: options.noteIds[id] }
-							: undefined,
+						metadata:
+							options.noteIds?.[id] || options.markers?.[id]
+								? {
+										noteId: options.noteIds?.[id],
+										suggestion: options.markers?.[id],
+									}
+								: undefined,
 					},
 					innerBlocks: [],
 				}
@@ -101,6 +105,7 @@ function renderAction(props, options = {}) {
 		},
 		selectors: {
 			isFixApplied: (state, id) => !!options.applied?.[id],
+			getLastReview: () => options.review ?? null,
 		},
 	});
 	const record =
@@ -146,6 +151,7 @@ function renderAction(props, options = {}) {
 		selectors: {
 			getBlocks: (state) => state,
 			getBlock: (state, id) => getBlock(id),
+			getBlockAttributes: (state, id) => getBlock(id)?.attributes ?? null,
 			getClientIdsWithDescendants: () => order,
 			getBlockRootClientId: () => null,
 			getBlockIndex: (state, id) => order.indexOf(id),
@@ -288,6 +294,94 @@ describe('BlockAction', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Apply change' })
 		).not.toBeInTheDocument();
+	});
+
+	it('reads a move Gutenberg recorded as a suggestion as pending', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				// Gutenberg may mark the neighbor of a swapped pair instead.
+				markers: { intro: { type: 'pending-move', authorId: 1 } },
+			}
+		);
+
+		expect(
+			screen.getByText(
+				'Suggested in the post. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+		expect(
+			screen.queryByText('The post already has this change.')
+		).not.toBeInTheDocument();
+	});
+
+	it('still reads the move as pending once Gutenberg saved its note', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				// Gutenberg's auto-save adds its own note's id to its marker.
+				markers: {
+					rep: { type: 'pending-move', commentId: 55, authorId: 1 },
+				},
+			}
+		);
+
+		expect(
+			screen.getByText(
+				'Suggested in the post. Accept or reject it from the Notes sidebar.'
+			)
+		).toBeInTheDocument();
+	});
+
+	it('reads a move as applied when the marker is the plugin’s own', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				markers: {
+					rep: { type: 'pending-move', commentId: 7, authorId: 1 },
+				},
+			}
+		);
+
+		expect(
+			screen.getByText('The post already has this change.')
+		).toBeInTheDocument();
+	});
+
+	it('reads a move as applied when another block in the parent holds a pending move', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				// A move the author made by hand earlier, or another note's.
+				markers: { bg: { type: 'pending-move', authorId: 1 } },
+			}
+		);
+
+		expect(
+			screen.getByText('The post already has this change.')
+		).toBeInTheDocument();
+	});
+
+	it('reads a move as applied when its target holds another AI note’s move', () => {
+		renderAction(
+			{ action: move },
+			{
+				order: ['rep', 'intro', 'bg'],
+				noteIds: { intro: 8 },
+				markers: {
+					intro: { type: 'pending-move', commentId: 8, authorId: 1 },
+				},
+				review: { notes: [{ id: 7 }, { id: 8 }] },
+			}
+		);
+
+		expect(
+			screen.getByText('The post already has this change.')
+		).toBeInTheDocument();
 	});
 
 	it('reads a move already in place as applied', () => {

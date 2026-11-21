@@ -1,5 +1,171 @@
 {
-	"_comment": "Block HTML and the text the editor's rich text reads from it (create( { html } ).text). Reply_Service::editor_text() and extractEditorText() must agree with it; the PHP side also trims the outer ends.",
+	"_comment": "Block HTML and the text the editor's rich text reads from it (create( { html } ).text) with core's formats registered. Reply_Service::editor_text() and extractEditorText() must agree with it; the PHP side also trims the outer ends.",
+	"_comment_formats": "The rich text format types core registers in the editor, in order: the tag and class each handles, the HTML attributes it keeps, whether its text can be edited, and whether rich text reads it as plain text. Editor_Text::FORMATS must match; the JS tests register these, and an e2e test checks them against the editor.",
+	"formats": [
+		{
+			"name": "core/note",
+			"tagName": "mark",
+			"className": "wp-note",
+			"attributes": [
+				"data-id"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/bold",
+			"tagName": "strong",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/code",
+			"tagName": "code",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/image",
+			"tagName": "img",
+			"className": null,
+			"attributes": [
+				"class",
+				"style",
+				"src",
+				"alt"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/italic",
+			"tagName": "em",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/link",
+			"tagName": "a",
+			"className": null,
+			"attributes": [
+				"href",
+				"data-type",
+				"data-id",
+				"id",
+				"target",
+				"rel",
+				"class"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/strikethrough",
+			"tagName": "s",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/underline",
+			"tagName": "span",
+			"className": null,
+			"attributes": [
+				"style"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/text-color",
+			"tagName": "mark",
+			"className": "has-inline-color",
+			"attributes": [
+				"style",
+				"class"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/subscript",
+			"tagName": "sub",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/superscript",
+			"tagName": "sup",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/keyboard",
+			"tagName": "kbd",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/unknown",
+			"tagName": "*",
+			"className": null,
+			"attributes": [],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/language",
+			"tagName": "bdo",
+			"className": null,
+			"attributes": [
+				"lang",
+				"dir"
+			],
+			"contentEditable": true,
+			"asText": false
+		},
+		{
+			"name": "core/math",
+			"tagName": "math",
+			"className": null,
+			"attributes": [
+				"data-latex"
+			],
+			"contentEditable": false,
+			"asText": false
+		},
+		{
+			"name": "core/non-breaking-space",
+			"tagName": "span",
+			"className": "non-breaking-space",
+			"attributes": [],
+			"contentEditable": true,
+			"asText": true
+		},
+		{
+			"name": "core/footnote",
+			"tagName": "sup",
+			"className": "fn",
+			"attributes": [
+				"data-fn"
+			],
+			"contentEditable": false,
+			"asText": false
+		}
+	],
 	"cases": [
 		{
 			"name": "plain break",
@@ -185,6 +351,171 @@
 			"name": "paragraph wrapper",
 			"html": "<p class=\"has-text-align-center\">a <strong>b</strong></p>",
 			"text": "a b"
+		},
+		{
+			"name": "footnote",
+			"html": "growth<sup data-fn=\"f1\" class=\"fn\"><a href=\"#f1\" id=\"f1-link\">1</a></sup> last year",
+			"text": "growth\ufffc last year"
+		},
+		{
+			"name": "footnote without a link",
+			"html": "a<sup data-fn=\"f1\" class=\"fn\">1</sup>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "footnote among other classes",
+			"html": "a<sup class=\"x fn\" data-fn=\"f1\"><a href=\"#f1\">1</a></sup>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty footnote",
+			"html": "a<sup data-fn=\"f1\" class=\"fn\"></sup>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "superscript without the footnote class",
+			"html": "a<sup data-fn=\"f1\"><a href=\"#f1\">1</a></sup>b",
+			"text": "a1b"
+		},
+		{
+			"name": "formula",
+			"html": "a<math data-latex=\"x\"><mi>x</mi></math>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty anchor",
+			"html": "a<a id=\"x\"></a>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty link",
+			"html": "a<a href=\"#x\"></a>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty anchor with only a name",
+			"html": "a<a name=\"x\"></a>b",
+			"text": "ab"
+		},
+		{
+			"name": "anchor with text",
+			"html": "a<a id=\"x\">t</a>b",
+			"text": "atb"
+		},
+		{
+			"name": "inline comment",
+			"html": "a<!-- note -->b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty inline comment",
+			"html": "a<!---->b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "script",
+			"html": "a<script>x</script>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty bold",
+			"html": "a<strong></strong>b",
+			"text": "ab"
+		},
+		{
+			"name": "empty span with a class",
+			"html": "a<span class=\"x\"></span>b",
+			"text": "ab"
+		},
+		{
+			"name": "empty span with a style",
+			"html": "a<span style=\"text-decoration:underline\"></span>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty highlight",
+			"html": "a<mark class=\"has-inline-color\" style=\"color:red\"></mark>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "empty element with an unknown attribute",
+			"html": "a<abbr title=\"x\"></abbr>b",
+			"text": "ab"
+		},
+		{
+			"name": "image without attributes",
+			"html": "a<img>b",
+			"text": "ab"
+		},
+		{
+			"name": "linked image",
+			"html": "a<a href=\"#x\"><img src=\"x.png\" alt=\"\"></a>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "keyboard",
+			"html": "a<kbd>Ctrl</kbd>b",
+			"text": "aCtrlb"
+		},
+		{
+			"name": "language",
+			"html": "a<bdo lang=\"ar\" dir=\"rtl\">xy</bdo>b",
+			"text": "axyb"
+		},
+		{
+			"name": "non-breaking space format",
+			"html": "a<span class=\"non-breaking-space\">&nbsp;</span>b",
+			"text": "a\u00a0b"
+		},
+		{
+			"name": "object character in the text",
+			"html": "a\ufffcb",
+			"text": "ab"
+		},
+		{
+			"name": "encoded object character",
+			"html": "a&#xFFFC;b",
+			"text": "ab"
+		},
+		{
+			"name": "closing tag with nothing open",
+			"html": "a</strong>b",
+			"text": "ab"
+		},
+		{
+			"name": "unclosed footnote",
+			"html": "a<sup class=\"fn\" data-fn=\"f1\">1",
+			"text": "a\ufffc"
+		},
+		{
+			"name": "unclosed comment",
+			"html": "a<!-- b",
+			"text": "a\ufffc"
+		},
+		{
+			"name": "closing break",
+			"html": "a</br>b",
+			"text": "a\nb"
+		},
+		{
+			"name": "lone angle bracket",
+			"html": "a < b",
+			"text": "a < b"
+		},
+		{
+			"name": "footnote inside bold",
+			"html": "<strong>a<sup class=\"fn\" data-fn=\"f1\"><a href=\"#f1\">1</a></sup></strong>b",
+			"text": "a\ufffcb"
+		},
+		{
+			"name": "quoted angle bracket",
+			"html": "<a href=\"#x\" title=\"a>b\">c</a>",
+			"text": "c"
+		},
+		{
+			"name": "style",
+			"html": "a<style>p{}</style>b",
+			"text": "ap{}b"
 		}
 	],
 	"_comment_blocks": "Blocks with inner blocks: the editor matches an edit against the block's own rich text, `content`, never the inner blocks. The server reads it from the innerContent strings around the inner blocks (before, inner, after); the review reads the `content` attribute.",
@@ -244,6 +575,33 @@
 			"name": "image with a caption",
 			"markup": "<!-- wp:image --><figure class=\"wp-block-image\"><img src=\"http://example.com/chart.png\" alt=\"\"/><figcaption class=\"wp-element-caption\">A chart</figcaption></figure><!-- /wp:image -->",
 			"text": "A chart"
+		}
+	],
+	"_comment_wrappers": "Parent blocks whose own HTML, without inner blocks, is a wrapper. `own` is the server's own HTML (the block's innerContent strings), `text` its own text on both sides: Reply_Service::editor_text( own ) and the text the editor sends for the block.",
+	"wrappers": [
+		{
+			"name": "group",
+			"markup": "<!-- wp:group --><div class=\"wp-block-group\"><!-- wp:paragraph --><p>Inner text.</p><!-- /wp:paragraph --></div><!-- /wp:group -->",
+			"own": "<div class=\"wp-block-group\"></div>",
+			"text": ""
+		},
+		{
+			"name": "list",
+			"markup": "<!-- wp:list --><ul class=\"wp-block-list\"><!-- wp:list-item --><li>Inner text.</li><!-- /wp:list-item --></ul><!-- /wp:list -->",
+			"own": "<ul class=\"wp-block-list\"></ul>",
+			"text": ""
+		},
+		{
+			"name": "buttons",
+			"markup": "<!-- wp:buttons --><div class=\"wp-block-buttons\"><!-- wp:button --><div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\">Inner text.</a></div><!-- /wp:button --></div><!-- /wp:buttons -->",
+			"own": "<div class=\"wp-block-buttons\"></div>",
+			"text": ""
+		},
+		{
+			"name": "quote with a citation",
+			"markup": "<!-- wp:quote --><blockquote class=\"wp-block-quote\"><!-- wp:paragraph --><p>Inner text.</p><!-- /wp:paragraph --><cite>Someone</cite></blockquote><!-- /wp:quote -->",
+			"own": "<blockquote class=\"wp-block-quote\"><cite>Someone</cite></blockquote>",
+			"text": "Someone"
 		}
 	]
 }

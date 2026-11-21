@@ -145,6 +145,38 @@ class Stub_Model_Directory {
 	}
 
 	/**
+	 * Every model the provider lists, as objects with an ID.
+	 *
+	 * @return list<object> Listed models.
+	 * @throws \RuntimeException When set to fail.
+	 */
+	public function listModelMetadata(): array { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid -- Mirrors the AI Client API.
+		if ( $this->fails ) {
+			throw new \RuntimeException( 'Could not list models.' );
+		}
+		return array_map(
+			static fn ( string $id ): object => new class( $id ) {
+				/**
+				 * Constructor.
+				 *
+				 * @param string $id Model ID.
+				 */
+				public function __construct( private string $id ) {}
+
+				/**
+				 * Model ID.
+				 *
+				 * @return string ID.
+				 */
+				public function getId(): string { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid -- Mirrors the AI Client API.
+					return $this->id;
+				}
+			},
+			array_keys( $this->models )
+		);
+	}
+
+	/**
 	 * The model's metadata.
 	 *
 	 * @param  string $model_id Model ID.
@@ -363,6 +395,22 @@ class ModelCapabilitiesTest extends TestCase {
 		$this->assertFalse( $capabilities->supports_vision( AI_FEEDBACK_DEFAULT_MODEL ) );
 		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-4' ) );
 		$this->assertTrue( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
+	}
+
+	/**
+	 * A provider that lists only a dated release of the model answers for
+	 * it, under the same ID the request is pinned to (Model_Pin).
+	 */
+	public function test_core_metadata_for_a_dated_release(): void {
+		$capabilities = self::with_anthropic(
+			array(
+				'claude-opus-4-1-20250805' => self::model( true ),
+				'claude-opus-4-20250514'   => self::model( false ),
+			)
+		);
+
+		$this->assertSame( 'claude-opus-4-20250514', $capabilities->find_listed_id( 'anthropic', 'claude-opus-4' ) );
+		$this->assertFalse( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
 	}
 
 	/**

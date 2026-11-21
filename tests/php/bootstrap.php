@@ -56,6 +56,7 @@ if ( ! function_exists( 'get_network_option' ) ) {
 }
 require_once $includes_dir . 'class-fresh-eyes-user.php';
 require_once $includes_dir . 'class-mentions.php';
+require_once $includes_dir . 'class-editor-text.php';
 
 // Mock WordPress core functions.
 if ( ! function_exists( 'get_locale' ) ) {
@@ -135,6 +136,19 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		public $data;
 		public $status;
+		public $links = array();
+
+		public function add_link( $rel, $href, $attributes = array() ) {
+			$this->links[ $rel ][] = array( 'href' => $href ) + $attributes;
+		}
+
+		public function remove_link( $rel, $href = null ) {
+			unset( $this->links[ $rel ] );
+		}
+
+		public function get_links() {
+			return $this->links;
+		}
 
 		public function __construct( $data = null, $status = 200 ) {
 			$this->data   = $data;
@@ -340,6 +354,7 @@ if (! function_exists('is_wp_error') ) {
 require_once $includes_dir . 'class-health-controller.php';
 require_once $includes_dir . 'class-settings-controller.php';
 require_once $includes_dir . 'class-model-capabilities.php';
+require_once $includes_dir . 'class-model-pin.php';
 
 // Mock WP REST request and additional response helpers needed by Settings_Controller.
 if ( ! class_exists( 'WP_REST_Request' ) ) {
@@ -390,6 +405,15 @@ if ( ! function_exists( 'rest_ensure_response' ) ) {
 if ( ! function_exists( 'register_rest_route' ) ) {
 	function register_rest_route( $namespace, $route, $args ) {
 		// No-op for unit tests.
+	}
+}
+
+if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
+	function rest_sanitize_boolean( $value ) {
+		if ( is_string( $value ) ) {
+			return ! in_array( strtolower( $value ), array( 'false', '0', '' ), true );
+		}
+		return (bool) $value;
 	}
 }
 

@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * WordPress dependencies
@@ -16,6 +16,10 @@ import {
 	extractEditorText,
 	getBlockAnchor,
 } from '../block-utils';
+import {
+	registerEditorFormats,
+	unregisterEditorFormats,
+} from '../../../tests/js/editor-formats';
 
 const EDITOR_TEXT = require('../../../tests/fixtures/editor-text.json');
 
@@ -129,6 +133,10 @@ describe('extractBlockData', () => {
 
 // Shared with Reply_Service::editor_text() on the server.
 describe('extractEditorText', () => {
+	// With core's formats, as in the editor, a footnote is an object.
+	beforeAll(registerEditorFormats);
+	afterAll(unregisterEditorFormats);
+
 	it.each(EDITOR_TEXT.cases.map((item) => [item.name, item]))(
 		'reads %s as the editor does',
 		(_name, { html, text }) => {
@@ -138,12 +146,45 @@ describe('extractEditorText', () => {
 		}
 	);
 
-	it('drops comments, which are block delimiters here', () => {
+	it('drops block delimiters', () => {
 		expect(
 			extractEditorText(
 				'<!-- wp:paragraph -->\n<p>a<br>b</p>\n<!-- /wp:paragraph -->'
 			)
 		).toBe('\na\nb\n');
+	});
+
+	it('keeps a comment inside the text as an object, as the editor does', () => {
+		expect(
+			extractEditorText(
+				'<!-- wp:paragraph -->\n<p>a<!-- note -->b</p>\n<!-- /wp:paragraph -->'
+			)
+		).toBe('\na\ufffcb\n');
+	});
+
+	it('reads a footnote in a list item with a nested list as an object', () => {
+		const [data] = extractBlockData([
+			{
+				clientId: 'item',
+				name: 'core/list-item',
+				attributes: {
+					content:
+						'Revenue grew<sup data-fn="f1" class="fn"><a href="#f1" id="f1-link">1</a></sup> last year.',
+				},
+				originalContent: '<li>x</li>',
+				innerBlocks: [
+					{
+						clientId: 'nested',
+						name: 'core/list',
+						attributes: {},
+						originalContent: '<ul><li>Nested item</li></ul>',
+						innerBlocks: [],
+					},
+				],
+			},
+		]);
+
+		expect(data.content).toBe('Revenue grew\ufffc last year.');
 	});
 });
 
