@@ -561,17 +561,18 @@ class Review_Service {
 			return array();
 		}
 		$provider = $this->get_model_provider( $model );
-		$images   = $this->collect_review_images( $blocks, $provider );
-		if ( array() === $images && array() === $this->skipped_images ) {
-			return array();
-		}
-		// A model that refused images recently passed this check before, so
+		// Checked before any file is read, since none will be sent. A model
+		// that refused images recently passed the vision check before, so
 		// it isn't asked again.
 		if ( Image_Refusals::is_refused( $provider, $model ) ) {
 			Logger::debug( sprintf( 'Model %s refused images recently, so none are sent', $model ) );
-			foreach ( $images as $image ) {
-				$this->skip_image( $image['block_id'], 'refused_recently' );
+			foreach ( Review_Images::candidate_ids( $blocks ) as $block_id ) {
+				$this->skip_image( $block_id, 'refused_recently' );
 			}
+			return array();
+		}
+		$images = $this->collect_review_images( $blocks, $provider );
+		if ( array() === $images && array() === $this->skipped_images ) {
 			return array();
 		}
 		if ( ! $this->model_supports_vision( $model ) ) {

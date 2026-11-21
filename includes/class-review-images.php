@@ -202,6 +202,27 @@ class Review_Images {
 	}
 
 	/**
+	 * Client IDs of the blocks collect() might send, up to get_max(),
+	 * without reading any file.
+	 *
+	 * @param  array<mixed> $blocks Blocks from the review request.
+	 * @return list<string>
+	 */
+	public static function candidate_ids( array $blocks ): array {
+		$ids = array();
+		$max = self::get_max();
+		foreach ( $blocks as $block ) {
+			if ( count( $ids ) >= $max ) {
+				break;
+			}
+			if ( is_array( $block ) && self::is_candidate( $block ) && is_string( $block['clientId'] ?? null ) ) {
+				$ids[] = $block['clientId'];
+			}
+		}
+		return $ids;
+	}
+
+	/**
 	 * Whether a block is an image collect() might send: a Media Library
 	 * image, with a URL, and without alt text.
 	 *

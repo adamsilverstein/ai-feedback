@@ -769,6 +769,21 @@ class ReviewImagesTest extends TestCase {
 		$this->assertSame( array( 'refused_recently' ), array_column( $result['images_skipped'], 'reason' ) );
 		$this->assertArrayNotHasKey( 'block_change', $notes->items[0] );
 
+		// No file is read while the refusal holds, so an image that would
+		// be left out for its type is only reported as refused.
+		list( $service, , $result ) = $this->review( 'gpt-4o', array( self::alt_response() ), array( self::attachment( 'gif', 30 ) ) );
+		$this->assertSame( array( array() ), $service->sent );
+		$this->assertIsArray( $result );
+		$this->assertSame(
+			array(
+				array(
+					'block_id' => 'gif',
+					'reason'   => 'refused_recently',
+				),
+			),
+			$result['images_skipped']
+		);
+
 		// Another model, or the same model once the setting changes, still gets images.
 		$this->assertFalse( Image_Refusals::is_refused( 'google', 'gemini-2.0-flash' ) );
 		Image_Refusals::clear_on_option_change( 'connectors_ai_openai_api_key' );
