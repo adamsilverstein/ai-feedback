@@ -357,7 +357,7 @@ class ModelCapabilitiesTest extends TestCase {
 	public function test_catalog_marks_listed_models_as_vision(): void {
 		$capabilities = new Testable_Model_Capabilities();
 
-		foreach ( array( AI_FEEDBACK_DEFAULT_MODEL, 'claude-opus-4', 'gpt-4o', 'gemini-2.0-flash' ) as $model ) {
+		foreach ( array( AI_FEEDBACK_DEFAULT_MODEL, 'claude-opus-5-5', 'gpt-4o', 'gemini-2.0-flash' ) as $model ) {
 			$this->assertTrue( $capabilities->supports_vision( $model ), $model );
 		}
 		$this->assertFalse( $capabilities->supports_vision( 'unknown-model' ) );
@@ -388,13 +388,13 @@ class ModelCapabilitiesTest extends TestCase {
 		$capabilities = self::with_anthropic(
 			array(
 				AI_FEEDBACK_DEFAULT_MODEL => self::model( false ),
-				'claude-opus-4'           => self::model( true ),
+				'claude-opus-5-5'         => self::model( true ),
 			)
 		);
 
 		$this->assertFalse( $capabilities->supports_vision( AI_FEEDBACK_DEFAULT_MODEL ) );
-		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-4' ) );
-		$this->assertTrue( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
+		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-5-5' ) );
+		$this->assertTrue( $capabilities->core_supports_images( 'claude-opus-5-5', 'anthropic' ) );
 	}
 
 	/**
@@ -455,19 +455,19 @@ class ModelCapabilitiesTest extends TestCase {
 		$this->assertNull( ( new Testable_Model_Capabilities() )->core_supports_images( 'gpt-4o', 'openai' ) );
 
 		// Provider not configured.
-		$capabilities           = self::with_anthropic( array( 'claude-opus-4' => self::model( false ) ) );
+		$capabilities           = self::with_anthropic( array( 'claude-opus-5-5' => self::model( false ) ) );
 		$capabilities->registry = new Stub_Capability_Registry( array( 'anthropic' => Stub_Provider_A::class ), array() );
-		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
-		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-4' ) );
+		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-5-5', 'anthropic' ) );
+		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-5-5' ) );
 
 		// Provider doesn't list the model.
-		$capabilities = self::with_anthropic( array( 'claude-opus-4' => self::model( false ) ) );
+		$capabilities = self::with_anthropic( array( 'claude-opus-5-5' => self::model( false ) ) );
 		$this->assertNull( $capabilities->core_supports_images( AI_FEEDBACK_DEFAULT_MODEL, 'anthropic' ) );
 		$this->assertTrue( $capabilities->supports_vision( AI_FEEDBACK_DEFAULT_MODEL ) );
 
 		// A registry without the expected methods.
 		$capabilities->registry = new \stdClass();
-		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
+		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-5-5', 'anthropic' ) );
 	}
 
 	/**
@@ -477,8 +477,8 @@ class ModelCapabilitiesTest extends TestCase {
 		$capabilities               = self::with_anthropic( array() );
 		Stub_Provider_A::$directory = new Stub_Model_Directory( array(), true );
 
-		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-4', 'anthropic' ) );
-		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-4' ) );
+		$this->assertNull( $capabilities->core_supports_images( 'claude-opus-5-5', 'anthropic' ) );
+		$this->assertTrue( $capabilities->supports_vision( 'claude-opus-5-5' ) );
 	}
 
 	/**
@@ -535,16 +535,16 @@ class ModelCapabilitiesTest extends TestCase {
 	 * The `ai_feedback_model_supports_vision` filter has the last word.
 	 */
 	public function test_filter_overrides(): void {
-		$capabilities = self::with_anthropic( array( 'claude-opus-4' => self::model( true ) ) );
+		$capabilities = self::with_anthropic( array( 'claude-opus-5-5' => self::model( true ) ) );
 
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_model_supports_vision' => false );
-		$this->assertFalse( $capabilities->supports_vision( 'claude-opus-4' ) );
+		$this->assertFalse( $capabilities->supports_vision( 'claude-opus-5-5' ) );
 
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_model_supports_vision' => true );
 		$this->assertTrue( $capabilities->supports_vision( 'unknown-model' ) );
 
 		// Only a real true turns images on.
 		$GLOBALS['test_filter_results'] = array( 'ai_feedback_model_supports_vision' => 'yes' );
-		$this->assertFalse( $capabilities->supports_vision( 'claude-opus-4' ) );
+		$this->assertFalse( $capabilities->supports_vision( 'claude-opus-5-5' ) );
 	}
 }
