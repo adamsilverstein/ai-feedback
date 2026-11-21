@@ -578,6 +578,7 @@ namespace AI_Feedback\Tests {
 			$note = ( new Notes_Manager() )->get_notes_for_post( 42 )[0] ?? null;
 			$this->assertIsArray( $note );
 			$this->assertNull( $note['suggestion_status'] );
+			$this->assertSame( 'pending', $note['held_suggestion_status'] );
 		}
 
 		/**
@@ -600,11 +601,13 @@ namespace AI_Feedback\Tests {
 			$manager = new Notes_Manager();
 
 			$this->assertNull( $manager->get_notes_for_post( 42 )[0]['suggestion_status'] );
+			$this->assertNull( $manager->get_notes_for_post( 42 )[0]['held_suggestion_status'] );
 
 			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::PAYLOAD_META ] = '{"schemaVersion":2}';
 			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::STATUS_META ]  = 'applied-unsaved';
 
 			$this->assertSame( 'applied-unsaved', $manager->get_notes_for_post( 42 )[0]['suggestion_status'] );
+			$this->assertSame( 'applied-unsaved', $manager->get_notes_for_post( 42 )[0]['held_suggestion_status'] );
 		}
 	}
 }

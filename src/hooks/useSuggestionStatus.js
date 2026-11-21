@@ -134,15 +134,22 @@ export function selectSuggestionStatus(select, item) {
  * Reads the status of the suggestion a note holds, whether it is the note's
  * own edit or an AI reply's.
  *
+ * Until the notes load it reads the notes response's
+ * `held_suggestion_status`, which a review response doesn't have: a note
+ * fresh from a review can only hold its own fix.
+ *
  * @param {(store: string) => Object} select Registry select.
- * @param {Object}                    item   Feedback item with `id` and `suggestion_status`.
+ * @param {Object}                    item   Feedback item with `id`, `suggestion_status` and maybe `held_suggestion_status`.
  * @return {string|null} Suggestion status, or null when the note holds no suggestion.
  */
 export function selectHeldSuggestionStatus(select, item) {
 	const notes = selectNotes(select);
 	const record = notes ? getIndex(notes).byId.get(Number(item.id)) : null;
-	return record
-		? getRecordSuggestionStatus(record)
+	if (record) {
+		return getRecordSuggestionStatus(record);
+	}
+	return item.held_suggestion_status !== undefined
+		? item.held_suggestion_status
 		: (item.suggestion_status ?? null);
 }
 
@@ -171,7 +178,8 @@ export function useHeldSuggestionStatus(item) {
 			selectHeldSuggestionStatus(select, {
 				id: item.id,
 				suggestion_status: item.suggestion_status,
+				held_suggestion_status: item.held_suggestion_status,
 			}),
-		[item.id, item.suggestion_status]
+		[item.id, item.suggestion_status, item.held_suggestion_status]
 	);
 }

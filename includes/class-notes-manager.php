@@ -1114,7 +1114,8 @@ class Notes_Manager {
 	 * Notes created before these fields were stored return empty strings; the
 	 * sidebar falls back to the note content for those. `quick_fix` is null
 	 * when the note has none, and `suggestion_status` is null unless the fix
-	 * was added as a Gutenberg suggestion.
+	 * was added as a Gutenberg suggestion. `held_suggestion_status` is the
+	 * status of the suggestion the note holds, its own fix's or a reply's.
 	 *
 	 * @param  int $note_id Note ID.
 	 * @return array<string, mixed> Feedback fields.
@@ -1143,7 +1144,10 @@ class Notes_Manager {
 		);
 
 		// Null when the note holds a reply's edit rather than its own.
-		$values['suggestion_status'] = ( new Suggestions() )->get_edit_status( $note_id, $note_id );
+		$suggestions                 = new Suggestions();
+		$values['suggestion_status'] = $suggestions->get_edit_status( $note_id, $note_id );
+		// Whoever's edit it is, so the sidebar knows before the notes load.
+		$values['held_suggestion_status'] = $suggestions->get_status( $note_id );
 
 		return $values;
 	}

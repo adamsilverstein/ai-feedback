@@ -122,6 +122,17 @@ describe('selectSuggestionStatus', () => {
 });
 
 describe('selectHeldSuggestionStatus', () => {
+	it('reads the notes response’s held status until the notes load', () => {
+		// A root note holding a reply's pending edit reads null for its own.
+		expect(
+			selectHeldSuggestionStatus(selectWith(null), {
+				id: 39,
+				suggestion_status: null,
+				held_suggestion_status: 'pending',
+			})
+		).toBe('pending');
+	});
+
 	it('reads the suggestion a note holds, whoever’s edit it is', () => {
 		const select = selectWith([
 			root('{"schemaVersion":2,"aiFeedbackEditOwner":40}', 'pending'),
