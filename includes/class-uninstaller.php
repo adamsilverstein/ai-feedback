@@ -50,6 +50,8 @@ class Uninstaller {
 	 */
 	public const TRANSIENTS = array(
 		'ai_feedback_user_retry',
+		// Remembered image refusals, from #329.
+		'ai_feedback_image_refusals',
 	);
 
 	/**
@@ -103,6 +105,8 @@ class Uninstaller {
 	 */
 	public const POST_META = array(
 		Review_History::META_KEY,
+		// The review's open note IDs, kept next to its history, from #309.
+		'_ai_feedback_open_notes',
 	);
 
 	/**
@@ -133,6 +137,8 @@ class Uninstaller {
 		Reply_Cron_Dispatcher::JOB_META_KEY,
 		Reply_Cron_Dispatcher::CLAIMED_AT_META_KEY,
 		Reply_Cron_Dispatcher::CLAIM_TOKEN_META_KEY,
+		// Which model answered a note, from #323.
+		'ai_answered_by',
 	);
 
 	/**

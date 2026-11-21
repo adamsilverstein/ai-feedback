@@ -50,7 +50,7 @@ class UninstallerTest extends TestCase {
 		ai_feedback_test_reset_users();
 		$this->wpdb      = $GLOBALS['wpdb'] ?? null;
 		$GLOBALS['wpdb'] = new \Uninstall_Test_WPDB();
-		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls' ) as $global ) {
+		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls', 'test_posts', 'test_links' ) as $global ) {
 			$GLOBALS[ $global ] = array();
 		}
 		$GLOBALS['test_blog_id'] = 1;
@@ -62,7 +62,7 @@ class UninstallerTest extends TestCase {
 	protected function tearDown(): void {
 		ai_feedback_test_reset_users();
 		$GLOBALS['wpdb'] = $this->wpdb;
-		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls', 'test_blog_id' ) as $global ) {
+		foreach ( array( 'test_post_meta', 'test_comment_meta', 'test_cron', 'test_sites', 'test_site_ids', 'test_blog_stack', 'test_switched_to', 'test_get_sites_calls', 'test_blog_id', 'test_posts', 'test_links' ) as $global ) {
 			unset( $GLOBALS[ $global ] );
 		}
 		parent::tearDown();
@@ -211,6 +211,35 @@ class UninstallerTest extends TestCase {
 		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
 		$this->assertArrayHasKey( 5, $GLOBALS['test_user_objects'] );
 		$this->assertArrayNotHasKey( Fresh_Eyes_User::OPTION, $GLOBALS['test_options'] );
+	}
+
+	/**
+	 * Uninstall deletes the user through Fresh_Eyes_User, so an account that
+	 * owns a post is kept rather than deleted with its content, and keeps its
+	 * marker so it is still recognized.
+	 */
+	public function test_uninstall_keeps_a_fresh_eyes_user_that_owns_content(): void {
+		$fresh_eyes = Fresh_Eyes_User::ensure();
+		$this->assertGreaterThan( 0, $fresh_eyes );
+		$GLOBALS['test_posts'] = array(
+			array(
+				'post_author' => $fresh_eyes,
+				'post_type'   => 'post',
+				'post_status' => 'draft',
+			),
+		);
+
+		Uninstaller::uninstall();
+
+		$users = $GLOBALS['test_user_objects'];
+		$meta  = $GLOBALS['test_user_meta'];
+		$this->assertIsArray( $users );
+		$this->assertIsArray( $meta );
+		$this->assertIsArray( $meta[ $fresh_eyes ] ?? null );
+
+		$this->assertSame( array(), $GLOBALS['test_deleted_users'] );
+		$this->assertArrayHasKey( $fresh_eyes, $users );
+		$this->assertSame( '1', $meta[ $fresh_eyes ][ Fresh_Eyes_User::MARKER_META ] ?? null );
 	}
 
 	/**

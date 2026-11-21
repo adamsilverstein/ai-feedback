@@ -213,10 +213,10 @@ Deactivating the plugin keeps everything. Deleting it removes its settings and p
 |---------|------|
 | Review settings, site and per-user | Notes (comments of type `note`) |
 | House style rules, site and personal, on every site | The notes' meta: feedback details, suggested edits, personas, mentions, house style proposals, reply status |
-| Review history (`_ai_feedback_history` post meta) | |
+| Review history (`_ai_feedback_history` and `_ai_feedback_open_notes` post meta) | |
 | Usage analytics and rate limit records | |
 | The plugin's editor preferences (tips, welcome guide) | |
-| Cached model lists, chunked review sessions and locks | |
+| Cached model lists, remembered image refusals, chunked review sessions and locks | |
 | Scheduled AI replies | |
 | The hidden Fresh Eyes user, unless it somehow owns posts | |
 
