@@ -118,6 +118,27 @@ export function getReviewAudience(state) {
 }
 
 /**
+ * Whether reviews send the post's images to the AI provider, a setting of
+ * the site.
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True when images are sent.
+ */
+export function getSendImages(state) {
+	return state.settings.sendImages;
+}
+
+/**
+ * Whether the current user can change the site's settings.
+ *
+ * @param {Object} state Store state.
+ * @return {boolean} True for users who can.
+ */
+export function canManageSite(state) {
+	return state.canManageSite;
+}
+
+/**
  * Get available locales.
  *
  * @param {Object} state Store state.

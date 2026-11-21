@@ -128,6 +128,65 @@ async function openDraft(
 }
 
 /**
+ * Switch the editor to Suggest intent from the Options menu.
+ *
+ * @param {import('@playwright/test').Page} page Page.
+ */
+async function switchToSuggesting(page) {
+	await page
+		.getByRole('region', { name: 'Editor top bar' })
+		.getByRole('button', { name: 'Options' })
+		.click();
+	const suggesting = page.getByRole('menuitemradio', {
+		name: /^Suggesting/,
+	});
+	await suggesting.click();
+	await expect(suggesting).toHaveAttribute('aria-checked', 'true');
+	await page.keyboard.press('Escape');
+}
+
+/**
+ * The post's notes, with their suggestion meta.
+ *
+ * @param {Object} requestUtils Request utils fixture.
+ * @param {number} postId       Post ID.
+ * @return {Promise<Object[]>} Notes.
+ */
+function getNotes(requestUtils, postId) {
+	return requestUtils.rest({
+		path: '/wp/v2/comments',
+		params: {
+			post: postId,
+			type: 'note',
+			status: 'all',
+			context: 'edit',
+			per_page: 100,
+		},
+	});
+}
+
+/**
+ * Operation types of every pending suggestion on the post, sorted.
+ *
+ * @param {Object[]} notes Notes.
+ * @return {string[]} One entry per pending suggestion operation.
+ */
+function pendingOperations(notes) {
+	return notes
+		.filter(
+			(note) =>
+				note.meta?._wp_suggestion &&
+				(note.meta._wp_suggestion_status || 'pending') === 'pending'
+		)
+		.flatMap((note) =>
+			JSON.parse(note.meta._wp_suggestion).operations.map(
+				(operation) => operation.type
+			)
+		)
+		.sort();
+}
+
+/**
  * Drain replies a failed test left queued. Mock mode follows the e2e cookie,
  * not the queued event, so a later cookie-less cron run would send them to a
  * real provider.
@@ -146,8 +205,11 @@ module.exports = {
 	blockTexts,
 	decideSuggestion,
 	drainCron,
+	getNotes,
 	getSuggestionMeta,
 	markerIds,
 	openDraft,
 	openNotesSidebar,
+	pendingOperations,
+	switchToSuggesting,
 };

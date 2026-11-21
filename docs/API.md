@@ -78,9 +78,9 @@ The AI writes them as `{ "type": "remove" }`, `{ "type": "move", "target_block_i
 
 The editor shows each one on its note with a one-line description, such as "Move above “Why this matters”" or "Remove this block and the 2 blocks inside it". Apply is a single undo step. An edit whose block or move target is gone shows as outdated, a move next to one of the block's own inner blocks is never offered, and a removal that would take a block linked to another note with it is not offered.
 
-With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
+With Gutenberg's Suggestion Mode on, a review note's removal, or a move that stays within one parent block, becomes a pending structural suggestion (Gutenberg's apply-and-tag shape: a `metadata.suggestion` marker carrying the note ID, plus a `block-remove` or `block-move` operation on the note). This needs Gutenberg's structural suggestions, detected by `gutenberg_strip_pending_structural_suggestions()` and filterable through `ai_feedback_use_structural_suggestions`. The stored payload is read back after it is saved, and if it is not what was sent the note goes back to a plain note. In Gutenberg's Suggest intent, Gutenberg records the move itself as the current user's suggestion, so the note goes back to a plain note and the move is suggested once. Inserts, moves between parent blocks, and structural edits from replies stay with Preview and Apply in the sidebar.
 
-Known limitation: the plugin can't tell whether the editor is in Gutenberg's Edit or Suggest intent. Gutenberg only exposes that through a private selector (`getEditorIntent()`) and nothing in the page reflects it. In Suggest intent, Gutenberg's own capture may record a suggested move a second time, as a pending move by the current user. Run reviews in Edit intent when Suggestion Mode is on.
+Known limitation: the plugin can't read whether the editor is in Gutenberg's Edit or Suggest intent, since Gutenberg only exposes it through a private selector (`getEditorIntent()`). It goes by what Gutenberg does instead: in Suggest intent Gutenberg marks a move with a `pending-move` marker as it lands, one that does not carry the AI note's ID, and seeing one is what sends the move to Gutenberg. That suggestion is credited to the current user rather than the AI note, and the note's sidebar card says the move is suggested in the post.
 
 **Formatting fixes:**
 
@@ -506,9 +506,13 @@ X-WP-Nonce: {nonce}
     { "id": "skeptical_expert", "label": "Skeptical expert", "description": "Questions claims and asks for sources." },
     { "id": "first_time_visitor", "label": "First-time visitor", "description": "Flags jargon and assumed knowledge." },
     { "id": "busy_skimmer", "label": "Busy skimmer", "description": "Reads headings and first sentences only, and reports what they took away." }
-  ]
+  ],
+  "send_images": true,
+  "can_manage_site": false
 }
 ```
+
+`send_images` is the site's image setting: whether reviews may send the post's images to the AI provider for alt text suggestions. `can_manage_site` is true when the current user has `manage_options` and so may change it.
 
 ---
 
@@ -519,6 +523,8 @@ Save the current user's review preferences. Each user has their own model, focus
 Send `scope: "site"` to change the site defaults instead, which apply to users who have not picked a value. This requires `manage_options`.
 
 `GET /settings` returns the user's own value for each setting, falling back to the site default and then the plugin default.
+
+`send_images` is different: it is a setting of the site, not a preference, so it is saved for the site under either scope and always requires `manage_options`. It is stored in the `ai_feedback_send_images` option as `'1'` or `'0'`, and is on when never saved. With it off, `Review_Images` collects nothing, so a review sends no image, proposes no alt text from image content and reports no skipped images. The `ai_feedback_max_review_images` filter wins over it: the filter is passed 0 when the setting is off, so returning a number above 0 sends images anyway, and returning 0 keeps them on the site when the setting is on.
 
 #### Request
 
@@ -539,6 +545,7 @@ X-WP-Nonce: {nonce}
 | `feedback_locale` | string | No | Feedback language, or `auto` |
 | `default_persona` | string | No | Reader persona ID ("Read it as"). Unknown IDs return 400 `invalid_persona` |
 | `review_audience` | string | No | "Who is this for?" text, at most 100 characters. An empty string clears it |
+| `send_images` | boolean | No | Whether reviews send the post's images to the AI provider. A setting of the site: requires `manage_options` under either scope |
 
 **Example Request:**
 
@@ -563,7 +570,7 @@ Returns the updated settings object (same format as GET /settings).
 | 400 | `invalid_model` | Model ID is not valid |
 | 400 | `invalid_focus_area` | Focus area is not valid |
 | 400 | `invalid_tone` | Tone is not valid |
-| 403 | `rest_forbidden` | User cannot edit posts, or sent `scope: "site"` without `manage_options` |
+| 403 | `rest_forbidden` | User cannot edit posts, or sent `scope: "site"` or `send_images` without `manage_options` |
 
 ---
 
