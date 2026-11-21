@@ -355,6 +355,35 @@ class ReplyStatusControllerTest extends TestCase {
 	}
 
 	/**
+	 * Threads and AI replies are recognised by their meta whoever wrote
+	 * them: a thread and reply from before the Fresh Eyes user (author 0)
+	 * next to ones written as it (author 41), and a person's note with no
+	 * meta that is never mistaken for one.
+	 */
+	public function test_threads_recognise_old_and_new_ai_notes_side_by_side(): void {
+		$base = array(
+			'comment_post_ID' => '42',
+			'comment_type'    => 'note',
+			'comment_author'  => 'Fresh Eyes',
+		);
+		foreach ( array( 300 => '0', 400 => '41' ) as $root => $author ) {
+			$GLOBALS['test_comments'][ $root ]         = new \WP_Comment( $base + array( 'comment_ID' => (string) $root, 'user_id' => $author ) );
+			$GLOBALS['test_comment_meta'][ $root ]     = array( 'ai_feedback' => '1' );
+			$GLOBALS['test_comments'][ $root + 1 ]     = new \WP_Comment( $base + array( 'comment_ID' => (string) ( $root + 1 ), 'comment_parent' => (string) $root, 'comment_author' => 'Jane', 'user_id' => '7', 'comment_content' => 'Which one?' ) );
+			$GLOBALS['test_comments'][ $root + 2 ]     = new \WP_Comment( $base + array( 'comment_ID' => (string) ( $root + 2 ), 'comment_parent' => (string) $root, 'user_id' => $author, 'comment_content' => 'This one.' ) );
+			$GLOBALS['test_comment_meta'][ $root + 2 ] = array( 'ai_feedback' => '1' );
+		}
+		// A person's own note, without the meta, is not a Fresh Eyes thread.
+		$GLOBALS['test_comments'][500] = new \WP_Comment( $base + array( 'comment_ID' => '500', 'comment_author' => 'Jane', 'user_id' => '7' ) );
+
+		$threads = (array) $this->controller->get_threads( $this->threads_request() )->get_data()['threads'];
+
+		$this->assertSame( array( 300, 400 ), array_keys( $threads ) );
+		$this->assertSame( array( false, true ), array_column( $threads[300]['replies'], 'is_ai' ) );
+		$this->assertSame( array( false, true ), array_column( $threads[400]['replies'], 'is_ai' ) );
+	}
+
+	/**
 	 * An AI reply's edit is returned with the thread; other replies have none.
 	 */
 	public function test_threads_include_ai_reply_edit(): void {

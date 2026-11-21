@@ -538,5 +538,32 @@
 			"content": "Two.&nbsp; Spaces",
 			"text": "Two.\u00a0 Spaces"
 		}
+	],
+	"_comment_wrappers": "Parent blocks whose own HTML, without inner blocks, is a wrapper. `own` is the server's own HTML (the block's innerContent strings), `text` its own text on both sides: Reply_Service::editor_text( own ) and the text the editor sends for the block.",
+	"wrappers": [
+		{
+			"name": "group",
+			"markup": "<!-- wp:group --><div class=\"wp-block-group\"><!-- wp:paragraph --><p>Inner text.</p><!-- /wp:paragraph --></div><!-- /wp:group -->",
+			"own": "<div class=\"wp-block-group\"></div>",
+			"text": ""
+		},
+		{
+			"name": "list",
+			"markup": "<!-- wp:list --><ul class=\"wp-block-list\"><!-- wp:list-item --><li>Inner text.</li><!-- /wp:list-item --></ul><!-- /wp:list -->",
+			"own": "<ul class=\"wp-block-list\"></ul>",
+			"text": ""
+		},
+		{
+			"name": "buttons",
+			"markup": "<!-- wp:buttons --><div class=\"wp-block-buttons\"><!-- wp:button --><div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\">Inner text.</a></div><!-- /wp:button --></div><!-- /wp:buttons -->",
+			"own": "<div class=\"wp-block-buttons\"></div>",
+			"text": ""
+		},
+		{
+			"name": "quote with a citation",
+			"markup": "<!-- wp:quote --><blockquote class=\"wp-block-quote\"><!-- wp:paragraph --><p>Inner text.</p><!-- /wp:paragraph --><cite>Someone</cite></blockquote><!-- /wp:quote -->",
+			"own": "<blockquote class=\"wp-block-quote\"><cite>Someone</cite></blockquote>",
+			"text": "Someone"
+		}
 	]
 }

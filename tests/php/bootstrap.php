@@ -136,6 +136,19 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		public $data;
 		public $status;
+		public $links = array();
+
+		public function add_link( $rel, $href, $attributes = array() ) {
+			$this->links[ $rel ][] = array( 'href' => $href ) + $attributes;
+		}
+
+		public function remove_link( $rel, $href = null ) {
+			unset( $this->links[ $rel ] );
+		}
+
+		public function get_links() {
+			return $this->links;
+		}
 
 		public function __construct( $data = null, $status = 200 ) {
 			$this->data   = $data;
@@ -341,6 +354,7 @@ if (! function_exists('is_wp_error') ) {
 require_once $includes_dir . 'class-health-controller.php';
 require_once $includes_dir . 'class-settings-controller.php';
 require_once $includes_dir . 'class-model-capabilities.php';
+require_once $includes_dir . 'class-model-pin.php';
 
 // Mock WP REST request and additional response helpers needed by Settings_Controller.
 if ( ! class_exists( 'WP_REST_Request' ) ) {
