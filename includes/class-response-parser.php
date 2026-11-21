@@ -1203,6 +1203,57 @@ class Response_Parser {
 	}
 
 	/**
+	 * Read the house style rules suggested from published posts.
+	 *
+	 * The response must be an object whose `rules` is a list. Each rule is
+	 * sanitized like a saved one; one that is not a string, is empty, is too
+	 * long, repeats another or matches a rule the author already has is
+	 * dropped. At most House_Style_Suggestions::MAX_SUGGESTIONS are kept.
+	 *
+	 * @param  string $response Raw AI response.
+	 * @param  mixed  $existing Rule texts the author already has.
+	 * @return list<string>|null Rules, or null when the response can't be read.
+	 */
+	public function parse_rule_suggestions( string $response, mixed $existing = array() ): ?array {
+		$response   = trim( $response );
+		$candidates = array( $response );
+		if ( preg_match( '/```(?:json)?\s*(.*?)```/s', $response, $fenced ) ) {
+			$candidates[] = trim( $fenced[1] );
+		}
+		$start = strpos( $response, '{' );
+		$end   = strrpos( $response, '}' );
+		if ( false !== $start && false !== $end && $end > $start ) {
+			$candidates[] = substr( $response, $start, $end - $start + 1 );
+		}
+
+		$proposed = null;
+		foreach ( $candidates as $candidate ) {
+			$data = json_decode( $candidate, true );
+			if ( is_array( $data ) && ! array_is_list( $data ) && is_array( $data['rules'] ?? null ) && array_is_list( $data['rules'] ) ) {
+				$proposed = $data['rules'];
+				break;
+			}
+		}
+		if ( null === $proposed ) {
+			return null;
+		}
+
+		$rules = array();
+		// A response with far more entries than asked for is not read to the end.
+		foreach ( House_Style::clean_list( array_slice( $proposed, 0, 2 * House_Style::MAX_RULES ), 2 * House_Style::MAX_RULES ) as $rule ) {
+			if ( House_Style::list_has_rule( $existing, $rule ) ) {
+				continue;
+			}
+			$rules[] = $rule;
+			if ( count( $rules ) >= House_Style_Suggestions::MAX_SUGGESTIONS ) {
+				break;
+			}
+		}
+
+		return $rules;
+	}
+
+	/**
 	 * Decode a reply's JSON object, allowing a code fence or text around it.
 	 *
 	 * Tries the whole response, then a fenced block, then the first `{` to

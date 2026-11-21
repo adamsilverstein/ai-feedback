@@ -128,6 +128,27 @@ export function dismissProposal(noteId) {
 }
 
 /**
+ * Ask the AI to propose rules from recent published posts. Nothing is
+ * saved; the request counts as one review against the hourly limit.
+ *
+ * @param {Object} options
+ * @param {string} [options.scope] SCOPE_USER for the user's own posts, SCOPE_SITE for the whole site's.
+ * @param {string} [options.model] AI model, as for a review.
+ * @return {Promise<{suggestions: string[], scope: string, post_count: number}>} Proposed rules.
+ */
+export function suggestRules({ scope = SCOPE_USER, model } = {}) {
+	const data = { scope };
+	if (model) {
+		data.model = model;
+	}
+	return apiFetch({
+		path: `${HOUSE_STYLE_PATH}/suggestions/posts`,
+		method: 'POST',
+		data,
+	});
+}
+
+/**
  * Key for comparing rules: case, spacing and closing punctuation ignored,
  * like the server's duplicate check.
  *

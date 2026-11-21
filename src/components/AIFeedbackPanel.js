@@ -224,7 +224,7 @@ export default function AIFeedbackPanel() {
 					<ToneSelector />
 					<PersonaSelector />
 					<FocusAreaSelector />
-					<HouseStyle />
+					<HouseStyle model={selectedModel} />
 					<ImageSharing />
 				</PanelBody>
 			</div>

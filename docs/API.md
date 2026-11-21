@@ -797,6 +797,31 @@ Change a rule's `text`, or remove it. Pass the rule's `scope` (`user` by default
 
 Record that the author doesn't want to keep a rule an AI reply proposed, so the thread stops offering it. Requires `edit_post` on the reply's post.
 
+### POST /house-style/suggestions/posts
+
+Propose rules from recent published posts. Nothing is saved: the response lists rule texts, and each becomes a rule only when the user saves it with [POST /house-style](#post-house-style).
+
+```json
+{ "scope": "user", "model": "claude-sonnet-5-5" }
+```
+
+`scope` is `user` (default) or `site` and needs what saving a rule of that scope needs: `edit_posts`, or `manage_options` for `site`. `model` is the model to ask, as for a review, and defaults to the plugin's default model.
+
+```json
+{
+  "suggestions": [ "Headings use sentence case", "Write WordPress with a capital P" ],
+  "scope": "user",
+  "post_count": 5
+}
+```
+
+- **Which posts.** The 5 most recent published posts: the current user's own for `user`, posts by any author for `site`. Only the `publish` status, no password, public post types that support the editor (not attachments), and only posts the user passes `read_post` for. Drafts, pending, scheduled, private and password protected posts are never read. Each post is checked again after the query, so a plugin that changes the query can't widen it.
+- **How much is sent.** Posts are sent as plain text (no markup, block comments or shortcodes; headings marked with `##`), at most 4000 characters a post and 20000 in total, half of what one review request can carry. Posts past the total are left out. Posts are framed as material, not instructions.
+- **Cost.** One AI request through the same call a review makes, with the same retries. It uses one slot of the hourly limit reviews use (10 an hour), given back when the AI service is unavailable (`ai_service_unavailable`, `503`). Without any post to read the response is `400` `house_style_no_posts` and no slot is used.
+- **What comes back.** The AI must return `{"rules": ["..."]}`. Each rule is sanitized like a saved one; an entry that is not a string, is empty, is longer than `max_length`, repeats another or matches a rule the user's reviews already follow is dropped. At most 5 are returned, possibly none. A response that is not that object is `502` `invalid_rule_suggestions`.
+
+Nothing is stored by this request beyond the hourly limit's timestamp.
+
 ### How replies propose a rule
 
 The reply prompt lists the rules and lets the AI add `"remember": "short rule"` to its JSON when the author states a standing preference, such as "we always write WordPress with a capital P". The rule is sanitized like a saved one and stored in the reply's `feedback_house_rule` comment meta, unless the author's reviews already follow it. Nothing is saved as a rule until the author clicks **Remember**, after editing the text if they like.
@@ -1132,6 +1157,26 @@ add_filter( 'ai_feedback_house_style_rules', function( array $rules, int $user_i
 }, 10, 2 );
 ```
 
+#### `ai_feedback_house_style_sample_size`
+
+How many recent published posts [rule suggestions](#post-house-stylesuggestionsposts) read. Default 5, at most 10. The text sent is capped in total, so a larger sample does not make a larger request.
+
+```php
+add_filter( 'ai_feedback_house_style_sample_size', function( int $size, string $scope ): int {
+    return 'site' === $scope ? 8 : $size;
+}, 10, 2 );
+```
+
+#### `ai_feedback_house_style_sample_post_types`
+
+Which post types rule suggestions read. By default every public post type that supports the editor, except attachments. Only published posts the user can read are used, whatever the type.
+
+```php
+add_filter( 'ai_feedback_house_style_sample_post_types', function( array $post_types ): array {
+    return array( 'post' );
+} );
+```
+
 #### `ai_feedback_max_review_images`
 
 How many images a review request may show a vision model so it can propose alt text. Default 4; return 0 to never send images.
@@ -1167,6 +1212,17 @@ Change the review response used in `AI_FEEDBACK_MOCK_MODE`, for example to test 
 ```php
 add_filter( 'ai_feedback_mock_review', function( array $response, array $blocks ): array {
     $response['feedback'][0]['block_action'] = array( 'type' => 'remove' );
+    return $response;
+}, 10, 2 );
+```
+
+#### `ai_feedback_mock_rule_suggestions`
+
+Change the rule suggestions returned in `AI_FEEDBACK_MOCK_MODE`. The built-in mock proposes "Headings use sentence case" and "Use the Oxford comma".
+
+```php
+add_filter( 'ai_feedback_mock_rule_suggestions', function( array $response, array $posts ): array {
+    $response['rules'] = array( 'Spell out numbers under ten' );
     return $response;
 }, 10, 2 );
 ```

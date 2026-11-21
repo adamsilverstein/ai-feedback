@@ -50,3 +50,33 @@ if ( ! function_exists( 'get_blog_option' ) ) {
 		return 'blogname' === $option ? ( $GLOBALS['test_blog_names'][ $id ] ?? $default_value ) : $default_value;
 	}
 }
+
+// Published posts for rule suggestions. Returns every seeded post whatever
+// the query asks for, so tests can check the query and the checks after it.
+if ( ! function_exists( 'get_posts' ) ) {
+	function get_posts( $args = array() ) {
+		$GLOBALS['test_get_posts_args'][] = $args;
+		return $GLOBALS['test_get_posts'] ?? array();
+	}
+}
+
+if ( ! function_exists( 'get_post_types' ) ) {
+	function get_post_types( $args = array(), $output = 'names', $operator = 'and' ) {
+		return array(
+			'post' => 'post',
+			'page' => 'page',
+		);
+	}
+}
+
+if ( ! function_exists( 'post_type_supports' ) ) {
+	function post_type_supports( $post_type, $feature ) {
+		return in_array( $post_type, $GLOBALS['test_editor_post_types'] ?? array( 'post', 'page' ), true );
+	}
+}
+
+if ( ! function_exists( 'strip_shortcodes' ) ) {
+	function strip_shortcodes( $content ) {
+		return (string) preg_replace( '/\[[a-z][^\]]*\]/i', '', (string) $content );
+	}
+}
