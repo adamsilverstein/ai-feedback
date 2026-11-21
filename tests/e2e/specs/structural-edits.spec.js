@@ -191,6 +191,61 @@ test.describe('Structural edits', () => {
 		).toHaveAttribute('aria-disabled', 'true');
 	});
 
+	test('a move next to a quote finds the quote by its own text after a reload', async ({
+		page,
+		editor,
+		admin,
+		requestUtils,
+		aiFeedback,
+	}) => {
+		const post = await requestUtils.createPost({
+			title: 'Move next to a quote',
+			content: [
+				'<!-- wp:paragraph --><p>Move me below the quote.</p><!-- /wp:paragraph -->',
+				'<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>Inner words.</p><!-- /wp:paragraph --><cite>Ada Lovelace</cite></blockquote><!-- /wp:quote -->',
+				'<!-- wp:paragraph --><p>Closing words.</p><!-- /wp:paragraph -->',
+			].join(''),
+			status: 'draft',
+		});
+		await admin.editPost(post.id);
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(3);
+		await aiFeedback.openSidebar();
+		const response = await aiFeedback.runReview();
+		expect((await response.json()).note_ids).toHaveLength(1);
+		await editor.saveDraft();
+
+		// After a reload every block has a new client ID, so the quote is
+		// found by the text the review kept: its own, the citation.
+		await page.reload();
+		await expect
+			.poll(() => editor.getBlocks().then((blocks) => blocks.length))
+			.toBe(3);
+		await aiFeedback.openSidebar();
+		const moveItem = page.locator('.ai-feedback-item', {
+			hasText: 'Follow the quote',
+		});
+		await expect(moveItem).toContainText('Move below “Ada Lovelace”');
+		await moveItem.getByRole('button', { name: 'Apply change' }).click();
+		await expect
+			.poll(() =>
+				editor
+					.getBlocks()
+					.then((blocks) =>
+						blocks.map(
+							(block) =>
+								`${block.name}: ${String(block.attributes.content ?? block.attributes.citation ?? '')}`
+						)
+					)
+			)
+			.toEqual([
+				'core/quote: Ada Lovelace',
+				'core/paragraph: Move me below the quote.',
+				'core/paragraph: Closing words.',
+			]);
+	});
+
 	test('a reply can ask to move the block', async ({
 		page,
 		editor,
