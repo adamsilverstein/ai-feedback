@@ -72,6 +72,8 @@ Yes — your content is sent to whichever AI provider you've configured in Setti
 
 When the selected model can see images (the built-in Claude, GPT and Gemini models can, and the AI client's model information is checked first), a review also sends up to four Media Library images that have no alt text, so the model can propose some. Images from other sites are never fetched or sent. Developers can turn this off by returning 0 from the `ai_feedback_max_review_images` filter.
 
+An administrator can turn this off for the whole site: open Review Settings in the Fresh Eyes sidebar and uncheck "Send images to the AI provider". It is on by default. With it off, no image leaves your site and reviews only point out missing alt text. The `ai_feedback_max_review_images` filter wins over the setting either way.
+
 = Why is there a Fresh Eyes user? =
 
 So you can pick Fresh Eyes from the `@` menu in a note, the plugin adds a hidden user named Fresh Eyes. It has no role or email address, can't log in, and stays out of the Users screen and other user lists. Uninstalling the plugin removes it. Developers can go without it by returning false from the `ai_feedback_create_mention_user` filter (network-wide on multisite); typing `@fresh-eyes` still works. Tools that switch the current user directly, such as single sign-on or "log in as" plugins, can still make it the current user, but it has no role or capabilities, so it can't edit anything. Another account named "Fresh Eyes" would show next to it in the `@` menu; WordPress emails that account about the mention like any other user.
