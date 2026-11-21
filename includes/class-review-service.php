@@ -464,7 +464,7 @@ class Review_Service {
 	 * @return list<array{block_id: string, mime: string, data: string}> Images.
 	 */
 	protected function get_review_images( array $blocks, string $model ): array {
-		if ( ! Review_Images::has_candidates( $blocks ) ) {
+		if ( 0 === Review_Images::get_max() || ! Review_Images::has_candidates( $blocks ) ) {
 			return array();
 		}
 		$provider = $this->get_model_provider( $model );
