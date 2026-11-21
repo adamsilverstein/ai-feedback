@@ -194,6 +194,8 @@ test.describe('Reply edits as suggestions', () => {
 			.toBe('Revenue grew 40% in 2025.');
 		// Accept opened Gutenberg's Notes sidebar in its place.
 		await aiFeedback.openSidebar();
+		// The review's only note is now addressed, so the list is folded.
+		await page.getByRole('button', { name: 'Show feedback' }).click();
 		await expect(
 			page
 				.getByRole('list', { name: 'Conversation replies' })
