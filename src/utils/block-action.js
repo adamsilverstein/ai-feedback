@@ -316,27 +316,38 @@ export function isCapturedMoveMarker(marker, noteId) {
 }
 
 /**
- * Whether a block or one of its siblings holds a move recorded for someone
- * other than a note. For a swap of two neighbors Gutenberg may mark either
- * block.
+ * Whether Gutenberg holds a note's move as its own pending suggestion.
  *
- * @param {Object}      selectors Block editor selectors.
- * @param {string|null} clientId  Client ID.
- * @param {number}      noteId    The note the move belongs to.
+ * Gutenberg marks the moved block, or for a swap of two neighbors the block
+ * it moved past, which is the move's target. Other blocks in the parent may
+ * hold moves that have nothing to do with this one, and a marker carrying
+ * another AI note's id is that note's own suggestion.
+ *
+ * @param {Object}      selectors   Block editor selectors.
+ * @param {string|null} clientId    Client ID of the note's block.
+ * @param {string|null} targetId    Client ID of the block it moves next to.
+ * @param {number}      noteId      The note the move belongs to.
+ * @param {number[]}    [aiNoteIds] IDs of the review's AI notes.
  * @return {boolean} True when the move is pending in Gutenberg.
  */
-export function hasCapturedMove(selectors, clientId, noteId) {
-	if (!clientId) {
-		return false;
-	}
-	return selectors
-		.getBlockOrder(selectors.getBlockRootClientId(clientId) ?? '')
-		.some((id) =>
-			isCapturedMoveMarker(
-				selectors.getBlockAttributes(id)?.metadata?.suggestion,
-				noteId
+export function hasCapturedMove(
+	selectors,
+	clientId,
+	targetId,
+	noteId,
+	aiNoteIds = []
+) {
+	return [clientId, targetId].some((id) => {
+		const marker = id
+			? selectors.getBlockAttributes(id)?.metadata?.suggestion
+			: null;
+		return (
+			isCapturedMoveMarker(marker, noteId) &&
+			!aiNoteIds.some(
+				(aiNoteId) => Number(aiNoteId) === Number(marker.commentId)
 			)
 		);
+	});
 }
 
 /**
