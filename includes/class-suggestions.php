@@ -159,6 +159,7 @@ class Suggestions {
 	 * reloads before saving. A note is listed only when neither the saved post
 	 * nor any user's autosave holds its anchor and it is older than the cleanup delay,
 	 * so markers that are still unsaved in another editor are left alone. A
+	 * reply's edit held by its thread's root note is dated by the reply. A
 	 * save alone is not taken as proof, since it may come from an editor that
 	 * never had the markers.
 	 *
@@ -215,7 +216,11 @@ class Suggestions {
 		$ids = array();
 		foreach ( $notes as $note ) {
 			$note_id = (int) $note->comment_ID;
-			$created = strtotime( $note->comment_date_gmt . ' UTC' );
+			// A root note holding a reply's edit is as old as that reply: the
+			// suggestion was made when the reply arrived.
+			$owner_id = $this->get_owner_id( $note_id );
+			$owner    = null !== $owner_id && $owner_id !== $note_id ? get_comment( $owner_id ) : null;
+			$created  = strtotime( ( $owner instanceof \WP_Comment ? $owner : $note )->comment_date_gmt . ' UTC' );
 			if (
 				'pending' === $this->get_status( $note_id ) &&
 				false !== $created &&

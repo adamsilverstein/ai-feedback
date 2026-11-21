@@ -149,6 +149,28 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * Adds an AI reply to a note on post 42.
+		 *
+		 * @param int    $reply_id  Reply ID.
+		 * @param int    $parent_id Note it replies to.
+		 * @param string $date_gmt  Creation date, GMT.
+		 */
+		private function add_reply( int $reply_id, int $parent_id, string $date_gmt ): void {
+			$reply = new \WP_Comment(
+				(object) array(
+					'comment_ID'       => (string) $reply_id,
+					'comment_post_ID'  => '42',
+					'comment_parent'   => (string) $parent_id,
+					'comment_date_gmt' => $date_gmt,
+				)
+			);
+			/** @var array<int, \WP_Comment> $comments */
+			$comments                 = $GLOBALS['test_comments'] ?? array();
+			$comments[ $reply_id ]    = $reply;
+			$GLOBALS['test_comments'] = $comments;
+		}
+
+		/**
 		 * Sets post 42's last save time and content.
 		 *
 		 * @param string $modified_gmt Last modified date, GMT.
@@ -207,6 +229,22 @@ namespace AI_Feedback\Tests {
 			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 			$GLOBALS['test_comments'][401]->comment_parent = (string) self::NOTE_ID;
 
+			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+		}
+
+		/**
+		 * A root note holding a recent reply's edit is kept, however old the
+		 * note itself is.
+		 */
+		public function test_saved_pending_ids_date_a_held_edit_by_its_reply(): void {
+			$this->set_post_modified( $this->ago( 60 ) );
+			$this->add_suggestion( 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
+			$this->set_meta( 401, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":402}' );
+			$this->add_reply( 402, 401, $this->ago( 5 * MINUTE_IN_SECONDS ) );
+
+			$this->assertSame( array(), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
+
+			$this->add_reply( 402, 401, $this->ago( 2 * HOUR_IN_SECONDS ) );
 			$this->assertSame( array( 401 ), ( new Suggestions() )->get_saved_pending_ids( 42 ) );
 		}
 
