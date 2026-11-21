@@ -203,7 +203,9 @@ class Review_Images {
 
 	/**
 	 * Client IDs of the blocks collect() might send, up to get_max(),
-	 * without reading any file.
+	 * without reading any file. A block whose attachment the user can't
+	 * read, or whose URL doesn't match it, is still listed, since telling
+	 * those apart means looking the attachment up.
 	 *
 	 * @param  array<mixed> $blocks Blocks from the review request.
 	 * @return list<string>
