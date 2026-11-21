@@ -134,7 +134,7 @@ class Notes_Manager {
 	 * @param  mixed $item Feedback item.
 	 * @return bool
 	 */
-	private static function has_block_edit( mixed $item ): bool {
+	public static function has_block_edit( mixed $item ): bool {
 		return is_array( $item ) && (
 			( ! empty( $item['block_action'] ) && is_array( $item['block_action'] ) )
 			|| ( ! empty( $item['block_change'] ) && is_array( $item['block_change'] ) )

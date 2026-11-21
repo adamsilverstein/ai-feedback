@@ -893,7 +893,12 @@ class Review_Service {
 				// Map block to the existing parent note.
 				$block_mapping[ $block_id ] = $existing_note_id;
 			} else {
-				// Create new thread for this block.
+				// Create new thread for this block. Only its root note keeps a
+				// structural edit or formatting fix, so that item goes first.
+				usort(
+					$items,
+					static fn ( mixed $a, mixed $b ): int => (int) Notes_Manager::has_block_edit( $b ) <=> (int) Notes_Manager::has_block_edit( $a )
+				);
 				$parent_id = 0;
 				foreach ( $items as $index => $item ) {
 					$note_id = $this->notes_manager->add_reply_to_thread(

@@ -12,6 +12,7 @@ namespace AI_Feedback\Tests;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use AI_Feedback\Notes_Manager;
 use AI_Feedback\Review_History;
 use AI_Feedback\Review_Service;
 
@@ -220,5 +221,49 @@ class ReviewServiceStrengthsTest extends TestCase {
 		$comment = get_comment( $new_thread );
 		$this->assertInstanceOf( \WP_Comment::class, $comment );
 		$this->assertSame( '0', $comment->comment_parent );
+	}
+
+	/**
+	 * A new thread started beside a resolved one keeps the block's structural
+	 * edit, which only a thread's root note can hold, even when other
+	 * feedback on the block ranks higher.
+	 */
+	public function test_new_thread_after_resolved_one_keeps_block_edit(): void {
+		$this->mock_response( array( $this->item( 'block-1' ), $this->item( 'block-2' ) ) );
+		$first = $this->review();
+		$this->assertIsArray( $first['block_mapping'] );
+		$resolved = $first['block_mapping']['block-2'];
+		$open     = $first['block_mapping']['block-1'];
+		$this->assertIsInt( $resolved );
+		$this->assertIsInt( $open );
+		wp_set_comment_status( $resolved, 'approve' );
+
+		$this->mock_response(
+			array(
+				array(
+					'severity' => 'critical',
+					'title'    => 'Unsupported claim',
+					'feedback' => 'The claim here has no source.',
+				) + $this->item( 'block-2' ),
+				array(
+					'severity'     => 'suggestion',
+					'title'        => 'Repeats the opening',
+					'feedback'     => 'This says what the first paragraph already said.',
+					'block_action' => array( 'type' => 'remove' ),
+				) + $this->item( 'block-2' ),
+			)
+		);
+		$second = $this->review( array( array( 'id' => $open ) ) );
+
+		$this->assertIsArray( $second['block_mapping'] );
+		$root = $second['block_mapping']['block-2'];
+		$this->assertIsInt( $root );
+		$this->assertNotSame( $resolved, $root );
+		$this->assertIsArray( $second['note_ids'] );
+		$this->assertCount( 2, $second['note_ids'] );
+		$this->assertSame(
+			array( 'type' => 'remove_block' ),
+			Notes_Manager::decode_block_action( get_comment_meta( $root, Notes_Manager::BLOCK_ACTION_META_KEY, true ) )
+		);
 	}
 }
