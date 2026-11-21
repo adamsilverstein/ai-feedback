@@ -45,6 +45,19 @@ describe('mergeChunkResponses', () => {
 		expect(mergeChunkResponses([])).toBeNull();
 	});
 
+	it('lists the images every chunk left out', () => {
+		const merged = mergeChunkResponses([
+			{ images_skipped: [{ block_id: 'a', reason: 'type' }] },
+			{},
+			{ images_skipped: [{ block_id: 'b', reason: 'refused' }] },
+		]);
+
+		expect(merged.images_skipped).toEqual([
+			{ block_id: 'a', reason: 'type' },
+			{ block_id: 'b', reason: 'refused' },
+		]);
+	});
+
 	it('combines notes, mappings and counts across chunks', () => {
 		const merged = mergeChunkResponses([
 			{
