@@ -463,6 +463,39 @@ class ReviewProgressTest extends TestCase {
 	}
 
 	/**
+	 * A part of an older chunked review that lands after a newer review
+	 * adds its notes to that review's baseline rather than replace it.
+	 */
+	public function test_late_part_of_an_older_review_keeps_the_latest_baseline(): void {
+		$part_one = $this->add_note( 'r1' );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( $part_one ) ) );
+
+		$newer = $this->add_note( 'r2' );
+		Review_History::record( self::POST_ID, $this->review( 'r2', array( $newer ) ) );
+
+		$part_two = $this->add_note( 'r1' );
+		Review_History::record( self::POST_ID, $this->review( 'r1', array( $part_two ) ) );
+
+		$this->assertSame(
+			array(
+				'review_id' => 'r2',
+				'note_ids'  => array( $part_one, $newer, $part_two ),
+			),
+			Review_History::get_open_notes( self::POST_ID )
+		);
+
+		Review_History::record( self::POST_ID, $this->review( 'r3', array() ) );
+		$history = Review_History::get( self::POST_ID );
+		$this->assertSame(
+			array(
+				'addressed'  => 0,
+				'still_open' => 3,
+			),
+			$history[2]['progress']
+		);
+	}
+
+	/**
 	 * Strengths are stored as plain text and malformed ones are dropped.
 	 */
 	public function test_history_sanitizes_strengths(): void {

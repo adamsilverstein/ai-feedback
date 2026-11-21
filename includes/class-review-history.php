@@ -168,13 +168,21 @@ class Review_History {
 				}
 			}
 
-			$open = self::get_open_notes( $post_id );
+			$open           = self::get_open_notes( $post_id );
+			$open_review_id = $entry['review_id'];
 
 			if ( null !== $existing ) {
 				$history[ $existing ] = self::merge_part( $history[ $existing ], $entry );
-				$open_ids             = $open['review_id'] === $entry['review_id']
-					? Review_Progress::merge_ids( $open['note_ids'], $note_ids )
-					: Review_Progress::merge_ids( $note_ids );
+				if ( array_key_last( $history ) !== $existing ) {
+					// A part that lands after a newer review adds its notes
+					// to that review's baseline rather than replace it.
+					$open_review_id = $open['review_id'];
+					$open_ids       = Review_Progress::merge_ids( $open['note_ids'], $note_ids );
+				} else {
+					$open_ids = $open['review_id'] === $entry['review_id']
+						? Review_Progress::merge_ids( $open['note_ids'], $note_ids )
+						: Review_Progress::merge_ids( $note_ids );
+				}
 			} else {
 				$previous = end( $history );
 				$open_ids = Review_Progress::merge_ids( $note_ids );
@@ -204,7 +212,7 @@ class Review_History {
 				$post_id,
 				self::OPEN_NOTES_META_KEY,
 				array(
-					'review_id' => $entry['review_id'],
+					'review_id' => $open_review_id,
 					'note_ids'  => $open_ids,
 				)
 			);
