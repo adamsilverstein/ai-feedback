@@ -645,6 +645,8 @@ export async function suggestBlockAction(note) {
 
 		// In Suggest intent Gutenberg tags the move as it lands, on this
 		// block or a neighbor, and saves its own suggestion for it.
+		// Compared by identity: a neighbor that already held a move gets
+		// the same fields written again.
 		const moved = dataSelect(blockEditorStore);
 		if (
 			siblings.some((id, i) => {
