@@ -129,6 +129,14 @@ describe('getFeedbackProgress', () => {
 		});
 	});
 
+	it('keeps loaded statuses but no deletions from a list being refetched', () => {
+		const records = [record(1, { status: 'approved' })];
+		expect(getFeedbackProgress(notes, records, false)).toEqual({
+			addressed: 3,
+			total: 4,
+		});
+	});
+
 	it('leaves out feedback that never became a note', () => {
 		expect(
 			getFeedbackProgress([{ title: 'Unsaved' }, { id: 5 }], null)

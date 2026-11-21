@@ -27,7 +27,9 @@ export default function useFeedbackProgress(review) {
 			const args = ['root', 'comment', getNotesQuery(postId)];
 			const records = select('core').getEntityRecords(...args);
 			// A list that is being refetched may be partial, such as just
-			// the notes a review added, so it can't show a deletion.
+			// the notes a review added, so it can't show a deletion. Its
+			// statuses still count, or a reply would reset the progress
+			// until the refetch ends.
 			const isSettled =
 				select('core').hasFinishedResolution(
 					'getEntityRecords',
@@ -36,7 +38,8 @@ export default function useFeedbackProgress(review) {
 
 			return getFeedbackProgress(
 				notes,
-				isSettled && Array.isArray(records) ? records : null
+				Array.isArray(records) ? records : null,
+				isSettled
 			);
 		},
 		[notes]

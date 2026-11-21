@@ -50,11 +50,13 @@ export function isNoteAddressed(note, { record = null, status = null } = {}) {
  *
  * @param {Array}      notes   Feedback notes from the review.
  * @param {Array|null} records The post's note records from core-data, or null
- *                             while they are loading. Only a loaded list can
- *                             show that a note was deleted.
+ *                             before they load.
+ * @param {boolean}    settled Whether the list has finished loading. One that
+ *                             is being refetched may be partial, so only a
+ *                             settled list can show that a note was deleted.
  * @return {{ addressed: number, total: number }} Counts of saved, existing notes.
  */
-export function getFeedbackProgress(notes, records = null) {
+export function getFeedbackProgress(notes, records = null, settled = true) {
 	const byId = new Map((records || []).map((record) => [record.id, record]));
 	const reviewNotes = new Map(
 		(notes || []).filter((note) => note?.id).map((note) => [note.id, note])
@@ -64,7 +66,7 @@ export function getFeedbackProgress(notes, records = null) {
 	let total = 0;
 	reviewNotes.forEach((note) => {
 		const record = byId.get(note.id) || null;
-		if (records && !record) {
+		if (settled && records && !record) {
 			return;
 		}
 

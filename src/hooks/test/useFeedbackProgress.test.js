@@ -69,8 +69,15 @@ describe('useFeedbackProgress', () => {
 		});
 	});
 
-	it('ignores a list that is still loading, which may be partial', () => {
+	it('keeps loaded statuses while the list is refetched, without reading deletions from it', () => {
 		expect(progressWith({ records, isSettled: false })).toEqual({
+			addressed: 2,
+			total: 3,
+		});
+	});
+
+	it('uses the review alone before any records load', () => {
+		expect(progressWith({ records: null, isSettled: false })).toEqual({
 			addressed: 1,
 			total: 3,
 		});
