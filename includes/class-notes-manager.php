@@ -1110,7 +1110,8 @@ class Notes_Manager {
 			is_string( $block_name ) ? $block_name : ''
 		);
 
-		$values['suggestion_status'] = ( new Suggestions() )->get_status( $note_id );
+		// Null when the note holds a reply's edit rather than its own.
+		$values['suggestion_status'] = ( new Suggestions() )->get_edit_status( $note_id, $note_id );
 
 		return $values;
 	}

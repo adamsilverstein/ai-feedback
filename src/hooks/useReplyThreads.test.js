@@ -167,8 +167,9 @@ describe('suggestNewReplyEdits', () => {
 		suggestNewReplyEdits(threads, new Set());
 		suggestNewReplyEdits(threads, new Set());
 
+		// Twice for the instance that suggests, once for the other.
 		await waitFor(() =>
-			expect(mockSupersedeSuggestions).toHaveBeenCalledTimes(2)
+			expect(mockSupersedeSuggestions).toHaveBeenCalledTimes(3)
 		);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledTimes(1);
 		expect(mockSuggestReplyEdit).toHaveBeenCalledWith(
@@ -215,12 +216,23 @@ describe('suggestNewReplyEdits', () => {
 		await waitFor(() =>
 			expect(mockSuggestReplyEdit).toHaveBeenCalledWith(revised, 600)
 		);
-		// The review's quick fix on the root note, then the first revision.
+		// The root note's suggestion is left for the revision to replace,
+		// then retired only if the revision could not be suggested.
+		expect(mockSupersedeSuggestions).toHaveBeenCalledWith(600, [600, 601], {
+			keepRoot: true,
+		});
 		expect(mockSupersedeSuggestions).toHaveBeenLastCalledWith(
 			600,
 			[600, 601]
 		);
-		expect(order).toEqual(['supersede', 'suggest', 'supersede', 'suggest']);
+		expect(order).toEqual([
+			'supersede',
+			'suggest',
+			'supersede',
+			'supersede',
+			'suggest',
+			'supersede',
+		]);
 	});
 
 	it('retires stale suggestions on the first load without suggesting', async () => {
@@ -240,7 +252,8 @@ describe('suggestNewReplyEdits', () => {
 		await waitFor(() =>
 			expect(mockSupersedeSuggestions).toHaveBeenCalledWith(
 				700,
-				[700, 701]
+				[700, 701],
+				{ keepRoot: false }
 			)
 		);
 		expect(mockSuggestReplyEdit).not.toHaveBeenCalled();

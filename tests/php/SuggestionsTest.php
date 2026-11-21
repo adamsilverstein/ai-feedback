@@ -135,6 +135,20 @@ namespace AI_Feedback\Tests {
 		}
 
 		/**
+		 * Sets one meta value on a note.
+		 *
+		 * @param int    $note_id Note ID.
+		 * @param string $key     Meta key.
+		 * @param string $value   Meta value.
+		 */
+		private function set_meta( int $note_id, string $key, string $value ): void {
+			/** @var array<int, array<string, string>> $meta */
+			$meta                         = $GLOBALS['test_comment_meta'] ?? array();
+			$meta[ $note_id ][ $key ]     = $value;
+			$GLOBALS['test_comment_meta'] = $meta;
+		}
+
+		/**
 		 * Sets post 42's last save time and content.
 		 *
 		 * @param string $modified_gmt Last modified date, GMT.
@@ -388,6 +402,54 @@ namespace AI_Feedback\Tests {
 
 			$GLOBALS['test_comment_meta'][ self::NOTE_ID ][ Suggestions::STATUS_META ] = 'rejected';
 			$this->assertSame( 'rejected', ( new Suggestions() )->get_status( self::NOTE_ID ) );
+		}
+
+		/**
+		 * A payload naming a reply belongs to that reply.
+		 */
+		public function test_owner_is_the_reply_named_in_the_payload(): void {
+			$suggestions = new Suggestions();
+			$this->assertNull( $suggestions->get_owner_id( self::NOTE_ID ) );
+
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2}' );
+			$this->assertSame( self::NOTE_ID, $suggestions->get_owner_id( self::NOTE_ID ) );
+
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+			$this->assertSame( 501, $suggestions->get_owner_id( self::NOTE_ID ) );
+
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":"501"}' );
+			$this->assertSame( self::NOTE_ID, $suggestions->get_owner_id( self::NOTE_ID ) );
+		}
+
+		/**
+		 * A reply's edit held by the root note reports the root's status, and
+		 * the root's own edit then is not a suggestion.
+		 */
+		public function test_edit_status_follows_the_owner(): void {
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+			$this->set_meta( self::NOTE_ID, Suggestions::STATUS_META, 'rejected-unsaved' );
+			$this->set_meta( 502, Suggestions::PAYLOAD_META, '{"schemaVersion":2}' );
+
+			$suggestions = new Suggestions();
+			$this->assertSame( 'rejected-unsaved', $suggestions->get_edit_status( 501, self::NOTE_ID ) );
+			$this->assertNull( $suggestions->get_edit_status( self::NOTE_ID, self::NOTE_ID ) );
+			// An older reply that holds its own suggestion keeps it.
+			$this->assertSame( 'pending', $suggestions->get_edit_status( 502, self::NOTE_ID ) );
+
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2}' );
+			$this->assertSame( 'rejected-unsaved', $suggestions->get_edit_status( self::NOTE_ID, self::NOTE_ID ) );
+			$this->assertNull( $suggestions->get_edit_status( 501, self::NOTE_ID ) );
+		}
+
+		/**
+		 * A note holding a reply's edit reports no status for its own fix.
+		 */
+		public function test_note_fields_skip_a_status_owned_by_a_reply(): void {
+			$this->set_meta( self::NOTE_ID, Suggestions::PAYLOAD_META, '{"schemaVersion":2,"aiFeedbackEditOwner":501}' );
+
+			$note = ( new Notes_Manager() )->get_notes_for_post( 42 )[0] ?? null;
+			$this->assertIsArray( $note );
+			$this->assertNull( $note['suggestion_status'] );
 		}
 
 		/**

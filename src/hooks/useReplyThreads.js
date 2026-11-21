@@ -37,6 +37,10 @@ let queue = Promise.resolve();
 /**
  * Retire superseded suggestions in a thread, then suggest its newest edit.
  *
+ * The newest edit is suggested on the thread's root note, replacing the
+ * root's pending suggestion in one step, so that one is left in place until
+ * then. If the newest edit can't be suggested, it is retired like the rest.
+ *
  * Runs one thread at a time, so each step sees the block as the last left it.
  *
  * @param {number}      threadId   Root note of the thread.
@@ -47,9 +51,13 @@ let queue = Promise.resolve();
 function refineThread(threadId, superseded, reply) {
 	queue = queue
 		.then(async () => {
-			await supersedeSuggestions(threadId, superseded);
+			await supersedeSuggestions(threadId, superseded, {
+				keepRoot: !!reply,
+			});
 			if (reply) {
 				await suggestReplyEdit(reply, threadId);
+				// A no-op when the root note now holds the newest edit.
+				await supersedeSuggestions(threadId, superseded);
 			}
 		})
 		.catch(() => {

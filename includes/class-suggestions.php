@@ -96,6 +96,54 @@ class Suggestions {
 	}
 
 	/**
+	 * Payload key naming the AI reply whose edit a thread's root note holds.
+	 *
+	 * Gutenberg only links a thread's root note to its block, so a reply's
+	 * edit is suggested on the root note and this key says which reply it is.
+	 */
+	public const EDIT_OWNER_KEY = 'aiFeedbackEditOwner';
+
+	/**
+	 * Returns the note whose edit a note's suggestion is.
+	 *
+	 * @param  int $note_id Note ID.
+	 * @return int|null The reply named in the payload, the note itself when none is named, or null when the note is not a suggestion.
+	 */
+	public function get_owner_id( int $note_id ): ?int {
+		$payload = get_comment_meta( $note_id, self::PAYLOAD_META, true );
+		if ( ! is_string( $payload ) || '' === $payload ) {
+			return null;
+		}
+
+		$decoded = json_decode( $payload, true );
+		$owner   = is_array( $decoded ) ? ( $decoded[ self::EDIT_OWNER_KEY ] ?? null ) : null;
+		return is_int( $owner ) && $owner > 0 ? $owner : $note_id;
+	}
+
+	/**
+	 * Returns the suggestion status of one edit in a thread.
+	 *
+	 * A reply's edit may be suggested on the thread's root note, and then the
+	 * root note's own edit is not a suggestion.
+	 *
+	 * @param  int $edit_id Note that proposed the edit: the root note or an AI reply.
+	 * @param  int $root_id The thread's root note.
+	 * @return string|null Status, or null when the edit is not a suggestion.
+	 */
+	public function get_edit_status( int $edit_id, int $root_id ): ?string {
+		$root_owner = $this->get_owner_id( $root_id );
+		if ( null === $root_owner || $root_owner === $root_id ) {
+			return $this->get_status( $edit_id );
+		}
+		if ( $edit_id === $root_owner ) {
+			return $this->get_status( $root_id );
+		}
+		// The root note's own edit gave way to the reply's. Another reply may
+		// still hold its own, from before reply edits moved to the root note.
+		return $edit_id === $root_id ? null : $this->get_status( $edit_id );
+	}
+
+	/**
 	 * Seconds a pending AI suggestion is kept before it may be cleaned up.
 	 *
 	 * An editor holding unsaved markers autosaves them within a minute or so,

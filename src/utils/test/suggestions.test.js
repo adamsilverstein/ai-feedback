@@ -42,6 +42,7 @@ import {
 	suggestQuickFix,
 	suggestQuickFixes,
 	suggestReplyEdit,
+	getSuggestionOwnerId,
 	supersedeSuggestions,
 } from '../suggestions';
 import {
@@ -58,6 +59,7 @@ const mocks = vi.hoisted(() => ({
 	setSuggestionStatus: vi.fn(),
 	createInfoNotice: vi.fn(),
 	notes: null,
+	resolveNotes: vi.fn(),
 }));
 
 vi.mock('@wordpress/api-fetch', () => ({ default: mocks.apiFetch }));
@@ -101,6 +103,12 @@ vi.mock('@wordpress/data', async (importOriginal) => {
 					return actual.select(store);
 			}
 		},
+		resolveSelect: () => ({
+			getEntityRecords: async () => {
+				await mocks.resolveNotes();
+				return mocks.notes;
+			},
+		}),
 		dispatch: (store) => {
 			switch (store) {
 				case 'core/block-editor':
@@ -690,6 +698,7 @@ describe('suggestReplyEdit', () => {
 		is_ai: true,
 		edit: { type: 'replace_text', find: 'in order to', replace: 'to' },
 	};
+	const ROOT = { id: 39, author: 0, meta: {} };
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -698,6 +707,7 @@ describe('suggestReplyEdit', () => {
 		mocks.saveEntityRecord.mockImplementation((kind, name, record) =>
 			savedRecord(record)
 		);
+		mocks.notes = [ROOT];
 		mocks.blocks = {
 			'block-1': {
 				name: 'core/paragraph',
@@ -709,23 +719,26 @@ describe('suggestReplyEdit', () => {
 	afterEach(() => {
 		delete window.__experimentalSuggestionMode;
 		delete window.aiFeedbackData;
+		mocks.notes = null;
 	});
 
-	it('adds the edit as a suggestion on the reply', async () => {
+	it('adds the edit as a suggestion on the thread’s root note, naming the reply', async () => {
 		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
 			true
 		);
 
-		expect(mocks.saveEntityRecord).toHaveBeenCalledWith(
-			'root',
-			'comment',
-			expect.objectContaining({ id: 40 }),
-			{ throwOnError: true }
-		);
+		const [, , record] = mocks.saveEntityRecord.mock.calls[0];
+		expect(record.id).toBe(39);
+		expect(JSON.parse(record.meta._wp_suggestion)).toMatchObject({
+			aiFeedbackEditOwner: 40,
+		});
+		expect(record.meta._wp_suggestion_status).toBe('pending');
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content:
-				'We met <mark class="wp-suggestion-add" data-suggestion-id="40" data-suggestion-type="add" data-author="0">to</mark><mark class="wp-suggestion-del" data-suggestion-id="40" data-suggestion-type="del" data-author="0">in order to</mark> plan.',
+				'We met <mark class="wp-suggestion-add" data-suggestion-id="39" data-suggestion-type="add" data-author="0">to</mark><mark class="wp-suggestion-del" data-suggestion-id="39" data-suggestion-type="del" data-author="0">in order to</mark> plan.',
 		});
+		// The root note's own fix is not the suggestion.
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(39, null);
 		expect(mocks.createInfoNotice).toHaveBeenCalledTimes(1);
 	});
 
@@ -750,7 +763,7 @@ describe('suggestReplyEdit', () => {
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith(
 			'linked-block',
 			expect.objectContaining({
-				content: expect.stringContaining('data-suggestion-id="40"'),
+				content: expect.stringContaining('data-suggestion-id="39"'),
 			})
 		);
 	});
@@ -777,7 +790,7 @@ describe('suggestReplyEdit', () => {
 		await expect(suggestReplyEdit(rewrite, 39)).resolves.toBe(true);
 
 		const [, , record] = mocks.saveEntityRecord.mock.calls[0];
-		expect(record.id).toBe(41);
+		expect(record.id).toBe(39);
 		expect(JSON.parse(record.meta._wp_suggestion)).toMatchObject({
 			blockName: 'core/paragraph',
 			operations: [
@@ -787,15 +800,114 @@ describe('suggestReplyEdit', () => {
 					suggestionType: 'replace',
 				},
 			],
+			aiFeedbackEditOwner: 41,
 		});
-		expect(record.meta._wp_suggestion_status).toBe('pending');
 
 		// Markers are built after the save, carrying the saved author.
 		const marker = (type, html) =>
-			`<mark class="wp-suggestion-${type}" data-suggestion-id="41" data-suggestion-type="${type}" data-author="0">${html}</mark>`;
+			`<mark class="wp-suggestion-${type}" data-suggestion-id="39" data-suggestion-type="${type}" data-author="0">${html}</mark>`;
 		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
 			content: `We met ${marker('del', 'in order ')}to plan${marker('add', ' the <em>launch</em>')}.`,
 		});
+	});
+
+	it('replaces the root note’s pending suggestion in one block update', async () => {
+		mocks.notes = [
+			{
+				...ROOT,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":38}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+		mocks.blocks['block-1'].attributes.content =
+			'We met <mark class="wp-suggestion-add" data-suggestion-id="39" data-suggestion-type="add" data-author="0">so as to</mark><mark class="wp-suggestion-del" data-suggestion-id="39" data-suggestion-type="del" data-author="0">in order to</mark> plan.';
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			true
+		);
+
+		const [, , record] = mocks.saveEntityRecord.mock.calls[0];
+		expect(JSON.parse(record.meta._wp_suggestion)).toMatchObject({
+			aiFeedbackEditOwner: 40,
+		});
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledTimes(1);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content:
+				'We met <mark class="wp-suggestion-add" data-suggestion-id="39" data-suggestion-type="add" data-author="0">to</mark><mark class="wp-suggestion-del" data-suggestion-id="39" data-suggestion-type="del" data-author="0">in order to</mark> plan.',
+		});
+	});
+
+	it('leaves a pending suggestion that is already this reply’s', async () => {
+		mocks.notes = [
+			{
+				...ROOT,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":40}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			true
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		expect(mocks.createInfoNotice).not.toHaveBeenCalled();
+	});
+
+	it.each(['applied-unsaved', 'rejected-unsaved', 'applied', 'rejected'])(
+		'leaves the edit to the sidebar once the root’s suggestion is %s',
+		async (status) => {
+			mocks.notes = [
+				{
+					...ROOT,
+					meta: {
+						_wp_suggestion: '{"schemaVersion":2}',
+						_wp_suggestion_status: status,
+					},
+				},
+			];
+
+			await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+				false
+			);
+			expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+		}
+	);
+
+	it('leaves the edit to the sidebar in a thread a person started', async () => {
+		mocks.notes = [{ ...ROOT, author: 3 }];
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
+	});
+
+	it('waits for the notes to load before reading the root note', async () => {
+		mocks.notes = null;
+		mocks.resolveNotes.mockImplementationOnce(async () => {
+			mocks.notes = [ROOT];
+		});
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			true
+		);
+		expect(mocks.saveEntityRecord.mock.calls[0][2].id).toBe(39);
+	});
+
+	it('leaves the edit to the sidebar when the notes can’t be loaded', async () => {
+		mocks.notes = null;
+		mocks.resolveNotes.mockRejectedValueOnce(new Error('offline'));
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
 	it('removes the suggestion again when the server drops the payload', async () => {
@@ -818,16 +930,44 @@ describe('suggestReplyEdit', () => {
 			'root',
 			'comment',
 			{
-				id: 40,
+				id: 39,
 				meta: { _wp_suggestion: null, _wp_suggestion_status: null },
 			},
 			{ throwOnError: true }
 		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
-		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(40, null);
+		expect(mocks.setSuggestionStatus).toHaveBeenCalledWith(39, null);
 	});
 
-	it('leaves a block that already holds suggestions alone', async () => {
+	it('takes the replaced markers out too when the replacement fails', async () => {
+		mocks.notes = [
+			{
+				...ROOT,
+				meta: {
+					_wp_suggestion: '{"schemaVersion":2}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+		mocks.blocks['block-1'].attributes.content =
+			'We met <mark class="wp-suggestion-add" data-suggestion-id="39" data-suggestion-type="add">so as to</mark><mark class="wp-suggestion-del" data-suggestion-id="39" data-suggestion-type="del">in order to</mark> plan.';
+		mocks.saveEntityRecord.mockImplementation(
+			async (kind, name, { id }) => ({
+				id,
+				author: 0,
+				meta: { _wp_suggestion: '' },
+			})
+		);
+
+		await expect(suggestReplyEdit(reply, 39, 'block-1')).resolves.toBe(
+			false
+		);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'We met in order to plan.',
+		});
+	});
+
+	it('leaves a block that already holds another note’s suggestions alone', async () => {
 		mocks.blocks['block-1'].attributes.content =
 			'We <mark class="wp-suggestion-del" data-suggestion-id="7">met</mark> in order to plan.';
 
@@ -864,6 +1004,31 @@ describe('suggestReplyEdit', () => {
 			false
 		);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+});
+
+describe('getSuggestionOwnerId', () => {
+	it('names the reply in the payload, or else the note itself', () => {
+		expect(getSuggestionOwnerId(null)).toBe(null);
+		expect(getSuggestionOwnerId({ id: 39, meta: {} })).toBe(null);
+		expect(
+			getSuggestionOwnerId({
+				id: 39,
+				meta: { _wp_suggestion: '{"schemaVersion":2}' },
+			})
+		).toBe(39);
+		expect(
+			getSuggestionOwnerId({
+				id: 39,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":40}',
+				},
+			})
+		).toBe(40);
+		expect(
+			getSuggestionOwnerId({ id: 39, meta: { _wp_suggestion: '{nope' } })
+		).toBe(39);
 	});
 });
 
@@ -973,6 +1138,54 @@ describe('supersedeSuggestions', () => {
 
 		await expect(supersedeSuggestions(39, [39])).resolves.toEqual([39]);
 		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('retires the root note when it holds a superseded reply’s edit', async () => {
+		mocks.blocks['block-1'].attributes.content =
+			`We met ${ADD_40.replaceAll('"40"', '"39"')}${DEL_40.replaceAll('"40"', '"39"')} plan.`;
+		mocks.notes = [
+			{
+				id: 39,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":40}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+
+		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([39]);
+		expect(mocks.updateBlockAttributes).toHaveBeenCalledWith('block-1', {
+			content: 'We met in order to plan.',
+		});
+	});
+
+	it('keeps the root note when it holds the newest reply’s edit', async () => {
+		mocks.blocks['block-1'].attributes.content =
+			`We met ${ADD_40.replaceAll('"40"', '"39"')}${DEL_40.replaceAll('"40"', '"39"')} plan.`;
+		mocks.notes = [
+			{
+				id: 39,
+				meta: {
+					_wp_suggestion:
+						'{"schemaVersion":2,"aiFeedbackEditOwner":41}',
+					_wp_suggestion_status: 'pending',
+				},
+			},
+		];
+
+		await expect(supersedeSuggestions(39, [39, 40])).resolves.toEqual([]);
+		expect(mocks.updateBlockAttributes).not.toHaveBeenCalled();
+	});
+
+	it('leaves the root note for the newest edit to replace with keepRoot', async () => {
+		mocks.blocks['block-1'].attributes.content =
+			`We met ${ADD_40.replaceAll('"40"', '"39"')}${DEL_40.replaceAll('"40"', '"39"')} plan.`;
+
+		await expect(
+			supersedeSuggestions(39, [39], { keepRoot: true })
+		).resolves.toEqual([]);
+		expect(mocks.saveEntityRecord).not.toHaveBeenCalled();
 	});
 
 	it('leaves accepted and rejected suggestions alone', async () => {
